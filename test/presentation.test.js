@@ -33,6 +33,18 @@ const { createServer } = require('../server.js');
   const grown = await presentation.get();
   for (const row of grown.sessions.slice(1)) assert.deepEqual(row, byId.get(row.id), 'new earlier IDs cannot rename existing rooms or repos');
   assert.equal(grown.sessions[0].project, 'Platform'); assert.equal(grown.sessions[0].repo, 'helio-auth');
+  const custom = makePresentationObserver({ get: async () => inventory }, () => 1000, {
+    company: 'Orbit Works', repoPrefix: 'orbit', rooms: [{ name: 'Studio 2', repos: ['orbit-studio-2-2'] }]
+  });
+  const labeled = await custom.get();
+  assert.equal(labeled.presentation.company, 'Orbit Works');
+  assert.equal(labeled.sessions[0].project, 'Studio 2');
+  assert.equal(labeled.sessions[0].repo, 'orbit-studio-2-2');
+  assert.equal(labeled.sessions[1].project, 'Studio 3', 'overflow room cannot reuse a configured room name');
+  assert.equal(JSON.stringify(labeled).includes(secret), false, 'custom labels retain masking');
+  inventory = { ...inventory, sessions: [{ ...inventory.sessions[0], id: 'obs_' + 'd'.repeat(24), repoId: 'repo_extra' }, ...inventory.sessions] };
+  const expanded = await custom.get();
+  assert.equal(expanded.sessions[0].repo, 'orbit-studio-2-3', 'generated repo aliases cannot reuse reserved configured names');
   const server = createServer({ observer: presentation, token: 'fixture' });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;

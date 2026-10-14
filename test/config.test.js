@@ -1,0 +1,61 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const { loadConfig, validateConfig } = require('../sidecar/config.js');
+const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'observer-config-'));
+const file = path.join(folder, 'settings.json'), missing = path.join(folder, 'missing.json');
+const write = value => fs.writeFileSync(file, JSON.stringify(value));
+try {
+  const defaults = loadConfig([], missing);
+  assert.equal(defaults.presentation, false); assert.equal(defaults.labels.company, 'Helioforge');
+  assert.equal(loadConfig(['--presentation'], missing).presentation, true);
+  write({ presentation: true, company: 'Orbit Works', repoPrefix: 'orbit', rooms: [{ name: 'Delivery', repos: ['orbit-api'] }] });
+  const configured = loadConfig([], file);
+  assert.equal(configured.presentation, true); assert.equal(configured.labels.company, 'Orbit Works');
+  assert.deepEqual(configured.labels.rooms, [{ name: 'Delivery', repos: ['orbit-api'] }]);
+  const overridden = loadConfig(['--config', file, '--company', 'Acme Studio', '--repo-prefix', 'acme', '--no-presentation'], missing);
+  assert.equal(overridden.presentation, false); assert.equal(overridden.labels.company, 'Acme Studio'); assert.equal(overridden.labels.repoPrefix, 'acme');
+  assert.deepEqual(overridden.labels.rooms, configured.labels.rooms, 'explicit aliases are kept verbatim');
+  write({ presentation: false, repoPrefix: 'orbit' });
+  const enabled = loadConfig(['--presentation'], file);
+  assert.equal(enabled.presentation, true); assert.equal(enabled.labels.rooms[0].repos[0], 'orbit-web');
+  assert.equal(loadConfig(['--repo-prefix', 'custom'], missing).labels.rooms[0].repos[0], 'custom-web');
+  write({ theme: { fx: false, colors: { accent: '#ABCDEF' } } });
+  assert.deepEqual(loadConfig(['--fx'], file).theme, { fx: true, colors: { accent: '#ABCDEF' } });
+  assert.equal(loadConfig(['--no-fx'], file).theme.fx, false);
+  assert.throws(() => loadConfig(['--fx', '--no-fx'], missing));
+  for (const theme of [null, [], { fx: 'false' }, { scripts: 'bad' }, { colors: { accent: 'red' } }, { colors: { accent: '#123' } }, { colors: { custom: '#123456' } }]) assert.throws(() => validateConfig({ theme }));
+  const basic = loadConfig(['--config', path.join(__dirname, '../themes/basic.json')], missing);
+  assert.equal(basic.presentation, false); assert.equal(basic.theme.fx, false);
+  const helio = loadConfig(['--config', path.join(__dirname, '../themes/helioforge.json')], missing);
+  assert.equal(helio.presentation, true); assert.equal(helio.labels.company, 'Helioforge'); assert.equal(helio.theme.fx, true);
+  assert.equal(helio.theme.colors.accent, '#77dce8');
+  assert.equal(loadConfig(['--help'], file).help, true);
+  assert.throws(() => loadConfig(['--presentaton'], missing));
+  assert.throws(() => loadConfig(['unexpected'], missing));
+  assert.throws(() => loadConfig(['--presentation', '--no-presentation'], missing));
+  assert.throws(() => loadConfig(['--company'], missing));
+  assert.throws(() => loadConfig(['--config', missing], missing), /Cannot load/);
+  assert.throws(() => loadConfig(['--config', ''], missing), /nonempty/);
+  for (const input of [null, [], { presentation: 'true' }, { compny: 'Typo' }, { company: '' }, { company: 'line\nbreak' }, { company: 'x'.repeat(81) },
+    { repoPrefix: 'bad prefix' }, { repoPrefix: '-bad' }, { rooms: [] }, { rooms: ['Product'] }, { rooms: [{ name: 'Product', reops: [] }] },
+    { rooms: [{ name: 'Product', repos: 'repo' }] }, { rooms: [{ name: 'Product' }, { name: 'product' }] },
+    { rooms: [{ name: 'Product', repos: ['api'] }, { name: 'Platform', repos: ['API'] }] }]) assert.throws(() => validateConfig(input));
+  write({ presentation: true, compny: 'Typo' });
+  assert.throws(() => loadConfig(['--company', 'Override'], file), /Unknown/, 'invalid file cannot silently disable masking or be hidden by flags');
+  fs.writeFileSync(file, '{invalid private text');
+  assert.throws(() => loadConfig([], file), /invalid JSON/);
+  fs.writeFileSync(file, ' '.repeat(65537));
+  assert.throws(() => loadConfig([], file), /64 KiB/);
+  const server = path.join(__dirname, '../server.js');
+  const invalid = spawnSync(process.execPath, [server, '--config', file], { cwd: folder, encoding: 'utf8', timeout: 3000 });
+  assert.equal(invalid.status, 1); assert.match(invalid.stderr, /config/); assert.doesNotMatch(invalid.stdout, /Local Observer:/);
+  const help = spawnSync(process.execPath, [server, '--help'], { cwd: folder, encoding: 'utf8', timeout: 3000 });
+  assert.equal(help.status, 0); assert.match(help.stdout, /--no-presentation/);
+  const example = JSON.parse(fs.readFileSync(path.join(__dirname, '../observer.config.example.json'), 'utf8'));
+  validateConfig(example);
+  console.log('config: defaults, optional/explicit files, CLI precedence, custom names, strict validation, help and fail-before-startup passed');
+} finally { fs.rmSync(folder, { recursive: true, force: true }); }

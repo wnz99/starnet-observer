@@ -111,7 +111,55 @@ Labels stay stable during that server run. Actual repositories, folders, session
 
 The header explicitly says **LIVE · FICTIONAL LABELS**. Describe a shared recording as “Live agent activity with fictional company/project labels”; these labels do not represent an actual customer or employer. This is presentation masking, not a guarantee of full anonymity: activity patterns, timing, and aggregate counts are still real.
 
-Restart with `npm start` to return to normal observation. Do not record private terminal windows or unrelated browser tabs alongside it.
+Restart with `npm start -- --no-presentation` to return to normal observation, even if your config enables masking. Do not record private terminal windows or unrelated browser tabs alongside it.
+
+## Themes and configuration
+
+The same observer loads JSON configuration over its built-in defaults. Themes are data files: they can set fictional labels, interface colors, and initial FX without changing the application code.
+
+Two presets are included:
+
+```sh
+# Original interface colors, real names, simple starfield
+npm start -- --config themes/basic.json
+
+# Helioforge fictional labels, cyan interface accents, FX enabled
+npm start -- --config themes/helioforge.json
+```
+
+`presentation` explicitly controls privacy masking. Colors and FX do not enable masking on their own. The Helioforge preset sets `presentation: true`; the basic preset sets it to `false`.
+
+To make your own theme, copy the example:
+
+```sh
+cp observer.config.example.json observer.config.json
+```
+
+Edit it, then run `npm start`. `observer.config.json` next to `server.js` is loaded automatically and is Git-ignored. An explicit `--config` path instead selects that file; relative paths resolve from the directory where you run the command. The selected file replaces the automatic file, then merges with built-in defaults. Restart the server and reload the browser after edits.
+
+The configuration fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `presentation` | Boolean; private labels and blocked inspectors when true. Defaults to false. |
+| `company` | Company name in the presentation header. |
+| `repoPrefix` | Prefix for generated repo aliases. With built-in room lists, it also updates the built-in aliases. Explicit `rooms[].repos` names stay verbatim. |
+| `rooms` | Ordered room objects with `name` and optional `repos` arrays. Overrides the built-in room list. Aliases are allocated by opaque source IDs; allocation stays stable during one server run. |
+| `theme.fx` | Boolean; initial sky/station FX. When set, overrides the saved browser preference at page load. The FX button still works afterward. When omitted, the browser keeps its usual saved preference. |
+| `theme.colors` | Optional interface colors: `accent`, `background`, `panel`, `text`, each a six-digit hex color. Omitted colors use the original defaults. The station geometry, crew sprites, and observed status colors keep their original styling. |
+
+Names must be nonempty text without control characters, at most 80 characters. Room names and explicit repo names must be unique, ignoring case. `repoPrefix` is 1–32 lowercase letters, digits, or hyphens, starting with a letter or digit. Additional rooms/repos get unique generated names. Unknown fields, invalid values, missing explicit files, and malformed JSON stop startup instead of silently applying a different mode. Files are limited to 64 KiB.
+
+CLI flags override the selected file:
+
+```sh
+npm start -- --presentation --company "Orbit Works" --repo-prefix orbit --no-fx
+npm start -- --config themes/helioforge.json --company "My Demo Studio" --no-fx
+npm start -- --no-presentation
+node server.js --help
+```
+
+Use either `--presentation` or `--no-presentation`, and either `--fx` or `--no-fx`; conflicting pairs are rejected. `--company` and `--repo-prefix` customize labels but do not enable presentation mode. Port selection remains `PORT=4320 npm start`.
 
 ## Optional Codex desktop observation
 

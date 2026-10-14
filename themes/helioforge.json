@@ -1,0 +1,15 @@
+{
+  "presentation": true,
+  "company": "Helioforge",
+  "repoPrefix": "helio",
+  "rooms": [
+    { "name": "Product", "repos": ["helio-web", "helio-mobile", "helio-api"] },
+    { "name": "Platform", "repos": ["helio-auth", "helio-billing", "helio-data"] },
+    { "name": "Intelligence", "repos": ["helio-agents", "helio-context", "helio-evals"] },
+    { "name": "Operations", "repos": ["helio-console", "helio-ci", "helio-observability"] }
+  ],
+  "theme": {
+    "fx": true,
+    "colors": { "accent": "#77dce8", "background": "#02060b", "panel": "#06121b", "text": "#d8eef6" }
+  }
+}

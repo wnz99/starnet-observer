@@ -8,11 +8,12 @@ const { makeObserver } = require('./sidecar/observer.js');
 const { makePresentationObserver } = require('./sidecar/presentation.js');
 const { redact, setKnownSecretSource } = require('./sidecar/redaction.js');
 const { setClock } = require('./sidecar/failopen.js');
+const { loadConfig, HELP } = require('./sidecar/config.js');
 const ROOT = path.join(__dirname, 'frontend');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.woff2': 'font/woff2' };
 const SESSION_IDENTITY = /^(?:(?:codex|claude):[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|(?:helper:)?obs_[a-f0-9]{24})(?:\|obs_[a-f0-9]{24})?$/i;
 
-function createServer({ observer = makeObserver({ now: Date.now }), token = crypto.randomBytes(32).toString('hex') } = {}) {
+function createServer({ observer = makeObserver({ now: Date.now }), token = crypto.randomBytes(32).toString('hex'), theme = {} } = {}) {
   const server = http.createServer(async (req, res) => {
     const port = server.address()?.port;
     const hosts = new Set(['127.0.0.1:' + port, 'localhost:' + port]);
@@ -54,7 +55,7 @@ function createServer({ observer = makeObserver({ now: Date.now }), token = cryp
       if (!canonical.startsWith(ROOT + path.sep)) return json(403, { error: 'Forbidden path' });
       let data = await fs.readFile(canonical);
       if (canonical === path.join(ROOT, 'observer.html')) {
-        const boot = '<script nonce="' + nonce + '">window.__OBSERVER_TOKEN__=' + JSON.stringify(token) + ';</script>';
+        const boot = '<script nonce="' + nonce + '">window.__OBSERVER_TOKEN__=' + JSON.stringify(token) + ';window.__OBSERVER_THEME__=' + JSON.stringify(theme).replace(/</g, '\\u003c') + ';</script>';
         data = Buffer.from(data.toString().replace('</head>', boot + '</head>'));
       }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(canonical)] || 'application/octet-stream' });
@@ -72,16 +73,18 @@ function createServer({ observer = makeObserver({ now: Date.now }), token = cryp
 }
 
 if (require.main === module) {
+  let config;
+  try { config = loadConfig(); } catch (error) { console.error('[observer config]', redact(String(error.message))); process.exit(1); }
+  if (config.help) { console.log(HELP); process.exit(0); }
   const port = Number(process.env.PORT || 4319);
   if (!Number.isInteger(port) || port < 1 || port > 65535) { console.error('PORT must be an integer between 1 and 65535'); process.exit(1); }
   const heldSecrets = () => Object.entries(process.env).filter(([name]) => /TOKEN|SECRET|PASSWORD|API_KEY/i.test(name)).map(([, value]) => value);
   setKnownSecretSource(heldSecrets);
   setClock(Date.now);
-  const presentation = process.argv.includes('--presentation');
   const observer = makeObserver({ now: Date.now });
-  const server = createServer({ observer: presentation ? makePresentationObserver(observer) : observer });
+  const server = createServer({ observer: config.presentation ? makePresentationObserver(observer, Date.now, config.labels) : observer, theme: config.theme });
   server.on('error', error => { console.error('[observer]', redact(String(error.message))); process.exitCode = 1; });
-  server.listen(port, '127.0.0.1', () => console.log('Local Observer: http://127.0.0.1:' + port + '\nRead only. Stop with Ctrl+C.'));
+  server.listen(port, '127.0.0.1', () => console.log('Local Observer: http://127.0.0.1:' + port + '\nPrivate labels: ' + (config.presentation ? 'on (' + config.labels.company + ')' : 'off') + '\nRead only. Stop with Ctrl+C.'));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); server.closeAllConnections(); });
 }
 module.exports = { createServer };

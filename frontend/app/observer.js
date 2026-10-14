@@ -3,6 +3,16 @@
 'use strict';
 (async () => {
   const get = id => document.getElementById(id);
+  const theme = window.__OBSERVER_THEME__ || {};
+  const themeVariables = { accent: ['--phosphor', '--chrome'], background: ['--bg'], panel: ['--panel'], text: ['--ink'] };
+  for (const [name, color] of Object.entries(theme.colors || {})) {
+    for (const variable of themeVariables[name] || []) document.documentElement.style.setProperty(variable, color);
+    if (name === 'accent') {
+      const rgb = [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16));
+      document.documentElement.style.setProperty('--glow', 'rgba(' + rgb.join(',') + ',.22)');
+    }
+  }
+
   const layout = ObserverModel.createLayout(), courier = ObserverMail.createCourier();
   const filters = Array.from(get('filters').querySelectorAll('button'));
   const clock = () => typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -226,7 +236,7 @@
   // Ambient sky effects (Matrix rain, pixies, nebulae): on by default, remembered per browser.
   const FX_KEY = 'observer.fx';
   const fxButton = get('fx-toggle');
-  function readFx() { try { return window.localStorage.getItem(FX_KEY) !== 'off'; } catch (_) { return true; } }
+  function readFx() { if (typeof theme.fx === 'boolean') return theme.fx; try { return window.localStorage.getItem(FX_KEY) !== 'off'; } catch (_) { return true; } }
   function applyFx(on) { view.setFx(on); fxButton.setAttribute('aria-pressed', on ? 'true' : 'false'); try { window.localStorage.setItem(FX_KEY, on ? 'on' : 'off'); } catch (_) {} }
   if (fxButton && typeof view.setFx === 'function') { applyFx(readFx()); fxButton.addEventListener('click', () => applyFx(!view.fx())); }
   get('zoom-in').addEventListener('click', () => view.zoomBy(1.25));

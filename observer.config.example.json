@@ -1,0 +1,45 @@
+{
+  "presentation": true,
+  "company": "Orbit Works",
+  "repoPrefix": "orbit",
+  "rooms": [
+    {
+      "name": "Product",
+      "repos": [
+        "orbit-web",
+        "orbit-api",
+        "orbit-mobile"
+      ]
+    },
+    {
+      "name": "Platform",
+      "repos": [
+        "orbit-auth",
+        "orbit-data"
+      ]
+    },
+    {
+      "name": "Intelligence",
+      "repos": [
+        "orbit-agents",
+        "orbit-evals"
+      ]
+    },
+    {
+      "name": "Operations",
+      "repos": [
+        "orbit-console",
+        "orbit-ci"
+      ]
+    }
+  ],
+  "theme": {
+    "fx": true,
+    "colors": {
+      "accent": "#ffcc77",
+      "background": "#090603",
+      "panel": "#161008",
+      "text": "#fff0d5"
+    }
+  }
+}

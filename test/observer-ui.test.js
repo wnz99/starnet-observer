@@ -32,19 +32,23 @@ const findPart = (node, name) => { if (new RegExp('^' + name + '-\\d+$').test(no
 const panelPart = (host, name, index = -1) => { const root = host.children.at(index); return root ? findPart(root, name) : null; };
 (async () => {
   const elements = Object.fromEntries(['world', 'health', 'observed', 'sessions', 'empty', 'filters', 'overview', 'previous-page', 'next-page', 'search', 'page-label', 'room-count', 'counts',
-    'zoom-in', 'zoom-out', 'mail-health', 'mail-counts', 'mail-ledger', 'mail-empty', 'mail-detail', 'inspector', 'inspector-log', 'inspector-title', 'inspector-status', 'inspector-task', 'inspector-meta',
+    'zoom-in', 'zoom-out', 'fx-toggle', 'mail-health', 'mail-counts', 'mail-ledger', 'mail-empty', 'mail-detail', 'inspector', 'inspector-log', 'inspector-title', 'inspector-status', 'inspector-task', 'inspector-meta',
     'inspector-health', 'inspector-stats', 'inspector-truncated', 'inspector-window', 'inspector-empty', 'inspector-follow', 'inspector-pause', 'inspector-jump', 'inspector-buffer', 'inspector-close',
     'mail-inspector', 'mail-inspector-title', 'mail-inspector-meta', 'mail-inspector-health', 'mail-inspector-body', 'mail-inspector-truncated', 'mail-inspector-empty', 'mail-inspector-close', 'zoom-chip', 'source-health', 'panels', 'station-totals', 'station-stats', 'station-stats-summary', 'controls-help', 'controls-help-popover'].map(id => [id, element()]));
   const filters = ['all', 'working', 'blocked'].map(value => { const button = element(); button.dataset.filter = value; return button; }); elements.filters.children = filters;
   const events = {}, updates = [], focuses = [], zooms = [], lifecycle = [], invalidations = [], refreshes = [];
   const inspections = new Map(), specs = new Map(), reads = [];
+  let fxState = true;
+  const themedStyles = new Map();
   let listener, subscriptions = 0, removals = 0, spec, viewOptions;
   const scene = () => updates.at(-1).scene, options = () => updates.at(-1).options, chairOf = id => scene().workers.find(worker => worker.id === id).chair;
-  document = { body: element(), activeElement: null, hidden: false, getElementById: id => elements[id], createElement: element, addEventListener(name, fn) { events[name] = fn; } };
-  const ObserverView = { create(created) { viewOptions = created; return { update(next, payload) { updates.push({ scene: next, options: payload }); }, focus(id) { focuses.push(id); },
+  document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => elements[id], createElement: element, addEventListener(name, fn) { events[name] = fn; } };
+  document.documentElement.style.setProperty = (key, value) => themedStyles.set(key, value);
+  const bodyStyles = new Map(); document.body.style.setProperty = (key, value) => bodyStyles.set(key, value);
+  const ObserverView = { create(created) { viewOptions = created; return { setFx(on) { fxState = on; }, fx() { return fxState; }, update(next, payload) { updates.push({ scene: next, options: payload }); }, focus(id) { focuses.push(id); },
     overview() { focuses.push(null); }, zoomBy(factor) { zooms.push(factor); }, start() { lifecycle.push('start'); }, stop() { lifecycle.push('stop'); }, invalidate() { invalidations.push(1); } }; } };
   const context = { console, Date, Set, Map, document, setTimeout: fakeSetTimeout, clearTimeout: fakeClearTimeout, ObserverModel, ObserverMail, ObserverInspector, ObserverMailInspector, ObserverScene, ObserverView, encodeURIComponent,
-    window: { addEventListener(name, fn) { events[name] = fn; } }, SPRITES: { init: async () => {} },
+    window: { __OBSERVER_THEME__: { fx: false, colors: { accent: '#77dce8', background: '#02060b' } }, localStorage: { getItem() { return 'on'; }, setItem() {} }, addEventListener(name, fn) { events[name] = fn; } }, SPRITES: { init: async () => {} },
     Harness: { api: { get: path => { reads.push(path); return new Promise(() => {}); } } },
     QuerySpine: { define(key, options) { specs.set(key, options); if (key === 'observer.sessions') spec = options; },
       invalidate(key) { refreshes.push(key); return Promise.resolve(); },
@@ -58,6 +62,11 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
   // A real poll always parses a new data object; tests that edit rows in place republish them the same way.
   const poll = () => ({ ...snapshot, data: { ...snapshot.data } });
   assert.equal(viewOptions.canvas, elements.world); assert.deepEqual(lifecycle, ['start'], 'one view, started once');
+  assert.equal(fxState, false, 'explicit theme FX wins over saved browser preference');
+  assert.equal(elements['fx-toggle'].attributes['aria-pressed'], 'false');
+  assert.equal(themedStyles.get('--phosphor'), '#77dce8'); assert.equal(themedStyles.get('--bg'), '#02060b');
+  assert.equal(bodyStyles.has('--chrome'), false); assert.equal(bodyStyles.has('--glow'), false, 'theme inheritance leaves body stale-state overrides in control');
+  elements['fx-toggle'].handlers.click(); assert.equal(fxState, true, 'manual FX toggle remains available');
   listener(snapshot); assert.equal(scene().workers.length, 16); assert.equal(elements.sessions.children.length, 1);
   assert.equal(scene().platforms.length, 1); assert(scene().workers.every(worker => worker.platformKey === scene().platforms[0].key), 'every worker stands on its project platform');
   assert.equal(new Set(scene().workers.map(worker => worker.chair.x + ',' + worker.chair.y)).size, 16, '16 distinct desks');
@@ -211,7 +220,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
   for (const init of [() => new Promise(() => {}), () => Promise.reject(new Error('assets blocked')), () => { throw new Error('no sprites'); }]) {
     const own = Object.fromEntries(Object.keys(elements).map(id => [id, element()])), started = [], renders = [];
     let defined = false, live = null;
-    const ownDocument = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener() {} };
+    const ownDocument = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener() {} };
     own.filters.children = ['all', 'working', 'blocked'].map(value => { const node = element(); node.dataset.filter = value; return node; });
     vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document: ownDocument, SPRITES: { init },
       ObserverView: { create: () => ({ update: next => renders.push(next), focus() {}, overview() {}, zoomBy() {}, start: () => started.push('start'), stop() {}, invalidate() {} }) },
@@ -235,7 +244,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
     own.filters.children = ['all', 'working', 'blocked'].map(value => { const node = element(); node.dataset.filter = value; return node; });
     const docEvents = {}, winEvents = {}, sceneUpdates = [], lifecycle = [], refreshes = [], inspectSubs = new Map();
     let invalidated = 0, live = null, subscribed = 0, unsubscribed = 0, rowWork = 0;
-    document = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
+    document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
     vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document,
       ObserverModel: { ...ObserverModel, activity: row => { rowWork++; return ObserverModel.activity(row); } },
       window: { addEventListener(name, fn) { winEvents[name] = fn; } },
@@ -322,7 +331,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
       const qOwn = Object.fromEntries(ids.map(id => [id, element()]));
       qOwn.filters.children = ['all', 'working', 'blocked'].map(value => { const node = element(); node.dataset.filter = value; return node; });
       const qDoc = {}, gets = [];
-      const qDocument = { body: element(), activeElement: null, hidden: false, getElementById: id => qOwn[id], createElement: element, addEventListener(name, fn) { qDoc[name] = fn; } };
+      const qDocument = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => qOwn[id], createElement: element, addEventListener(name, fn) { qDoc[name] = fn; } };
       document = qDocument;
       const sandbox = vm.createContext({ ...context, document: qDocument, AbortController, window: { addEventListener() {} },
         setInterval: () => 0, clearInterval() {},
@@ -365,7 +374,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
       const hOwn = Object.fromEntries(ids.map(id => [id, element()]));
       hOwn.filters.children = ['all', 'working', 'blocked'].map(value => { const node = element(); node.dataset.filter = value; return node; });
       const hDoc = {}, hWin = {}, acquired = { subscribe: 0, read: 0, start: 0 };
-      const hDocument = { body: element(), activeElement: null, hidden: true, getElementById: id => hOwn[id], createElement: element, addEventListener(name, fn) { hDoc[name] = fn; } };
+      const hDocument = { documentElement: element(), body: element(), activeElement: null, hidden: true, getElementById: id => hOwn[id], createElement: element, addEventListener(name, fn) { hDoc[name] = fn; } };
       document = hDocument;
       vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document: hDocument, window: { addEventListener(name, fn) { hWin[name] = fn; } },
         ObserverView: { create: () => ({ update() {}, focus() {}, overview() {}, zoomBy() {}, start: () => { acquired.start++; }, stop() {}, invalidate() {} }) },
@@ -391,7 +400,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
     const P = name => panelPart(own.panels, name);
     const docEvents = {}, updates = [], platformFocus = [], overviews = [], inspectSubs = new Map();
     let created4, live = null;
-    document = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
+    document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
     vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document, window: { addEventListener() {} },
       ObserverView: { create: options => { created4 = options; return { update: (scene, payload) => updates.push({ scene, options: payload }), focus() {}, focusPlatform: key => platformFocus.push(key),
         overview: () => overviews.push(1), zoomBy() {}, start() {}, stop() {}, invalidate() {} }; } },
@@ -501,7 +510,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
       timers.clear();
       const own = Object.fromEntries(Object.keys(elements).map(id => [id, element()])); own.world = canvas();
       own.filters.children = ['all', 'working', 'blocked'].map(value => { const node = element(); node.dataset.filter = value; return node; });
-      document = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener() {} };
+      document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener() {} };
       let live, floor, realView, now = 0, updateCount = 0;
       const bodies = new Map(), poses = new Map();
       vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document,
@@ -564,7 +573,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
     const narrow = { matches: false, listeners: [], addEventListener(name, fn) { this.listeners.push(fn); } };
     const docEvents = {}, subs = new Map(), mailReads = [];
     let view5, live = null;
-    document = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: make, addEventListener(name, fn) { docEvents[name] = fn; } };
+    document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: make, addEventListener(name, fn) { docEvents[name] = fn; } };
     vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document,
       window: { addEventListener() {}, matchMedia: () => narrow },
       Harness: { api: { get: path => new Promise((resolve, reject) => mailReads.push({ path, resolve, reject })) } },
@@ -743,7 +752,7 @@ const panelPart = (host, name, index = -1) => { const root = host.children.at(in
     own['controls-help-popover'].hidden = true; own['controls-help-popover'].append(element());
     const docEvents = {}, subs = new Map(), requests = [], viewCalls = [];
     let viewOptions5 = null, updateOptions = null, invalidated = 0, live = null, subscribed = 0;
-    document = { body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
+    document = { documentElement: element(), body: element(), activeElement: null, hidden: false, getElementById: id => own[id], createElement: element, addEventListener(name, fn) { docEvents[name] = fn; } };
     vm.runInNewContext(fs.readFileSync(require.resolve('../frontend/app/observer.js'), 'utf8'), { ...context, document, window: { addEventListener() {} },
       Harness: { api: { get: path => { requests.push(path); return new Promise(() => {}); } } },
       ObserverView: { create: options => { viewOptions5 = options; return { update: (scene, payload) => { updateOptions = payload; }, focus: id => viewCalls.push(['focus', id]),

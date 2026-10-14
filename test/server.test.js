@@ -13,7 +13,7 @@ const { createServer } = require('../server.js');
     async inspect(id, identity) { calls.push(['inspect', id, identity]); return { id, health: 'available', turns: [] }; },
     inspectMessage(id, identity) { calls.push(['mail', id, identity]); return { id, health: 'available', text: 'fixture' }; }
   };
-  const server = createServer({ observer, token: 'fixture-token' });
+  const server = createServer({ observer, token: 'fixture-token', theme: { fx: false, colors: { accent: '#77dce8' }, scriptCanary: '</script>' } });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const auth = { 'X-Observer-Token': 'fixture-token' };
@@ -23,6 +23,12 @@ const { createServer } = require('../server.js');
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /window\.__OBSERVER_TOKEN__="fixture-token"/);
+    assert.match(html, /window\.__OBSERVER_THEME__=/);
+    const boot = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
+    const sandbox = { window: {} }; require('node:vm').runInNewContext(boot, sandbox);
+    assert.equal(sandbox.window.__OBSERVER_THEME__.fx, false);
+    assert.equal(sandbox.window.__OBSERVER_THEME__.colors.accent, '#77dce8');
+    assert.equal(sandbox.window.__OBSERVER_THEME__.scriptCanary, '</script>');
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
     // Every script referenced by the shipped page must exist and be executable JavaScript.
     for (const match of html.matchAll(/src="([^"]+\.js)"/g)) {

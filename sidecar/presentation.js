@@ -1,28 +1,37 @@
 'use strict';
 const { unavailable } = require('./observer-inspector.js');
-const ROOMS = [
-  { name: 'Product', repos: ['helio-web', 'helio-mobile', 'helio-api'] },
-  { name: 'Platform', repos: ['helio-auth', 'helio-billing', 'helio-data'] },
-  { name: 'Intelligence', repos: ['helio-agents', 'helio-context', 'helio-evals'] },
-  { name: 'Operations', repos: ['helio-console', 'helio-ci', 'helio-observability'] }
-];
+const { DEFAULT_LABELS } = require('./config.js');
 const TOOL_NAMES = new Set(['Bash', 'exec_command', 'shell', 'local_shell', 'write_stdin', 'Read', 'NotebookRead', 'view_image', 'Edit', 'MultiEdit', 'Write', 'NotebookEdit', 'apply_patch', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'web_search', 'web__run', 'functions.exec', 'functions.wait', 'wait', 'Task', 'Agent', 'spawn_agent', 'TodoWrite', 'update_plan']);
 
 // A server-side allowlist, not a text replacement: private labels never reach the recording page.
 // Opaque ownership IDs and live status/freshness remain unchanged; aliases are display identities only.
-function makePresentationObserver(observer, now = Date.now) {
+function makePresentationObserver(observer, now = Date.now, labels = DEFAULT_LABELS) {
   const projects = new Map(), repos = new Map(), terminals = new Map(), worktrees = new Map();
+  const roomNames = new Set(labels.rooms.map(room => room.name.toLowerCase()));
+  const repoNames = new Set(labels.rooms.flatMap(room => room.repos).map(name => name.toLowerCase()));
   function project(id) {
     if (!projects.has(id)) {
-      const index = projects.size, room = ROOMS[index];
-      projects.set(id, { name: room?.name || 'Studio ' + (index + 1), repos: room?.repos || [], count: 0 });
+      const index = projects.size, room = labels.rooms[index];
+      let name = room?.name, suffix = index + 1;
+      if (!room) {
+        do { name = 'Studio ' + suffix++; } while (roomNames.has(name.toLowerCase()));
+        roomNames.add(name.toLowerCase());
+      }
+      projects.set(id, { name, repos: room?.repos || [], count: 0 });
     }
     return projects.get(id);
   }
   function repo(row, room) {
     if (!repos.has(row.repoId)) {
       const index = room.count++;
-      repos.set(row.repoId, room.repos[index] || 'helio-' + room.name.toLowerCase().replace(/ /g, '-') + '-' + (index + 1));
+      let name = room.repos[index];
+      if (!name) {
+        const stem = labels.repoPrefix + '-' + (room.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'studio');
+        let suffix = index + 1;
+        do { name = stem + '-' + suffix++; } while (repoNames.has(name.toLowerCase()));
+        repoNames.add(name.toLowerCase());
+      }
+      repos.set(row.repoId, name);
     }
     return repos.get(row.repoId);
   }
@@ -61,7 +70,7 @@ function makePresentationObserver(observer, now = Date.now) {
       const source = value => value ? { health: value.health, observedAt: value.observedAt } : undefined;
       const bus = inventory.bus;
       return {
-        presentation: { company: 'Helioforge', label: 'Live activity · fictional company labels' },
+        presentation: { company: labels.company, label: 'Live activity · fictional company labels' },
         sessions: inventory.sessions.map(rowProjection), aggregate: inventory.aggregate,
         health: inventory.health, observedAt: inventory.observedAt,
         error: inventory.error ? 'Local session inventory unavailable' : null,
