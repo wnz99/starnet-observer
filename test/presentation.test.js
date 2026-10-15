@@ -89,5 +89,20 @@ const { createServer } = require('../server.js');
     await firstClose; assert.equal(closes, 1, 'presentation close delegates exactly once');
     await new Promise(resolve => server.close(resolve));
   }
+  // Remote host names are private: rows and host sources carry fictional ship names, never the configured id.
+  const remote = makePresentationObserver({ get: async () => ({ ...inventory, sessions: [...inventory.sessions.map(r => ({ ...r, host: null })), { ...inventory.sessions[0], id: 'obs_' + 'f'.repeat(24), host: 'herdr-dev-2' }],
+    sources: { ...inventory.sources, hosts: { local: { health: 'available', observedAt: 1, reason: null, agents: 1 }, 'herdr-dev-2': { health: 'stale', observedAt: 1, reason: 'SSH connection timed out', agents: 1 } } },
+    hostBus: { 'herdr-dev-2': { health: 'available', reason: 'secret reason', observedAt: 1, window: 100, messages: [{ id: 5, key: '5@herdr-dev-2', host: 'herdr-dev-2', identity: 'mail_' + 'a'.repeat(64), from: 'obs_' + 'f'.repeat(24), to: 'external', sentAt: 1, acknowledgedAt: null, wake: 'requested',
+      relay: { direction: 'out', machine: 'whitenoise', repo: 'llm-bus', provider: 'codex', state: 'accepted_remote' } }],
+      remote: { relay: 'llm-bus-relay.wnz.workers.dev', machine: 'friend-1', lastActivityAt: 900, onRelay: [{ id: 'obs_' + 'f'.repeat(24), repo: 'llm-bus' }], peers: [{ machine: 'whitenoise', repos: ['llm-bus'], agents: 5, lastSeen: 800, list: [{ id: 'peer_' + 'a'.repeat(24), provider: 'codex', repo: 'llm-bus', lastSeen: 800 }] }] } } } }) }, () => 1000);
+  const masked = await remote.get();
+  assert.equal(JSON.stringify(masked).includes('herdr-dev-2'), false);
+  assert.equal(masked.sessions.at(-1).host, 'Ship 1'); assert.equal(masked.sessions[0].host, null);
+  assert.deepEqual(masked.sources.hosts['Ship 1'], { health: 'stale', observedAt: 1, agents: 1 }, 'host reasons are not shown in presentation');
+  assert.deepEqual(masked.hostBus['Ship 1'].messages[0], { id: 5, key: '5@Ship 1', host: 'Ship 1', from: 'obs_' + 'f'.repeat(24), to: 'external', sentAt: 1, acknowledgedAt: null, wake: 'requested',
+    relay: { direction: 'out', machine: 'Machine 1', repo: 'Shared repo 1', provider: 'codex', state: 'accepted_remote' } }, 'remote mail is masked like local mail: ship name, no identity, fictional relay names');
+  assert.deepEqual(masked.hostBus['Ship 1'].remote, { relay: 'Relay 1', machine: 'Machine 2', lastActivityAt: 900, onRelay: [{ id: 'obs_' + 'f'.repeat(24), repo: 'Shared repo 1' }], peers: [{ machine: 'Machine 1', repos: ['Shared repo 1'], agents: 5, lastSeen: 800, list: [{ id: 'peer_' + 'a'.repeat(24), provider: 'codex', repo: 'Shared repo 1', lastSeen: 800 }] }] }, 'relay host, machines and shared repos are aliased; counts and times stay real');
+  for (const real of ['whitenoise', 'friend-1', 'wnz', 'llm-bus-relay']) assert.equal(JSON.stringify(masked).includes(real), false, real);
+  assert.ok(!JSON.stringify(masked.hostBus).includes('secret reason'));
   console.log('presentation: stable fictional labels, real status/topology/totals/mail, no private fields, source immutability, and blocked HTTP inspectors passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

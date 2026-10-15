@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_phase_name: 0 planned
 status: planning
-stopped_at: "PR #10 final review approved; merge authorized"
-last_updated: "2026-10-15T20:19:54.565Z"
-last_activity: 2026-10-15
-last_activity_desc: "PR #9 merged; PR #10 fixes and integration approved, all 31 Bun test files passed; merge authorized."
-state_head: 1db401f5c90ebea3a2adb389ba3c516b7032122b
+stopped_at: "PR #11 fixes verified and final review clean; PR remains open"
+last_updated: "2026-10-15T21:04:53.333597+00:00"
+last_activity: 2026-10-16
+last_activity_desc: "PR #11 synced to main; host and relay defects fixed; 37 Bun test files passed; independent full-scope review clean."
+state_head: d1268c1437baba01814f7f6dd1b7202de8c2c749
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** PR #9 merged. PR #10 fixes and integration independently approved; merge authorized. PR #11 retains three known bugs.
+**Current focus:** PRs #9 and #10 merged. PR #11 fixes verified and independently approved; PR remains open.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: PR #10 merge ready; zero unresolved review findings; merge authorized
-Last activity: 2026-10-15 — PR #9 merged; PR #10 includes current published main, all 31 Bun test files passed, fresh independent full-scope review approved.
+Status: PR #11 fixes complete; zero unresolved review findings; PR open
+Last activity: 2026-10-16 — PR #11 includes published main; all 37 Bun test files passed and independent full-scope review approved.
 
 ## Quick Tasks Completed
 
@@ -45,7 +45,8 @@ Last activity: 2026-10-15 — PR #9 merged; PR #10 includes current published ma
 | 261015-mjy | Overseer providers and checkout sections | 2026-10-15 | [PR #12](https://github.com/wnz99/starnet-observer/pull/12) | Complete; merge authorized | [261015-mjy](./quick/261015-mjy-overseer-providers-and-checkout-sections/) |
 | 261015-sb0 | Resolve PR 8 conflicts with main | 2026-10-15 | 27353b2 | Verified; independent review approved | [261015-sb0-resolve-pr-8-conflicts-with-main-preserv](./quick/261015-sb0-resolve-pr-8-conflicts-with-main-preserv/) |
 | 261015-vnn | Sync PR 9 and fix arrangement preferences and courier bugs | 2026-10-15 | [PR #9](https://github.com/wnz99/starnet-observer/pull/9) | Complete; merged | [261015-vnn-sync-pr-9-with-main-preserving-existing-](./quick/261015-vnn-sync-pr-9-with-main-preserving-existing-/) |
-| 261015-vtr | Sync PR 10 and fix helper index lineage proof bugs | 2026-10-15 | [PR #10](https://github.com/wnz99/starnet-observer/pull/10) | Complete; verified; merge authorized | [261015-vtr-sync-pr-10-and-fix-helper-index-lineage-](./quick/261015-vtr-sync-pr-10-and-fix-helper-index-lineage-/) |
+| 261015-vtr | Sync PR 10 and fix helper index lineage proof bugs | 2026-10-15 | [PR #10](https://github.com/wnz99/starnet-observer/pull/10) | Complete; merged | [261015-vtr-sync-pr-10-and-fix-helper-index-lineage-](./quick/261015-vtr-sync-pr-10-and-fix-helper-index-lineage-/) |
+| 261015-vno | Sync PR 11 and fix host, relay and mail defects | 2026-10-15 | [PR #11](https://github.com/wnz99/starnet-observer/pull/11) | Complete; verified; independent final review clean | [261015-vno](./quick/261015-vno-sync-pr-11-with-main-preserving-existing/) |
 
 ## Accumulated Context
 
@@ -66,10 +67,10 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 
 ## Session Continuity
 
-Last session: 2026-10-15
-Stopped at: PR #10 final delivery records before authorized merge
+Last session: 2026-10-16
+Stopped at: PR #11 fix delivery verified; PR remains open
 Resume file: None
-Next action: Merge PR #10 with a merge commit and verify GitHub merge proof. PR #11 remains open with known bugs.
+Next action: Await PR #11 merge decision. No unresolved review finding remains; live SSH/desktop/browser integration was not exercised.
 
 ### Registered Work
 

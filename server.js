@@ -12,7 +12,8 @@ const { loadConfig, HELP } = require('./sidecar/config.js');
 const { loadThemePack } = require('./sidecar/theme-packs.js');
 const canonicalTheme = require('./frontend/assets/themes/starnet/theme.json');
 const { makeOverseerState, resolveEndpoint } = require('./sidecar/overseer-state.js');
-const { makeControl, PANE } = require('./sidecar/control.js');
+const { makeControl, PANE, TARGET } = require('./sidecar/control.js');
+const { makeRemoteHosts, makeFederatedObserver } = require('./sidecar/observer-remotes.js');
 const ROOT = path.join(__dirname, 'frontend');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.woff2': 'font/woff2' };
 const SESSION_IDENTITY = /^(?:(?:codex|claude):[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|(?:helper:)?obs_[a-f0-9]{24})(?:\|obs_[a-f0-9]{24})?$/i;
@@ -40,7 +41,7 @@ function createServer({ observer = makeObserver({ now: Date.now }), token = cryp
     if (!hosts.has(req.headers.host) || req.headers.origin && ![...hosts].some(host => req.headers.origin === 'http://' + host) || req.headers['sec-fetch-site'] === 'cross-site') return json(403, { error: 'Local origin required' });
     const authorized = () => { const supplied = req.headers['x-observer-token']; return typeof supplied === 'string' && Buffer.byteLength(supplied) === Buffer.byteLength(token) && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(token)); };
     // Control actions are the one mutating surface, present only when the operator opted in at launch.
-    const action = control && req.method === 'POST' ? /^\/api\/control\/(attach|spawn|close|overseer)$/.exec(req.url) : null;
+    const action = control && req.method === 'POST' ? /^\/api\/control\/(attach|spawn|close|overseer|spawn-host)$/.exec(req.url) : null;
     if (req.method !== 'GET' && !action) return json(405, { error: 'Read-only server: GET required' });
     if (action) {
       if (!authorized()) return json(403, { error: 'Observer token required; reload the page' });
@@ -48,9 +49,17 @@ function createServer({ observer = makeObserver({ now: Date.now }), token = cryp
       let chunks = [], bytes = 0;
       try { for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return json(413, { error: 'Body too large' }); chunks.push(chunk); } } catch (_) { return json(400, { error: 'Body unreadable' }); }
       let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch (_) { return json(400, { error: 'Invalid JSON' }); }
-      if (action[1] === 'overseer' && (!body || !['claude', 'codex'].includes(body.provider))) return json(400, { error: 'invalid-provider' });
-      if (action[1] !== 'overseer' && (!body || typeof body.paneId !== 'string' || !PANE.test(body.paneId))) return json(400, { error: 'paneId required' });
-      try { const result = action[1] === 'overseer' ? await control.overseer(body.provider) : await control[action[1]](body.paneId); return json(200, controlResult(action[1], result)); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json(400, { error: 'JSON object required' });
+      if (action[1] === 'overseer' && !['claude', 'codex'].includes(body.provider)) return json(400, { error: 'invalid-provider' });
+      // Pane ids may be host-namespaced (`herdr-dev-2/w1:p1`); control refuses hosts that are not configured remotes.
+      if (!['overseer', 'spawn-host'].includes(action[1]) && (typeof body.paneId !== 'string' || !TARGET.test(body.paneId))) return json(400, { error: 'paneId required' });
+      if (action[1] === 'spawn-host' && (typeof body.host !== 'string' || body.folder !== undefined && body.folder !== null && typeof body.folder !== 'string')) return json(400, { error: 'host and folder must be strings' });
+      // Presentation masks host identities, so remote control (which would echo them) is unavailable there.
+      if (presentation && (action[1] === 'spawn-host' || typeof body.paneId === 'string' && !PANE.test(body.paneId))) return json(403, controlResult(action[1], null, new Error('control-unavailable')));
+      try {
+        const result = action[1] === 'overseer' ? await control.overseer(body.provider) : action[1] === 'spawn-host' ? await control.spawnHost(body.host, body.folder ?? null) : await control[action[1]](body.paneId);
+        return json(200, controlResult(action[1], result));
+      }
       catch (thrown) { const error = thrown instanceof Error ? thrown : new Error(String(thrown)); const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599 ? error.status : 500; if (status >= 500) console.warn('[observer control]', presentation ? controlResult(action[1], null, error).error : redact(String(error.message))); return json(status, controlResult(action[1], null, error)); }
     }
     try {
@@ -64,6 +73,12 @@ function createServer({ observer = makeObserver({ now: Date.now }), token = cryp
           if (identities.length > 1 || identities.length === 1 && (identities[0].length > 128 || !SESSION_IDENTITY.test(identities[0]))) return json(400, { id: session[1], health: 'unavailable', reason: 'invalid-identity', turns: [] });
           const data = await observer.inspect(session[1], identities[0]);
           return json(data.reason === 'unknown-session' ? 404 : 200, data);
+        }
+        // A remote host's message is addressed id@host; its body lives on that host's disk, so it is never inspectable here.
+        const remoteMail = url.pathname.match(/^\/api\/observer\/messages\/([1-9][0-9]{0,15})@([a-z0-9][a-z0-9-]{0,31})\/inspect$/);
+        if (remoteMail && Number.isSafeInteger(Number(remoteMail[1]))) {
+          if (identities.length) return json(400, { id: remoteMail[1] + '@' + remoteMail[2], identity: null, health: 'unavailable', reason: 'invalid-identity', text: null });
+          return json(200, { id: remoteMail[1] + '@' + remoteMail[2], identity: null, health: 'unavailable', reason: 'remote-inspect', text: null });
         }
         const mail = url.pathname.match(/^\/api\/observer\/messages\/([1-9][0-9]{0,15})\/inspect$/);
         if (mail && Number.isSafeInteger(Number(mail[1]))) {
@@ -137,14 +152,17 @@ if (require.main === module) {
   setClock(Date.now);
   const endpoint = resolveEndpoint({});
   const overseerState = makeOverseerState({ endpoint });
-  const observer = makeObserver({ now: Date.now, warmDetails: !config.presentation, endpoint, overseerState,
+  const local = makeObserver({ now: Date.now, warmDetails: !config.presentation, endpoint, overseerState,
     arrange: { roomsFile: config.roomsFile, warn: message => console.warn('[observer arrange]', redact(String(message))) } });
-  const control = process.env.OBSERVER_CONTROL === '1' ? makeControl({ endpoint, overseerState, target: paneId => observer.controlTarget(paneId), claudeArgs: String(process.env.OBSERVER_CLAUDE_ARGS || '').split(/\s+/).filter(Boolean) }) : null;
+  const remoteHosts = config.remotes.length ? makeRemoteHosts({ remotes: config.remotes, now: Date.now }) : null;
+  const observer = remoteHosts ? makeFederatedObserver(local, remoteHosts, Date.now) : local;
+  const control = process.env.OBSERVER_CONTROL === '1' ? makeControl({ endpoint, overseerState, target: paneId => observer.controlTarget(paneId), remotes: config.remotes, claudeArgs: String(process.env.OBSERVER_CLAUDE_ARGS || '').split(/\s+/).filter(Boolean) }) : null;
   let server;
   try { server = createServer({ observer: config.presentation ? makePresentationObserver(observer, Date.now, config.labels) : observer, theme: config.theme, control }); }
-  catch (error) { console.error('[observer theme]', error.themeReason || redact(String(error.message))); process.exit(1); }
+  catch (error) { console.error('[observer theme]', error.themeReason || redact(String(error.message))); remoteHosts?.close(); process.exit(1); }
   server.on('error', error => { console.error('[observer]', redact(String(error.message))); process.exitCode = 1; });
-  server.listen(port, '127.0.0.1', () => console.log('Local Observer: http://127.0.0.1:' + port + '\nPrivate labels: ' + (config.presentation ? 'on (' + config.labels.company + ')' : 'off') + (control ? '\nControl actions: on (OBSERVER_CONTROL=1): attach, spawn and close Herdr agents from the page.' : '\nRead only.') + ' Stop with Ctrl+C.'));
-  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); server.closeAllConnections(); });
+  server.listen(port, '127.0.0.1', () => console.log('Local Observer: http://127.0.0.1:' + port + '\nPrivate labels: ' + (config.presentation ? 'on (' + config.labels.company + ')' : 'off') + (control ? '\nControl actions: on (OBSERVER_CONTROL=1): attach, spawn and close Herdr agents from the page.' : '\nRead only.') +
+    (remoteHosts ? '\nRemote hosts (over ssh): ' + config.remotes.map(remote => remote.id + ' = ' + remote.ssh).join(', ') + (control ? '. Control actions reach them too.' : '. Read only.') : '') + ' Stop with Ctrl+C.'));
+  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { remoteHosts?.close(); server.close(); server.closeAllConnections(); });
 }
 module.exports = { createServer };

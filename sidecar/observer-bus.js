@@ -13,6 +13,90 @@ const QUERY = 'SELECT id, sender, recipient, sent_at, acknowledged_at, wake_stat
 const WAKES = new Set(['requested', 'failed', 'unsupported']);
 const MESSAGE_IDENTITY = /^mail_[a-f0-9]{64}$/;
 const ADDRESS = /^(claude|codex):[A-Za-z0-9._-]{1,200}$/;
+/* llm-bus remote relay (wnz99/llm-bus PR #39): optional tables beside the native mailbox, present once a bridge has run.
+   Only routing metadata is selected: the relay's host name and this machine's id (remote_binding), each relayed message's
+   direction, peer machine, shared repo and delivery state (remote_outbox / remote_imports), and the cached remote roster
+   counted per machine (remote_peers). Credentials never live in the bus; URL paths, native session ids and bodies are
+   never read here. The roster cache is not proof of connectivity: liveness is judged from its newest activity time. */
+const REMOTE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const REMOTE_ADDRESS = /^([A-Za-z0-9_-]{1,128})\/([A-Za-z0-9_-]{1,128})\/(claude|codex):[A-Za-z0-9._-]{1,200}$/;
+const RELAY_STATES = new Set(['queued_local', 'accepted_remote', 'delivered_local', 'acknowledged', 'expired']);
+const REMOTE_TABLES = ['remote_binding', 'remote_outbox', 'remote_imports', 'remote_peers', 'remote_publications'];
+const PEER_IDLE_MS = 24 * 3600 * 1000, MAX_PEERS = 2000, MAX_MACHINES = 32;
+const MAX_PEER_AGENTS = 48;
+// A remote agent's page identity: an opaque hash of its full relay address, so the far side's native session id never
+// leaves this process, while a message and the roster entry for the same agent still join exactly.
+const peerId = address => 'peer_' + crypto.createHash('sha256').update('starnet-relay-peer-v1\0' + address).digest('hex').slice(0, 24);
+const peerOf = address => { const match = REMOTE_ADDRESS.exec(address); return match ? { machine: match[1], repo: match[2], provider: match[3], peer: peerId(address) } : null; };
+// "url|machine_id" (llm-bus Config.connection): the URL's host name only, never its path, port, query or user info.
+function relayBinding(connection) {
+  if (typeof connection !== 'string') return null;
+  const bar = connection.lastIndexOf('|'), machine = connection.slice(bar + 1);
+  if (bar < 1 || !REMOTE_ID.test(machine)) return null;
+  try { const url = new URL(connection.slice(0, bar)); return /^https?:$/.test(url.protocol) && url.hostname ? { relay: url.hostname.slice(0, 253), machine } : null; }
+  catch (_) { return null; }
+}
+function selectRemote(database, rows, at) {
+  const present = new Set(database.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('" + REMOTE_TABLES.join("','") + "')").all().map(row => row.name));
+  if (!present.has('remote_binding')) return null;
+  const binding = relayBinding(database.query('SELECT connection FROM remote_binding WHERE id = 1').all()[0]?.connection);
+  if (!binding) return null;
+  const oldest = rows.reduce((min, row) => Math.min(min, row.id), Infinity), outbox = new Map(), imports = new Set();
+  if (Number.isFinite(oldest)) {
+    if (present.has('remote_outbox')) for (const row of database.query('SELECT local_id, state FROM remote_outbox WHERE local_id >= ?').all(oldest)) outbox.set(row.local_id, row.state);
+    if (present.has('remote_imports')) for (const row of database.query('SELECT local_id FROM remote_imports WHERE local_id >= ?').all(oldest)) imports.add(row.local_id);
+  }
+  let lastActivityAt = null, expiresAt = Infinity;
+  const changesAt = value => { if (value > at) expiresAt = Math.min(expiresAt, value); };
+  const seen = value => {
+    const ms = typeof value === 'string' ? Date.parse(value) : NaN;
+    if (Number.isFinite(ms)) {
+      if (ms <= at + 60000) lastActivityAt = Math.max(lastActivityAt ?? 0, ms);
+      else changesAt(ms - 60000);
+    }
+    return Number.isFinite(ms) ? ms : null;
+  };
+  for (const row of rows) {
+    const out = outbox.has(row.id), peer = out ? peerOf(row.recipient) : imports.has(row.id) ? peerOf(row.sender) : null;
+    if (!peer) continue;
+    const state = out ? (RELAY_STATES.has(outbox.get(row.id)) ? outbox.get(row.id) : 'unknown') : row.acknowledgedAt ? 'acknowledged' : 'delivered_local';
+    row.relay = { direction: out ? 'out' : 'in', machine: peer.machine, repo: peer.repo, provider: peer.provider, peer: peer.peer, state };
+    seen(row.sentAt);
+  }
+  const machines = new Map();
+  if (present.has('remote_peers')) for (const { payload } of database.query('SELECT payload FROM remote_peers LIMIT ' + MAX_PEERS).all()) {
+    let peer; try { peer = JSON.parse(payload); } catch (_) { continue; }
+    if (!peer || !REMOTE_ID.test(peer.machine_id) || !REMOTE_ID.test(peer.repo_id) || peer.machine_id === binding.machine) continue;
+    if (!machines.has(peer.machine_id) && machines.size >= MAX_MACHINES) continue;
+    const entry = machines.get(peer.machine_id) || { machine: peer.machine_id, repos: new Set(), agents: 0, lastSeen: null, list: [] };
+    machines.set(peer.machine_id, entry); entry.repos.add(peer.repo_id);
+    const last = seen(peer.last_seen), address = typeof peer.address === 'string' ? peer.address : '', who = peerOf(address);
+    // llm-bus's own roster rule: a session that reported its end, or has been idle 24 hours, is not listed.
+    if (!peer.ended && last !== null && at - last < PEER_IDLE_MS) {
+      changesAt(last + PEER_IDLE_MS);
+      entry.agents++;
+      if (who && who.machine === peer.machine_id && entry.list.length < MAX_PEER_AGENTS) entry.list.push({ id: who.peer, provider: who.provider, repo: who.repo, lastSeen: last });
+    }
+    if (last !== null) entry.lastSeen = Math.max(entry.lastSeen ?? 0, last);
+  }
+  /* Which of this machine's own sessions are on the relay: the bridge publishes exactly the sessions of repositories its
+     config maps, and records each publication here ("repo/native address" → payload). An ended or day-old publication
+     is not counted, matching llm-bus's own roster rule. Native addresses stay in this process (joined in publicBus). */
+  const published = [];
+  if (present.has('remote_publications')) for (const { address: key, payload } of database.query('SELECT address, payload FROM remote_publications LIMIT ' + MAX_PEERS).all()) {
+    let value; try { value = JSON.parse(payload); } catch (_) { continue; }
+    if (!value || !ADDRESS.test(value.native_address) || !REMOTE_ID.test(value.repo_id) || key !== value.repo_id + '/' + value.native_address || value.ended) continue;
+    const last = typeof value.last_seen === 'string' ? Date.parse(value.last_seen) : NaN;
+    if (Number.isFinite(last) && at - last < PEER_IDLE_MS) {
+      changesAt(last + PEER_IDLE_MS);
+      published.push({ address: value.native_address, repo: value.repo_id });
+    }
+  }
+  const peers = [...machines.values()].map(entry => ({ machine: entry.machine, repos: [...entry.repos].sort().slice(0, 16), agents: entry.agents, lastSeen: entry.lastSeen,
+    list: entry.list.sort((a, b) => a.repo.localeCompare(b.repo) || a.id.localeCompare(b.id)) }))
+    .sort((a, b) => a.machine.localeCompare(b.machine));
+  return { view: { relay: binding.relay, machine: binding.machine, peers, lastActivityAt, published }, expiresAt };
+}
 
 // Mirrors llm-bus default_path(): LLM_BUS_DB (with ~), else the per-user data folder.
 function defaultBusPath(env = process.env, platform = process.platform, home = os.homedir()) {
@@ -103,7 +187,8 @@ function messageIdentity(sourceFingerprint, row) {
 
 function makeBusReader({ file = defaultBusPath(), loadSqlite = loadBunSqlite, now, tempRoot = os.tmpdir(), copyFile = fs.copyFileSync } = {}) {
   if (typeof now !== 'function') throw new TypeError('Bus reader requires an injected now clock');
-  let rows = [], observedAt = null, health = 'unknown', reason = null, reusableFingerprint = null;
+  let rows = [], remote = null, observedAt = null, health = 'unknown', reason = null, reusableFingerprint = null;
+  let remoteSelectedAt = null, remoteExpiresAt = Infinity;
   const query = makePrivateSnapshotQuery({ file, loadSqlite, tempRoot, copyFile });
   const selectRows = (database, sourceFingerprint) => {
     const result = [];
@@ -112,7 +197,14 @@ function makeBusReader({ file = defaultBusPath(), loadSqlite = loadBunSqlite, no
       result.push({ id: row.id, identity: messageIdentity(sourceFingerprint, row), sender: row.sender, recipient: row.recipient, sentAt: instant(row.sent_at),
         acknowledgedAt: instant(row.acknowledged_at), wake: row.wake_status == null ? 'none' : WAKES.has(row.wake_status) ? row.wake_status : 'unknown' });
     }
-    return { rows: result };
+    // Relay metadata is optional: a bus without (or with unreadable) remote tables still reads as a plain local bus.
+    let relayView = null, expiresAt = Infinity;
+    const selectedAt = now();
+    try {
+      const selection = selectRemote(database, result, selectedAt);
+      relayView = selection?.view || null; expiresAt = selection?.expiresAt ?? Infinity;
+    } catch (_) { relayView = null; for (const row of result) delete row.relay; }
+    return { rows: result, remote: relayView, selectedAt, expiresAt };
   };
   // A failed read keeps the last good rows and their observedAt, so the browser sees them as stale.
   function read() {
@@ -120,18 +212,24 @@ function makeBusReader({ file = defaultBusPath(), loadSqlite = loadBunSqlite, no
     try {
       const current = fingerprint(file);
       if (current[0] === null) result = { reason: 'missing' };
-      else if (reusableFingerprint && current.join('|') === reusableFingerprint.join('|')) {
-        return { rows, observedAt, health: 'available', reason: null };
+      // A stable database does not freeze the relay's clock-dependent roster/publications.
+      else if (reusableFingerprint && current.join('|') === reusableFingerprint.join('|') &&
+        (!remote || now() >= remoteSelectedAt && now() < remoteExpiresAt)) {
+        return { rows, remote, observedAt, health: 'available', reason: null };
       }
     } catch (_) { result = { reason: 'unreadable' }; }
     result = result || query(selectRows);
     if (result.rows) {
-      rows = result.rows; observedAt = now(); health = 'available'; reason = null;
+      const unchanged = reusableFingerprint && result.fingerprint.join('|') === reusableFingerprint.join('|');
+      rows = result.rows; remote = result.remote || null;
+      remoteSelectedAt = result.selectedAt; remoteExpiresAt = result.expiresAt;
+      if (!unchanged) observedAt = now();
+      health = 'available'; reason = null;
       reusableFingerprint = result.fingerprint;
     } else {
       health = 'unavailable'; reason = result.reason; reusableFingerprint = null;
     }
-    return { rows, observedAt, health, reason };
+    return { rows, remote, observedAt, health, reason };
   }
 
   // Private raw results are confined to the worker transport and the shared sanitizer below.
@@ -177,6 +275,10 @@ function publicBus(state, sessions) {
   const endpoint = address => ADDRESS.test(address) && panes.get(address) || 'external';
   return { health: state.health, reason: state.reason, observedAt: state.observedAt, window: WINDOW,
     messages: state.rows.map(row => ({ id: row.id, ...(row.identity === undefined ? {} : { identity: row.identity }), from: endpoint(row.sender), to: endpoint(row.recipient),
-      sentAt: row.sentAt, acknowledgedAt: row.acknowledgedAt, wake: row.wake })) };
+      sentAt: row.sentAt, acknowledgedAt: row.acknowledgedAt, wake: row.wake, ...(row.relay ? { relay: { ...row.relay } } : {}) })),
+    ...(state.remote ? { remote: { relay: state.remote.relay, machine: state.remote.machine, lastActivityAt: state.remote.lastActivityAt,
+      // This machine's panes on the relay: exact pane joins only, as observer ids with their shared repo.
+      onRelay: (state.remote.published || []).flatMap(entry => { const id = ADDRESS.test(entry.address) && panes.get(entry.address); return id && id !== 'ambiguous' ? [{ id, repo: entry.repo }] : []; }),
+      peers: state.remote.peers.map(peer => ({ ...peer, repos: peer.repos.slice(), list: (peer.list || []).map(agent => ({ ...agent })) })) } } : {}) };
 }
-module.exports = { makeBusReader, publicBus, defaultBusPath, WINDOW, makePrivateSnapshotQuery, sanitizeMessageInspection };
+module.exports = { makeBusReader, publicBus, defaultBusPath, WINDOW, makePrivateSnapshotQuery, sanitizeMessageInspection, relayBinding, RELAY_STATES };

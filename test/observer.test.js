@@ -1,6 +1,6 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { makeObserver: makeNativeObserver } = require('../sidecar/observer.js');
+const { makeObserver: makeNativeObserver, aggregateRows } = require('../sidecar/observer.js');
 // Inventory fixtures never consult a developer's real private overseer record.
 const emptyOverseerState = { read: async () => ({ state: 'empty' }), match: async () => false };
 const makeCoreObserver = options => makeNativeObserver({ overseerState: emptyOverseerState, ...options });
@@ -115,6 +115,7 @@ const pane = (id, session = ID) => ({ pane_id: id, agent: 'codex', agent_status:
   await pollingFreshness();
   await identityEnrichmentOrdering();
   await usageAggregate();
+  aggregateHostOwnership();
   await aggregateAgeAndOverflow();
   await aggregateOptionalEvidence();
   await optionalToolObservationFallback();
@@ -1577,4 +1578,28 @@ async function overseerRoles() {
     assert.equal((await restarted.get()).sessions[0].role, null);
     assert(!JSON.stringify(await restarted.get()).includes(file), 'private state path never enters rows');
   } finally { for (const observer of observers) observer.close(); await fs.rm(directory, { recursive: true, force: true }); }
+}
+
+// A transcript UUID belongs to one host; copied histories on other machines are
+// independent observations, while duplicate panes on the same host still agree or conflict.
+function aggregateHostOwnership() {
+  const usage = value => ({ inputTokens: { value, state: 'available' }, outputTokens: { value: 2, state: 'available' },
+    cacheReadTokens: { value: 0, state: 'available' }, cacheWriteTokens: { value: 0, state: 'available' }, observedAt: 1000 });
+  const local = { id: 'local-pane', provider: 'codex', source: 'herdr', sessionId: ID, inspectionIdentity: 'codex:' + ID,
+    inventoryHealth: 'available', observedAt: 1000, status: 'working', usage: usage(10) };
+  const remote = { ...local, id: 'remote-pane', host: 'vm', status: 'blocked', usage: usage(20) };
+  const combined = aggregateRows([local, remote], 1000);
+  assert.equal(combined.agents.observed, 2, 'same UUID on different hosts represents two observed agents');
+  assert.equal(combined.agents.verifiedSessions, 2);
+  assert.equal(combined.agents.statuses.working, 1); assert.equal(combined.agents.statuses.blocked, 1);
+  assert.equal(combined.coverage.conflicting, 0, 'independent host statuses and counters never conflict');
+  assert.deepEqual(combined.usage.inputTokens, { value: 30, state: 'available' });
+  assert.deepEqual(combined.usage.outputTokens, { value: 4, state: 'available' });
+
+  const duplicate = aggregateRows([local, { ...local, id: 'local-copy', host: null }, remote, { ...remote, id: 'remote-copy' }], 1000);
+  assert.deepEqual(duplicate, combined, 'same-host duplicates count once; missing and null host both mean local');
+  const conflicted = aggregateRows([local, remote, { ...remote, id: 'remote-copy', status: 'done', usage: usage(99) }], 1000);
+  assert.equal(conflicted.coverage.conflicting, 1, 'same-host contradictory duplicates retain existing exclusion policy');
+  assert.equal(conflicted.agents.observed, 1); assert.equal(conflicted.agents.statuses.working, 1);
+  assert.deepEqual(conflicted.usage.inputTokens, { value: 10, state: 'partial' }, 'remote conflict cannot discard or contaminate local usage');
 }

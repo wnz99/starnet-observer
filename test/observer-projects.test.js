@@ -128,6 +128,15 @@ assert.throws(() => makeProjectResolver({ execute: execFile }), /requires an inj
     assert.equal((await resolver.resolve(otherLinked)).projectId, 'unassigned', 'replaced main Git identity is rejected');
     const all = JSON.stringify([main, nested, linked, folder, ai, web, review, notes, starnet, tools, solo, same]);
     assert(!all.includes(temp) && !all.includes(await fs.realpath(temp)), 'no full paths cross the resolver');
-    console.log('observer projects: Git roots, worktrees inside and outside Projects, canonical parent/direct/Personal roots, symlinked root, same names and no full paths OK');
+    // The home folder as a room carries a display-only flag; ids and names are unchanged, and nothing else gets it.
+    const homeDir = path.join(temp, 'home-user'), elsewhere = path.join(temp, 'home-user', 'notes'); await fs.mkdir(elsewhere, { recursive: true });
+    await repository(path.join(homeDir, 'repo'));
+    const homed = makeProjectResolver({ now: () => 1000, execute: execFile, home: homeDir });
+    const [atHome, inRepo, below] = await homed.resolveMany([homeDir, path.join(homeDir, 'repo'), elsewhere]);
+    assert.equal(atHome.projectHome, true); assert.equal(atHome.project, 'home-user', 'the label change is the page’s; the name stays');
+    assert.equal(inRepo.projectHome, true, 'a repository directly in home groups under the home room');
+    assert.equal('projectHome' in below, false, 'a folder below home is its own room, not home');
+    assert.equal('projectHome' in main, false, 'no flag outside home');
+    console.log('observer projects: home-folder flag, Git roots, worktrees inside and outside Projects, canonical parent/direct/Personal roots, symlinked root, same names and no full paths OK');
   } finally { await fs.rm(temp, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

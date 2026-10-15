@@ -8,7 +8,19 @@ const TOOL_NAMES = new Set(['Bash', 'exec_command', 'shell', 'local_shell', 'wri
 // Opaque ownership IDs and live status/freshness remain unchanged; aliases are display identities only.
 function makePresentationObserver(observer, now = Date.now, labels = DEFAULT_LABELS) {
   let closePromise = null;
-  const projects = new Map(), repos = new Map(), worktrees = new Map(), folders = new Map();
+  const projects = new Map(), repos = new Map(), worktrees = new Map(), hosts = new Map(), folders = new Map();
+  // Remote host ids are operator-chosen names (often real machine names): they become fictional ship names.
+  const host = id => { if (id == null) return null; if (!hosts.has(id)) hosts.set(id, 'Ship ' + (hosts.size + 1)); return hosts.get(id); };
+  // llm-bus relay names (relay host, machine ids, shared repo ids) are real names too: each gets a stable fictional alias.
+  const aliases = new Map(), alias = (kind, prefix, id) => { const key = kind + '\0' + id; if (!aliases.has(key)) aliases.set(key, prefix + ' ' + ([...aliases.keys()].filter(k => k.startsWith(kind + '\0')).length + 1)); return aliases.get(key); };
+  const relayOf = relay => relay ? { direction: relay.direction, machine: alias('machine', 'Machine', relay.machine), repo: alias('repo', 'Shared repo', relay.repo), provider: relay.provider,
+    ...(relay.peer ? { peer: relay.peer } : {}), state: relay.state } : undefined;
+  const remoteOf = remote => remote ? { relay: alias('relay', 'Relay', remote.relay), machine: alias('machine', 'Machine', remote.machine), lastActivityAt: remote.lastActivityAt,
+    onRelay: (remote.onRelay || []).map(entry => ({ id: entry.id, repo: alias('repo', 'Shared repo', entry.repo) })),
+    peers: (remote.peers || []).map(peer => ({ machine: alias('machine', 'Machine', peer.machine), repos: (peer.repos || []).map(repo => alias('repo', 'Shared repo', repo)), agents: peer.agents, lastSeen: peer.lastSeen,
+      list: (peer.list || []).map(agent => ({ id: agent.id, provider: agent.provider, repo: alias('repo', 'Shared repo', agent.repo), lastSeen: agent.lastSeen })) })) } : undefined;
+  const mailOf = (message, extra = {}) => { const relay = relayOf(message.relay); return { id: message.id, ...extra, from: message.from, to: message.to, sentAt: message.sentAt, acknowledgedAt: message.acknowledgedAt, wake: message.wake, ...(relay ? { relay } : {}) }; };
+
   // Dynamic-arrangement labels are private too: fictional bay/section names in the same sorted allocation pass.
   const bays = new Map(), sections = new Map();
   const bay = id => { if (!bays.has(id)) bays.set(id, 'Bay ' + (bays.size + 1)); return bays.get(id); };
@@ -52,7 +64,7 @@ function makePresentationObserver(observer, now = Date.now, labels = DEFAULT_LAB
     if (checkoutId && row.folder && !folders.has(folderKey)) folders.set(folderKey, 'Folder ' + (folders.size + 1));
     const helper = row.source === 'helper' || Object.hasOwn(row, 'parentId');
     const safe = {
-      id: row.id, provider: row.provider, source: row.source, status: row.status,
+      id: row.id, host: host(row.host), provider: row.provider, source: row.source, status: row.status,
       projectId: row.projectId, project: room.name, projectKind: row.projectKind,
       repoId: row.repoId, repo: repoName, repoKind: row.repoKind,
       checkoutId, checkoutKind,
@@ -91,9 +103,14 @@ function makePresentationObserver(observer, now = Date.now, labels = DEFAULT_LAB
         sessions: inventory.sessions.map(rowProjection), aggregate: inventory.aggregate,
         health: inventory.health, observedAt: inventory.observedAt,
         error: inventory.error ? 'Local session inventory unavailable' : null,
-        sources: { herdr: source(inventory.sources?.herdr), desktop: source(inventory.sources?.desktop) },
+        sources: { herdr: source(inventory.sources?.herdr), desktop: source(inventory.sources?.desktop),
+          ...(inventory.sources?.hosts ? { hosts: Object.fromEntries(Object.entries(inventory.sources.hosts).map(([id, value]) =>
+            [id === 'local' ? 'local' : host(id), { health: value.health, observedAt: value.observedAt, agents: value.agents }])) } : {}) },
         bus: bus ? { health: bus.health, reason: bus.reason, observedAt: bus.observedAt, window: bus.window,
-          messages: bus.messages.map(message => ({ id: message.id, from: message.from, to: message.to, sentAt: message.sentAt, acknowledgedAt: message.acknowledgedAt, wake: message.wake })) } : null
+          messages: bus.messages.map(message => mailOf(message)), ...(bus.remote ? { remote: remoteOf(bus.remote) } : {}) } : null,
+        // Each remote host's own mail, masked like local mail and keyed by the host's fictional ship name.
+        ...(inventory.hostBus ? { hostBus: Object.fromEntries(Object.entries(inventory.hostBus).map(([id, value]) => [host(id), { health: value.health, observedAt: value.observedAt, window: value.window,
+          messages: (value.messages || []).map(message => mailOf(message, { key: message.id + '@' + host(id), host: host(id) })), ...(value.remote ? { remote: remoteOf(value.remote) } : {}) }])) } : {})
       };
     },
     async inspect(id) { return unavailable(id, 'presentation-mode', now()); },

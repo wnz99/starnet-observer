@@ -78,5 +78,16 @@ try {
   }
   const example = JSON.parse(fs.readFileSync(path.join(__dirname, '../observer.config.example.json'), 'utf8'));
   validateConfig(example);
+  // Remotes: validated ids, ssh targets that can never be read as ssh options, plain dirs, defaults.
+  assert.deepEqual(loadConfig([], missing).remotes, []);
+  write({ remotes: [{ id: 'herdr-dev-2', ssh: 'nick@34.153.167.160' }, { id: 'box', ssh: 'devbox', dir: '/srv/observer' }] });
+  assert.deepEqual(loadConfig([], file).remotes, [{ id: 'herdr-dev-2', ssh: 'nick@34.153.167.160', dir: '~/starnet-observer' },
+    { id: 'box', ssh: 'devbox', dir: '/srv/observer' }]);
+  // Mail topology is never configured: relays are drawn only from each bus's own binding.
+  assert.throws(() => validateConfig({ remotes: [{ id: 'a', ssh: 'h', mail: 'relay' }] }), /mail/);
+  for (const remotes of [{}, Array.from({ length: 17 }, (_, i) => ({ id: 'h' + i, ssh: 'h' })), [{ id: 'A', ssh: 'h' }], [{ id: 'local', ssh: 'h' }],
+    [{ id: 'a', ssh: 'h' }, { id: 'a', ssh: 'g' }], [{ id: 'a', ssh: '-oProxyCommand=touch /tmp/x' }], [{ id: 'a', ssh: 'h; rm' }], [{ id: 'a', ssh: 'u@h@x' }],
+    [{ id: 'a', ssh: 'h', dir: '~/x; rm -rf ~' }], [{ id: 'a', ssh: 'h', dir: '../up' }], [{ id: 'a', ssh: 'h', dir: '$HOME' }], [{ id: 'a', ssh: 'h', port: 22 }]])
+    assert.throws(() => validateConfig({ remotes }));
   console.log('config: defaults, optional/explicit files, CLI precedence, custom names, strict validation, help and fail-before-startup passed');
 } finally { fs.rmSync(folder, { recursive: true, force: true }); }

@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const { stationChildEnv } = require('./child-env.js');
 const { makeArranger, UNASSIGNED } = require('./observer-arrangement.js');
@@ -14,9 +15,12 @@ const unassigned = () => ({ projectId: 'unassigned', project: 'Unassigned', proj
    Canonical main-repository parents own rooms; direct folder agents use that same folder identity.
    With `arrange` (an object: { roomsFile?, home? }), each row also carries `arrangement`, the dynamic grouping from
    observer-arrangement.js; without it the output is exactly the folder grouping. */
-function makeProjectResolver({ execute, now, arrange = null, fs: arrangeFs }) {
+function makeProjectResolver({ execute, now, home = os.homedir(), arrange = null, fs: arrangeFs }) {
   if (typeof now !== 'function') throw new TypeError('Project resolver requires an injected now clock');
   const cache = new Map();
+  // The user's home folder as a room gets a display-only flag (the page labels it "~ home"); ids are unchanged.
+  let homeReal = null;
+  const homeFolder = async () => homeReal ?? (homeReal = await fs.realpath(home).catch(() => home));
   const gitSettings = () => ({ timeout: 1000, maxBuffer: 16384,
     env: Object.fromEntries(Object.entries(stationChildEnv()).filter(([name]) => !name.startsWith('GIT_'))) });
   const arranger = arrange ? makeArranger({ now, fs: arrangeFs, home: arrange.home, roomsFile: arrange.roomsFile || null, warn: arrange.warn,
@@ -62,14 +66,14 @@ function makeProjectResolver({ execute, now, arrange = null, fs: arrangeFs }) {
       identity = common; kind = 'repository'; root = main; mainRoot = gitDir === common ? main : null;
       if (checkout !== root) worktree = path.basename(checkout);
     }
-    const projectFolder = kind === 'repository' ? path.dirname(root) : root;
+    const projectFolder = kind === 'repository' ? path.dirname(root) : root, atHome = projectFolder === await homeFolder();
     // Sub-folder inside the checkout the pane is working in ('' at the root): a display label only.
     let folder = '', here = null;
     try { here = await fs.realpath(cwd); const rel = path.relative(checkoutRoot, here); if (rel && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)) folder = rel.split(path.sep).map(clean).filter(Boolean).join('/'); } catch (_) { folder = ''; }
     const value = { projectId: opaque('prj_', 'folder\0' + projectFolder), project: clean(path.basename(projectFolder)) || 'Local folder', projectKind: 'group',
       repoId: opaque(kind === 'repository' ? 'repo_' : 'dir_', identity), repo: clean(path.basename(root)) || 'Local folder', repoKind: kind,
       checkoutId: opaque('checkout_', checkoutRoot), checkoutKind: kind === 'folder' ? 'folder' : worktree ? 'worktree' : 'main',
-      worktree: worktree ? clean(worktree) : null, folder: folder.slice(0, 120) };
+      worktree: worktree ? clean(worktree) : null, folder: folder.slice(0, 120), ...(atHome ? { projectHome: true } : {}) };
     // Canonical paths stay inside the process: the arranger reads them, the API never sees them.
     const paths = here ? { kind, root, checkoutRoot, here } : null;
     found.paths = paths;

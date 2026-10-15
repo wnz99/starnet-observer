@@ -23,11 +23,13 @@
   const savedFilter = prefs.get('filter'), savedPage = Number(prefs.get('page'));
   let latest, selected = null, page = Number.isInteger(savedPage) && savedPage >= 0 && savedPage < 1000 ? savedPage : 0,
     filter = filters.some(button => button.dataset.filter === savedFilter) ? savedFilter : 'all', ingested = null, ingestedStale = false, mailSelected = null, inventoryStale = true;
-  let pendingSpots = [], scene = null, grounded = true, byId = new Map();
+  let pendingSpots = [], scene = null, grounded = true, byId = new Map(), shadowById = new Map(), relayMembers = new Map();
   // Visibility: a hidden page owns no subscription, deadline or frame; resume proves freshness before inspection.
   let active = false, unsubscribe = null, resumedAt = 0, awaitingProof = false, cachedAtResume = null;
   const rowFor = id => byId.get(id);
-  const messageFor = id => (latest?.data?.bus?.messages || []).find(value => value.id === id);
+  // The mail panel lists the selected host's own bus (this machine's unless a remote host tab is chosen).
+  const panelBus = () => (selectedHost && latest?.data?.hostBus?.[selectedHost]) || (selectedHost ? null : latest?.data?.bus) || null;
+  const messageFor = id => (panelBus()?.messages || []).find(value => value.id === id);
   const FRESH_MS = 6000, fresh = at => Number.isFinite(at) && Date.now() - at <= FRESH_MS;
   // Inventory older than six seconds is stale even while a GET is still pending: the view asks on every paint.
   // Overall freshness means at least one source refreshed; it never makes another source's rows live.
@@ -45,45 +47,76 @@
   }
   // Couriers fly between Herdr panes, so a fresh Desktop source never launches them over a stale Herdr floor.
   const mailStale = state => isStale(state) || sourceStale('herdr', state);
+  function remoteMailStale(host, state = latest) {
+    const source = state?.data?.sources?.hosts?.[host], bus = state?.data?.hostBus?.[host];
+    return isStale(state) || source?.health !== 'available' || !fresh(source.observedAt) ||
+      bus?.health !== 'available' || !fresh(bus.observedAt);
+  }
   const isHelper = row => row.source === 'helper' || Object.hasOwn(row, 'parentId');
   /* Repository highlight: one exact repository id, never a label or the parent-folder project. It selects, never
      filters or moves the camera, and asks for nothing: the list and the floor just repaint. */
   let selectedRepoId = null;
+  /* Multi-host: the panel lists one host's crew at a time (null = this machine). Chosen by a host tab, a ship click
+     or selecting an agent; only meaningful when the hub reports remote hosts. */
+  let selectedHost = null, hostList = [], pendingSpawn = null;
+  /* The chosen host tab survives a reload: only its id is stored (localStorage key observer.host), read once, and
+     honoured only if the hub still reports that host; storage failures are ignored. */
+  const HOST_KEY = 'observer.host';
+  let restoreHost = (() => { try { const value = window.localStorage?.getItem(HOST_KEY); return typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(value) ? value : null; } catch (_) { return null; } })();
+  function rememberHost(host) { try { if (host) window.localStorage?.setItem(HOST_KEY, host); else window.localStorage?.removeItem(HOST_KEY); } catch (_) { /* private mode or blocked storage */ } }
   function toggleRepository(repoId) {
     if (typeof repoId !== 'string' || !(latest?.data?.sessions || []).some(row => row.repoId === repoId)) return;
     selectedRepoId = selectedRepoId === repoId ? null : repoId;
     if (latest) render(latest, true);
   }
-  const view = ObserverView.create({ theme: pack, canvas: get('world'), reducedMotion, onSelect: id => select(id, true), onObservatory: () => observatoryClicked(),
+  const view = ObserverView.create({ theme: pack, canvas: get('world'), reducedMotion, onSelect: id => select(id, true), onObservatory: () => observatoryClicked(), onShip: host => hostClicked(host), hostSelection: () => (hostList.length ? selectedHost : undefined),
     // A worker's canvas title toggles the same exact panel as its list title and magnifier; focus returns to the station.
     onTitleToggle: id => { const row = rowFor(id); if (row) togglePanel(agentTarget(row), get('world')); },
     // Platform zoom never selects a worker; it only clears a previous worker selection.
     onPlatform: () => { selected = null; if (latest) render(latest, true); },
     onMode: ({ mode, platform }) => showZoom(mode === 'platform' ? platform : null),
     // Read every frame, so a title Herdr publishes later replaces the fallback while still hovered.
-    hoverLabel: id => { const row = rowFor(id); return row ? ObserverModel.hoverLabel(row, rowStale(row)) : null; },
+    hoverLabel: id => { const row = rowFor(id), carried = relayMembers.get(id); if (row) return ObserverModel.hoverLabel(row, rowStale(row)) + (carried ? ' · on relay (' + carried.repo + ')' : '');
+      const ghost = shadowById.get(id);   // a relay roster entry: what llm-bus lists, nothing observed
+      return ghost ? (PROVIDERS[ghost.provider] || 'Agent') + ' on ' + ghost.machine + ' · ' + ghost.repo + (ghost.lastActivityAt ? ' · active ' + ObserverModel.age(ghost.lastActivityAt) : '') + ' · via relay, not observed' : null; },
     idleLevel: id => { const row = rowFor(id); return row ? ObserverModel.idleAge(row).level : 0; },
     idleVigour: id => { const row = rowFor(id); return row ? ObserverModel.idleAge(row).vigour : 1; },
-    nameFor: id => { const row = rowFor(id); return row ? workerName(row) : ''; },
+    nameFor: id => { const row = rowFor(id); if (row) return workerName(row); const ghost = shadowById.get(id); return ghost ? (PROVIDERS[ghost.provider] || 'Agent') + ' · ' + ghost.machine : ''; },
     onCamera: ({ canZoomIn, canZoomOut }) => { get('zoom-in').disabled = !canZoomIn; get('zoom-out').disabled = !canZoomOut; } });
-  /* One courier, stepped by the view's frame. A transition into stale or reduced grounds flights at once; the
-     reset makes the next live snapshot rebase instead of replaying what was missed. */
+  /* One courier per host's bus, stepped by the view's frame: this machine's, plus one for each remote ship, whose
+     flights stay inside that ship (its own mailroom and crew). A transition into stale or reduced grounds flights at
+     once; the reset makes the next live snapshot rebase instead of replaying what was missed. */
+  const remoteCouriers = new Map(), remotePending = new Map(), remoteGrounded = new Set();
+  const courierFor = host => { if (!remoteCouriers.has(host)) remoteCouriers.set(host, ObserverMail.createCourier({ colors: pack.scene?.colors })); return remoteCouriers.get(host); };
+  const resetCouriers = () => { courier.reset(); for (const value of remoteCouriers.values()) value.reset(); };
   function mailFrame(now) {
     const ground = mailStale(latest) || reducedMotion();
     if (ground && !grounded) courier.reset();
     grounded = ground;
     courier.step(now);
-    return courier.frame(now, { reduced: ground, pending: pendingSpots, pads: scene ? scene.mail.pads : [] });
+    const frame = courier.frame(now, { reduced: ground, pending: pendingSpots, pads: scene ? scene.mail.pads : [] });
+    for (const [host, remote] of remoteCouriers) {
+      const own = scene && ObserverScene.mailOf(scene, host); if (!own) continue;
+      const ownGround = remoteMailStale(host) || reducedMotion();
+      if (ownGround && !remoteGrounded.has(host)) remote.reset();
+      if (ownGround) remoteGrounded.add(host); else remoteGrounded.delete(host);
+      remote.step(now);
+      const extra = remote.frame(now, { reduced: ownGround, pending: remotePending.get(host) || [], pads: own.pads });
+      frame.drones = [...(frame.drones || []), ...(extra.drones || [])]; frame.envelopes = [...(frame.envelopes || []), ...(extra.envelopes || [])];
+    }
+    return frame;
   }
 
   function setPage(next) {
     if (next === page) return;
-    page = next; courier.reset(); prefs.set('page', page);
+    page = next; resetCouriers(); prefs.set('page', page);
   }
   function select(id, scroll = false) {
     if (!byId.has(id)) return;
     selected = id;
-    const target = layout.pageFor(id); if (byId.get(id).role !== 'overseer' && Number.isInteger(target)) setPage(target);   // the overseer sits on every page
+    const row = byId.get(id);
+    if (hostList.length && (row.host || null) !== selectedHost) { selectedHost = row.host || null; mailSelected = null; rememberHost(selectedHost); }
+    const target = layout.pageFor(id); if ((row.role !== 'overseer' || row.host) && Number.isInteger(target)) setPage(target);   // the local overseer sits on every page
     render(latest, true);
     view.focus(id);
     if (scroll) rowNodes.get(id)?.button.scrollIntoView({ block: 'nearest' });
@@ -312,25 +345,33 @@
   // Closed or killed only on positive lifecycle evidence: inactivity, a missing file or a finished task never closes a helper.
   const lifecycleText = row => isHelper(row) && row.lifecycleEvidence?.state === 'closed' ? (row.lifecycleEvidence.reason === 'killed' ? 'killed' : 'closed') : '';
 
-  function endpointLabel(id) {
+  function endpointLabel(id, message = null, side = null) {
     if (id === 'ambiguous') return 'Ambiguous session';
     const row = byId.get(id);
-    return row ? workerName(row) + ' · ' + (row.project || 'Unassigned') : 'Outside the observer';
+    if (row) return workerName(row) + ' · ' + (row.project || 'Unassigned');
+    // The far side of relayed mail: the machine, shared repo and provider llm-bus routed it by (never a session id).
+    const relay = message?.relay, far = relay && ((relay.direction === 'out') === (side === 'to'));
+    return far ? (relay.provider ? PROVIDERS[relay.provider] || relay.provider : 'Agent') + ' on ' + relay.machine + ' · ' + relay.repo + ' (via relay)' : 'Outside the observer';
   }
+  // Relayed mail's delivery as llm-bus's bridge last synchronized it: storage and delivery are never proof of handling.
+  const RELAY_TEXT = { queued_local: 'queued here for the relay', accepted_remote: 'held at the relay', delivered_local: 'delivered to the far machine, not acknowledged',
+    acknowledged: 'acknowledged', expired: 'expired at the relay (30 days)', unknown: 'relay state unknown' };
   // Wake is a request to the recipient's host, never proof the message was read.
   const wakeText = { requested: 'wake requested', failed: 'wake failed', unsupported: 'wake unsupported', unknown: 'wake state unknown', none: 'no wake recorded' };
-  const mailStatus = message => message.acknowledgedAt ? 'acknowledged' : 'not acknowledged · ' + (wakeText[message.wake] || wakeText.unknown);
+  const mailPending = message => !message.acknowledgedAt && message.relay?.state !== 'expired';
+  const mailStatus = message => message.relay && (message.relay.direction === 'out' || message.relay.state === 'expired') ? RELAY_TEXT[message.relay.state] || RELAY_TEXT.unknown
+    : message.acknowledgedAt ? 'acknowledged' : 'not acknowledged · ' + (wakeText[message.wake] || wakeText.unknown);
   function busHealth(bus) {
     if (!bus) return 'Bus not read yet';
-    if (bus.health === 'available') return 'Live · llm-bus';
+    if (bus.health === 'available') return 'Live · llm-bus' + (bus.remote ? ' · relay ' + bus.remote.machine + ' ⇄ ' + bus.remote.relay : '');
     const reason = { missing: 'No bus database found', unsupported: 'Bus SQLite support unavailable; use the supported Bun runtime', unreadable: 'Bus unreadable',
       unstable: 'Bus busy while copying · retrying' }[bus.reason] || 'Bus unavailable';
     return reason + (bus.observedAt ? ' · last known ' + ObserverModel.age(bus.observedAt) : '');
   }
   function mailDetail(message) {
-    return 'Message #' + message.id + ' · from ' + endpointLabel(message.from) + ' · to ' + endpointLabel(message.to) +
+    return 'Message #' + message.id + ' · from ' + endpointLabel(message.from, message, 'from') + ' · to ' + endpointLabel(message.to, message, 'to') +
       ' · sent ' + (ObserverModel.age(message.sentAt) || 'at an unknown time') + ' · ' + mailStatus(message) +
-      (byId.has(message.to) ? '' : byId.has(message.from) ? ' · recipient is not an observed pane; showing sender' : ' · neither side is an observed pane');
+      (byId.has(message.to) ? '' : byId.has(message.from) ? (message.relay ? ' · the recipient is on another machine; showing sender' : ' · recipient is not an observed pane; showing sender') : ' · neither side is an observed pane');
   }
   // Selecting a ledger row focuses the recipient pane, else the sender; neither being observed is said plainly.
   function showMail(message) {
@@ -370,11 +411,12 @@
     entry = { item, button, route, state, read }; mailRows.set(id, entry);
     return entry;
   }
-  function renderMail(bus) {
+  function renderMail(bus, mailCourier = courier) {
     const messages = bus && Array.isArray(bus.messages) ? bus.messages : [], limit = bus?.window || 100;
-    const pending = messages.filter(message => !message.acknowledgedAt).length, skipped = courier.state().skipped;
+    const pending = messages.filter(mailPending).length, acknowledged = messages.filter(message => !!message.acknowledgedAt).length;
+    const expired = messages.length - pending - acknowledged, skipped = mailCourier.state().skipped;
     setText(get('mail-health'), busHealth(bus));
-    setText(get('mail-counts'), bus ? pending + ' pending · ' + (messages.length - pending) + ' acknowledged · in recent ' + limit +
+    setText(get('mail-counts'), bus ? pending + ' pending · ' + acknowledged + ' acknowledged' + (expired ? ' · ' + expired + ' expired' : '') + ' · in recent ' + limit +
       (skipped ? ' · ' + skipped + ' shown without animation' : '') : '');
     const focusedNode = document.activeElement, ledgerTop = get('mail-ledger').scrollTop, present = new Set(messages.map(message => message.id));
     for (const id of mailRows.keys()) if (!present.has(id)) mailRows.delete(id);
@@ -382,8 +424,8 @@
     const items = messages.map(message => {
       const entry = mailRow(message.id);
       entry.button.setAttribute('aria-pressed', String(mailSelected === message.id));
-      setText(entry.route, '#' + message.id + ' ' + endpointLabel(message.from) + ' → ' + endpointLabel(message.to));
-      entry.state.className = 'mail-state' + (message.acknowledgedAt ? '' : ' pending');
+      setText(entry.route, '#' + message.id + ' ' + endpointLabel(message.from, message, 'from') + ' → ' + endpointLabel(message.to, message, 'to'));
+      entry.state.className = 'mail-state' + (mailPending(message) ? ' pending' : '');
       setText(entry.state, mailStatus(message) + ' · ' + ObserverModel.age(message.sentAt));
       // Only a message with a verified identity can be read; the toggle names what it will do.
       const target = mailTarget(message), open = !!target && isOpenTarget(target);
@@ -419,10 +461,68 @@
     if (!CONTROL || !paneId || button.disabled) return;
     button.disabled = true; notice(pending);
     try {
-      const result = await Harness.api.post('/api/control/' + action, action === 'overseer' ? { provider } : { paneId });
-      notice(action === 'overseer' ? PROVIDERS[provider] + ' overseer started in ' + result.paneId + ' · terminal opening · it takes the observatory chair on the next poll' : action === 'spawn' ? 'Started ' + (result.name || 'a new agent') + ' in ' + result.paneId + ' · terminal opening' : action === 'attach' ? 'Terminal opening for ' + paneId : 'Closed ' + paneId);
-    } catch (error) { notice((action === 'overseer' ? 'Could not start the overseer: ' : action === 'spawn' ? 'Could not start an agent: ' : action === 'attach' ? 'Could not open a terminal: ' : 'Could not close the agent: ') + error.message, true); }
+      const result = await Harness.api.post('/api/control/' + action, action === 'overseer' ? { provider } : action === 'spawn-host' ? { host: paneId } : { paneId });
+      // Spawning never opens a terminal: the new agent is selected in the panel when it appears; ⇱ attaches.
+      if (['spawn', 'spawn-host', 'overseer'].includes(action) && typeof result.paneId === 'string') pendingSpawn = { paneId: result.paneId, until: Date.now() + 90000 };
+      notice(action === 'spawn-host' ? 'Started ' + (result.name || 'a new agent') + ' in ' + result.folder + ' · ' + result.paneId + ' · selecting it when it appears' : action === 'overseer' ? 'Overseer started in ' + result.paneId + ' · it takes the observatory chair on the next poll' : action === 'spawn' ? 'Started ' + (result.name || 'a new agent') + ' in ' + result.paneId + ' · selecting it when it appears' : action === 'attach' ? 'Terminal opening for ' + paneId : 'Closed ' + paneId);
+    } catch (error) { notice((action === 'spawn-host' ? 'Could not start an agent on that host: ' : action === 'overseer' ? 'Could not start the overseer: ' : action === 'spawn' ? 'Could not start an agent: ' : action === 'attach' ? 'Could not open a terminal: ' : 'Could not close the agent: ') + error.message, true); }
     finally { button.disabled = false; }
+  }
+  /* Ship click or host tab: the panel switches to that host's crew. Acting (spawn, attach) happens from the panel. */
+  function hostClicked(host) {
+    if (!hostList.length) return;
+    const next = host && hostList.some(entry => entry.id === host) ? host : null;
+    if (next === selectedHost) return;
+    selectedHost = next; selectedRepoId = null; mailSelected = null; rememberHost(next);
+    if (selected && (byId.get(selected)?.host || null) !== next) selected = null;
+    if (latest) render(latest, true);
+  }
+  const hostName = host => host || 'This machine';
+  function hostHealthText(host, sources, count) {
+    const source = host ? sources?.[host] : sources?.local, agents = count + ' agent' + (count === 1 ? '' : 's');
+    if (!source || source.health === 'available') return { text: 'Live · ' + agents, live: true };
+    if (source.health === 'stale') return { text: 'Stale · last seen ' + (source.observedAt ? ObserverModel.age(source.observedAt) : 'never') + ' · ' + agents, live: false };
+    return { text: 'Unreachable · ' + (source.reason || 'no connection') + (count ? ' · last known ' + agents : ''), live: false };
+  }
+  const hostTabNodes = new Map();
+  function renderHosts(hosts, sources, rows, panelRows) {
+    const tabs = get('host-tabs'), health = get('host-health'), title = get('crew-title'), spawnBox = get('host-spawn');
+    if (!hosts.length) {
+      if (tabs) tabs.hidden = true; if (health) health.hidden = true; if (spawnBox) spawnBox.hidden = true;
+      if (title) setText(title, 'Your local crew');
+      return;
+    }
+    const all = [null, ...hosts.map(host => host.id)];
+    for (const key of hostTabNodes.keys()) if (!all.includes(key)) hostTabNodes.delete(key);
+    const nodes = all.map(host => {
+      let tab = hostTabNodes.get(host);
+      if (!tab) {
+        tab = text('button', 'host-tab', ''); tab.type = 'button'; tab.setAttribute('role', 'tab'); tab.dataset.host = host || '';
+        tab.addEventListener('click', () => hostClicked(host)); hostTabNodes.set(host, tab);
+      }
+      const source = host ? sources?.[host] : sources?.local, live = !source || source.health === 'available';
+      tab.className = 'host-tab' + (host ? ' remote' : '') + (live ? ' live' : '');
+      const label = hostName(host), count = rows.filter(row => (row.host || null) === host).length;
+      if (tab.dataset.label !== label + ' · ' + count) { tab.replaceChildren(text('span', 'host-dot', ''), text('span', 'host-label', label + ' · ' + count)); tab.dataset.label = label + ' · ' + count; }
+      tab.setAttribute('aria-selected', String(host === selectedHost));
+      return tab;
+    });
+    if (tabs) { tabs.replaceChildren(...nodes); tabs.hidden = false; }
+    if (title) setText(title, hostName(selectedHost) + ' crew');
+    const state = hostHealthText(selectedHost, sources, panelRows.length);
+    if (health) { setText(health, state.text); health.className = 'host-health ' + (state.live ? 'live' : 'down'); health.hidden = false; }
+    // "New agent in ~": always offered on a remote host (and on this machine when it has no agents), control on.
+    if (spawnBox) {
+      const offer = CONTROL && state.live && (selectedHost !== null || !panelRows.length);
+      spawnBox.hidden = !offer;
+      if (offer && spawnBox.dataset.host !== (selectedHost || '')) {
+        const plus = text('button', 'project-spawn', '+'); plus.type = 'button';
+        plus.title = 'Start a new Claude agent in the home folder on ' + hostName(selectedHost); plus.setAttribute('aria-label', plus.title);
+        const host = selectedHost;
+        plus.addEventListener('click', () => controlAction(plus, 'spawn-host', host || 'local', 'Starting an agent on ' + hostName(host) + '…'));
+        spawnBox.replaceChildren(text('span', 'host-spawn-label', 'New agent in ~'), plus); spawnBox.dataset.host = selectedHost || '';
+      }
+    }
   }
   let overseerChooser = null;
   function closeOverseerChooser() {
@@ -441,7 +541,7 @@
         const option = text('option', '', PROVIDERS[value]); option.value = value; provider.append(option);
       }
       const confirmation = text('p', '', ''); confirmation.id = 'overseer-confirmation';
-      const describe = () => { confirmation.textContent = 'Start ' + PROVIDERS[provider.value] + ' in a new Herdr workspace with a brief on watching the other agents, and open its terminal?'; };
+      const describe = () => { confirmation.textContent = 'Start ' + PROVIDERS[provider.value] + ' in a new Herdr workspace with a brief on watching the other agents, unattended? Use ⇱ to attach.'; };
       provider.addEventListener('change', describe);
       const actions = text('div', 'overseer-actions', '');
       const start = text('button', '', 'Start'); start.type = 'button'; start.id = 'overseer-start';
@@ -453,7 +553,7 @@
         if (!['claude', 'codex'].includes(chosen)) return;
         closeOverseerChooser();
         // A poll may have found the singleton while the chooser was open.
-        const row = (latest?.data?.sessions || []).find(entry => entry.role === 'overseer' && entry.source === 'herdr');
+        const row = (latest?.data?.sessions || []).find(entry => entry.role === 'overseer' && entry.source === 'herdr' && !entry.host);
         if (row) { select(row.id, true); return; }
         controlAction(get('world'), 'overseer', 'overseer', 'Starting the ' + PROVIDERS[chosen] + ' overseer…', chosen);
       });
@@ -469,7 +569,7 @@
   }
   /* Observatory click: select the seated overseer, or (with control on) offer to start one. */
   function observatoryClicked() {
-    const row = (latest?.data?.sessions || []).find(entry => entry.role === 'overseer' && entry.source === 'herdr');
+    const row = (latest?.data?.sessions || []).find(entry => entry.role === 'overseer' && entry.source === 'herdr' && !entry.host);
     if (row) { select(row.id, true); return; }
     if (!CONTROL) { notice('No overseer. Start the observer with OBSERVER_CONTROL=1 to spawn one from here.', true); return; }
     openOverseerChooser();
@@ -482,7 +582,7 @@
     const zoom = text('button', 'project-zoom', '⤢'); zoom.type = 'button'; zoom.addEventListener('click', () => zoomProject(key));
     heading.append(text('span', 'project-swatch', ''), label, kind, total, zoom);
     if (CONTROL) {
-      const spawn = text('button', 'project-spawn', '+'); spawn.type = 'button'; spawn.title = 'Start a new Claude agent in this project (new Herdr tab, terminal opens)';
+      const spawn = text('button', 'project-spawn', '+'); spawn.type = 'button'; spawn.title = 'Start a new Claude agent in this project (new Herdr tab; select it and press ⇱ to attach)';
       spawn.setAttribute('aria-label', 'Start a new Claude agent in this project');
       spawn.addEventListener('click', () => {
         const seed = (lastGroups.get(key) || []).find(row => row.source === 'herdr' && row.paneId && !rowStale(row));
@@ -548,16 +648,23 @@
     const stale = rowStale(row), helper = isHelper(row), chip = row.source === 'desktop' ? 'APP' : helper ? 'HELPER' : '';
     // Working emphasis is the row's own fresh status; a stale "was working" row is only highlighted.
     const inRepo = selectedRepoId !== null && row.repoId === selectedRepoId, working = inRepo && !stale && row.status === 'working';
-    const itemClass = 'session-item' + (helper ? ' helper' : '') + (inRepo ? ' repo-selected' : '') + (working ? ' repo-working' : '');
+    const needsInput = !stale && row.status === 'blocked' && row.source === 'herdr';
+    const itemClass = 'session-item' + (helper ? ' helper' : '') + (inRepo ? ' repo-selected' : '') + (working ? ' repo-working' : '') + (needsInput ? ' needs-input' : '');
     if (entry.item.className !== itemClass) entry.item.className = itemClass;
     entry.mark.hidden = !inRepo; setText(entry.mark, working ? '◆◆' : inRepo ? '◆' : '');
     setText(entry.markText, working ? 'Highlighted repository, working now' : inRepo ? 'Highlighted repository' : '');
     entry.item.style.setProperty('--depth', String(Math.min(depth, 4)));
     entry.button.setAttribute('aria-pressed', String(selected === row.id));
     entry.provider.className = 'provider ' + row.provider; setText(entry.provider, workerName(row)); if (entry.provider.title !== workerName(row)) entry.provider.title = workerName(row);
-    entry.status.className = 'status ' + row.status; setText(entry.status, (stale ? 'was ' : '') + (row.status === 'blocked' ? 'waiting' : row.status));
+    entry.status.className = 'status ' + row.status; setText(entry.status, (stale ? 'was ' : '') + (row.status === 'blocked' ? (needsInput ? 'waiting for input' : 'waiting') : row.status));
+    const hint = needsInput ? 'Waiting for input — press ⇱ to attach' : '';
+    if ((entry.item.title || '') !== hint) entry.item.title = hint;
     entry.source.hidden = !chip; setText(entry.source, chip);
-    if (entry.attach) { const can = row.source === 'herdr' && !!row.paneId && !stale; entry.attach.hidden = !can; entry.close.hidden = !can; }
+    if (entry.attach) {
+      const can = row.source === 'herdr' && !!row.paneId && !stale; entry.attach.hidden = !can; entry.close.hidden = !can;
+      const attachClass = 'row-attach' + (needsInput ? ' prominent' : ''); if (entry.attach.className !== attachClass) entry.attach.className = attachClass;
+      entry.attach.title = needsInput ? 'Waiting for input — open a terminal attached to this agent' : 'Open a terminal attached to this agent';
+    }
     setText(entry.title, composedTask(row) ? taskText(row) : row.title);
     const toolLive = !Number.isFinite(row.tool?.observedAt) || fresh(row.tool.observedAt);
     const last = toolLive && row.tool?.available && row.tool.last;
@@ -606,7 +713,7 @@
     const matching = rows.filter(row => (filter === 'all' || row.status === filter) &&
       [row.project, row.repo, row.title, row.paneId, row.provider, row.worktree, row.folder, ObserverModel.checkoutLabel(row)].some(value => String(value || '').toLowerCase().includes(query)));
     const groups = new Map(), labels = new Map(), unread = new Map();
-    for (const message of messages) if (!message.acknowledgedAt) unread.set(message.to, (unread.get(message.to) || 0) + 1);
+    for (const message of messages) if (mailPending(message)) unread.set(message.to, (unread.get(message.to) || 0) + 1);
     // Repositories by exact id per project, from every row: a filter or search never hides a repository's toggle.
     const repos = new Map(), repoNames = new Map();
     for (const row of rows) {
@@ -634,7 +741,7 @@
       lastGroups = groups;
       const first = group[0], entry = groupNode(key);
       entry.section.style.setProperty('--room', layout.colorFor(key).accent);
-      setText(entry.label, (first.project || 'Unassigned') + (labels.get(first.project)?.size > 1 ? ' · ' + key.slice(-4) : ''));
+      setText(entry.label, ObserverModel.projectName(first) + (labels.get(first.project)?.size > 1 ? ' · ' + key.slice(-4) : ''));
       setText(entry.kind, key === 'desktop' ? 'APPS' : first.projectKind === 'group' ? 'PROJECT' : first.projectKind === 'repository' ? 'REPO' : 'FOLDER');
       // Helpers are counted apart: a parent's own totals never include its helpers.
       const helpers = group.filter(isHelper).length;
@@ -704,7 +811,7 @@
 
   /* Health, freshness and ages follow every notification; content work follows changed content or an explicit
      view change. QuerySpine re-notifies the old data while a request is pending: that is metadata only. */
-  let sceneKey = null, contentKey = null, deadline = null, mailProof = null;
+  let sceneKey = null, contentKey = null, deadline = null, mailProof = null, ingestedHosts = null;
   const DESKTOP_REASONS = { 'permission-denied': 'accessibility permission is not granted to the observer reader', 'native-reader-building': 'the native reader is still starting',
     'native-reader-unavailable': 'the native reader is unavailable', 'unsupported-platform': 'not supported on this system', 'not-observed': 'not read yet' };
   function header(state, stale) {
@@ -741,7 +848,9 @@
     // A sidecar that publishes no aggregate gets no totals: nothing is inferred from the roster.
     nodes.list.hidden = !aggregate; nodes.disclosure.hidden = !aggregate;
     if (!aggregate) return;
-    const live = !sourceStale('herdr', state), agents = aggregate.agents || {}, coverage = aggregate.coverage || {};
+    const hosts = state.data?.sources?.hosts;
+    const live = hosts ? !isStale(state) && Object.values(hosts).some(source => source.health === 'available' && fresh(source.observedAt)) : !sourceStale('herdr', state);
+    const agents = aggregate.agents || {}, coverage = aggregate.coverage || {};
     const usageLive = live && (!Number.isFinite(aggregate.usageObservedAt) || fresh(aggregate.usageObservedAt));
     if (nodes.list.dataset.freshness !== (live ? 'live' : 'stale')) nodes.list.dataset.freshness = live ? 'live' : 'stale';
     nodes.disclosure.dataset.freshness = usageLive ? 'live' : 'stale';
@@ -796,7 +905,7 @@
     if (arrangeButton) arrangeButton.setAttribute('aria-pressed', arrangeOn ? 'true' : 'false');
     if (persist) prefs.set('arrange', arrangeOn ? 1 : 0);
     layout = ObserverModel.createLayout({ projectAccents: pack.scene?.projectAccents }); sceneKey = null; selectedRepoId = null;
-    courier.reset(); ingested = null;
+    resetCouriers(); ingested = null; ingestedHosts = null;
     if (rawLatest) render(arrangedState(rawLatest), true);
   }
   if (arrangeButton) { arrangeButton.setAttribute('aria-pressed', arrangeOn ? 'true' : 'false'); arrangeButton.addEventListener('click', () => applyArrange(!arrangeOn, true)); }
@@ -822,19 +931,49 @@
     if (badge) setText(badge, data?.presentation ? 'LIVE · FICTIONAL LABELS' + (CONTROL ? ' · CONTROLS ON' : '') : CONTROL ? 'CONTROLS ON' : 'READ ONLY');
     // A repository whose last row left clears its highlight.
     if (selectedRepoId !== null && !rows.some(row => row.repoId === selectedRepoId)) selectedRepoId = null;
-    const overseerRow = rows.find(row => row.role === 'overseer' && row.source === 'herdr') || null;
-    layout.reconcile(rows.filter(row => row !== overseerRow));
+    const overseerRow = rows.find(row => row.role === 'overseer' && row.source === 'herdr' && !row.host) || null;
+    // Remote hosts (multi-host hub only): one ship each, in a stable order; health and last-seen come from the hub.
+    const hostSources = data?.sources?.hosts || null;
+    const hosts = hostSources ? Object.keys(hostSources).filter(id => id !== 'local').sort().map(id => ({ id, health: hostSources[id].health,
+      observedAt: hostSources[id].observedAt ?? null, reason: hostSources[id].reason || null, agents: hostSources[id].agents ?? 0, mail: hostSources[id].mail || null })) : [];
+    hostList = hosts;
+    // The first roster that lists hosts decides a remembered tab: kept if that host is present, else this machine.
+    if (restoreHost !== null && hosts.length) { if (hosts.some(host => host.id === restoreHost)) selectedHost = restoreHost; restoreHost = null; }
+    if (selectedHost !== null && !hosts.some(host => host.id === selectedHost)) selectedHost = null;
+    // A just-spawned agent is selected once it appears in the roster.
+    if (pendingSpawn) {
+      const spawned = rows.find(row => row.paneId === pendingSpawn.paneId);
+      if (spawned) { pendingSpawn = null; Promise.resolve().then(() => select(spawned.id, true)); }
+      else if (Date.now() > pendingSpawn.until) pendingSpawn = null;
+    }
+    const panelRows = hosts.length ? rows.filter(row => (row.host || null) === selectedHost) : rows;
+    /* llm-bus relays come from each observed bus's own binding. Each unobserved machine on a relay becomes a shadow ship
+       of ghost crew from the relay roster: on the floor only, never in byId, so nothing selects, inspects or controls it. */
+    const relayBuses = [[null, data?.bus || null], ...Object.entries(data?.hostBus || {}).filter(([id]) => hosts.some(host => host.id === id))];
+    const relays = ObserverScene.relayNetworks(relayBuses, Date.now()), ghosts = ObserverScene.shadowRows(relays);
+    shadowById = new Map(ghosts.map(row => [row.id, row]));
+    // Who the relay carries: each bus's own published panes (exact pane joins, by its host) and every shadow agent.
+    relayMembers = new Map([...relayBuses.flatMap(([host, bus]) => (bus?.remote?.onRelay || []).map(entry => [entry.id, { host, repo: entry.repo }])),
+      ...ghosts.map(row => [row.id, { host: row.host, repo: row.repo }])]);
+    const shadowHosts = relays.flatMap(net => net.shadows.map(shadow => ({ id: shadow.host, shadow: true, health: 'shadow', machine: shadow.machine, relay: net.relay,
+      member: net.members[0]?.host ?? null, agents: Math.max(shadow.agents, ghosts.filter(row => row.host === shadow.host).length), lastSeen: shadow.lastSeen })));
+    // Each shadow ship docks beside the first observed ship on its relay (this machine first, when it is a member).
+    const sceneHosts = [...hosts, ...shadowHosts.filter((host, index) => shadowHosts.findIndex(other => other.id === host.id) === index)];
+    const relayKey = JSON.stringify([[...relayMembers.keys()].sort(), sceneHosts.filter(host => host.shadow).map(host => [host.id, host.agents]), relays.map(net => [net.relay, net.members.map(member => [member.host, member.state, member.crossed,
+      member.lastActivityAt && Math.floor((Date.now() - member.lastActivityAt) / 60000)])])]);
+    layout.reconcile([...rows.filter(row => row !== overseerRow), ...ghosts]);
     if (selected && !byId.has(selected)) { overview(); }
     if (data && page >= layout.pages()) setPage(layout.pages() - 1);
     if (!layout.onPage(page).length && rows.length) setPage(layout.pageFor(rows[0].id));
-    const rooms = layout.onPage(page), onFloor = rooms.flatMap(room => room.rows.map(value => value.row));
+    const rooms = layout.onPage(page), onFloor = rooms.flatMap(room => room.rows.map(value => value.row)).filter(row => !row.shadow), floorRows = [...rows, ...ghosts];
     // Geometry and row fields consumed by floor paint or movement; titles and tools are read live by the hover callbacks.
-    const key = JSON.stringify([page, rooms, overseerRow && [overseerRow.id, overseerRow.status, overseerRow.provider]], (name, value) => name === 'row' ? [value.id, value.status, value.provider, value.worktree, value.checkoutId, value.checkoutKind, value.folder, value.lineageState, value.lifecycleEvidence?.state] : value);
+    const key = JSON.stringify([page, rooms, overseerRow && [overseerRow.id, overseerRow.status, overseerRow.provider], ...(hosts.length ? [hosts.map(host => [host.id, host.health, host.agents, host.reason, host.health === 'available' ? null : Math.floor((clock() - (host.observedAt || 0)) / 60000)])] : [])], (name, value) => name === 'row' ? [value.id, value.status, value.provider, value.worktree, value.checkoutId, value.checkoutKind, value.folder, value.lineageState, value.lifecycleEvidence?.state] : value);
     const bus = data?.bus || null, messages = Array.isArray(bus?.messages) ? bus.messages : [];
     // Hover text, plates and pending envelopes read rows and bus live; a frozen floor repaints only when they change.
-    const content = JSON.stringify([stale, data?.health, rows, bus && [bus.health, bus.reason, messages]]);
-    if (key !== sceneKey || !scene) {
-      sceneKey = key; scene = ObserverScene.build(rooms, page, { overseer: overseerRow, overseerAccent: pack.scene?.colors?.cyan });
+    const hostBus = data?.hostBus || {};
+    const content = JSON.stringify([stale, data?.health, rows, bus && [bus.health, bus.reason, messages], Object.entries(hostBus).map(([id, value]) => [id, value.health, value.messages])]);
+    if (key + relayKey !== sceneKey || !scene) {
+      sceneKey = key + relayKey; scene = ObserverScene.build(rooms, page, { overseer: overseerRow, overseerAccent: pack.scene?.colors?.cyan, relays, relayMembers, ...(sceneHosts.length ? { hosts: sceneHosts, localHealth: hostSources?.local?.health } : {}) });
       // Row freshness is read from the current roster by id: the cached scene's row objects can be older.
       view.update(scene, { stale: () => isStale(latest), rowStale: worker => rowStale(rowFor(worker.id)), mailFrame, inspected: inspectedAgent,
         repositorySelection: () => selectedRepoId, onRepositoryToggle: toggleRepository });
@@ -844,18 +983,31 @@
     contentKey = content;
     // Bus metadata is still listed while the inventory is stale; flights need both to be live.
     const parked = mailStale(state);
-    if (data && (data !== ingested || parked !== ingestedStale)) { ingested = data; ingestedStale = parked; courier.update(bus, { now: clock(), deck: page, reduced: reducedMotion(), live: !parked, route: message => ObserverScene.route(scene, layout, message, rows) }); }
+    if (data && (data !== ingested || parked !== ingestedStale)) { ingested = data; ingestedStale = parked; courier.update(bus, { now: clock(), deck: page, reduced: reducedMotion(), live: !parked, route: message => ObserverScene.route(scene, layout, message, floorRows) }); }
     pendingSpots = ObserverScene.pending(scene, layout, messages);
+    // Each remote host's own mail: its courier and pending envelopes stay on its own ship.
+    for (const id of [...remoteCouriers.keys()]) if (!hostBus[id]) { remoteCouriers.delete(id); remotePending.delete(id); remoteGrounded.delete(id); }
+    for (const [id, value] of Object.entries(hostBus)) {
+      const list = Array.isArray(value.messages) ? value.messages : [];
+      if (data !== ingestedHosts) courierFor(id).update(value, { now: clock(), deck: page, reduced: reducedMotion(), live: !remoteMailStale(id, state), route: message => ObserverScene.route(scene, layout, message, floorRows, id) });
+      remotePending.set(id, ObserverScene.pending(scene, layout, list, id));
+    }
+    ingestedHosts = data;
     setText(get('page-label'), 'Deck ' + (page + 1) + (layout.pages() > 1 ? ' / ' + layout.pages() : ''));
     get('previous-page').disabled = page === 0; get('next-page').disabled = page + 1 >= layout.pages();
     const projects = new Set(rows.map(ObserverModel.projectKey));
     setText(get('room-count'), projects.size + ' projects · ' + onFloor.length + ' workers on this deck');
     // Working and waiting count only rows whose own source is live; the rest are reported as last known.
-    const current = stale ? rows : rows.filter(row => !rowStale(row, state)), behind = rows.length - current.length;
+    const current = stale ? panelRows : panelRows.filter(row => !rowStale(row, state)), behind = panelRows.length - current.length;
     const working = current.filter(row => row.status === 'working').length, blocked = current.filter(row => row.status === 'blocked').length;
-    setText(get('counts'), (stale ? 'Last known: ' : '') + working + ' working · ' + blocked + ' waiting · ' + rows.length + ' total' + (behind ? ' · ' + behind + ' last known' : ''));
-    renderMail(bus);
-    renderSessions(rows, stale, messages, bus);
+    setText(get('counts'), (stale ? 'Last known: ' : '') + working + ' working · ' + blocked + ' waiting · ' + panelRows.length + ' total' + (behind ? ' · ' + behind + ' last known' : ''));
+    renderHosts(hosts, hostSources, rows, panelRows);
+    // The mailroom section lists the selected host's own bus; with remotes, the title names whose it is.
+    const shownBus = hosts.length && selectedHost ? hostBus[selectedHost] || null : bus;
+    renderMail(shownBus, hosts.length && selectedHost ? courierFor(selectedHost) : courier);
+    if (hosts.length) setText(get('mail-title'), 'Mailroom · ' + (selectedHost || 'this machine') + ' · recent ' + (Number.isInteger(shownBus?.window) ? shownBus.window : 100));
+    renderSessions(panelRows, stale, Array.isArray(shownBus?.messages) ? shownBus.messages : [], shownBus);
+    if (hosts.length && !panelRows.length && !stale) setText(get('empty'), 'No sessions on ' + (selectedHost || 'this machine') + '.');
     for (const entry of panels) if (entry.target.kind === 'agent') entry.view.roster();
   }
   /* A failed crew replacement keeps its complete default group: one bounded theme warning (pack, group, reason; never
@@ -877,7 +1029,7 @@
     // A tab loaded or restored in the background acquires nothing until it is actually shown.
     if (active || document.hidden) return;
     active = true; resumedAt = Date.now(); awaitingProof = panels.some(entry => entry.target.kind === 'agent'); cachedAtResume = latest?.data;
-    courier.reset(); ingested = null;
+    resetCouriers(); ingested = null; ingestedHosts = null;
     unsubscribe = QuerySpine.subscribe('observer.sessions', snapshot => ingest(snapshot), { immediate: false, refresh: false });
     Promise.resolve(QuerySpine.invalidate('observer.sessions', { refresh: true })).catch(() => {});
     view.start();

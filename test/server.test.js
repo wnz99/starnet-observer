@@ -157,6 +157,13 @@ const { createServer } = require('../server.js');
       noStore(response);
     }
     assert.equal((await get('/api/observer/messages/1/inspect?identity=invalid')).status, 400);
+    // A remote host's message (id@host) is never inspectable from the hub, and never reaches the local reader.
+    const before = calls.length, remoteMail = await get('/api/observer/messages/5@herdr-dev-2/inspect');
+    assert.equal(remoteMail.status, 200); const remoteBody = await remoteMail.json();
+    assert.deepEqual([remoteBody.id, remoteBody.health, remoteBody.reason, remoteBody.text], ['5@herdr-dev-2', 'unavailable', 'remote-inspect', null]);
+    assert.equal(calls.length, before, 'the local bus is not consulted');
+    for (const bad of ['/api/observer/messages/5@Bad_Host/inspect', '/api/observer/messages/0@vm/inspect', '/api/observer/messages/5@vm@x/inspect']) assert.equal((await get(bad)).status, 404, bad);
+    assert.equal((await get('/api/observer/messages/5@vm/inspect?identity=' + mailIdentity)).status, 400, 'no identity is accepted for a remote message');
     assert.equal((await get('/api/key')).status, 404);
     assert.equal((await get('/package.json')).status, 404);
     assert.equal((await get('/%ZZ')).status, 400);
