@@ -28,32 +28,56 @@
    guardChildProcess(cp) -> cp-like            spawn/execFile/exec/execSync/execFileSync/spawnSync/fork default
                                                 a missing `env` option to stationChildEnv(process.env); an explicit
                                                 `env` is the caller's decision and is passed through untouched. */
-'use strict';
-const { note: failNote } = require('./failopen.js');
+"use strict";
+const { note: failNote } = require("./failopen.js");
 
 const STATION_NAME_RE = /^(?:STARNET|SKYNET)_/i;
 // Never stripped by the value rule: a process without these cannot even start, and a connector env value that
 // happened to equal a path must not take PATH down with it.
-const NEVER_STRIP = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'HOME', 'USERPROFILE', 'TEMP', 'TMP',
-  'TMPDIR', 'APPDATA', 'LOCALAPPDATA', 'SHELL', 'LANG', 'LC_ALL', 'USER', 'USERNAME', 'LOGNAME', 'PWD']);
-const VALUE_MIN = 8;   // same floor as context.js KNOWN_MIN: shorter strings collide with ordinary values
+const NEVER_STRIP = new Set([
+  "PATH",
+  "PATHEXT",
+  "SYSTEMROOT",
+  "WINDIR",
+  "COMSPEC",
+  "HOME",
+  "USERPROFILE",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "SHELL",
+  "LANG",
+  "LC_ALL",
+  "USER",
+  "USERNAME",
+  "LOGNAME",
+  "PWD",
+]);
+const VALUE_MIN = 8; // same floor as context.js KNOWN_MIN: shorter strings collide with ordinary values
 
 let source = { names: null, values: null };
 function setStationSecretSource(s) {
   s = s || {};
   source = {
-    names: typeof s.names === 'function' ? s.names : null,
-    values: typeof s.values === 'function' ? s.values : null
+    names: typeof s.names === "function" ? s.names : null,
+    values: typeof s.values === "function" ? s.values : null,
   };
 }
 function readSet(fn, upper) {
   const out = new Set();
   if (!fn) return out;
   let raw;
-  try { raw = fn(); } catch (e) { failNote('child-env.source', e); return out; }
-  if (!raw || typeof raw[Symbol.iterator] !== 'function') return out;
+  try {
+    raw = fn();
+  } catch (e) {
+    failNote("child-env.source", e);
+    return out;
+  }
+  if (!raw || typeof raw[Symbol.iterator] !== "function") return out;
   for (const v of raw) {
-    if (typeof v !== 'string') continue;
+    if (typeof v !== "string") continue;
     const t = v.trim();
     if (!t) continue;
     if (upper) out.add(t.toUpperCase());
@@ -71,15 +95,15 @@ function stationChildEnv(base, extra) {
     const v = src[k];
     if (v == null) continue;
     const K = k.toUpperCase();
-    if (STATION_NAME_RE.test(k)) continue;                                   // rule 1
-    if (ownedNames.has(K)) continue;                                        // rule 2
+    if (STATION_NAME_RE.test(k)) continue; // rule 1
+    if (ownedNames.has(K)) continue; // rule 2
     const s = String(v);
-    if (!NEVER_STRIP.has(K) && heldValues.size && heldValues.has(s.trim())) continue;   // rule 3
+    if (!NEVER_STRIP.has(K) && heldValues.size && heldValues.has(s.trim())) continue; // rule 3
     out[k] = s;
   }
-  if (extra && typeof extra === 'object') {
+  if (extra && typeof extra === "object") {
     for (const k of Object.keys(extra)) {
-      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
       const v = extra[k];
       if (v != null) out[k] = String(v);
     }
@@ -87,34 +111,51 @@ function stationChildEnv(base, extra) {
   return out;
 }
 
-function isOptionsObject(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+function isOptionsObject(x) {
+  return !!x && typeof x === "object" && !Array.isArray(x);
+}
 /* Fill a missing `env` in a child_process argument list (any of the spawn/exec/execFile call shapes). */
 function withStationEnv(args) {
   const a = Array.prototype.slice.call(args);
   for (let i = 1; i < a.length; i++) {
     if (isOptionsObject(a[i])) {
-      if (Object.prototype.hasOwnProperty.call(a[i], 'env') && a[i].env) return a;
+      if (Object.prototype.hasOwnProperty.call(a[i], "env") && a[i].env) return a;
       a[i] = Object.assign({}, a[i], { env: stationChildEnv(process.env) });
       return a;
     }
   }
   const opts = { env: stationChildEnv(process.env) };
   let at = a.length;
-  for (let i = 1; i < a.length; i++) if (typeof a[i] === 'function') { at = i; break; }
+  for (let i = 1; i < a.length; i++)
+    if (typeof a[i] === "function") {
+      at = i;
+      break;
+    }
   // execFile(file, undefined|null, opts?) — collapse an explicit empty slot rather than shifting the callback
-  if (at > 1 && a[at - 1] == null && at - 1 >= 1 && !Array.isArray(a[at - 1])) { a[at - 1] = opts; return a; }
+  if (at > 1 && a[at - 1] == null && at - 1 >= 1 && !Array.isArray(a[at - 1])) {
+    a[at - 1] = opts;
+    return a;
+  }
   a.splice(at, 0, opts);
   return a;
 }
-const GUARDED = ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec', 'execSync', 'fork'];
+const GUARDED = ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync", "fork"];
 function guardChildProcess(cp) {
   const out = Object.create(cp);
   for (const name of GUARDED) {
-    if (typeof cp[name] !== 'function') continue;
+    if (typeof cp[name] !== "function") continue;
     const orig = cp[name];
-    out[name] = function guardedChildProcessCall() { return orig.apply(cp, withStationEnv(arguments)); };
+    out[name] = function guardedChildProcessCall() {
+      return orig.apply(cp, withStationEnv(arguments));
+    };
   }
   return out;
 }
 
-module.exports = { stationChildEnv, setStationSecretSource, guardChildProcess, withStationEnv, STATION_NAME_RE };
+module.exports = {
+  stationChildEnv,
+  setStationSecretSource,
+  guardChildProcess,
+  withStationEnv,
+  STATION_NAME_RE,
+};

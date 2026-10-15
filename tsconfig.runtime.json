@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["server.ts", "sidecar/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["**/*.test.ts", "**/*.fixture.ts"]
+}

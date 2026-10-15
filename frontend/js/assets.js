@@ -1,11 +1,11 @@
 /* STARNET — assets.js : PixelLab sprite loading + per-agent recoloring */
-'use strict';
+"use strict";
 
 const SPRITES = (() => {
   let ready = false;
   let loading = false;
-  const frames = {};   // key "minion.walk.south" -> [Image]
-  const tinted = {};   // key "FORGE|minion.walk.south" -> [canvas]
+  const frames = {}; // key "minion.walk.south" -> [Image]
+  const tinted = {}; // key "FORGE|minion.walk.south" -> [canvas]
   // null means the manifest has not been planned yet. This distinction matters: World starts drawing
   // immediately while init() is still awaiting manifest.json, so an existing non-default crew skin can
   // reach loadSet() before its tracks exist. Memoizing that empty pre-init lookup as a finished set job
@@ -25,9 +25,14 @@ const SPRITES = (() => {
      the eyes (their identity) while the suit stays a clean premium white. */
   function hexToHsl(hex) {
     const n = parseInt(hex.slice(1), 16);
-    let r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    let h = 0, s = 0; const l = (mx + mn) / 2;
+    let r = ((n >> 16) & 255) / 255,
+      g = ((n >> 8) & 255) / 255,
+      b = (n & 255) / 255;
+    const mx = Math.max(r, g, b),
+      mn = Math.min(r, g, b);
+    let h = 0,
+      s = 0;
+    const l = (mx + mn) / 2;
     if (mx !== mn) {
       const d = mx - mn;
       s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
@@ -37,11 +42,12 @@ const SPRITES = (() => {
     }
     return { h, s, l };
   }
-  const BASE_HUE = 190, BASE_SAT = 0.80;
+  const BASE_HUE = 190,
+    BASE_SAT = 0.8;
   function filterFor(agentId) {
     // Skins are natively-colored sprite sets, so there is no per-agent hue-rotate.
     // (An agent's `color` still drives its name-tag / UI accents — just not the sprite.)
-    return '';
+    return "";
   }
 
   /* crew sprites are authored on a 92px master — far larger than their ~35px on-floor footprint.
@@ -51,7 +57,7 @@ const SPRITES = (() => {
      the per-set downscale at DRAW time with smoothing ON (drawBody) — full detail survives onto the
      floor at the SAME size, and stays sharp when the camera zooms in.
      ultron keeps more of his source size so he towers over the crew. */
-  const SCALE = { ultron: 0.60 };   // skins read their scale from DATA.SKINS; ULTRON is special
+  const SCALE = { ultron: 0.6 }; // skins read their scale from DATA.SKINS; ULTRON is special
   function drawScaleFor(setName) {
     const skin = metadataFor(setName);
     return (skin && skin.scale) || SCALE[setName] || 2 / 3;
@@ -61,21 +67,32 @@ const SPRITES = (() => {
      still, not a floor body — has to cancel this scale out exactly. Re-deriving it in the UI would drift
      the moment ULTRON, a new set, or the DATA.SKINS fallback changed; asking the engine cannot. */
   function defaultSetForBody(b, canonical) {
-    const study=!canonical&&typeof SkinStudy!=='undefined'&&SkinStudy.setFor(b);if(study)return study;
-    return (b && b.id === 'ULTRON') ? (DATA.SKINS.ultron?.set || 'ultron')
-      : ((DATA.SKINS[b && b.skin] && DATA.SKINS[b.skin].set) || DATA.SKINS[DATA.DEFAULT_SKIN].set);
+    const study = !canonical && typeof SkinStudy !== "undefined" && SkinStudy.setFor(b);
+    if (study) return study;
+    return b && b.id === "ULTRON"
+      ? DATA.SKINS.ultron?.set || "ultron"
+      : (DATA.SKINS[b && b.skin] && DATA.SKINS[b.skin].set) || DATA.SKINS[DATA.DEFAULT_SKIN].set;
   }
   function setForBody(b, group) {
-    const fallback = defaultSetForBody(b, group === 'default');
-    if (group === 'default' || (b && b.id === 'ULTRON')) return fallback;
+    const fallback = defaultSetForBody(b, group === "default");
+    if (group === "default" || (b && b.id === "ULTRON")) return fallback;
     const replacement = replacements[b && b.skin];
-    return replacement && replacement.state === 'ready' ? replacement.set : fallback;
+    return replacement && replacement.state === "ready" ? replacement.set : fallback;
   }
   function metadataFor(set) {
-    return setMetadata[set] || DATA.SKINS[set] || Object.values(DATA.SKINS).find(s => s.set === set) || {};
+    return (
+      setMetadata[set] ||
+      DATA.SKINS[set] ||
+      Object.values(DATA.SKINS).find((s) => s.set === set) ||
+      {}
+    );
   }
-  function bodyScale(b) { return drawScaleFor(setForBody(b)); }
-  function isReviewSet(set) { return metadataFor(set).presentation === 'review'; }
+  function bodyScale(b) {
+    return drawScaleFor(setForBody(b));
+  }
+  function isReviewSet(set) {
+    return metadataFor(set).presentation === "review";
+  }
 
   /* foot-line measurement — every PixelLab master leaves transparent padding BELOW the feet
      (the crew sets all sit ~23px up from the 92px canvas bottom). The contact shadow is drawn
@@ -84,24 +101,29 @@ const SPRITES = (() => {
      (and ULTRON) floated worst. We measure the padding once per set from a STABLE idle frame
      (rot/blink/sit — never a walk frame, whose lifted foot would shift the body each stride) and
      anchor the FEET to the floor instead. Auto-derived so new skins self-correct. */
-  const footPad = {};                 // set -> transparent rows below the feet, in master px
-  const DEFAULT_FOOT = 23;            // crew authoring constant; only used if a frame can't be read
+  const footPad = {}; // set -> transparent rows below the feet, in master px
+  const DEFAULT_FOOT = 23; // crew authoring constant; only used if a frame can't be read
   function measureFootPad(img) {
     try {
-      const w = img.width | 0, h = img.height | 0;
+      const w = img.width | 0,
+        h = img.height | 0;
       if (!w || !h) return DEFAULT_FOOT;
-      const c = document.createElement('canvas'); c.width = w; c.height = h;
-      const x = c.getContext('2d', { willReadFrequently: true });
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const x = c.getContext("2d", { willReadFrequently: true });
       x.drawImage(img, 0, 0);
       const data = x.getImageData(0, 0, w, h).data;
       for (let y = h - 1; y >= 0; y--) {
         const row = y * w * 4;
         for (let px = 0; px < w; px++) {
-          if (data[row + px * 4 + 3] > 16) return (h - 1) - y;   // first opaque row from the bottom
+          if (data[row + px * 4 + 3] > 16) return h - 1 - y; // first opaque row from the bottom
         }
       }
       return DEFAULT_FOOT;
-    } catch (e) { return DEFAULT_FOOT; }   // tainted/unreadable → safe fallback
+    } catch (e) {
+      return DEFAULT_FOOT;
+    } // tainted/unreadable → safe fallback
   }
   /* ---------- how far one walk CYCLE carries the body ----------
      The walk is distance-phased, so this number decides whether the feet plant or skate: if the
@@ -115,45 +137,63 @@ const SPRITES = (() => {
      Sets whose feet never separate (pikachu, capybara — wide-stance animals whose walk is a bob,
      not a stride) have no step length to read, so they keep the old constant rather than being
      handed a fabricated one. */
-  const CYCLE_PER_HEIGHT = 0.56;   // fallback when a set's swing can't be measured
+  const CYCLE_PER_HEIGHT = 0.56; // fallback when a set's swing can't be measured
   const cycleCache = {};
   function bandGap(img, lo) {
     try {
-      const w = img.width | 0, h = img.height | 0;
+      const w = img.width | 0,
+        h = img.height | 0;
       if (!w || !h) return null;
-      const c = document.createElement('canvas'); c.width = w; c.height = h;
-      const x = c.getContext('2d', { willReadFrequently: true });
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const x = c.getContext("2d", { willReadFrequently: true });
       x.drawImage(img, 0, 0);
       const d = x.getImageData(0, 0, w, h).data;
-      let top = -1, bot = -1, minX = w, maxX = -1;
+      let top = -1,
+        bot = -1,
+        minX = w,
+        maxX = -1;
       for (let y = 0; y < h; y++) {
         for (let px = 0; px < w; px++) {
-          if (d[(y * w + px) * 4 + 3] > 16) { if (top < 0) top = y; bot = y; break; }
+          if (d[(y * w + px) * 4 + 3] > 16) {
+            if (top < 0) top = y;
+            bot = y;
+            break;
+          }
         }
       }
       if (top < 0) return null;
       const band = Math.floor(bot - (bot - top) * (lo || 0.16));
       for (let y = band; y <= bot; y++) {
         for (let px = 0; px < w; px++) {
-          if (d[(y * w + px) * 4 + 3] > 16) { if (px < minX) minX = px; if (px > maxX) maxX = px; }
+          if (d[(y * w + px) * 4 + 3] > 16) {
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+          }
         }
       }
-      return maxX < minX ? null : (maxX - minX + 1);
-    } catch (e) { return null; }   // tainted/unreadable → caller falls back
+      return maxX < minX ? null : maxX - minX + 1;
+    } catch (e) {
+      return null;
+    } // tainted/unreadable → caller falls back
   }
   function cycleUnitsFor(set, sc, frameH) {
-    const cacheKey = set + ':' + sc;
+    const cacheKey = set + ":" + sc;
     if (cycleCache[cacheKey] != null) return cycleCache[cacheKey];
     // Approved masters contain 68 rows of transparent packing. They are not leg length.
     const visibleHeight = metadataFor(set).sourceStandingHeight || frameH;
     const fallback = visibleHeight * sc * CYCLE_PER_HEIGHT;
-    const side = frames[set + '.walk.east'] || frames[set + '.walk.west'];
-    const idleFr = frames[set + '.rot.east'] || frames[set + '.rot.west'];
+    const side = frames[set + ".walk.east"] || frames[set + ".walk.west"];
+    const idleFr = frames[set + ".rot.east"] || frames[set + ".rot.west"];
     let out = fallback;
     if (side && side.length && idleFr && idleFr[0]) {
       const idle = bandGap(idleFr[0]);
       let widest = 0;
-      for (const f of side) { const g = bandGap(f); if (g && g > widest) widest = g; }
+      for (const f of side) {
+        const g = bandGap(f);
+        if (g && g > widest) widest = g;
+      }
       // a real stride has to open the feet WIDER than standing; below that there is no swing to read
       if (idle && widest && widest - idle >= 3) {
         // Remove the stationary boot width: only the extra separation represents leg travel.
@@ -180,32 +220,38 @@ const SPRITES = (() => {
   function getTrackPad(key) {
     if (trackPad[key] != null) return trackPad[key];
     const fr = frames[key];
-    return (trackPad[key] = (fr && fr[0]) ? measureFootPad(fr[0]) : DEFAULT_FOOT);
+    return (trackPad[key] = fr && fr[0] ? measureFootPad(fr[0]) : DEFAULT_FOOT);
   }
   function getFootPad(set) {
     if (footPad[set] != null) return footPad[set];
     let ref = null;
-    for (const d of ['south', 'east', 'west', 'north']) {
-      const fr = frames[set + '.rot.' + d] || frames[set + '.blink.' + d] || frames[set + '.sit.' + d];
-      if (fr && fr[0]) { ref = fr[0]; break; }
+    for (const d of ["south", "east", "west", "north"]) {
+      const fr =
+        frames[set + ".rot." + d] || frames[set + ".blink." + d] || frames[set + ".sit." + d];
+      if (fr && fr[0]) {
+        ref = fr[0];
+        break;
+      }
     }
-    if (!ref) {   // last resort: any frame of the set
-      const k = Object.keys(frames).find(kk => kk.indexOf(set + '.') === 0);
+    if (!ref) {
+      // last resort: any frame of the set
+      const k = Object.keys(frames).find((kk) => kk.indexOf(set + ".") === 0);
       if (k && frames[k][0]) ref = frames[k][0];
     }
     return (footPad[set] = ref ? measureFootPad(ref) : DEFAULT_FOOT);
   }
   function tintFrames(agentId, key) {
-    const ck = agentId + '|' + key;
+    const ck = agentId + "|" + key;
     if (tinted[ck]) return tinted[ck];
     const src = frames[key];
     if (!src) return null;
     const filt = filterFor(agentId);
-    tinted[ck] = src.map(img => {
-      if (!filt) return img;   // no recolor (skins are natively colored) → use the master image directly, full res
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const x = c.getContext('2d');
+    tinted[ck] = src.map((img) => {
+      if (!filt) return img; // no recolor (skins are natively colored) → use the master image directly, full res
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const x = c.getContext("2d");
       x.filter = filt;
       x.drawImage(img, 0, 0);
       return c;
@@ -231,46 +277,88 @@ const SPRITES = (() => {
                    never again), so it is served from probation and never floods the kept tier.
      An idle or seated body is promoted within a second and is never rebuilt again; walkers cycle the ring
      and can no longer push it out. Time is the caller's nowMs (deterministic, like the rest of drawBody). */
-  const BODY_LIGHT_LIMIT = 4096, BODY_LIGHT_PIXELS = 4194304, BODY_LIGHT_PROBATION = 96, BODY_LIGHT_POOL = 8, BODY_LIGHT_PROMOTE_MS = 600;
-  const bodyLights = new Map(), probation = new Map(), lightPool = [], frameIds = new WeakMap();
-  let nextFrameId = 1, bodyLightScratch = null, bodyLightBuilds = 0, bodyLightPixels = 0, bodyLightRecycled = 0;
-  const clamp01 = n => Math.max(0, Math.min(1, Number(n) || 0));
+  const BODY_LIGHT_LIMIT = 4096,
+    BODY_LIGHT_PIXELS = 4194304,
+    BODY_LIGHT_PROBATION = 96,
+    BODY_LIGHT_POOL = 8,
+    BODY_LIGHT_PROMOTE_MS = 600;
+  const bodyLights = new Map(),
+    probation = new Map(),
+    lightPool = [],
+    frameIds = new WeakMap();
+  let nextFrameId = 1,
+    bodyLightScratch = null,
+    bodyLightBuilds = 0,
+    bodyLightPixels = 0,
+    bodyLightRecycled = 0;
+  const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
   function bodyLight(raw) {
     if (!raw || !Array.isArray(raw.color) || raw.color.length < 3) return null;
     const strength = Math.round(clamp01(raw.strength) * 6) / 6;
     if (!strength) return null;
-    const color = raw.color.slice(0, 3).map(n =>
-      Math.min(255, Math.round(Math.max(0, Math.min(255, Number(n) || 0)) / 24) * 24));
-    const dx = Number(raw.dx), dy = Number(raw.dy);
-    const angle = Number.isFinite(dx) && Number.isFinite(dy) && Math.hypot(dx, dy) > 0.001
-      ? Math.atan2(dy, dx) : -2.2;
+    const color = raw.color
+      .slice(0, 3)
+      .map((n) => Math.min(255, Math.round(Math.max(0, Math.min(255, Number(n) || 0)) / 24) * 24));
+    const dx = Number(raw.dx),
+      dy = Number(raw.dy);
+    const angle =
+      Number.isFinite(dx) && Number.isFinite(dy) && Math.hypot(dx, dy) > 0.001
+        ? Math.atan2(dy, dx)
+        : -2.2;
     const sector = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8;
-    return { color, strength, dx: Math.cos(sector * Math.PI / 4), dy: Math.sin(sector * Math.PI / 4),
-      key: color.join(',') + '|' + strength + '|' + sector };
+    return {
+      color,
+      strength,
+      dx: Math.cos((sector * Math.PI) / 4),
+      dy: Math.sin((sector * Math.PI) / 4),
+      key: color.join(",") + "|" + strength + "|" + sector,
+    };
   }
-  function releaseBodyLight(canvas) { canvas.width = canvas.height = 1; }
-  function dropBodyLight(key, canvas) { bodyLights.delete(key); bodyLightPixels -= canvas.width * canvas.height; releaseBodyLight(canvas); }
-  function lightLive(c) { const g = c.getContext('2d'); return !!(g && !(g.isContextLost && g.isContextLost())); }
+  function releaseBodyLight(canvas) {
+    canvas.width = canvas.height = 1;
+  }
+  function dropBodyLight(key, canvas) {
+    bodyLights.delete(key);
+    bodyLightPixels -= canvas.width * canvas.height;
+    releaseBodyLight(canvas);
+  }
+  function lightLive(c) {
+    const g = c.getContext("2d");
+    return !!(g && !(g.isContextLost && g.isContextLost()));
+  }
   /* A GPU reset (sleep, driver update) loses every canvas at once, and a RESTORED context comes back blank while
      isContextLost() reads false again: a kept frame would then draw an idle body as nothing, for as long as it stays
      kept. Any light canvas reporting loss or restoration drops both tiers — every pair rebuilds on its next draw. */
   function flushBodyLights() {
     for (const c of bodyLights.values()) releaseBodyLight(c);
     for (const t of probation.values()) releaseBodyLight(t.c);
-    bodyLights.clear(); probation.clear(); lightPool.length = 0; bodyLightPixels = 0;
+    bodyLights.clear();
+    probation.clear();
+    lightPool.length = 0;
+    bodyLightPixels = 0;
   }
   function watchLight(c) {
-    try { c.addEventListener('contextlost', flushBodyLights); c.addEventListener('contextrestored', flushBodyLights); } catch (_) {}
+    try {
+      c.addEventListener("contextlost", flushBodyLights);
+      c.addEventListener("contextrestored", flushBodyLights);
+    } catch (_) {}
     return c;
   }
   function lightFrame(frame, light, nowMs) {
     if (!light) return frame;
     let id = frameIds.get(frame);
-    if (!id) { id = nextFrameId++; frameIds.set(frame, id); }
-    const key = id + '|' + light.key;
+    if (!id) {
+      id = nextFrameId++;
+      frameIds.set(frame, id);
+    }
+    const key = id + "|" + light.key;
     const hit = bodyLights.get(key);
     if (hit) {
-      if (lightLive(hit)) { bodyLights.delete(key); bodyLights.set(key, hit); return hit; }
+      if (lightLive(hit)) {
+        bodyLights.delete(key);
+        bodyLights.set(key, hit);
+        return hit;
+      }
       dropBodyLight(key, hit);
     }
     const trial = probation.get(key);
@@ -278,10 +366,17 @@ const SPRITES = (() => {
       probation.delete(key);
       const kept = trial.c;
       if (!lightLive(kept)) releaseBodyLight(kept);
-      else if (!(nowMs - trial.at >= BODY_LIGHT_PROMOTE_MS)) { probation.set(key, trial); return kept; }
-      else {   // still in use long after its build: this pair is worth keeping
-        bodyLights.set(key, kept); bodyLightPixels += kept.width * kept.height;
-        while (bodyLights.size > 1 && (bodyLights.size > BODY_LIGHT_LIMIT || bodyLightPixels > BODY_LIGHT_PIXELS)) {
+      else if (!(nowMs - trial.at >= BODY_LIGHT_PROMOTE_MS)) {
+        probation.set(key, trial);
+        return kept;
+      } else {
+        // still in use long after its build: this pair is worth keeping
+        bodyLights.set(key, kept);
+        bodyLightPixels += kept.width * kept.height;
+        while (
+          bodyLights.size > 1 &&
+          (bodyLights.size > BODY_LIGHT_LIMIT || bodyLightPixels > BODY_LIGHT_PIXELS)
+        ) {
           const oldest = bodyLights.keys().next().value;
           dropBodyLight(oldest, bodyLights.get(oldest));
         }
@@ -290,50 +385,79 @@ const SPRITES = (() => {
     }
     let canvas;
     try {
-      const w = frame.width | 0, h = frame.height | 0;
+      const w = frame.width | 0,
+        h = frame.height | 0;
       if (!w || !h || w * h > 262144) return frame;
       canvas = lightPool.pop();
-      if (canvas) bodyLightRecycled++; else canvas = watchLight(document.createElement('canvas'));
-      canvas.width = w; canvas.height = h;   // also clears a recycled bitmap and resets its state
-      const g = canvas.getContext('2d');
-      if (!g || (g.isContextLost && g.isContextLost())) { releaseBodyLight(canvas); return frame; }
+      if (canvas) bodyLightRecycled++;
+      else canvas = watchLight(document.createElement("canvas"));
+      canvas.width = w;
+      canvas.height = h; // also clears a recycled bitmap and resets its state
+      const g = canvas.getContext("2d");
+      if (!g || (g.isContextLost && g.isContextLost())) {
+        releaseBodyLight(canvas);
+        return frame;
+      }
       g.drawImage(frame, 0, 0);
-      const cx = w / 2, cy = h * 0.43, reach = Math.max(w, h) * 0.43;
-      const ramp = g.createLinearGradient(cx - light.dx * reach, cy - light.dy * reach,
-        cx + light.dx * reach, cy + light.dy * reach);
-      ramp.addColorStop(0, 'rgba(12,20,34,' + (0.17 * light.strength) + ')');
-      ramp.addColorStop(0.48, 'rgba(12,20,34,0)');
-      ramp.addColorStop(1, 'rgba(' + light.color.join(',') + ',' + (0.24 * light.strength) + ')');
+      const cx = w / 2,
+        cy = h * 0.43,
+        reach = Math.max(w, h) * 0.43;
+      const ramp = g.createLinearGradient(
+        cx - light.dx * reach,
+        cy - light.dy * reach,
+        cx + light.dx * reach,
+        cy + light.dy * reach,
+      );
+      ramp.addColorStop(0, "rgba(12,20,34," + 0.17 * light.strength + ")");
+      ramp.addColorStop(0.48, "rgba(12,20,34,0)");
+      ramp.addColorStop(1, "rgba(" + light.color.join(",") + "," + 0.24 * light.strength + ")");
       // source-atop retains the master's alpha exactly, including its antialiased silhouette.
-      g.globalCompositeOperation = 'source-atop'; g.fillStyle = ramp; g.fillRect(0, 0, w, h);
-      if (!bodyLightScratch) bodyLightScratch = document.createElement('canvas');
-      bodyLightScratch.width = w; bodyLightScratch.height = h;
-      const edge = bodyLightScratch.getContext('2d');
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = ramp;
+      g.fillRect(0, 0, w, h);
+      if (!bodyLightScratch) bodyLightScratch = document.createElement("canvas");
+      bodyLightScratch.width = w;
+      bodyLightScratch.height = h;
+      const edge = bodyLightScratch.getContext("2d");
       if (edge && !(edge.isContextLost && edge.isContextLost())) {
         edge.drawImage(frame, 0, 0);
-        edge.globalCompositeOperation = 'destination-out';
+        edge.globalCompositeOperation = "destination-out";
         edge.drawImage(frame, -light.dx * 1.6, -light.dy * 1.6);
-        edge.globalCompositeOperation = 'source-in';
-        edge.fillStyle = 'rgb(' + light.color.join(',') + ')'; edge.fillRect(0, 0, w, h);
-        g.globalAlpha = 0.42 * light.strength; g.drawImage(bodyLightScratch, 0, 0);
+        edge.globalCompositeOperation = "source-in";
+        edge.fillStyle = "rgb(" + light.color.join(",") + ")";
+        edge.fillRect(0, 0, w, h);
+        g.globalAlpha = 0.42 * light.strength;
+        g.drawImage(bodyLightScratch, 0, 0);
       }
-      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-      probation.set(key, { c: canvas, at: +nowMs || 0 }); bodyLightBuilds++;
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = "source-over";
+      probation.set(key, { c: canvas, at: +nowMs || 0 });
+      bodyLightBuilds++;
       // the ring's oldest pair was drawn BODY_LIGHT_PROBATION builds ago — long after any body used it this frame
       while (probation.size > BODY_LIGHT_PROBATION) {
-        const oldest = probation.keys().next().value, c = probation.get(oldest).c;
+        const oldest = probation.keys().next().value,
+          c = probation.get(oldest).c;
         probation.delete(oldest);
-        if (lightPool.length < BODY_LIGHT_POOL) lightPool.push(c); else releaseBodyLight(c);
+        if (lightPool.length < BODY_LIGHT_POOL) lightPool.push(c);
+        else releaseBodyLight(c);
       }
       return canvas;
     } catch (e) {
       if (canvas) releaseBodyLight(canvas);
-      return frame;  // unsupported/lost offscreen context must never hide a real crew body
+      return frame; // unsupported/lost offscreen context must never hide a real crew body
     }
   }
   function bodyAppearanceStats() {
-    return { cachedFrames: bodyLights.size + probation.size, kept: bodyLights.size, probation: probation.size, limit: BODY_LIGHT_LIMIT,
-      builds: bodyLightBuilds, recycled: bodyLightRecycled, pixels: bodyLightPixels, pixelLimit: BODY_LIGHT_PIXELS };
+    return {
+      cachedFrames: bodyLights.size + probation.size,
+      kept: bodyLights.size,
+      probation: probation.size,
+      limit: BODY_LIGHT_LIMIT,
+      builds: bodyLightBuilds,
+      recycled: bodyLightRecycled,
+      pixels: bodyLightPixels,
+      pixelLimit: BODY_LIGHT_PIXELS,
+    };
   }
 
   /* ---------- deck contact and directional body shadow ----------
@@ -355,44 +479,53 @@ const SPRITES = (() => {
     const k = 1 - Math.min(0.5, lift * 0.14);
     const spread = rx * k * (o.spread || 1);
     if (!(spread > 0.5)) return;
-    const a0 = ctx.globalAlpha, ink = ctx.fillStyle;
+    const a0 = ctx.globalAlpha,
+      ink = ctx.fillStyle;
     const fade = k * (o.alpha != null ? o.alpha : 1);
-    ctx.fillStyle = o.color || '#080d19';
+    ctx.fillStyle = o.color || "#080d19";
     try {
       for (const [radius, alpha] of SHADOW_RINGS) {
         const reach = o.color ? 0.08 : 0.48 * radius * radius;
         ctx.globalAlpha = a0 * alpha * fade * (o.color ? 1.2 : 1);
         ctx.beginPath();
-        ctx.ellipse(cx + spread * reach * (o.direction ? o.direction.x : 1),
+        ctx.ellipse(
+          cx + spread * reach * (o.direction ? o.direction.x : 1),
           cy + spread * reach * (o.direction ? o.direction.y : 0.62),
-          spread * radius * (o.color ? 1 : 1.14), spread * radius * SHADOW_SQUASH,
-          o.color ? 0 : 0.18, 0, Math.PI * 2);
+          spread * radius * (o.color ? 1 : 1.14),
+          spread * radius * SHADOW_SQUASH,
+          o.color ? 0 : 0.18,
+          0,
+          Math.PI * 2,
+        );
         ctx.fill();
       }
       if (!o.color) {
         // Tight occlusion under the boots, anchored to the deck through idle bob.
-        ctx.globalAlpha = a0 * 0.20 * fade * k;
+        ctx.globalAlpha = a0 * 0.2 * fade * k;
         ctx.beginPath();
         ctx.ellipse(cx, cy, spread * 0.42, spread * 0.115, 0, 0, Math.PI * 2);
         ctx.fill();
       }
-    } finally { ctx.globalAlpha = a0; ctx.fillStyle = ink; }
+    } finally {
+      ctx.globalAlpha = a0;
+      ctx.fillStyle = ink;
+    }
   }
 
   /* pick best available animation key for a body state */
   function pick(set, names, dir) {
     for (const n of names) {
-      const exact = set + '.' + n + '.' + dir;
+      const exact = set + "." + n + "." + dir;
       if (frames[exact]) return exact;
     }
     // fall back to any direction of first available name, then south rot
     for (const n of names) {
-      for (const d of ['south', 'east', 'west', 'north']) {
-        const k = set + '.' + n + '.' + d;
+      for (const d of ["south", "east", "west", "north"]) {
+        const k = set + "." + n + "." + d;
         if (frames[k]) return k;
       }
     }
-    return frames[set + '.rot.south'] ? set + '.rot.south' : null;
+    return frames[set + ".rot.south"] ? set + ".rot.south" : null;
   }
 
   /* ---------- 8-direction render facing ----------
@@ -406,8 +539,14 @@ const SPRITES = (() => {
      Sets that don't ship diagonal frames are untouched: pick8 falls straight back to the old
      4-dir pick on `b.dir`, so this is a no-op for every skin until its diagonals exist. */
   const DIR8_A = {
-    east: 0, 'south-east': Math.PI / 4, south: Math.PI / 2, 'south-west': 3 * Math.PI / 4,
-    west: Math.PI, 'north-west': -3 * Math.PI / 4, north: -Math.PI / 2, 'north-east': -Math.PI / 4
+    east: 0,
+    "south-east": Math.PI / 4,
+    south: Math.PI / 2,
+    "south-west": (3 * Math.PI) / 4,
+    west: Math.PI,
+    "north-west": (-3 * Math.PI) / 4,
+    north: -Math.PI / 2,
+    "north-east": -Math.PI / 4,
   };
   /* A turn has WEIGHT. The first pass slewed the facing at a flat rate, which is exactly a
      turntable: the pose rotated at constant angular speed and the body appeared to slide around
@@ -419,14 +558,14 @@ const SPRITES = (() => {
        2. the feet keep the score. `_turnAng` accumulates radians actually swept, and drawBody
           spends it on WALK frames, so a pivoting body steps its legs around instead of holding a
           frozen idle pose while the sprite rotates underneath it. */
-  const TURN_MAX = 9;            // rad/s ceiling — below the old flat 12 so the turn is legible
-  const TURN_ACCEL = 55;         // rad/s²: spins up in ~160ms and brakes into the target
-  const TURN_STEP_W = 1.2;       // rad/s a standing body must exceed before its feet shuffle
-  const TURN_STEP_FRAMES = 4 / Math.PI;   // walk frames per radian swept ≈ 2 frames per 90° pivot
-  const DIR8_HYST = 0.10;        // rad a sector holds past its boundary (sectors are π/8 half-width)
-  const POSE_FADE_MS = 110;      // outgoing pose dissolves under the incoming one (drawBody)
-  const WALK_FACE_TRUST = 0.9;   // rad: walking art follows the eased facing unless displacement disagrees by more
-  const ang = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const TURN_MAX = 9; // rad/s ceiling — below the old flat 12 so the turn is legible
+  const TURN_ACCEL = 55; // rad/s²: spins up in ~160ms and brakes into the target
+  const TURN_STEP_W = 1.2; // rad/s a standing body must exceed before its feet shuffle
+  const TURN_STEP_FRAMES = 4 / Math.PI; // walk frames per radian swept ≈ 2 frames per 90° pivot
+  const DIR8_HYST = 0.1; // rad a sector holds past its boundary (sectors are π/8 half-width)
+  const POSE_FADE_MS = 110; // outgoing pose dissolves under the incoming one (drawBody)
+  const WALK_FACE_TRUST = 0.9; // rad: walking art follows the eased facing unless displacement disagrees by more
+  const ang = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   function renderDir8(b, dir, glancing, nowMs) {
     // while walking (and not glancing) follow the true continuous heading; otherwise the game dir
     // Arcing bodies travel ALONG their eased facing, so faceA is the smooth truth; raw displacement carries
@@ -434,25 +573,40 @@ const SPRITES = (() => {
     // still wins when the two genuinely disagree (a shove, a chord step) so art never walks backwards.
     // A displacement that matches the step the gait itself chose (b._travelHeading) is not evidence against
     // the facing: that is a slow chord step while the body is still turning (the first steps of a U-turn).
-    const moved = b._resolvedTravelHeading, faced = b.faceA, own = b._travelHeading;
+    const moved = b._resolvedTravelHeading,
+      faced = b.faceA,
+      own = b._travelHeading;
     const shoved = moved != null && (own == null || Math.abs(ang(moved - own)) > 0.5);
-    const travel = moved == null ? faced : faced == null || shoved && Math.abs(ang(moved - faced)) > WALK_FACE_TRUST ? moved : faced;
-    const want = (!glancing && b.state === 'walk' && travel != null) ? ang(travel) : DIR8_A[dir];
+    const travel =
+      moved == null
+        ? faced
+        : faced == null || (shoved && Math.abs(ang(moved - faced)) > WALK_FACE_TRUST)
+          ? moved
+          : faced;
+    const want = !glancing && b.state === "walk" && travel != null ? ang(travel) : DIR8_A[dir];
     if (want == null) return dir;
-    const dt = Math.max(0, Math.min(100, nowMs - (b._rAt || 0)));   // clamp: first frame / tab-restore must not spin
+    const dt = Math.max(0, Math.min(100, nowMs - (b._rAt || 0))); // clamp: first frame / tab-restore must not spin
     b._rAt = nowMs;
-    if (b._rA == null) { b._rA = want; b._rW = 0; b._turnAng = 0; }  // new body: snap, no tween
-    else if (b.state === 'walk' && !glancing) {
+    if (b._rA == null) {
+      b._rA = want;
+      b._rW = 0;
+      b._turnAng = 0;
+    } // new body: snap, no tween
+    else if (b.state === "walk" && !glancing) {
       // Locomotion already eases facing; a second lag draws a backwards-moving body.
-      b._rA=want;b._rW=0;
+      b._rA = want;
+      b._rW = 0;
     } else {
-      const turn = ang(want - b._rA), remain = Math.abs(turn);
+      const turn = ang(want - b._rA),
+        remain = Math.abs(turn);
       const s = dt / 1000;
       // brake so the facing ARRIVES at rest: v = sqrt(2·a·s) is the fastest it can still stop in time
       const target = Math.min(TURN_MAX, Math.sqrt(2 * TURN_ACCEL * remain));
       const cur = b._rW || 0;
-      b._rW = cur < target ? Math.min(target, cur + TURN_ACCEL * s)
-                           : Math.max(target, cur - TURN_ACCEL * s);
+      b._rW =
+        cur < target
+          ? Math.min(target, cur + TURN_ACCEL * s)
+          : Math.max(target, cur - TURN_ACCEL * s);
       const swept = Math.min(remain, b._rW * s);
       b._rA = ang(b._rA + Math.sign(turn) * swept);
       b._turnAng = (b._turnAng || 0) + swept;
@@ -460,11 +614,16 @@ const SPRITES = (() => {
     const cur = b._rD8;
     // Walking holds its sector past the boundary too: an arcing body sweeps through every sector once,
     // and separation nudges near a 22.5° edge used to flip the pose back and forth frame to frame.
-    if (cur && DIR8_A[cur] != null && Math.abs(ang(b._rA - DIR8_A[cur])) < Math.PI / 8 + DIR8_HYST) return cur;
-    let best = dir, bd = Infinity;
+    if (cur && DIR8_A[cur] != null && Math.abs(ang(b._rA - DIR8_A[cur])) < Math.PI / 8 + DIR8_HYST)
+      return cur;
+    let best = dir,
+      bd = Infinity;
     for (const d in DIR8_A) {
       const t = Math.abs(ang(b._rA - DIR8_A[d]));
-      if (t < bd) { bd = t; best = d; }
+      if (t < bd) {
+        bd = t;
+        best = d;
+      }
     }
     return (b._rD8 = best);
   }
@@ -472,7 +631,7 @@ const SPRITES = (() => {
   function pick8(set, names, dir8, dir) {
     if (dir8 !== dir) {
       for (const n of names) {
-        const k = set + '.' + n + '.' + dir8;
+        const k = set + "." + n + "." + dir8;
         if (frames[k]) return k;
       }
     }
@@ -485,17 +644,26 @@ const SPRITES = (() => {
      shared scratch canvas: drawBody copies it out synchronously before the next body is drawn. */
   let tweenCanvas = null;
   function tweenFrame(a, c, t) {
-    const w = Math.max(a.width, c.width) | 0, h = Math.max(a.height, c.height) | 0;
-    if (!tweenCanvas) tweenCanvas = document.createElement('canvas');
-    if (tweenCanvas.width !== w || tweenCanvas.height !== h) { tweenCanvas.width = w; tweenCanvas.height = h; }
-    const g = tweenCanvas.getContext('2d');
+    const w = Math.max(a.width, c.width) | 0,
+      h = Math.max(a.height, c.height) | 0;
+    if (!tweenCanvas) tweenCanvas = document.createElement("canvas");
+    if (tweenCanvas.width !== w || tweenCanvas.height !== h) {
+      tweenCanvas.width = w;
+      tweenCanvas.height = h;
+    }
+    const g = tweenCanvas.getContext("2d");
     if (!g || (g.isContextLost && g.isContextLost())) return t < 0.5 ? a : c;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    g.globalCompositeOperation = "source-over";
+    g.globalAlpha = 1;
     g.clearRect(0, 0, w, h);
-    g.globalAlpha = 1 - t; g.drawImage(a, 0, 0);
-    g.globalCompositeOperation = 'lighter'; g.globalAlpha = t; g.drawImage(c, 0, 0);
-    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    g.globalAlpha = 1 - t;
+    g.drawImage(a, 0, 0);
+    g.globalCompositeOperation = "lighter";
+    g.globalAlpha = t;
+    g.drawImage(c, 0, 0);
+    g.globalCompositeOperation = "source-over";
+    g.globalAlpha = 1;
     return tweenCanvas;
   }
 
@@ -514,65 +682,87 @@ const SPRITES = (() => {
   // Per destination: a body skipped on the stage is still pending there when a still or tile render paints it
   // elsewhere. Keyed weakly by the destination canvas (or the context itself when it has none).
   const offStage = new WeakMap();
-  const destinationOf = ctx => ctx.canvas || ctx;
+  const destinationOf = (ctx) => ctx.canvas || ctx;
   function warmDestination(ctx, draws) {
-    const canvas = ctx.canvas, m = ctx.getTransform ? ctx.getTransform() : null;
+    const canvas = ctx.canvas,
+      m = ctx.getTransform ? ctx.getTransform() : null;
     // Only an axis-aligned positive scale can be moved wholly past the bitmap; anything else is left untouched.
     if (!canvas || !(canvas.width > 0) || !m || !(m.a > 0) || !(m.d > 0) || m.b || m.c) return;
-    const left = Math.min(...draws.map(draw => draw[1])), shift = Math.max(0, Math.ceil(canvas.width + 2 - (m.a * left + m.e)));
+    const left = Math.min(...draws.map((draw) => draw[1])),
+      shift = Math.max(0, Math.ceil(canvas.width + 2 - (m.a * left + m.e)));
     ctx.save();
     try {
       ctx.imageSmoothingEnabled = true;
-      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+      if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
       ctx.setTransform(m.a, 0, 0, m.d, m.e + shift, m.f);
       for (const [source, x, y, w, h] of draws) ctx.drawImage(source, x, y, w, h);
-    } finally { ctx.restore(); }
+    } finally {
+      ctx.restore();
+    }
   }
   function drawBody(ctx, b, nowMs, appearance) {
     const reduced = !!(appearance && appearance.reducedMotion);
     const set = setForBody(b, appearance && appearance.group);
-    if (!loadedSets.has(set)) { loadSet(set); return null; }
-    const glancing = b.state !== 'walk' && b.glance && b.glance.until > nowMs;   // brief look-up: overrides facing & typing
-    const meeting = b.meet && b.meet.until > nowMs;        // hallway chat: stand still, face partner
-    const dir = glancing ? b.glance.dir : (b.dir || 'south');
+    if (!loadedSets.has(set)) {
+      loadSet(set);
+      return null;
+    }
+    const glancing = b.state !== "walk" && b.glance && b.glance.until > nowMs; // brief look-up: overrides facing & typing
+    const meeting = b.meet && b.meet.until > nowMs; // hallway chat: stand still, face partner
+    const dir = glancing ? b.glance.dir : b.dir || "south";
     // per-agent animation offset. Prefer the FLOAT `aph`: `phase` is an integer (world.js needs it as a
     // PHASES[] index for the mood engine), and a whole-frame offset ticks every body's cycle on the same
     // 100ms boundaries — the crew animated in lockstep. Bodies without `aph` (dossier portrait) fall back.
-    const aph = (b.aph != null ? b.aph : (b.phase || 0));
+    const aph = b.aph != null ? b.aph : b.phase || 0;
     // 8-sector render facing — only locomotion + standing poses use it; seated/desk states keep
     // the plain 4-dir vocabulary (their frames are cardinal-only and their facing is furniture-set)
     const dir8 = renderDir8(b, dir, glancing, nowMs);
-    let key = null, fps = 8, bob = 0, turnStep = false;
+    let key = null,
+      fps = 8,
+      bob = 0,
+      turnStep = false;
 
     if (meeting) {
-      key = pick8(set, ['rot'], dir8, dir); fps = 4;
-    } else if (b.state === 'walk') {
-      key = pick8(set, b._strideBlocked ? ['rot'] : ['walk'], dir8, dir); fps = 10;
+      key = pick8(set, ["rot"], dir8, dir);
+      fps = 4;
+    } else if (b.state === "walk") {
+      key = pick8(set, b._strideBlocked ? ["rot"] : ["walk"], dir8, dir);
+      fps = 10;
       // Four-direction artwork must choose its closest AVAILABLE facing from actual travel.
       // Falling back to b.dir on a diagonal can select the wrong side of the quadrant.
-      if (!b._strideBlocked && b._resolvedTravelHeading != null
-          && (!frames[set + '.walk.' + dir8] || !frames[set + '.walk.north-east'])) {
+      if (
+        !b._strideBlocked &&
+        b._resolvedTravelHeading != null &&
+        (!frames[set + ".walk." + dir8] || !frames[set + ".walk.north-east"])
+      ) {
         let nearest = Infinity;
         for (const [facing, angle] of Object.entries(DIR8_A)) {
-          const candidate = set + '.walk.' + facing;
+          const candidate = set + ".walk." + facing;
           const error = Math.abs(ang(angle - b._resolvedTravelHeading));
-          if (frames[candidate] && error < nearest) { nearest = error; key = candidate; }
+          if (frames[candidate] && error < nearest) {
+            nearest = error;
+            key = candidate;
+          }
         }
       }
     } else if (b.working && !glancing) {
       // Typing art is north-only on some skins: prefer a correctly facing sit/stand over a reversed worker.
-      key = pick(set, b.sitting ? ['type', 'sit', 'rot'] : ['rot'], dir); fps = 6;
-    } else if (b.state === 'social' && b.sitting) {
+      key = pick(set, b.sitting ? ["type", "sit", "rot"] : ["rot"], dir);
+      fps = 6;
+    } else if (b.state === "social" && b.sitting) {
       // can in hand reads best from the front; otherwise face what you came for
-      key = b.hasCan ? (pick(set, ['drink', 'sit'], 'south')) : pick(set, ['sit'], dir); fps = 6;
+      key = b.hasCan ? pick(set, ["drink", "sit"], "south") : pick(set, ["sit"], dir);
+      fps = 6;
     } else if (b.sitting) {
-      key = pick(set, ['sit', 'rot'], dir); fps = 4;
+      key = pick(set, ["sit", "rot"], dir);
+      fps = 4;
     } else if (b.speaking) {
       // Keep the feet planted. No whole-body hop as a substitute for missing mouth art.
-      key = pick8(set, ['talk','rot'], dir8, dir); fps = 6;
+      key = pick8(set, ["talk", "rot"], dir8, dir);
+      fps = 6;
       bob = 0;
     } else {
-      key = pick8(set, ['rot'], dir8, dir);
+      key = pick8(set, ["rot"], dir8, dir);
       bob = Math.sin(nowMs / 600 + aph) * 0.7;
       // PIVOT STEP. A standing body that changes facing used to hold a frozen idle pose while the
       // sprite rotated under it — the "it just slides round" read. Nobody turns like that; you
@@ -583,8 +773,12 @@ const SPRITES = (() => {
       // it drive the legs made a body take a full stride to look sideways and step back again.
       // The facing still eases round; only the footwork is suppressed.
       if (!isReviewSet(set) && !glancing && (b._rW || 0) > TURN_STEP_W) {
-        const wk = pick8(set, ['walk'], dir8, dir);
-        if (wk) { key = wk; turnStep = true; bob *= 0.35; }
+        const wk = pick8(set, ["walk"], dir8, dir);
+        if (wk) {
+          key = wk;
+          turnStep = true;
+          bob *= 0.35;
+        }
       }
     }
 
@@ -598,28 +792,40 @@ const SPRITES = (() => {
        was removed 2026-08-08 because a stretch played at those moments reads as a glitch. New
        meanings need new frames, not this one re-labelled. */
     let fixedIdx = null;
-    if (!reduced && key && key.indexOf('.rot.') !== -1 && b.state !== 'walk'
-        && !b.working && !b.sitting && !b.speaking && !meeting && !glancing) {
+    if (
+      !reduced &&
+      key &&
+      key.indexOf(".rot.") !== -1 &&
+      b.state !== "walk" &&
+      !b.working &&
+      !b.sitting &&
+      !b.speaking &&
+      !meeting &&
+      !glancing
+    ) {
       // EXACT direction only — never fall back to another facing. Most sets ship the stretch
       // on the 4 cardinals alone (the diagonals would cost 4 more generations each and are
       // unreachable in practice: a body that stops walking leaves its diagonal within ~50ms
       // and holds a cardinal while idle, and only an idle body stretches). Falling back would
       // snap the body 45° for the length of the stretch — the exact class of pop this pass
       // was built to remove.
-      const kd = key.slice(key.lastIndexOf('.') + 1);
-      const gk = frames[set + '.gesture.' + kd] ? set + '.gesture.' + kd : null;
+      const kd = key.slice(key.lastIndexOf(".") + 1);
+      const gk = frames[set + ".gesture." + kd] ? set + ".gesture." + kd : null;
       if (gk) {
-        const GFPS = 8, glen = frames[gk].length, gdur = glen * (1000 / GFPS);
+        const GFPS = 8,
+          glen = frames[gk].length,
+          gdur = glen * (1000 / GFPS);
         // a stretch is a RARE beat (Andrew, 2026-07-31): once every ~90 minutes per body,
         // not an every-cycle tic. Each body's fire-point is spread uniformly across the
         // period via its float phase, so the crew never stretches in unison — and a fresh
         // boot still sees SOMEONE stretch early rather than everyone at minute 90.
         const GESTURE_PERIOD = 5400000;
-        const gph = Math.abs(aph) % (2 * Math.PI) / (2 * Math.PI);
+        const gph = (Math.abs(aph) % (2 * Math.PI)) / (2 * Math.PI);
         const gt = (nowMs + gph * GESTURE_PERIOD) % GESTURE_PERIOD;
         if (gt < gdur) {
-          key = gk; fixedIdx = Math.min(glen - 1, Math.floor(gt / (1000 / GFPS)));
-          bob = 0;   // the frames carry the motion; bobbing on top reads as jitter
+          key = gk;
+          fixedIdx = Math.min(glen - 1, Math.floor(gt / (1000 / GFPS)));
+          bob = 0; // the frames carry the motion; bobbing on top reads as jitter
         }
       }
     }
@@ -628,8 +834,8 @@ const SPRITES = (() => {
     // staggered per-agent via b.phase so the crew doesn't blink in unison.
     // keyed off the RESOLVED key's own direction (may be a diagonal): swapping to a cardinal
     // blink frame under a diagonal pose would snap the head 45° for the blink's 130ms.
-    if (!reduced && key && key.indexOf('.rot.') !== -1 && b.state !== 'walk') {
-      const bk = set + '.blink.' + key.slice(key.lastIndexOf('.') + 1);
+    if (!reduced && key && key.indexOf(".rot.") !== -1 && b.state !== "walk") {
+      const bk = set + ".blink." + key.slice(key.lastIndexOf(".") + 1);
       if (frames[bk]) {
         const bt = (nowMs + aph * 900) % 3300;
         if (bt < 130) key = bk;
@@ -642,8 +848,10 @@ const SPRITES = (() => {
     b._pose = key;
     // Compare the selected artwork with post-collision displacement from this simulation tick.
     // Screen culling can skip draws for seconds, so inter-draw positions are not a heading sample.
-    b._renderTravelError=key.includes('.walk.')&&b._resolvedTravelHeading!=null&&!b._strideBlocked
-      ?Math.abs(ang(DIR8_A[key.split('.').at(-1)]-b._resolvedTravelHeading))*180/Math.PI:null;
+    b._renderTravelError =
+      key.includes(".walk.") && b._resolvedTravelHeading != null && !b._strideBlocked
+        ? (Math.abs(ang(DIR8_A[key.split(".").at(-1)] - b._resolvedTravelHeading)) * 180) / Math.PI
+        : null;
 
     const fr = tintFrames(b.id, key);
     if (!fr || !fr.length) return null;
@@ -660,14 +868,17 @@ const SPRITES = (() => {
     const stride = cycleUnitsFor(set, sc, fr[0].height) / fr.length;
     // Keep the angular cycle consistent as six-pose skins gain in-between frames.
     // Retired four/eight-frame sets retain their original cadence.
-    const turnFrameScale = (set === 'ultron' || set === 'minion') ? 1 : fr.length / 6;
-    const idx = fixedIdx != null ? fixedIdx
-      // a pivoting body spends SWEPT ANGLE on the walk cycle, the same way a travelling one spends
-      // distance — the feet are driven by what the body actually did, never by the clock
-      : turnStep ? Math.floor((b._turnAng || 0) * TURN_STEP_FRAMES * turnFrameScale + aph)
-      : (key.indexOf('.walk.') !== -1 && b.odo != null && stride > 0)
-        ? Math.floor(b.odo / stride + aph)
-        : Math.floor(nowMs / (1000 / fps) + aph);
+    const turnFrameScale = set === "ultron" || set === "minion" ? 1 : fr.length / 6;
+    const idx =
+      fixedIdx != null
+        ? fixedIdx
+        : // a pivoting body spends SWEPT ANGLE on the walk cycle, the same way a travelling one spends
+          // distance — the feet are driven by what the body actually did, never by the clock
+          turnStep
+          ? Math.floor((b._turnAng || 0) * TURN_STEP_FRAMES * turnFrameScale + aph)
+          : key.indexOf(".walk.") !== -1 && b.odo != null && stride > 0
+            ? Math.floor(b.odo / stride + aph)
+            : Math.floor(nowMs / (1000 / fps) + aph);
     b._renderFrame = fr.length > 1 ? ((idx % fr.length) + fr.length) % fr.length : 0;
     const f = fr.length > 1 ? fr[((idx % fr.length) + fr.length) % fr.length] : fr[0];
     // WALK IN-BETWEENS (2026-09-22, Andrew: "smooth out the walking frames"). An eight-drawing cycle
@@ -676,9 +887,14 @@ const SPRITES = (() => {
     // drawn as drawing k crossfaded into drawing k+1, eased so each authored drawing still holds
     // crisp around its own phase. Only neighbouring drawings of ONE cycle blend, the body's position
     // is untouched (nothing floats), and reduced motion keeps the hard cuts.
-    const phase = fixedIdx != null || reduced || fr.length < 2 || key.indexOf('.walk.') === -1 ? null
-      : turnStep ? (b._turnAng || 0) * TURN_STEP_FRAMES * turnFrameScale + aph
-      : (b.odo != null && stride > 0) ? b.odo / stride + aph : null;
+    const phase =
+      fixedIdx != null || reduced || fr.length < 2 || key.indexOf(".walk.") === -1
+        ? null
+        : turnStep
+          ? (b._turnAng || 0) * TURN_STEP_FRAMES * turnFrameScale + aph
+          : b.odo != null && stride > 0
+            ? b.odo / stride + aph
+            : null;
     const frac = phase == null ? 0 : phase - Math.floor(phase);
     const tween = frac * frac * (3 - 2 * frac);
     const fNext = tween > 0.02 ? fr[(b._renderFrame + 1) % fr.length] : null;
@@ -686,7 +902,8 @@ const SPRITES = (() => {
     // footprint = native master × per-set scale → identical on-floor size as before, but f is now the
     // full-resolution master. Draw it DOWN to that size with smoothing ON so the detail survives (and
     // stays sharp if the camera zooms in, since it resamples straight from the 92px master each frame).
-    const dw = f.width * sc, dh = f.height * sc;   // `sc` resolved above (the stride derivation needs it)
+    const dw = f.width * sc,
+      dh = f.height * sc; // `sc` resolved above (the stride derivation needs it)
     // SUB-UNIT positioning. This used to be Math.round() on the raw world coordinate — i.e. a snap to integer
     // WORLD units. But the camera scales 0.5-6x (default 2), so one unit of rounding landed as a 2-6 DEVICE-pixel
     // jump, and at 34 u/s (~0.57 units per frame) the body held still for ~2 frames and then hopped a whole unit.
@@ -695,8 +912,8 @@ const SPRITES = (() => {
     // We round to the nearest DEVICE pixel instead: still crisply pixel-aligned (no resample blur at rest), but
     // sub-unit in world space, so motion is continuous. Do NOT put Math.round back on the world coordinate.
     const _m = ctx.getTransform ? ctx.getTransform() : null;
-    const zs = (_m && _m.a > 0) ? _m.a : 1;
-    const snap = v => Math.round(v * zs) / zs;
+    const zs = _m && _m.a > 0 ? _m.a : 1;
+    const snap = (v) => Math.round(v * zs) / zs;
     const x = snap(b.px - dw / 2);
     // Keep the approved boots against the floor contact. The legacy three-world-pixel
     // lift separated an 18px body from its shadow by one sixth of its visible height.
@@ -709,35 +926,54 @@ const SPRITES = (() => {
     // SPRITE rises, the shadow pool remains on the deck under the stool where light actually lands.
     // Gated on the RESOLVED track actually being a sit pose: a set with no sit frames (minionchar,
     // 2026-08-10) falls back to rot/stand, and lifting a STANDING body onto the pad reads as levitation.
-    const workstationLift = isReviewSet(set) && b.sitting && !b.seated && (b.working || b.goal === 'work') ? 7 : 0;
-    const seatLift = b.sitting && /\.(sit|type)\./.test(key) ? (b.seatLift || workstationLift) : 0;
+    const workstationLift =
+      isReviewSet(set) && b.sitting && !b.seated && (b.working || b.goal === "work") ? 7 : 0;
+    const seatLift = b.sitting && /\.(sit|type)\./.test(key) ? b.seatLift || workstationLift : 0;
     // perched: anchor by THIS sit frame's own bottom padding (getTrackPad), not the standing footPad —
     // sets whose sit master carries extra empty rows below the tucked legs (skeleton) otherwise float.
     // Walking masters have slightly different packing below their boots. A set-wide idle
     // pad made those differences into floor penetration and floating during the cycle.
-    const walking = key.includes('.walk.') && !turnStep;
+    const walking = key.includes(".walk.") && !turnStep;
     // an in-between's boots sit between its two drawings' boots, so its foot line does too
-    const framePad = fNext ? getFramePad(f) + (getFramePad(fNext) - getFramePad(f)) * tween : getFramePad(f);
+    const framePad = fNext
+      ? getFramePad(f) + (getFramePad(fNext) - getFramePad(f)) * tween
+      : getFramePad(f);
     const pad = (walking ? framePad : seatLift ? getTrackPad(key) : getFootPad(set)) * sc;
     // Quiet standing breath changes the torso's height by less than a quarter world unit while
     // its measured foot line stays fixed. Existing walk/pivot, furniture, sleep, talk and gesture
     // tracks own their motion. Portraits keep their established framing. Omitting appearance
     // preserves the original three-argument renderer until the caller opts into local lighting.
-    const planted = !!appearance && !b.noShadow && !b.seated && !b.sitting && !b.sleeping
-      && b.state !== 'sleep' && b.state !== 'walk' && !b.working && (!b.speaking || isReviewSet(set))
-      && !meeting && !glancing && !turnStep && (key.indexOf('.rot.') !== -1 || key.indexOf('.blink.') !== -1 || key.indexOf('.talk.') !== -1);
+    const planted =
+      !!appearance &&
+      !b.noShadow &&
+      !b.seated &&
+      !b.sitting &&
+      !b.sleeping &&
+      b.state !== "sleep" &&
+      b.state !== "walk" &&
+      !b.working &&
+      (!b.speaking || isReviewSet(set)) &&
+      !meeting &&
+      !glancing &&
+      !turnStep &&
+      (key.indexOf(".rot.") !== -1 ||
+        key.indexOf(".blink.") !== -1 ||
+        key.indexOf(".talk.") !== -1);
     if (reduced || planted) bob = 0;
-    const motionDt=Math.max(0,Math.min(100,nowMs-(b._speechAt||nowMs)));b._speechAt=nowMs;
-    const speechWant=b.speaking?1:0;
-    b._speechEase=(b._speechEase||0)+(speechWant-(b._speechEase||0))*(1-Math.exp(-motionDt/180));
+    const motionDt = Math.max(0, Math.min(100, nowMs - (b._speechAt || nowMs)));
+    b._speechAt = nowMs;
+    const speechWant = b.speaking ? 1 : 0;
+    b._speechEase =
+      (b._speechEase || 0) + (speechWant - (b._speechEase || 0)) * (1 - Math.exp(-motionDt / 180));
     // Uneven phrase accents and rests, never purported audio lip-sync. Deform about the planted feet.
-    const accent=Math.max(0,Math.sin(nowMs/410+aph)*Math.sin(nowMs/970+aph*.7));
-    const speech=planted&&!reduced?(b._speechEase||0)*accent:0;
-    b._renderSpeechAccent=speech;
-    const breath = planted && !reduced ? Math.sin(nowMs / 1050 + aph) * 0.12 - speech*.18 : 0;
+    const accent = Math.max(0, Math.sin(nowMs / 410 + aph) * Math.sin(nowMs / 970 + aph * 0.7));
+    const speech = planted && !reduced ? (b._speechEase || 0) * accent : 0;
+    b._renderSpeechAccent = speech;
+    const breath = planted && !reduced ? Math.sin(nowMs / 1050 + aph) * 0.12 - speech * 0.18 : 0;
     const breathScale = 1 + breath / Math.max(12, dh - pad);
     const drawHeight = dh * breathScale;
-    const y = planted ? snap(b.py + GROUND_BITE - seatLift) - (dh - pad) * breathScale
+    const y = planted
+      ? snap(b.py + GROUND_BITE - seatLift) - (dh - pad) * breathScale
       : snap(b.py - dh + GROUND_BITE + bob + pad - seatLift);
     // Report the rendered pixel boundary, including snapping and authored margins.
     b._renderGroundGap = b.py - (y + (dh - framePad * sc) * breathScale);
@@ -747,57 +983,108 @@ const SPRITES = (() => {
     const shR = Math.max(4.5, dw * 0.21);
     // POSE DISSOLVE state is decided before any pixel work, so a culled body leaves its next frame exactly as a
     // painted one would (see the dissolve note at the draw below).
-    if (b._spriteGroup !== set) { b._poseLast = null; b._poseFade = null; b._spriteGroup = set; }
-    const prev = b._poseLast, fadeable = !reduced && !b.noShadow && prev && prev.key !== key
-      && nowMs - prev.at < 200 && Math.hypot(b.px - prev.px, b.py - prev.py) < 6;
-    if (fadeable) b._poseFade = { f: prev.f, ox: prev.x - prev.px, oy: prev.y - prev.py, w: prev.w, h: prev.h, at: nowMs };
-    const fade = b._poseFade, ft = fade && !reduced ? (nowMs - fade.at) / POSE_FADE_MS : 1, fading = !!fade && ft < 1;
+    if (b._spriteGroup !== set) {
+      b._poseLast = null;
+      b._poseFade = null;
+      b._spriteGroup = set;
+    }
+    const prev = b._poseLast,
+      fadeable =
+        !reduced &&
+        !b.noShadow &&
+        prev &&
+        prev.key !== key &&
+        nowMs - prev.at < 200 &&
+        Math.hypot(b.px - prev.px, b.py - prev.py) < 6;
+    if (fadeable)
+      b._poseFade = {
+        f: prev.f,
+        ox: prev.x - prev.px,
+        oy: prev.y - prev.py,
+        w: prev.w,
+        h: prev.h,
+        at: nowMs,
+      };
+    const fade = b._poseFade,
+      ft = fade && !reduced ? (nowMs - fade.at) / POSE_FADE_MS : 1,
+      fading = !!fade && ft < 1;
     if (fade && !fading) b._poseFade = null;
     b._renderPoseFade = fading ? +ft.toFixed(3) : null;
     b._poseLast = { key, f, x, y, px: b.px, py: b.py, w: dw, h: drawHeight, at: nowMs };
-    const geometry = { top: y + Math.round(drawHeight * 0.22), w: Math.round(dw * 0.6), h: drawHeight };
-    if (appearance && typeof appearance.shouldPaint === 'function') {
+    const geometry = {
+      top: y + Math.round(drawHeight * 0.22),
+      w: Math.round(dw * 0.6),
+      h: drawHeight,
+    };
+    if (appearance && typeof appearance.shouldPaint === "function") {
       // Sprite rect (+1px resample margin, + speech skew), the fading previous pose, and every ground ring:
       // a ring's centre shifts by <=0.48 and its radius is <=1.14 of the pool, the leader's spill pool is 1.55x.
-      const skew = Math.abs(speech) * 0.009 * drawHeight + 1, reach = shR * 1.55 * 1.62;
-      let left = Math.min(x - skew, b.px - reach), right = Math.max(x + dw + skew, b.px + reach);
-      let top = Math.min(y - 1, b.py - reach), bottom = Math.max(y + drawHeight + 1, b.py + reach);
+      const skew = Math.abs(speech) * 0.009 * drawHeight + 1,
+        reach = shR * 1.55 * 1.62;
+      let left = Math.min(x - skew, b.px - reach),
+        right = Math.max(x + dw + skew, b.px + reach);
+      let top = Math.min(y - 1, b.py - reach),
+        bottom = Math.max(y + drawHeight + 1, b.py + reach);
       if (fading) {
-        const fx = b.px + fade.ox, fy = b.py + fade.oy;
-        left = Math.min(left, fx - 1); right = Math.max(right, fx + fade.w + 1); top = Math.min(top, fy - 1); bottom = Math.max(bottom, fy + fade.h + 1);
+        const fx = b.px + fade.ox,
+          fy = b.py + fade.oy;
+        left = Math.min(left, fx - 1);
+        right = Math.max(right, fx + fade.w + 1);
+        top = Math.min(top, fy - 1);
+        bottom = Math.max(bottom, fy + fade.h + 1);
       }
       if (!appearance.shouldPaint({ x: left, y: top, w: right - left, h: bottom - top })) {
         const target = destinationOf(ctx);
         let skipped = offStage.get(target);
-        if (!skipped) offStage.set(target, skipped = new WeakSet());
+        if (!skipped) offStage.set(target, (skipped = new WeakSet()));
         skipped.add(b);
         return Object.assign(geometry, { painted: false });
       }
     }
-    const light = bodyLight(appearance && (appearance.light != null ? appearance.light
-      : typeof appearance.sampleLight === 'function' ? appearance.sampleLight(b.px, b.py) : null));
+    const light = bodyLight(
+      appearance &&
+        (appearance.light != null
+          ? appearance.light
+          : typeof appearance.sampleLight === "function"
+            ? appearance.sampleLight(b.px, b.py)
+            : null),
+    );
     // Sources are composed once per painted draw: on a re-entry frame before the shadow (to warm the destination),
     // otherwise at the draw as always.
-    let fadeSource = null, source = null;
+    let fadeSource = null,
+      source = null;
     const compose = () => {
       fadeSource = fading ? lightFrame(fade.f, light, nowMs) : null;
-      source = fNext ? tweenFrame(lightFrame(f, light, nowMs), lightFrame(fNext, light, nowMs), tween) : lightFrame(f, light, nowMs);
+      source = fNext
+        ? tweenFrame(lightFrame(f, light, nowMs), lightFrame(fNext, light, nowMs), tween)
+        : lightFrame(f, light, nowMs);
     };
     const skipped = offStage.get(destinationOf(ctx));
     if (skipped && skipped.delete(b)) {
       compose();
-      warmDestination(ctx, fading ? [[fadeSource, snap(b.px + fade.ox), snap(b.py + fade.oy), fade.w, fade.h], [source, x, y, dw, drawHeight]]
-        : [[source, x, y, dw, drawHeight]]);
+      warmDestination(
+        ctx,
+        fading
+          ? [
+              [fadeSource, snap(b.px + fade.ox), snap(b.py + fade.oy), fade.w, fade.h],
+              [source, x, y, dw, drawHeight],
+            ]
+          : [[source, x, y, dw, drawHeight]],
+      );
     }
     // the contact shadow (and ULTRON's red spill) is a GROUND cue — skip it for off-floor renders
     // like the dossier portrait (b.noShadow), where there's no floor and it scales into a blocky bar.
     // NOTE: fed the RAW b.px/b.py, not the device-snapped ones. Snapping the pool while the body
     // itself is sub-unit would let the shadow tick a pixel while the feet slid smoothly over it.
     if (!b.noShadow) {
-      const lift = Math.max(0, -bob);           // bob is +down; a negative bob has raised the body
-      if (set === 'ultron') {
+      const lift = Math.max(0, -bob); // bob is +down; a negative bob has raised the body
+      if (set === "ultron") {
         // the station leader's menacing red spill — a wider, slower pulse beneath his own pool
-        groundShadow(ctx, b.px, b.py, shR * 1.55, { lift, color: '#ff4a3d', alpha: reduced ? 0.55 : 0.55 + 0.25 * Math.sin(nowMs / 400) });
+        groundShadow(ctx, b.px, b.py, shR * 1.55, {
+          lift,
+          color: "#ff4a3d",
+          alpha: reduced ? 0.55 : 0.55 + 0.25 * Math.sin(nowMs / 400),
+        });
       }
       // a perched body adds its seatLift to the shadow's lift: the pool tightens + fades the higher the
       // seat, instead of claiming full floor contact the raised feet don't have
@@ -810,14 +1097,23 @@ const SPRITES = (() => {
     const prevSmooth = ctx.imageSmoothingEnabled;
     const prevQuality = ctx.imageSmoothingQuality;
     ctx.imageSmoothingEnabled = true;
-    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+    if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
     try {
       if (!source) compose();
-      if(speech){ctx.save();const foot=b.py+GROUND_BITE-seatLift;ctx.translate(0,foot);ctx.transform(1,0,speech*.009,1,0,0);ctx.translate(0,-foot);}
+      if (speech) {
+        ctx.save();
+        const foot = b.py + GROUND_BITE - seatLift;
+        ctx.translate(0, foot);
+        ctx.transform(1, 0, speech * 0.009, 1, 0, 0);
+        ctx.translate(0, -foot);
+      }
       // Rear-facing desk poses tuck their shins beneath the console. The chair
       // occludes the torso, but its open caster base must not reveal sprite boots.
-      const tuckDeskFeet = b.sitting && !b.seated && (b.working || b.goal === 'work')
-        && /\.(sit|type)\.north$/.test(key);
+      const tuckDeskFeet =
+        b.sitting &&
+        !b.seated &&
+        (b.working || b.goal === "work") &&
+        /\.(sit|type)\.north$/.test(key);
       if (tuckDeskFeet) {
         ctx.save();
         const floor = y + (dh - getFramePad(f) * sc) * breathScale;
@@ -839,11 +1135,10 @@ const SPRITES = (() => {
       }
       ctx.drawImage(source, x, y, dw, drawHeight);
       if (tuckDeskFeet) ctx.restore();
-      if(speech)ctx.restore();
-    }
-    finally {
+      if (speech) ctx.restore();
+    } finally {
       ctx.imageSmoothingEnabled = prevSmooth;
-      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = prevQuality;
+      if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = prevQuality;
     }
     // geometry for overlays (alert icon, bubble, selection box) — top of the visible body
     return geometry;
@@ -851,13 +1146,15 @@ const SPRITES = (() => {
 
   /* loading */
   function loadImage(path) {
-    return new Promise(res => {
+    return new Promise((res) => {
       const img = new Image();
       img.onload = async () => {
         try {
-          if (typeof img.decode === 'function') await img.decode();
+          if (typeof img.decode === "function") await img.decode();
           res(img);
-        } catch (_) { res(null); }
+        } catch (_) {
+          res(null);
+        }
       };
       img.onerror = () => res(null);
       img.src = path;
@@ -865,7 +1162,7 @@ const SPRITES = (() => {
   }
 
   function loadTrack(track, paths) {
-    return Promise.all(paths.map(p => loadImage('assets/sprites/' + p))).then(imgs => {
+    return Promise.all(paths.map((p) => loadImage("assets/sprites/" + p))).then((imgs) => {
       const ok = imgs.filter(Boolean);
       if (ok.length) frames[track] = ok;
       return ok.length;
@@ -873,7 +1170,7 @@ const SPRITES = (() => {
   }
 
   function loadSet(set) {
-    const key = String(set || '').trim();
+    const key = String(set || "").trim();
     if (!key) return Promise.resolve(false);
     // Do not cache a request until the manifest is ready and proves the set has tracks. drawBody calls us
     // again on the next frame, so a pre-init request naturally recovers as soon as init() installs the plan.
@@ -881,22 +1178,26 @@ const SPRITES = (() => {
     const tracks = tracksBySet[key] || [];
     if (!tracks.length) return Promise.resolve(false);
     if (setJobs[key]) return setJobs[key];
-    setJobs[key] = Promise.all(tracks.map(([track, paths]) => loadTrack(track, paths))).then(counts => {
-      const loaded = counts.reduce((n, count) => n + count, 0);
-      if (loaded) loadedSets.add(key);
-      return loaded > 0;
-    });
+    setJobs[key] = Promise.all(tracks.map(([track, paths]) => loadTrack(track, paths))).then(
+      (counts) => {
+        const loaded = counts.reduce((n, count) => n + count, 0);
+        if (loaded) loadedSets.add(key);
+        return loaded > 0;
+      },
+    );
     return setJobs[key];
   }
 
   function setForSkin(skin) {
-    const catalog = (typeof DATA !== 'undefined' && DATA.SKINS) || {};
-    const fallback = typeof DATA !== 'undefined' ? DATA.DEFAULT_SKIN : '';
+    const catalog = (typeof DATA !== "undefined" && DATA.SKINS) || {};
+    const fallback = typeof DATA !== "undefined" ? DATA.DEFAULT_SKIN : "";
     const picked = catalog[skin] || catalog[fallback];
-    return picked && picked.set ? picked.set : '';
+    return picked && picked.set ? picked.set : "";
   }
 
-  function replacementState(skin) { return replacements[skin]?.state || 'inherited'; }
+  function replacementState(skin) {
+    return replacements[skin]?.state || "inherited";
+  }
 
   function ensureSkin(skin) {
     const fallback = loadSet(setForSkin(skin));
@@ -904,90 +1205,141 @@ const SPRITES = (() => {
     if (!replacement) return fallback;
     if (!replacement.ensureJob) {
       // A complete replacement can paint even while unrelated canonical frames are still loading.
-      replacement.ensureJob = replacement.job.then(ok => ok || fallback);
+      replacement.ensureJob = replacement.job.then((ok) => ok || fallback);
     }
     return replacement.ensureJob;
   }
   function isSkinReady(skin) {
-    return replacementState(skin) === 'ready' || loadedSets.has(setForSkin(skin));
+    return replacementState(skin) === "ready" || loadedSets.has(setForSkin(skin));
   }
 
   function planReplacements(crew) {
     for (const [skin, group] of Object.entries(crew || {})) {
       const canonical = tracksBySet[setForSkin(skin)] || [];
       const requested = Object.entries(group.tracks || {});
-      const inherited = group.set === setForSkin(skin) && requested.length === canonical.length
-        && requested.every(([track, paths]) => {
-          const row = canonical.find(([key]) => key === group.set + '.' + track);
-          return row && JSON.stringify(paths.map(path => path.replace(/^\//, ''))) === JSON.stringify(row[1].map(path => 'assets/sprites/' + path));
+      const inherited =
+        group.set === setForSkin(skin) &&
+        requested.length === canonical.length &&
+        requested.every(([track, paths]) => {
+          const row = canonical.find(([key]) => key === group.set + "." + track);
+          return (
+            row &&
+            JSON.stringify(paths.map((path) => path.replace(/^\//, ""))) ===
+              JSON.stringify(row[1].map((path) => "assets/sprites/" + path))
+          );
         });
       if (inherited) continue;
       // Internal identity isolates staging and all derived caches from canonical sets, even when
       // a manifest reuses the default set name for different resource paths.
-      const set = '@replacement:' + skin;
+      const set = "@replacement:" + skin;
       setMetadata[set] = group;
-      const replacement = replacements[skin] = { set, state: 'loading', job: null };
+      const replacement = (replacements[skin] = { set, state: "loading", job: null });
       replacement.job = loadReplacement(skin, requested, replacement);
     }
   }
 
   async function loadReplacement(skin, tracks, replacement) {
-    const staged = await Promise.all(tracks.map(async ([track, paths]) => {
-      const images = await Promise.all(paths.map(loadImage));
-      return [replacement.set + '.' + track, images];
-    }));
+    const staged = await Promise.all(
+      tracks.map(async ([track, paths]) => {
+        const images = await Promise.all(paths.map(loadImage));
+        return [replacement.set + "." + track, images];
+      }),
+    );
     const images = staged.flatMap(([, frames]) => frames);
-    const reason = images.some(image => !image) ? 'image-load'
-      : images.some(image => image.width !== 144 || image.height !== 144) ? 'image-dimensions' : null;
+    const reason = images.some((image) => !image)
+      ? "image-load"
+      : images.some((image) => image.width !== 144 || image.height !== 144)
+        ? "image-dimensions"
+        : null;
     if (reason) {
-      replacement.state = 'failed';
+      replacement.state = "failed";
       // Failed images have never entered frame, tint, foot, track or cycle caches.
       staged.length = 0;
       images.length = 0;
-      if (onDegraded) { try { onDegraded({ skin, reason }); } catch (_) { /* consumer errors cannot poison settlement */ } }
+      if (onDegraded) {
+        try {
+          onDegraded({ skin, reason });
+        } catch (_) {
+          /* consumer errors cannot poison settlement */
+        }
+      }
       return false;
     }
     for (const [track, framesForTrack] of staged) frames[track] = framesForTrack;
     loadedSets.add(replacement.set);
-    replacement.state = 'ready';
+    replacement.state = "ready";
     return true;
   }
 
   async function init({ crew, onDegraded: notifyDegraded } = {}) {
-    onDegraded = typeof notifyDegraded === 'function' ? notifyDegraded : null;
+    onDegraded = typeof notifyDegraded === "function" ? notifyDegraded : null;
     loading = true;
     try {
-      const resp = await fetch('assets/sprites/manifest.json', { cache: 'no-cache' });
+      const resp = await fetch("assets/sprites/manifest.json", { cache: "no-cache" });
       if (!resp.ok) return;
       const man = await resp.json();
-      if(typeof SkinStudy!=='undefined')await SkinStudy.install(man);
+      if (typeof SkinStudy !== "undefined") await SkinStudy.install(man);
       tracksBySet = SpriteLoadPlan.groupTracks(man.sprites);
       planReplacements(crew);
       // ready when the DEFAULT skin's base pose loaded (the old `minion` astronaut set
       // was retired in favour of DATA.SKINS — gating on it left ready=false forever, so
       // every body fell through to the procedural fallback regardless of picked skin).
-      const defSet = (typeof DATA !== 'undefined' && DATA.SKINS && DATA.DEFAULT_SKIN
-        && DATA.SKINS[DATA.DEFAULT_SKIN] && DATA.SKINS[DATA.DEFAULT_SKIN].set) || 'bear';
+      const defSet =
+        (typeof DATA !== "undefined" &&
+          DATA.SKINS &&
+          DATA.DEFAULT_SKIN &&
+          DATA.SKINS[DATA.DEFAULT_SKIN] &&
+          DATA.SKINS[DATA.DEFAULT_SKIN].set) ||
+        "bear";
       // FIRST PAINT needs one honest body, not every animation. Fetch the default south pose first,
       // then let the other 106 default frames and ULTRON warm in parallel behind it. On the website
       // this cuts the cyan procedural placeholder from ~20 seconds to one image request.
-      const primeTrack = defSet + '.rot.south';
+      const primeTrack = defSet + ".rot.south";
       const primePaths = man.sprites && man.sprites[primeTrack];
-      if (Array.isArray(primePaths) && await loadTrack(primeTrack, primePaths)) {
+      if (Array.isArray(primePaths) && (await loadTrack(primeTrack, primePaths))) {
         loadedSets.add(defSet);
         ready = true;
         loading = false;
       }
       const leaderSet = defSet;
       const startup = Promise.all([loadSet(defSet), loadSet(leaderSet)]).then(() => {
-        if (frames[defSet + '.rot.south'] || frames[leaderSet + '.rot.south'] || Object.keys(frames).length) ready = true;
-        console.log('[SPRITES] startup sets loaded:', Array.from(loadedSets).join(', '), '—', Object.keys(frames).length, 'animation tracks');
+        if (
+          frames[defSet + ".rot.south"] ||
+          frames[leaderSet + ".rot.south"] ||
+          Object.keys(frames).length
+        )
+          ready = true;
+        console.log(
+          "[SPRITES] startup sets loaded:",
+          Array.from(loadedSets).join(", "),
+          "—",
+          Object.keys(frames).length,
+          "animation tracks",
+        );
       });
       if (!ready) await startup;
-    } catch (e) { console.warn('[SPRITES] manifest missing — procedural fallback', e); }
-    finally { loading = false; }
+    } catch (e) {
+      console.warn("[SPRITES] manifest missing — procedural fallback", e);
+    } finally {
+      loading = false;
+    }
   }
 
-  return { init, drawBody, groundShadow, ensureSkin, isSkinReady, replacementState, bodyScale, bodyAppearanceStats, setForBody,
-    get ready() { return ready; }, get loading() { return loading; } };
+  return {
+    init,
+    drawBody,
+    groundShadow,
+    ensureSkin,
+    isSkinReady,
+    replacementState,
+    bodyScale,
+    bodyAppearanceStats,
+    setForBody,
+    get ready() {
+      return ready;
+    },
+    get loading() {
+      return loading;
+    },
+  };
 })();

@@ -64,48 +64,13 @@
       "scale": 1
     },
     "shapes": {
-      "control": [
-        2,
-        8,
-        2,
-        8
-      ],
-      "input": [
-        2,
-        8,
-        2,
-        8
-      ],
-      "panel": [
-        3,
-        16,
-        3,
-        16
-      ],
-      "sessionRow": [
-        2,
-        10,
-        2,
-        2
-      ],
-      "mailRow": [
-        2,
-        8,
-        2,
-        2
-      ],
-      "tag": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "eyebrow": [
-        0,
-        0,
-        0,
-        0
-      ],
+      "control": [2, 8, 2, 8],
+      "input": [2, 8, 2, 8],
+      "panel": [3, 16, 3, 16],
+      "sessionRow": [2, 10, 2, 2],
+      "mailRow": [2, 8, 2, 2],
+      "tag": [0, 0, 0, 0],
+      "eyebrow": [0, 0, 0, 0],
       "badgeCut": "classic"
     },
     "decor": {
@@ -301,30 +266,14 @@
       "sourceStandingHeight": 76,
       "presentation": "review",
       "tracks": {
-        "rot.south": [
-          "assets/sprites/approved_android/rot_south.png"
-        ],
-        "rot.south-east": [
-          "assets/sprites/approved_android/rot_south-east.png"
-        ],
-        "rot.east": [
-          "assets/sprites/approved_android/rot_east.png"
-        ],
-        "rot.north-east": [
-          "assets/sprites/approved_android/rot_north-east.png"
-        ],
-        "rot.north": [
-          "assets/sprites/approved_android/rot_north.png"
-        ],
-        "rot.north-west": [
-          "assets/sprites/approved_android/rot_north-west.png"
-        ],
-        "rot.west": [
-          "assets/sprites/approved_android/rot_west.png"
-        ],
-        "rot.south-west": [
-          "assets/sprites/approved_android/rot_south-west.png"
-        ],
+        "rot.south": ["assets/sprites/approved_android/rot_south.png"],
+        "rot.south-east": ["assets/sprites/approved_android/rot_south-east.png"],
+        "rot.east": ["assets/sprites/approved_android/rot_east.png"],
+        "rot.north-east": ["assets/sprites/approved_android/rot_north-east.png"],
+        "rot.north": ["assets/sprites/approved_android/rot_north.png"],
+        "rot.north-west": ["assets/sprites/approved_android/rot_north-west.png"],
+        "rot.west": ["assets/sprites/approved_android/rot_west.png"],
+        "rot.south-west": ["assets/sprites/approved_android/rot_south-west.png"],
         "walk.south": [
           "assets/sprites/approved_android/walk_south_1.png",
           "assets/sprites/approved_android/walk_south_2.png",
@@ -381,15 +330,9 @@
           "assets/sprites/approved_android/walk_west_5.png",
           "assets/sprites/approved_android/walk_west_6.png"
         ],
-        "sit.south": [
-          "assets/sprites/approved_android/sit_south_4.png"
-        ],
-        "sit.east": [
-          "assets/sprites/approved_android/sit_east_4.png"
-        ],
-        "sit.west": [
-          "assets/sprites/approved_android/sit_west_4.png"
-        ],
+        "sit.south": ["assets/sprites/approved_android/sit_south_4.png"],
+        "sit.east": ["assets/sprites/approved_android/sit_east_4.png"],
+        "sit.west": ["assets/sprites/approved_android/sit_west_4.png"],
         "walk.south-west": [
           "assets/sprites/approved_android/walk_south-west_1.png",
           "assets/sprites/approved_android/walk_south-west_2.png",
@@ -398,9 +341,7 @@
           "assets/sprites/approved_android/walk_south-west_5.png",
           "assets/sprites/approved_android/walk_south-west_6.png"
         ],
-        "sit.north": [
-          "assets/sprites/approved_android/sit_north_4.png"
-        ],
+        "sit.north": ["assets/sprites/approved_android/sit_north_4.png"],
         "type.north": [
           "assets/sprites/approved_android/type_north_1.png",
           "assets/sprites/approved_android/type_north_2.png",
@@ -415,30 +356,14 @@
       "sourceStandingHeight": 76,
       "presentation": "review",
       "tracks": {
-        "rot.south": [
-          "assets/sprites/approved_blank_blue/rot_south.png"
-        ],
-        "rot.south-east": [
-          "assets/sprites/approved_blank_blue/rot_south-east.png"
-        ],
-        "rot.east": [
-          "assets/sprites/approved_blank_blue/rot_east.png"
-        ],
-        "rot.north-east": [
-          "assets/sprites/approved_blank_blue/rot_north-east.png"
-        ],
-        "rot.north": [
-          "assets/sprites/approved_blank_blue/rot_north.png"
-        ],
-        "rot.north-west": [
-          "assets/sprites/approved_blank_blue/rot_north-west.png"
-        ],
-        "rot.west": [
-          "assets/sprites/approved_blank_blue/rot_west.png"
-        ],
-        "rot.south-west": [
-          "assets/sprites/approved_blank_blue/rot_south-west.png"
-        ],
+        "rot.south": ["assets/sprites/approved_blank_blue/rot_south.png"],
+        "rot.south-east": ["assets/sprites/approved_blank_blue/rot_south-east.png"],
+        "rot.east": ["assets/sprites/approved_blank_blue/rot_east.png"],
+        "rot.north-east": ["assets/sprites/approved_blank_blue/rot_north-east.png"],
+        "rot.north": ["assets/sprites/approved_blank_blue/rot_north.png"],
+        "rot.north-west": ["assets/sprites/approved_blank_blue/rot_north-west.png"],
+        "rot.west": ["assets/sprites/approved_blank_blue/rot_west.png"],
+        "rot.south-west": ["assets/sprites/approved_blank_blue/rot_south-west.png"],
         "walk.south": [
           "assets/sprites/approved_blank_blue/walk_south_1.png",
           "assets/sprites/approved_blank_blue/walk_south_2.png",
@@ -503,18 +428,10 @@
           "assets/sprites/approved_blank_blue/walk_south-west_5.png",
           "assets/sprites/approved_blank_blue/walk_south-west_6.png"
         ],
-        "sit.south": [
-          "assets/sprites/approved_blank_blue/sit_south_4.png"
-        ],
-        "sit.east": [
-          "assets/sprites/approved_blank_blue/sit_east_4.png"
-        ],
-        "sit.north": [
-          "assets/sprites/approved_blank_blue/sit_north_4.png"
-        ],
-        "sit.west": [
-          "assets/sprites/approved_blank_blue/sit_west_4.png"
-        ],
+        "sit.south": ["assets/sprites/approved_blank_blue/sit_south_4.png"],
+        "sit.east": ["assets/sprites/approved_blank_blue/sit_east_4.png"],
+        "sit.north": ["assets/sprites/approved_blank_blue/sit_north_4.png"],
+        "sit.west": ["assets/sprites/approved_blank_blue/sit_west_4.png"],
         "type.north": [
           "assets/sprites/approved_blank_blue/type_north_1.png",
           "assets/sprites/approved_blank_blue/type_north_2.png",
@@ -529,30 +446,14 @@
       "sourceStandingHeight": 76,
       "presentation": "review",
       "tracks": {
-        "rot.south": [
-          "assets/sprites/approved_blank_amber/rot_south.png"
-        ],
-        "rot.south-east": [
-          "assets/sprites/approved_blank_amber/rot_south-east.png"
-        ],
-        "rot.east": [
-          "assets/sprites/approved_blank_amber/rot_east.png"
-        ],
-        "rot.north-east": [
-          "assets/sprites/approved_blank_amber/rot_north-east.png"
-        ],
-        "rot.north": [
-          "assets/sprites/approved_blank_amber/rot_north.png"
-        ],
-        "rot.north-west": [
-          "assets/sprites/approved_blank_amber/rot_north-west.png"
-        ],
-        "rot.west": [
-          "assets/sprites/approved_blank_amber/rot_west.png"
-        ],
-        "rot.south-west": [
-          "assets/sprites/approved_blank_amber/rot_south-west.png"
-        ],
+        "rot.south": ["assets/sprites/approved_blank_amber/rot_south.png"],
+        "rot.south-east": ["assets/sprites/approved_blank_amber/rot_south-east.png"],
+        "rot.east": ["assets/sprites/approved_blank_amber/rot_east.png"],
+        "rot.north-east": ["assets/sprites/approved_blank_amber/rot_north-east.png"],
+        "rot.north": ["assets/sprites/approved_blank_amber/rot_north.png"],
+        "rot.north-west": ["assets/sprites/approved_blank_amber/rot_north-west.png"],
+        "rot.west": ["assets/sprites/approved_blank_amber/rot_west.png"],
+        "rot.south-west": ["assets/sprites/approved_blank_amber/rot_south-west.png"],
         "walk.south": [
           "assets/sprites/approved_blank_amber/walk_south_1.png",
           "assets/sprites/approved_blank_amber/walk_south_2.png",
@@ -617,18 +518,10 @@
           "assets/sprites/approved_blank_amber/walk_south-west_5.png",
           "assets/sprites/approved_blank_amber/walk_south-west_6.png"
         ],
-        "sit.south": [
-          "assets/sprites/approved_blank_amber/sit_south_4.png"
-        ],
-        "sit.east": [
-          "assets/sprites/approved_blank_amber/sit_east_4.png"
-        ],
-        "sit.north": [
-          "assets/sprites/approved_blank_amber/sit_north_4.png"
-        ],
-        "sit.west": [
-          "assets/sprites/approved_blank_amber/sit_west_4.png"
-        ],
+        "sit.south": ["assets/sprites/approved_blank_amber/sit_south_4.png"],
+        "sit.east": ["assets/sprites/approved_blank_amber/sit_east_4.png"],
+        "sit.north": ["assets/sprites/approved_blank_amber/sit_north_4.png"],
+        "sit.west": ["assets/sprites/approved_blank_amber/sit_west_4.png"],
         "type.north": [
           "assets/sprites/approved_blank_amber/type_north_1.png",
           "assets/sprites/approved_blank_amber/type_north_2.png",

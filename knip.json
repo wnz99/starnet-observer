@@ -1,0 +1,40 @@
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "server.{js,ts}",
+        "sidecar/observer-sqlite-worker.{js,ts}",
+        "scripts/*.{js,mjs,ts}",
+        "frontend/app/theme-pack.{js,ts}",
+        "frontend/app/harness.{js,ts}",
+        "frontend/app/queryspine.{js,ts}",
+        "frontend/app/data-shim.{js,ts}",
+        "frontend/js/sprite-load-plan.{js,ts}",
+        "frontend/js/assets.{js,ts}",
+        "frontend/app/observer-model.{js,ts}",
+        "frontend/app/observer-scene.{js,ts}",
+        "frontend/app/observer-mail.{js,ts}",
+        "frontend/app/observer-inspector.{js,ts}",
+        "frontend/app/observer-mail-inspector.{js,ts}",
+        "frontend/app/scene-art-roles.{js,ts}",
+        "frontend/app/observer-office-art.{js,ts}",
+        "frontend/app/observer-view.{js,ts}",
+        "frontend/app/observer.{js,ts}",
+        "**/*.test.{js,ts}",
+        "eslint.config.mjs",
+        "tools/acceptance.ts",
+        "tools/quality/isolate-typescript.mjs",
+        "frontend/css/observer.css"
+      ],
+      "project": [
+        "server.{js,ts}",
+        "sidecar/**/*.{js,ts}",
+        "frontend/**/*.{js,ts}",
+        "scripts/**/*.{js,mjs,ts}",
+        "tools/**/*.{mjs,ts}",
+        "*.mjs"
+      ]
+    }
+  },
+  "ignoreBinaries": ["uv"]
+}

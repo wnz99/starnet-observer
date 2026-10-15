@@ -1,0 +1,29 @@
+---
+type: Reference
+title: Acceptance checklist
+description: Required behavior probes and evidence for this Bun application.
+---
+
+# Acceptance checklist
+
+Task 2 verifies setup independently of the remaining TypeScript migration. Never report a complete bootstrap while a required gate fails or is unrun. Run defect probes in disposable copies; preserve source and the real Git index.
+
+| Contract                 | Required evidence                                                                                                                  | Current status                                                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tool setup               | Frozen Bun install; exact executable versions; shell/helper checks                                                                 | Pass: Bun 1.3.13, Node 24.19.0, uv 0.13.1 and pinned ShellCheck                                                                            |
+| Full tool wiring         | Every root check, tests, real builds and packaged consumers                                                                        | Pending migration and packaging tasks; lint/scanners report findings                                                                       |
+| Type/lint coverage       | Source, colocated tests and tools all covered; deliberate error in each category fails read-only checks                            | Strict projects/rules installed; full coverage failure probes pending final TS migration                                                   |
+| Real tests               | Existing behavior suite passes; wrong expected behavior fails, then restores                                                       | 38 colocated suites pass; acceptance runner's four original negative probes retained                                                       |
+| Formatting               | Whole maintained tree passes; staged formatting checks only staged bytes                                                           | Pass; disposable staged/unstaged formatting and root/nested ignore probes verify both directions and unchanged index/worktree state        |
+| Hook scope               | Existing owners preserved; linked-worktree setup cannot activate missing stubs elsewhere                                           | Pass: unadapted shared-scope defect reproduced; worktree-local adapter and repeat installation verified                                    |
+| Pre-push                 | Dirty tree and a pushed commit other than checked-out HEAD fail; clean pushed HEAD runs static gate                                | Pass in disposable fixture                                                                                                                 |
+| Local-state hygiene      | Ignored local file allowed; force-tracked dummy `.agent-local.json` and `.env` rejected                                            | Pass without reading any credential files                                                                                                  |
+| Formatting compatibility | Markup/CSS assertions still reject real configuration defects after whitespace/quote changes                                       | Pass: missing hidden status, wrong head order, unbundled font, changed numeric font and changed logo width each fail their exact assertion |
+| Application isolation    | Packed artifact starts and tests outside root dependencies, with frozen consumer graph; browser artifacts have runtime smoke proof | Pending dependent build/isolation task; current baseline helper awaits application adapter                                                 |
+| Semantic MCP             | Actual selected Codex registration discovers tools; populated metadata and narrow real pattern search both succeed                 | Pass: 11 tools, 316 chunks, CC-043 high confidence for TypeScript boolean-parameter query; no provider turn                                |
+| Pending options          | Unanswered options generate no settings; included unavailable tools stay incomplete                                                | Semantic MCP included locally; other optional integrations remain pending                                                                  |
+| Repeat setup             | Same inputs preserve locks/settings, avoid duplicate hooks/skills and preserve unrelated owners                                    | Hook repeat and frozen replay pass; complete record replay awaits final digest lock                                                        |
+| Documentation            | YAML parser validates concept metadata; index has no frontmatter; local links resolve                                              | Required after documentation edits                                                                                                         |
+| CI and final record      | Configured CI checks final reviewed head; write bootstrap lock last                                                                | Pending dependent delivery tasks                                                                                                           |
+
+No Python or Nx application exists, so their baseline probes are not applicable. The external MCP Python environment is local tool infrastructure. CI and operating-system claims require their own evidence. See [development](development.md) for commands, [quality](quality.md) for owners and [sources](sources.md) for installation boundaries.

@@ -1,35 +1,15 @@
 {
   "sprites": {
-    "approved_android.rot.south": [
-      "approved_android/rot_south.png"
-    ],
-    "approved_blank_blue.rot.south": [
-      "approved_blank_blue/rot_south.png"
-    ],
-    "approved_blank_amber.rot.south": [
-      "approved_blank_amber/rot_south.png"
-    ],
-    "approved_android.rot.south-east": [
-      "approved_android/rot_south-east.png"
-    ],
-    "approved_android.rot.east": [
-      "approved_android/rot_east.png"
-    ],
-    "approved_android.rot.north-east": [
-      "approved_android/rot_north-east.png"
-    ],
-    "approved_android.rot.north": [
-      "approved_android/rot_north.png"
-    ],
-    "approved_android.rot.north-west": [
-      "approved_android/rot_north-west.png"
-    ],
-    "approved_android.rot.west": [
-      "approved_android/rot_west.png"
-    ],
-    "approved_android.rot.south-west": [
-      "approved_android/rot_south-west.png"
-    ],
+    "approved_android.rot.south": ["approved_android/rot_south.png"],
+    "approved_blank_blue.rot.south": ["approved_blank_blue/rot_south.png"],
+    "approved_blank_amber.rot.south": ["approved_blank_amber/rot_south.png"],
+    "approved_android.rot.south-east": ["approved_android/rot_south-east.png"],
+    "approved_android.rot.east": ["approved_android/rot_east.png"],
+    "approved_android.rot.north-east": ["approved_android/rot_north-east.png"],
+    "approved_android.rot.north": ["approved_android/rot_north.png"],
+    "approved_android.rot.north-west": ["approved_android/rot_north-west.png"],
+    "approved_android.rot.west": ["approved_android/rot_west.png"],
+    "approved_android.rot.south-west": ["approved_android/rot_south-west.png"],
     "approved_android.walk.south": [
       "approved_android/walk_south_1.png",
       "approved_android/walk_south_2.png",
@@ -86,15 +66,9 @@
       "approved_android/walk_west_5.png",
       "approved_android/walk_west_6.png"
     ],
-    "approved_android.sit.south": [
-      "approved_android/sit_south_4.png"
-    ],
-    "approved_android.sit.east": [
-      "approved_android/sit_east_4.png"
-    ],
-    "approved_android.sit.west": [
-      "approved_android/sit_west_4.png"
-    ],
+    "approved_android.sit.south": ["approved_android/sit_south_4.png"],
+    "approved_android.sit.east": ["approved_android/sit_east_4.png"],
+    "approved_android.sit.west": ["approved_android/sit_west_4.png"],
     "approved_android.walk.south-west": [
       "approved_android/walk_south-west_1.png",
       "approved_android/walk_south-west_2.png",
@@ -103,36 +77,20 @@
       "approved_android/walk_south-west_5.png",
       "approved_android/walk_south-west_6.png"
     ],
-    "approved_android.sit.north": [
-      "approved_android/sit_north_4.png"
-    ],
+    "approved_android.sit.north": ["approved_android/sit_north_4.png"],
     "approved_android.type.north": [
       "approved_android/type_north_1.png",
       "approved_android/type_north_2.png",
       "approved_android/type_north_3.png",
       "approved_android/type_north_4.png"
     ],
-    "approved_blank_blue.rot.south-east": [
-      "approved_blank_blue/rot_south-east.png"
-    ],
-    "approved_blank_blue.rot.east": [
-      "approved_blank_blue/rot_east.png"
-    ],
-    "approved_blank_blue.rot.north-east": [
-      "approved_blank_blue/rot_north-east.png"
-    ],
-    "approved_blank_blue.rot.north": [
-      "approved_blank_blue/rot_north.png"
-    ],
-    "approved_blank_blue.rot.north-west": [
-      "approved_blank_blue/rot_north-west.png"
-    ],
-    "approved_blank_blue.rot.west": [
-      "approved_blank_blue/rot_west.png"
-    ],
-    "approved_blank_blue.rot.south-west": [
-      "approved_blank_blue/rot_south-west.png"
-    ],
+    "approved_blank_blue.rot.south-east": ["approved_blank_blue/rot_south-east.png"],
+    "approved_blank_blue.rot.east": ["approved_blank_blue/rot_east.png"],
+    "approved_blank_blue.rot.north-east": ["approved_blank_blue/rot_north-east.png"],
+    "approved_blank_blue.rot.north": ["approved_blank_blue/rot_north.png"],
+    "approved_blank_blue.rot.north-west": ["approved_blank_blue/rot_north-west.png"],
+    "approved_blank_blue.rot.west": ["approved_blank_blue/rot_west.png"],
+    "approved_blank_blue.rot.south-west": ["approved_blank_blue/rot_south-west.png"],
     "approved_blank_blue.walk.south": [
       "approved_blank_blue/walk_south_1.png",
       "approved_blank_blue/walk_south_2.png",
@@ -197,45 +155,23 @@
       "approved_blank_blue/walk_south-west_5.png",
       "approved_blank_blue/walk_south-west_6.png"
     ],
-    "approved_blank_blue.sit.south": [
-      "approved_blank_blue/sit_south_4.png"
-    ],
-    "approved_blank_blue.sit.east": [
-      "approved_blank_blue/sit_east_4.png"
-    ],
-    "approved_blank_blue.sit.north": [
-      "approved_blank_blue/sit_north_4.png"
-    ],
-    "approved_blank_blue.sit.west": [
-      "approved_blank_blue/sit_west_4.png"
-    ],
+    "approved_blank_blue.sit.south": ["approved_blank_blue/sit_south_4.png"],
+    "approved_blank_blue.sit.east": ["approved_blank_blue/sit_east_4.png"],
+    "approved_blank_blue.sit.north": ["approved_blank_blue/sit_north_4.png"],
+    "approved_blank_blue.sit.west": ["approved_blank_blue/sit_west_4.png"],
     "approved_blank_blue.type.north": [
       "approved_blank_blue/type_north_1.png",
       "approved_blank_blue/type_north_2.png",
       "approved_blank_blue/type_north_3.png",
       "approved_blank_blue/type_north_4.png"
     ],
-    "approved_blank_amber.rot.south-east": [
-      "approved_blank_amber/rot_south-east.png"
-    ],
-    "approved_blank_amber.rot.east": [
-      "approved_blank_amber/rot_east.png"
-    ],
-    "approved_blank_amber.rot.north-east": [
-      "approved_blank_amber/rot_north-east.png"
-    ],
-    "approved_blank_amber.rot.north": [
-      "approved_blank_amber/rot_north.png"
-    ],
-    "approved_blank_amber.rot.north-west": [
-      "approved_blank_amber/rot_north-west.png"
-    ],
-    "approved_blank_amber.rot.west": [
-      "approved_blank_amber/rot_west.png"
-    ],
-    "approved_blank_amber.rot.south-west": [
-      "approved_blank_amber/rot_south-west.png"
-    ],
+    "approved_blank_amber.rot.south-east": ["approved_blank_amber/rot_south-east.png"],
+    "approved_blank_amber.rot.east": ["approved_blank_amber/rot_east.png"],
+    "approved_blank_amber.rot.north-east": ["approved_blank_amber/rot_north-east.png"],
+    "approved_blank_amber.rot.north": ["approved_blank_amber/rot_north.png"],
+    "approved_blank_amber.rot.north-west": ["approved_blank_amber/rot_north-west.png"],
+    "approved_blank_amber.rot.west": ["approved_blank_amber/rot_west.png"],
+    "approved_blank_amber.rot.south-west": ["approved_blank_amber/rot_south-west.png"],
     "approved_blank_amber.walk.south": [
       "approved_blank_amber/walk_south_1.png",
       "approved_blank_amber/walk_south_2.png",
@@ -300,18 +236,10 @@
       "approved_blank_amber/walk_south-west_5.png",
       "approved_blank_amber/walk_south-west_6.png"
     ],
-    "approved_blank_amber.sit.south": [
-      "approved_blank_amber/sit_south_4.png"
-    ],
-    "approved_blank_amber.sit.east": [
-      "approved_blank_amber/sit_east_4.png"
-    ],
-    "approved_blank_amber.sit.north": [
-      "approved_blank_amber/sit_north_4.png"
-    ],
-    "approved_blank_amber.sit.west": [
-      "approved_blank_amber/sit_west_4.png"
-    ],
+    "approved_blank_amber.sit.south": ["approved_blank_amber/sit_south_4.png"],
+    "approved_blank_amber.sit.east": ["approved_blank_amber/sit_east_4.png"],
+    "approved_blank_amber.sit.north": ["approved_blank_amber/sit_north_4.png"],
+    "approved_blank_amber.sit.west": ["approved_blank_amber/sit_west_4.png"],
     "approved_blank_amber.type.north": [
       "approved_blank_amber/type_north_1.png",
       "approved_blank_amber/type_north_2.png",

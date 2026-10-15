@@ -1,0 +1,191 @@
+{
+  "baseline": "wnz-repo-v1",
+  "ci": {
+    "actionRevisions": {
+      "bun": "0c5077e51419868618aeaa5fe8019c62421857d6",
+      "checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "node": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uv": "1c37ad07a6a961277cf70c0d37d6f313000f5884"
+    },
+    "operatingSystems": [],
+    "provider": "pending"
+  },
+  "components": [
+    {
+      "artifact": "application",
+      "entrypoints": [
+        "server.ts",
+        "sidecar/observer-sqlite-worker.ts",
+        "frontend/app/theme-pack.ts",
+        "frontend/app/harness.ts",
+        "frontend/app/queryspine.ts",
+        "frontend/app/data-shim.ts",
+        "frontend/js/sprite-load-plan.ts",
+        "frontend/js/assets.ts",
+        "frontend/app/observer-model.ts",
+        "frontend/app/observer-scene.ts",
+        "frontend/app/observer-mail.ts",
+        "frontend/app/observer-inspector.ts",
+        "frontend/app/observer-mail-inspector.ts",
+        "frontend/app/scene-art-roles.ts",
+        "frontend/app/observer-office-art.ts",
+        "frontend/app/observer-view.ts",
+        "frontend/app/observer.ts"
+      ],
+      "importPackage": null,
+      "language": "typescript",
+      "llm": {
+        "answer": "Observes existing sessions; no provider calls in application",
+        "providers": [],
+        "state": "none"
+      },
+      "mcp": {
+        "answer": "Application is not an MCP server",
+        "clients": null,
+        "protocol": null,
+        "state": "none",
+        "transport": null
+      },
+      "name": "observer",
+      "path": ".",
+      "runtimeDependencies": [],
+      "target": "bun",
+      "testDependencies": {},
+      "validation": {
+        "answer": "TypeScript runtime boundary validation required during migration; no Python application",
+        "state": "none"
+      }
+    }
+  ],
+  "documentationLanguage": "English",
+  "license": "MIT",
+  "options": {
+    "cloud": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "merge": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "promotion": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "selfHostedCi": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "semanticMcp": {
+      "answer": "User explicitly requested local semantic MCP.",
+      "details": {
+        "client": "Codex",
+        "configLocation": ".codex/config.toml (ignored local configuration)",
+        "revision": "c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+        "runtimeLocation": "~/.clean-code-tools/versions/c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+        "scope": "repository",
+        "source": "https://github.com/wnz99/clean-code-tools",
+        "transport": "stdio"
+      },
+      "state": "include"
+    },
+    "serena": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    }
+  },
+  "profile": "typescript-single",
+  "purpose": "Read-only local observer for terminal agent sessions; TypeScript migration in progress.",
+  "runtimes": {
+    "bun": "1.3.13",
+    "node": "24.19.0",
+    "nodeTypes": "24.19.2",
+    "python": null,
+    "uv": "0.13.1"
+  },
+  "skills": [
+    {
+      "digest": "a2621e700fb24f1258c8a8eaccfd2f66cd79abd7cdd2c97981feaa062dfd3622",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/clean-code-tools",
+        "state": "installed complete pinned directory; restart for current-session skill discovery"
+      },
+      "license": "UNLICENSED (upstream package.json declaration; no LICENSE file)",
+      "name": "clean-code-tools",
+      "revision": "c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+      "source": "https://github.com/wnz99/clean-code-tools",
+      "subdirectory": "skills/clean-code-tools"
+    },
+    {
+      "digest": "176aaaee464dc96f7d4f1976a1f34773c117e67d9f9106bb78dfbc9a2e26cd3e",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/verify-before-complete",
+        "state": "installed; preserved in place; no invented upstream"
+      },
+      "license": "not declared in trusted installed copy",
+      "name": "verify-before-complete",
+      "revision": null,
+      "source": "trusted installed copy supplied by user environment; not redistributed",
+      "subdirectory": null
+    },
+    {
+      "digest": "b35df137ec604149236e9dce0e4c676542ded90fa4a8c8a69e4e558df9042544",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-clean-code-js",
+        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+      },
+      "license": "MIT",
+      "name": "wnz-clean-code-js",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-clean-code-js"
+    },
+    {
+      "digest": "3a49d660f8d182de73c5f6fb4fc04d5b1bd7919b30b8f8ff32da90debf0663e1",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-code-reviewer",
+        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+      },
+      "license": "MIT",
+      "name": "wnz-code-reviewer",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-code-reviewer"
+    },
+    {
+      "digest": "88ae5a806ea51c2609f5ad6c4ccc49dcc40c2a94bbfd6045c6f4a05f60df9b42",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-doc-write-expert",
+        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+      },
+      "license": "MIT",
+      "name": "wnz-doc-write-expert",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-doc-write-expert"
+    },
+    {
+      "digest": "cafefd8b9789a502ffc5ffc834264c119e581acdee4274a25361312bd38cedee",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-test-quality",
+        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+      },
+      "license": "MIT",
+      "name": "wnz-test-quality",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-test-quality"
+    }
+  ]
+}

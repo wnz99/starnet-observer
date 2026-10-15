@@ -5,9 +5,27 @@
   "description": "Standalone read-only local observer for Herdr, Codex, Claude Code, and llm-bus.",
   "license": "MIT",
   "engines": {
-    "bun": ">=1.3.13"
+    "bun": ">=1.3.13",
+    "node": "24.19.0"
   },
   "scripts": {
+    "check": "bun run check:static && bun run test && bun run dependency-isolation",
+    "check:fallow": "fallow dead-code --summary --quiet && fallow dupes --summary --quiet",
+    "check:format": "prettier --check --ignore-unknown .",
+    "check:helpers": "eslint eslint.config.mjs tools/quality --max-warnings 0",
+    "check:hygiene": "sh tools/quality/hooks.sh hygiene",
+    "check:knip": "knip --no-progress --no-config-hints",
+    "check:root": "bun run check:versions && bun run check:hygiene && bun run check:shell && bun run check:format && bun run check:helpers && bun run check:knip && bun run check:fallow",
+    "check:shell": "uv tool run --from uv==0.13.1 uv tool run --from shellcheck-py==0.11.0.1 shellcheck .githooks/pre-commit .githooks/pre-push tools/quality/check-static.sh tools/quality/check-versions.sh tools/quality/check.sh tools/quality/format-index.sh tools/quality/hooks.sh tools/quality/install-hooks.sh tools/quality/setup.sh",
+    "check:static": "bun run check:root && bun run format-check && bun run build && bun run lint && bun run typecheck",
+    "check:versions": "sh tools/quality/check-versions.sh",
+    "dependency-isolation": "bun --no-env-file ./tools/quality/isolate-typescript.mjs observer",
+    "fix": "eslint . --fix",
+    "format": "prettier --write --ignore-unknown .",
+    "format-check": "prettier --check --ignore-unknown .",
+    "hooks:install": "sh tools/quality/install-hooks.sh",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit",
     "start": "bun --no-env-file server.js",
     "test": "bun --no-env-file test",
     "presentation": "bun --no-env-file server.js --presentation",
@@ -22,5 +40,20 @@
     "url": "https://github.com/wnz99/starnet-observer.git"
   },
   "homepage": "https://github.com/wnz99/starnet-observer#readme",
-  "packageManager": "bun@1.3.13"
+  "packageManager": "bun@1.3.13",
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/bun": "1.3.13",
+    "@types/node": "24.19.2",
+    "clean-code-tools": "1.0.7",
+    "eslint": "10.11.0",
+    "eslint-plugin-sonarjs": "4.2.1",
+    "eslint-plugin-unicorn": "69.0.0",
+    "fallow": "3.27.0",
+    "globals": "17.12.0",
+    "knip": "6.37.0",
+    "prettier": "3.9.8",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
+  }
 }

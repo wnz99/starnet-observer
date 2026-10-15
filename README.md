@@ -8,20 +8,20 @@ You do **not** need to install or run StarNet. The necessary observer code, shar
 
 ## Dependencies
 
-| Dependency | Purpose |
-| --- | --- |
-| macOS | Supported and tested platform for this initial release. |
-| [Bun](https://bun.sh/) 1.3.13 or newer | Runs the local server; native SQLite reads bus and helper-session snapshots. |
-| Git | Cloning, updates, and read-only repository/worktree detection. |
-| [Herdr](https://herdr.dev/docs/install/) | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr. |
-| Codex CLI and/or Claude Code | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys. |
-| [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS. |
-| [llm-bus](https://github.com/wnz99/llm-bus) (optional) | Supplies local agent registrations, message couriers, and message inspectors. Without it, terminal observation still works, but mail is unavailable. |
-| Xcode Command Line Tools (optional) | Supplies `swiftc` for observing the Codex desktop app. Not needed for terminal-only use. |
+| Dependency                                                      | Purpose                                                                                                                                              |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS                                                           | Supported and tested platform for this initial release.                                                                                              |
+| [Bun](https://bun.sh/) 1.3.13 or newer                          | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
+| Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
+| [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
+| Codex CLI and/or Claude Code                                    | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys.                      |
+| [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS.                                                                               |
+| [llm-bus](https://github.com/wnz99/llm-bus) (optional)          | Supplies local agent registrations, message couriers, and message inspectors. Without it, terminal observation still works, but mail is unavailable. |
+| Xcode Command Line Tools (optional)                             | Supplies `swiftc` for observing the Codex desktop app. Not needed for terminal-only use.                                                             |
 
-There are no package dependencies. Bun runs the server and regression suite; its native `bun:sqlite` reads private database snapshots. No Node executable is required.
+There are no runtime package dependencies. Bun runs the server and regression suite; its native `bun:sqlite` reads private database snapshots. Pinned development dependencies provide quality tooling; Node 24.19.0 is required for those tools, not for application startup.
 
-Bun emits no lockfile for this empty dependency graph. `bun install --frozen-lockfile` still verifies the dependency-free installation.
+`bun.lock` records the development dependency graph. Use `bun install --frozen-lockfile` to replay it.
 
 ## Install the observer
 
@@ -143,14 +143,14 @@ Edit it, then run `bun run start`. `observer.config.json` next to `server.js` is
 
 The configuration fields are:
 
-| Field | Meaning |
-| --- | --- |
-| `presentation` | Boolean; private labels and blocked inspectors when true. Defaults to false. |
-| `company` | Company name in the presentation header. |
-| `repoPrefix` | Prefix for generated repo aliases. With built-in room lists, it also updates the built-in aliases. Explicit `rooms[].repos` names stay verbatim. |
-| `rooms` | Ordered room objects with `name` and optional `repos` arrays. Overrides the built-in room list. Aliases are allocated by opaque source IDs; allocation stays stable during one server run. |
-| `theme.pack` | Installed data-only pack ID; omitted selects `starnet`. Restart and reload after changing it. |
-| `theme.fx` | Boolean; initial sky/station FX. CLI overrides configuration; omitted defaults to off. The FX button changes the current page without browser persistence. |
+| Field          | Meaning                                                                                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `presentation` | Boolean; private labels and blocked inspectors when true. Defaults to false.                                                                                                                 |
+| `company`      | Company name in the presentation header.                                                                                                                                                     |
+| `repoPrefix`   | Prefix for generated repo aliases. With built-in room lists, it also updates the built-in aliases. Explicit `rooms[].repos` names stay verbatim.                                             |
+| `rooms`        | Ordered room objects with `name` and optional `repos` arrays. Overrides the built-in room list. Aliases are allocated by opaque source IDs; allocation stays stable during one server run.   |
+| `theme.pack`   | Installed data-only pack ID; omitted selects `starnet`. Restart and reload after changing it.                                                                                                |
+| `theme.fx`     | Boolean; initial sky/station FX. CLI overrides configuration; omitted defaults to off. The FX button changes the current page without browser persistence.                                   |
 | `theme.colors` | Optional interface colors: `accent`, `background`, `panel`, `text`, each a six-digit hex color. Omitted colors inherit the selected pack. These four overrides change interface colors only. |
 
 Names must be nonempty text without control characters, at most 80 characters. Room names and explicit repo names must be unique, ignoring case. `repoPrefix` is 1–32 lowercase letters, digits, or hyphens, starting with a letter or digit. Additional rooms/repos get unique generated names. Unknown fields, invalid values, missing explicit files, and malformed JSON stop startup instead of silently applying a different mode. Files are limited to 64 KiB.
@@ -195,16 +195,16 @@ The canonical [default manifest](frontend/assets/themes/starnet/theme.json) is t
 
 The semantic color responsibilities are:
 
-| Inventory | Roles |
-| --- | --- |
-| `ui.colors` existing variable names | `bg`, `panel`, `row`, `line`, `chrome`, `phosphor`, `glow`, `alien`, `alien-dim`, `ink`, `dim`, `working`, `blocked`, `stale`, `focus`, and `tab-ink` retain the corresponding interface variable roles. |
-| Interface surfaces | `body-halo`, `control-bg`, `control-hover`, `topbar-grid`, `topbar-top`, `topbar-bottom`, `panel-outline`, `panel-inset`, `toolbar-top`, `stage-bg`, `footer-bg`, `filter-hover`, `row-hover`, `row-selected`, `inspect-control-bg`, `modal-backdrop`, and `tool-bg` name background/gradient/frame surfaces. |
-| Interface text and state effects | `control-ink`, `heading-ink`, `totals-ink`, `filter-ink`, `provider-ink`, `provider-claude`, `summary-ink`, and `unknown-role` name text roles. `selected-inset`, `selected-hover`, `mail-glow`, `stale-glow`, `repo-glow`, `scanline`, and `vignette` name selected/decorative effects. `danger`, `danger-ink`, `danger-tab-ink`, `danger-glow`, `danger-notice-ink`, and `danger-notice-glow` colour the opt-in close control and error notices. |
-| `scene.colors` base palette | `space`, `hullTop`, `hullSeam`, `hullLeft`, `hullRight`, `wall`, `wallCap`, `grate`, `grateDark`, `window`, `amber`, `cyan`, `rail`, `console`, `consoleTop`, `chair`, `glass`, `ink`, `dim`, `focus`, and `repo` name the original station palette. |
-| Scene status | `working`, `blocked`, `idle`, `done`, `unknown`, and `stale` keep status identities. Default canvas `stale` intentionally uses the blocked hue; interface `stale` remains separate. |
-| Scene materials | `furnishing-*`, `rack-shelf`, `wall-screen-face`, `vent-*`, `board-*`, `tank-*`, `planter-*`, `plant-leaf`, `crate-*`, `crate-stack-*`, `walkway-support`, `hub-*`, `pod-*`, `chute-*`, `tower-*`, `observatory-*`, `telescope-shell`, `telescope-core`, `desk-*`, `monitor-*`, `chair-*`, `partition-*`, `planning-desk-*`, and `deck-*` name fixed material faces, edges, and insets. Prefixes are documentation shorthand; only exact keys in the manifest are accepted. |
-| Scene lighting and sky | `star-*`, `shooting-star-*`, `plain-star`, `nebula-*`, `rain-*`, `pixie-*`, `planet-*`, `shuttle-body`, `spark`, `rim-spark`, `platform-spark`, `screen-spark`, `furniture-spark`, `vent-spark`, `tank-spark`, `mast-*`, `apron-spark`, `walkway-light-head`, `tower-spark`, `pod-spark`, `observatory-spark`, `telescope-spark`, `desk-spark`, `desk-spark-alt`, and `aura-*` name effect colors. Dynamic opacity/timing remains application-owned. |
-| Scene labels, crew fallback, and mail | `glow-transparent`, `contact-shadow`, `viewer-body`, `body-outline`, `office-backdrop`, `mail-pending`, `mail-acknowledged`, `mail-unassigned`, `envelope-outline`, `envelope-mark`, `drone-shadow`, `drone-body`, `drone-wing`, `plate-scanline`, `repo-label`, `viewer-label`, `radar-sweep`, and `stale-overlay` name their individual appearance roles. |
+| Inventory                             | Roles                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui.colors` existing variable names   | `bg`, `panel`, `row`, `line`, `chrome`, `phosphor`, `glow`, `alien`, `alien-dim`, `ink`, `dim`, `working`, `blocked`, `stale`, `focus`, and `tab-ink` retain the corresponding interface variable roles.                                                                                                                                                                                                                                                                    |
+| Interface surfaces                    | `body-halo`, `control-bg`, `control-hover`, `topbar-grid`, `topbar-top`, `topbar-bottom`, `panel-outline`, `panel-inset`, `toolbar-top`, `stage-bg`, `footer-bg`, `filter-hover`, `row-hover`, `row-selected`, `inspect-control-bg`, `modal-backdrop`, and `tool-bg` name background/gradient/frame surfaces.                                                                                                                                                               |
+| Interface text and state effects      | `control-ink`, `heading-ink`, `totals-ink`, `filter-ink`, `provider-ink`, `provider-claude`, `summary-ink`, and `unknown-role` name text roles. `selected-inset`, `selected-hover`, `mail-glow`, `stale-glow`, `repo-glow`, `scanline`, and `vignette` name selected/decorative effects. `danger`, `danger-ink`, `danger-tab-ink`, `danger-glow`, `danger-notice-ink`, and `danger-notice-glow` colour the opt-in close control and error notices.                          |
+| `scene.colors` base palette           | `space`, `hullTop`, `hullSeam`, `hullLeft`, `hullRight`, `wall`, `wallCap`, `grate`, `grateDark`, `window`, `amber`, `cyan`, `rail`, `console`, `consoleTop`, `chair`, `glass`, `ink`, `dim`, `focus`, and `repo` name the original station palette.                                                                                                                                                                                                                        |
+| Scene status                          | `working`, `blocked`, `idle`, `done`, `unknown`, and `stale` keep status identities. Default canvas `stale` intentionally uses the blocked hue; interface `stale` remains separate.                                                                                                                                                                                                                                                                                         |
+| Scene materials                       | `furnishing-*`, `rack-shelf`, `wall-screen-face`, `vent-*`, `board-*`, `tank-*`, `planter-*`, `plant-leaf`, `crate-*`, `crate-stack-*`, `walkway-support`, `hub-*`, `pod-*`, `chute-*`, `tower-*`, `observatory-*`, `telescope-shell`, `telescope-core`, `desk-*`, `monitor-*`, `chair-*`, `partition-*`, `planning-desk-*`, and `deck-*` name fixed material faces, edges, and insets. Prefixes are documentation shorthand; only exact keys in the manifest are accepted. |
+| Scene lighting and sky                | `star-*`, `shooting-star-*`, `plain-star`, `nebula-*`, `rain-*`, `pixie-*`, `planet-*`, `shuttle-body`, `spark`, `rim-spark`, `platform-spark`, `screen-spark`, `furniture-spark`, `vent-spark`, `tank-spark`, `mast-*`, `apron-spark`, `walkway-light-head`, `tower-spark`, `pod-spark`, `observatory-spark`, `telescope-spark`, `desk-spark`, `desk-spark-alt`, and `aura-*` name effect colors. Dynamic opacity/timing remains application-owned.                        |
+| Scene labels, crew fallback, and mail | `glow-transparent`, `contact-shadow`, `viewer-body`, `body-outline`, `office-backdrop`, `mail-pending`, `mail-acknowledged`, `mail-unassigned`, `envelope-outline`, `envelope-mark`, `drone-shadow`, `drone-body`, `drone-wing`, `plate-scanline`, `repo-label`, `viewer-label`, `radar-sweep`, and `stale-overlay` name their individual appearance roles.                                                                                                                 |
 
 Colors accept six-digit hex or numeric `rgba(r,g,b,a)` only: integer RGB channels 0–255 and alpha 0–1. `scene.projectAccents` contains exactly ten ordered hex colors, retaining the cobalt, teal, verdant, moss, amber, ember, crimson, orchid, violet, and indigo slot identities. They recolor only each slot's displayed accent (deck edges, signs, partitions, tethers, room swatches and courier parcels); project-to-slot assignment, floor names and geometry are unchanged. Scene colors apply per station view, so a themed view never changes another view on the same page. Legacy `theme.colors` overrides apply last to interface colors only: accent sets phosphor/chrome and derives the `.22` alpha glow from its RGB channels; background sets bg, panel sets panel, and text sets ink. It never recolors scene or crew.
 
@@ -241,11 +241,11 @@ The observer is read-only by default. Launch it with `OBSERVER_CONTROL=1` to ena
 OBSERVER_CONTROL=1 bun run start
 ```
 
-| Button | Where | What it does |
-| --- | --- | --- |
-| `+` | project heading | Uses a fresh Herdr session in the group as a seed, opens a tab in its workspace and current folder, and starts `claude`. No terminal opens; the new agent is selected in the panel when it appears. Use `⇱` to attach. A new agent stopped at a startup dialog (for example "trust this folder") shows a `!` and "waiting for input" until you attach and answer it. |
-| `⇱` | session row | Opens a Terminal window attached to that pane with `herdr agent attach --takeover`, so it takes input even if another terminal was attached. Detach with `ctrl+b q`; the agent keeps running. |
-| `✕` | session row | Closes the Herdr pane, ending that agent. The page asks you to confirm first. |
+| Button | Where           | What it does                                                                                                                                                                                                                                                                                                                                                         |
+| ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `+`    | project heading | Uses a fresh Herdr session in the group as a seed, opens a tab in its workspace and current folder, and starts `claude`. No terminal opens; the new agent is selected in the panel when it appears. Use `⇱` to attach. A new agent stopped at a startup dialog (for example "trust this folder") shows a `!` and "waiting for input" until you attach and answer it. |
+| `⇱`    | session row     | Opens a Terminal window attached to that pane with `herdr agent attach --takeover`, so it takes input even if another terminal was attached. Detach with `ctrl+b q`; the agent keeps running.                                                                                                                                                                        |
+| `✕`    | session row     | Closes the Herdr pane, ending that agent. The page asks you to confirm first.                                                                                                                                                                                                                                                                                        |
 
 Agents are grouped on the station by project (one deck), then by actual checkout and sub-folder (one walled section per checkout/folder, with repository, checkout and folder text on its sign); idle agents stroll inside their own section whenever another agent from the same folder is there too. Linked Git worktrees share their main repository group and repository highlight. Main and linked checkouts have separate Live sessions headings, followed by sub-folder sections. Equal checkout basenames stay distinct through canonical opaque checkout IDs; missing proof is labeled Checkout unavailable. Sub-folders are calculated relative to the checkout where each agent is working.
 
@@ -339,6 +339,8 @@ a "!" badge on the station and "waiting for input" in its row; press `⇱` to at
 - No cloud service, model calls, database server, or StarNet account is required.
 
 ## Update and test
+
+See [development setup](docs/development.md) and the [documentation index](docs/index.md) for pinned quality tooling, hooks and migration verification status.
 
 Stop the observer before updating:
 
