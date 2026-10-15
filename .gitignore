@@ -17,3 +17,8 @@ frontend/assets/themes/mama-pixel/
 themes/mama.json
 themes/mama-classic.json
 themes/mama-pixel.json
+.serena/
+
+# Generated codebase graphs
+graphify-out/
+.planning/graphs/
