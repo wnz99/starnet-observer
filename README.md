@@ -243,7 +243,7 @@ OBSERVER_CONTROL=1 bun run start
 
 | Button | Where | What it does |
 | --- | --- | --- |
-| `+` | project heading | Uses a fresh Herdr session in the group as a seed, opens a tab in its workspace and current folder, starts `claude`, and opens an attached Terminal window. |
+| `+` | project heading | Uses a fresh Herdr session in the group as a seed, opens a tab in its workspace and current folder, and starts `claude`. No terminal opens; the new agent is selected in the panel when it appears. Use `⇱` to attach. A new agent stopped at a startup dialog (for example "trust this folder") shows a `!` and "waiting for input" until you attach and answer it. |
 | `⇱` | session row | Opens a Terminal window attached to that pane with `herdr agent attach --takeover`, so it takes input even if another terminal was attached. Detach with `ctrl+b q`; the agent keeps running. |
 | `✕` | session row | Closes the Herdr pane, ending that agent. The page asks you to confirm first. |
 
@@ -259,15 +259,79 @@ After a caught launch failure, a later request can release a recorded reservatio
 
 One overseer is shared across providers; choosing another provider never replaces a running overseer. Project `+` continues to launch Claude.
 
-Set `OBSERVER_CLAUDE_ARGS` to pass flags only to spawned Claude sessions (including a Claude overseer), for example `OBSERVER_CLAUDE_ARGS="--dangerously-skip-permissions"`. Terminal launching uses macOS Terminal.app.
+Set `OBSERVER_CLAUDE_ARGS` to pass flags only to spawned Claude sessions (including a Claude overseer), for example `OBSERVER_CLAUDE_ARGS="--dangerously-skip-permissions"`. Only ⇱ opens a terminal (macOS Terminal.app); spawning runs the agent unattended.
 
 The control routes are `POST`-only and require the same per-launch token and local origin as the read routes. Attach, spawn, and close require a current private observer target proof, then matching live Herdr inventory, agent, and pane identities. Stale, unavailable, foreign, or reused targets are rejected before mutation. Without `OBSERVER_CONTROL=1`, the server rejects every non-GET request and omits the panel action buttons.
 
 Controls also work in presentation mode with `OBSERVER_CONTROL=1 bun run presentation`. Fictional labels remain in place; requests use real pane IDs. Control responses omit private names, paths, endpoint details, and raw process errors. Presentation mode still disables inspectors and transcript preparation; it does not make live actions anonymous.
 
+## Optional remote hosts (multi-host)
+
+Agents on other machines (for example a VPS running Herdr) can appear as their own ships next to this machine's
+station. Install the observer on each remote as usual, then list the remotes in `observer.config.json`:
+
+```json
+{ "remotes": [{ "id": "vm1", "ssh": "nick@203.0.113.10", "dir": "~/starnet-observer" }] }
+```
+
+The hub keeps one `ssh -o BatchMode=yes` stream per remote running `bun --no-env-file scripts/stream.js`, which prints
+one snapshot per line and opens no port. Key authentication must already work non-interactively. Remote rows and mail
+are sanitised and re-identified per host, remote ships dim with "last seen" when their stream goes quiet, and
+transcript or message inspection never reaches a remote.
+
+llm-bus is per host, so each remote ship has its own mailroom showing that host's own bus; its couriers and crew stay
+on their own ship, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
+host's numeric id and also carry a hub-wide `key` (`5@vm1`). The ships are joined only by a dashed "ssh · observing"
+line: the hub's observation stream, coloured by its real health, never a mail path.
+
+### llm-bus relays
+
+llm-bus can relay mail between machines through a relay it is bound to ([remote bus](https://github.com/wnz99/llm-bus/blob/main/docs/remote-bus.md)).
+Nothing about this is configured in the observer: every observed bus, local or remote, reports its own binding, and the
+station draws exactly that. The observer reads only routing metadata from the bus's `remote_*` tables: the relay's
+host name and this machine's id, each relayed message's direction, peer machine, shared repo and delivery state, and
+the relay's cached roster per machine (agent provider, shared repo and last activity). It never reads tokens, URL paths,
+native session ids or message bodies for this.
+
+- Every machine the relay's roster names that this observer does not watch becomes a **shadow ship**, docked beside
+  the observed ship it links to. It has its own mailroom (that machine's own llm-bus), a room per shared repo, and a
+  ghosted desk for each agent the roster lists as active in the last day. The ship is labelled "via relay · not
+  observed". Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
+  observed machine (this one, or a configured remote bound to the same relay) is never a shadow.
+- Relay highways join mailrooms: each observed member's mailroom to the other members' and to each shadow mailroom.
+  A highway is an ordinary ground walkway routed around the floors. Between observed ships it runs down the centre line
+  between the room banks; to a shadow ship it climbs to a lane north of both ships' top rows, crosses, and comes down.
+  Its label gives the relay, the observed end's state (live while that bus saw relay activity in the last 15 minutes,
+  otherwise quiet with its age, or bus unreadable), and how many agents at that end are on it.
+- A highway is **unverified** (dim rails, "roster only, no mail yet") until a relayed message has actually crossed it:
+  received from that machine, or synchronised as delivered to it. The relay roster alone proves the far machine
+  published to the same relay at some point, not that it is reachable now.
+- Which agents use the relay: the bridge publishes exactly the sessions of the repositories its config maps and records
+  them in `remote_publications`. The observer joins those records to panes exactly (live, under a day old). Rooms holding
+  a relay-carried agent, and every shadow room, get amber walkways to their mailroom and "⇄ relay" on their sign. Their
+  agents read "on relay (repo)" on hover. Every other room is local to its own bus.
+- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, along the relay highway, the far mailroom,
+  then the far agent's desk, along the highway. The far agent is matched by an opaque hash of its relay address, never its session id.
+  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the mailroom while `queued_local`, halfway along
+  the highway once `accepted_remote`, and at the far agent's desk once `delivered_local`. When both ends are
+  observed, each ship shows only its own half of the crossing.
+- Ledger rows name the far side, for example "Codex on whitenoise · llm-bus (via relay)", with the synchronised relay
+  state ("held at the relay", "delivered to the far machine, not acknowledged"). The bus status names the binding.
+- Presentation mode replaces relay hosts, machine ids and shared repo ids with fictional names.
+
+With `OBSERVER_CONTROL=1`, control actions also work on remote agents: `⇱`, `✕` and the project `+` run `herdr` on
+that host over the same non-interactive ssh (every argument validated and single-quoted; hosts not listed in
+`remotes` are refused), and attaching opens a Terminal running `ssh -t <host> 'herdr agent attach <pane> --takeover'`.
+Remote ships sit in a line below this machine's station. Clicking a ship (or a host tab above the Live sessions list)
+switches the list to that host's crew; the chosen tab is remembered across reloads. On a remote host the list starts
+with a "New agent in ~" row whose `+` starts Claude in that host's home folder, even on a host with no agents yet,
+reusing the Herdr workspace named after the folder or creating it. Starting an agent never opens a terminal: the new
+agent is selected when it appears. An agent waiting for input (for example Claude's "trust this folder" dialog) shows
+a "!" badge on the station and "waiting for input" in its row; press `⇱` to attach and answer it.
+
 ## Privacy and limits
 
-- Observation is read-only unless you opt in with `OBSERVER_CONTROL=1`: no agent launching, provider setup, message sending, acknowledgments, or session edits. With control on, the page can start, attach to and close Herdr agent panes, and nothing else.
+- Observation is read-only unless you opt in with `OBSERVER_CONTROL=1`: no agent launching, provider setup, message sending, acknowledgments, or session edits. With control on, the page can start, attach to and close Herdr agent panes, on this machine and on configured remotes, and nothing else.
 - The server may prepare bounded, redacted transcript projections locally in memory before you open an inspector: at most 32 identities per enrichment sweep, with two background detail jobs at once. Opening an inspector still checks current session ownership and source contents. Message bodies and desktop text remain on demand; presentation mode disables transcript preparation. Recognized credential patterns are redacted; private prose and file paths may still be visible. Share the code, not your session data.
 - The local API requires a per-launch token delivered to the local page. Foreign origins and hostnames are rejected. Do not expose the server through a public proxy.
 - Missing sources appear unavailable. Old data is marked stale; absence of a source is not treated as a fresh empty roster.

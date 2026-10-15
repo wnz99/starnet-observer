@@ -8,7 +8,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const MAX_HELPERS = 64, MAX_DEPTH = 3, NEARBY = 8, MAX_EDGES = 4096;
 const identity = row => row.provider + ':' + row.sessionId;
 const grouping = row => ({ projectId: row.projectId, project: row.project, projectKind: row.projectKind,
-  repoId: row.repoId, repo: row.repo, worktreeId: row.worktreeId, checkoutId: row.checkoutId, checkoutKind: row.checkoutKind, folder: row.folder, worktree: row.worktree });
+  repoId: row.repoId, repo: row.repo, worktreeId: row.worktreeId, checkoutId: row.checkoutId, checkoutKind: row.checkoutKind, folder: row.folder, worktree: row.worktree, ...(row.arrangement ? { arrangement: row.arrangement } : {}) });
 const helperId = binding => 'obs_' + crypto.createHash('sha256')
   .update(JSON.stringify([binding.provider, binding.parentSessionId, binding.sessionId])).digest('hex').slice(0, 24);
 
@@ -23,9 +23,15 @@ function lifecycle(provider, relationship, task) {
     source: task.source, observedAt: task.observedAt };
   return { state: 'unknown', reason: null, source: null, observedAt: null };
 }
-function ownStatus(task, at) {
+// Background Claude helpers rarely emit a fresh 'running' task event, so a conversation row the helper itself wrote
+// in the last 20s also counts as working. That is evidence of activity, not process liveness: with no recent row and
+// no terminal event the helper stays unknown.
+const ACTIVE_ROW_MS = 20000;
+function ownStatus(task, at, lastActivityAt = null) {
+  if (['completed', 'failed', 'killed', 'stopped'].includes(task?.status)) return 'done';
   if (task?.status === 'running' && Number.isFinite(task.observedAt) && at >= task.observedAt && at - task.observedAt <= 6000) return 'working';
-  return ['completed', 'failed', 'killed', 'stopped'].includes(task?.status) ? 'done' : 'unknown';
+  const active = typeof lastActivityAt === 'string' ? Date.parse(lastActivityAt) : NaN;
+  return Number.isFinite(active) && at >= active && at - active <= ACTIVE_ROW_MS ? 'working' : 'unknown';
 }
 
 // Shared bounded selector: production runs this in the SQLite worker; direct fixtures can inject SQLite.
@@ -104,6 +110,7 @@ function makeHelperObserver(options = {}) {
       const candidates = parent.provider === 'codex' ? (byParent.get(parent.sessionId) || [])
         .sort((a, b) => a.child.localeCompare(b.child)) : parent.provider === 'claude' ?
         (await transcripts.claudeCandidates(parent.sessionId, nextBindings.get(parent.id), parent.id)).map(value => ({ ...value, child: value.sessionId, state: 'verified' })) : [];
+      const parentClaims = parent.provider === 'claude' ? transcripts.claudeClaims?.(parent.id) : null;
       for (const candidate of candidates) {
         const key = parent.provider + ':' + (parent.provider === 'claude' ? candidate.canonical + ':' : '') + candidate.child;
         if (parent.provider === 'codex' && invalid.has(candidate.child) || ancestry.has(key) || exact.has(key) && !exact.get(key)) continue;
@@ -112,7 +119,7 @@ function makeHelperObserver(options = {}) {
         const existing = exact.get(key);
         const id = existing?.id || helperId(binding);
         if (parent.provider === 'claude' && claudeAncestors.some(ancestor =>
-          ancestor.canonical === binding.parentSessionId && ancestor.projection?.helperSpawns.has(candidate.child))) {
+          ancestor.canonical === binding.parentSessionId && (!ancestor.claims?.available || ancestor.claims.has(candidate.child)))) {
           ambiguousBindings.add(id);
           if (nextBindings.delete(id)) accepted--;
           annotations.delete(id); continue;
@@ -142,12 +149,12 @@ function makeHelperObserver(options = {}) {
           task: taskEvidence.summary || 'Task unavailable.' };
         const child = existing ? { ...existing, ...lineage } : {
           id, provider: parent.provider, sessionId: candidate.child, title: binding.nickname || 'Helper',
-          source: 'helper', presence: 'verified-lineage', status: ownStatus(taskStatus, now()), tool: { available: false },
+          source: 'helper', presence: 'verified-lineage', status: ownStatus(taskStatus, now(), parent.provider === 'claude' ? projection?.lastActivityAt : null), tool: { available: false },
           observedAt: now(), inventoryHealth: 'available', inspectionIdentity: 'helper:' + id, ...lineage
         };
         if (existing) annotations.set(id, lineage); else rows.push(child);
         await visit(child, depth + 1, ancestry, parent.provider === 'claude' ?
-          [...claudeAncestors, { canonical: parentBinding?.parentSessionId || parent.sessionId, projection: parentProjection }] : []);
+          [...claudeAncestors, { canonical: parentBinding?.parentSessionId || parent.sessionId, claims: parentClaims }] : []);
       }
     }
     function lineageDepth(row) {

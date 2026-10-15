@@ -26,6 +26,12 @@ try {
   write({ theme: { fx: false, colors: { accent: '#ABCDEF' } } });
   assert.deepEqual(loadConfig(['--fx'], file).theme, { fx: true, colors: { accent: '#ABCDEF' } });
   assert.equal(loadConfig(['--no-fx'], file).theme.fx, false);
+  // Dynamic arrangement: theme default and the rooms file path (relative to the config file, default next to server.js).
+  write({ theme: { arrange: true }, roomsFile: 'my-rooms.json' });
+  const arranged = loadConfig([], file);
+  assert.equal(arranged.theme.arrange, true); assert.equal(arranged.roomsFile, path.join(folder, 'my-rooms.json'));
+  assert.equal(loadConfig([], missing).roomsFile, require('../sidecar/config.js').DEFAULT_ROOMS);
+  for (const bad of [{ theme: { arrange: 'yes' } }, { roomsFile: '' }, { roomsFile: 3 }, { roomsFile: 'a\u0000b' }]) assert.throws(() => validateConfig(bad));
   assert.throws(() => loadConfig(['--fx', '--no-fx'], missing));
   for (const theme of [null, [], { fx: 'false' }, { scripts: 'bad' }, { colors: { accent: 'red' } }, { colors: { accent: '#123' } }, { colors: { custom: '#123456' } }]) assert.throws(() => validateConfig({ theme }));
   assert.deepEqual(validateConfig({ theme: { pack: 'starnet' } }), { theme: { pack: 'starnet' } });
@@ -72,5 +78,16 @@ try {
   }
   const example = JSON.parse(fs.readFileSync(path.join(__dirname, '../observer.config.example.json'), 'utf8'));
   validateConfig(example);
+  // Remotes: validated ids, ssh targets that can never be read as ssh options, plain dirs, defaults.
+  assert.deepEqual(loadConfig([], missing).remotes, []);
+  write({ remotes: [{ id: 'herdr-dev-2', ssh: 'nick@34.153.167.160' }, { id: 'box', ssh: 'devbox', dir: '/srv/observer' }] });
+  assert.deepEqual(loadConfig([], file).remotes, [{ id: 'herdr-dev-2', ssh: 'nick@34.153.167.160', dir: '~/starnet-observer' },
+    { id: 'box', ssh: 'devbox', dir: '/srv/observer' }]);
+  // Mail topology is never configured: relays are drawn only from each bus's own binding.
+  assert.throws(() => validateConfig({ remotes: [{ id: 'a', ssh: 'h', mail: 'relay' }] }), /mail/);
+  for (const remotes of [{}, Array.from({ length: 17 }, (_, i) => ({ id: 'h' + i, ssh: 'h' })), [{ id: 'A', ssh: 'h' }], [{ id: 'local', ssh: 'h' }],
+    [{ id: 'a', ssh: 'h' }, { id: 'a', ssh: 'g' }], [{ id: 'a', ssh: '-oProxyCommand=touch /tmp/x' }], [{ id: 'a', ssh: 'h; rm' }], [{ id: 'a', ssh: 'u@h@x' }],
+    [{ id: 'a', ssh: 'h', dir: '~/x; rm -rf ~' }], [{ id: 'a', ssh: 'h', dir: '../up' }], [{ id: 'a', ssh: 'h', dir: '$HOME' }], [{ id: 'a', ssh: 'h', port: 22 }]])
+    assert.throws(() => validateConfig({ remotes }));
   console.log('config: defaults, optional/explicit files, CLI precedence, custom names, strict validation, help and fail-before-startup passed');
 } finally { fs.rmSync(folder, { recursive: true, force: true }); }

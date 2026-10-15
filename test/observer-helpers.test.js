@@ -220,6 +220,8 @@ const message = text => ({ type: 'response_item', payload: { type: 'message', ro
             } };
         } } });
       const raceHelpers = makeHelperObserver({ now, transcripts: raceTranscripts });
+      await raceHelpers.children([claudeParent]);
+      await raceTranscripts.spawnIndexIdle();
       const selectedNested = (await raceHelpers.children([claudeParent])).rows.find(row => row.sessionId === 'nested');
       const selectedDetail = await raceHelpers.inspect(selectedNested);
       assert(selectedDetail.turns.some(turn => turn.text === 'NESTED'));

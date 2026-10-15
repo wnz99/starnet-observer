@@ -7,6 +7,10 @@ const inspector = require('./observer-inspector.js');
 const { note: failNote } = require('./failopen.js');
 
 const READ_BYTES = 256 * 1024;
+// Claude spawn index: the bounded tail window loses the Agent spawn records of long-running parents, so their
+// helpers vanish while still running. The index streams the whole parent transcript once, keeps only the records
+// consumeHelperMetadata reads (same rules, same bounded maps), then follows appends by offset.
+const SPAWN_INDEX_BYTES = 128 * 1024 * 1024, SPAWN_CHUNK = 1024 * 1024;
 const cleanName = value => typeof value === 'string' ? value.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 120) : '';
 
 // Only tool identity/outcome and numeric usage cross this boundary. Conversation bodies stay on disk.
@@ -234,26 +238,134 @@ function makeTranscriptObserver(options = {}) {
     } catch (_) { return false; }
     finally { if (handle) await handle.close().catch(() => failNote('observer.transcripts.close', new Error('Transcript handle cleanup failed'))); }
   }
+  const spawnIndices = new Map();
+  function unavailableSpawnIndex(state = {}) {
+    Object.assign(state, { projection: Object.assign(inspector.createProjection(), { helperClaimsPartial: true }),
+      offset: 0, carry: null, skipping: false, digest: null, device: null, inode: null, ready: true });
+    return state.projection;
+  }
+  const spawnIndexKey = (file, sessionId, binding) => JSON.stringify([file, sessionId, binding?.parentSessionId || null]);
+  async function scanSpawnIndex(state, file, sessionId, binding) {
+    let handle;
+    try {
+      const resource = await capturePath('claude', file, !!binding);
+      handle = await io.open(resource.full, require('node:fs').constants.O_RDONLY | require('node:fs').constants.O_NOFOLLOW);
+      const stat = await handle.stat();
+      await verifyPath(resource, stat);
+      if (stat.size > SPAWN_INDEX_BYTES) { unavailableSpawnIndex(state); return; }
+      // Reuse metadata only after proving every previously indexed byte is unchanged.
+      // Size/mtime and sampled sentinels cannot distinguish an append from a middle rewrite.
+      let hash = crypto.createHash('sha256');
+      let reusable = !!state.projection && state.device === stat.dev && state.inode === stat.ino && stat.size >= state.offset;
+      if (reusable) {
+        for (let position = 0; position < state.offset;) {
+          const chunk = Buffer.alloc(Math.min(SPAWN_CHUNK, state.offset - position));
+          const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+          if (!bytesRead) throw new Error('Incomplete spawn index proof');
+          hash.update(chunk.subarray(0, bytesRead));
+          position += bytesRead;
+        }
+        reusable = hash.copy().digest('hex') === state.digest;
+      }
+      if (!reusable) {
+        Object.assign(state, { projection: inspector.createProjection(), offset: 0, carry: null, skipping: false });
+        hash = crypto.createHash('sha256');
+      }
+      let offset = state.offset, carry = state.carry, skipping = state.skipping;
+      const consumeLine = bytes => {
+        if (bytes.length > READ_BYTES) { state.projection.helperClaimsPartial = true; return; }
+        try { inspector.consumeHelperMetadata(state.projection, JSON.parse(bytes.toString('utf8')), 'claude', sessionId, binding); }
+        catch (_) { /* Invalid rows carry no spawn evidence. */ }
+      };
+      while (offset < stat.size) {
+        const chunk = Buffer.alloc(Math.min(SPAWN_CHUNK, stat.size - offset));
+        const { bytesRead } = await handle.read(chunk, 0, chunk.length, offset);
+        if (!bytesRead) throw new Error('Incomplete spawn index read');
+        hash.update(chunk.subarray(0, bytesRead));
+        offset += bytesRead;
+        let data = chunk.subarray(0, bytesRead), start = 0, end;
+        if (carry) { data = Buffer.concat([carry, data]); carry = null; }
+        while ((end = data.indexOf(10, start)) !== -1) {
+          if (skipping) skipping = false; else consumeLine(data.subarray(start, end));
+          start = end + 1;
+        }
+        const rest = data.subarray(start);
+        // An oversized unfinished row is skipped through its newline, like the bounded readers.
+        if (rest.length > READ_BYTES) { skipping = true; state.projection.helperClaimsPartial = true; } else if (rest.length && !skipping) carry = Buffer.from(rest);
+      }
+      await verifyPath(resource, await handle.stat());
+      Object.assign(state, { offset, carry, skipping, digest: hash.digest('hex'), device: stat.dev, inode: stat.ino, ready: true });
+    } catch (_) {
+      unavailableSpawnIndex(state);
+    } finally { if (handle) await handle.close().catch(() => failNote('observer.transcripts.close', new Error('Transcript handle cleanup failed'))); }
+  }
+  // The first full scan runs off the discovery path, so helpers outside the tail appear on a later poll; once an
+  // index exists, its complete prefix is verified before parsing appends, awaited for a consistent view.
+  async function spawnIndex(file, sessionId, binding) {
+    const key = spawnIndexKey(file, sessionId, binding);
+    let state = spawnIndices.get(key);
+    if (!state) {
+      if (spawnIndices.size >= 64) {
+        // Pending scans must remain tracked for deduplication and shutdown. Never
+        // detach work merely to admit another cold parent while all slots are busy.
+        const settled = [...spawnIndices].find(([, value]) => !value.promise);
+        if (!settled) return unavailableSpawnIndex();
+        spawnIndices.delete(settled[0]);
+      }
+      state = { projection: null, offset: 0, ready: false, promise: null };
+      spawnIndices.set(key, state);
+    }
+    state.usedAt = now();
+    const wasReady = state.ready;
+    if (!state.promise) state.promise = scanSpawnIndex(state, file, sessionId, binding).finally(() => { state.promise = null; });
+    if (wasReady) await state.promise;
+    return state.ready ? state.projection : null;
+  }
+  // Once an index exists, its evidence owns discovery as well as private proof.
+  // A partial index cannot establish a unique spawn; cached header metadata cannot repair it.
+  function mergedSpawn(projection, index, child) {
+    if (index) return index.helperClaimsPartial ? undefined : index.helperSpawns.get(child);
+    return projection?.helperClaimsPartial ? undefined : projection?.helperSpawns.get(child);
+  }
+  // Hide the mutable maps: traversal receives only an immutable claim-presence lookup.
+  // Null is still a claim, so an ambiguous ancestor cannot be guessed away.
+  const claudeClaimSnapshots = new Map();
+  function mergedClaims(projection, index) {
+    const spawns = new Map(), events = new Map();
+    for (const child of new Set([...(projection?.helperSpawns.keys() || []), ...(index?.helperSpawns.keys() || [])])) {
+      const spawn = mergedSpawn(projection, index, child);
+      if (spawn === undefined) continue;
+      spawns.set(child, spawn && Object.freeze({ ...spawn }));
+      // An absent/evicted indexed event means unknown; a stale header cannot restore it.
+      const event = (index || projection)?.helperEvents.get(child);
+      if (event) events.set(child, Object.freeze({ ...event }));
+    }
+    return Object.freeze({ available: !!index && !index.helperClaimsPartial, has: child => spawns.has(child), spawn: child => spawns.get(child), event: child => events.get(child) });
+  }
   async function claudeCandidates(parentSessionId, parentBinding, parentId) {
+    claudeClaimSnapshots.delete(parentId);
     try {
       const canonical = parentBinding?.parentSessionId || parentSessionId;
       const parentFile = parentBinding?.file || await locate('claude', canonical);
       if (!parentFile) return [];
       const projection = parentBinding?.projection || states.get(parentId)?.projection;
       if (!projection) return [];
+      const index = await spawnIndex(parentFile, parentSessionId, parentBinding);
+      const claims = mergedClaims(projection, index);
+      claudeClaimSnapshots.set(parentId, Object.freeze({ available: claims.available, has: claims.has }));
       const directory = path.join(path.dirname(parentBinding ? path.dirname(path.dirname(parentFile)) : parentFile), canonical, 'subagents');
       await containedChild('claude', directory);
       const entries = await io.readdir(directory, { withFileTypes: true });
       if (entries.length > 256) return [];
       const result = [];
       for (const entry of entries.filter(entry => entry.isFile() && /^agent-[A-Za-z0-9_-]{1,100}\.jsonl$/.test(entry.name)).sort((a, b) => a.name.localeCompare(b.name))) {
-        const sessionId = entry.name.slice(6, -6), spawn = projection.helperSpawns.get(sessionId);
+        const sessionId = entry.name.slice(6, -6), spawn = claims.spawn(sessionId);
         if (!spawn) continue;
         const file = path.join(directory, entry.name);
         if (!await corroborateClaudeSpawn(file, spawn, parentBinding)) continue;
-        const event = projection.helperEvents.get(sessionId);
+        const event = claims.event(sessionId);
         result.push({ sessionId, file, canonical, spawn: { ...spawn, parentId, parentBinding: parentBinding || null,
-          parentSessionId: parentSessionId }, event: event && (!event.toolUseId || event.toolUseId === spawn.toolUseId) ? event : null });
+          parentSessionId: parentSessionId, parentFile }, event: event && (!event.toolUseId || event.toolUseId === spawn.toolUseId) ? event : null });
       }
       return result;
     } catch (_) { return []; }
@@ -294,19 +406,15 @@ function makeTranscriptObserver(options = {}) {
       handle = await io.open(full, require('node:fs').constants.O_RDONLY | require('node:fs').constants.O_NOFOLLOW);
       const stat = await handle.stat();
       await verifyPath(resource, stat);
-      let first, firstRead;
-      if (binding) {
-        first = Buffer.alloc(Math.min(stat.size, READ_BYTES));
-        firstRead = await handle.read(first, 0, first.length, 0);
-      }
-      if (binding && !childMetadata(first.subarray(0, firstRead.bytesRead), provider, sessionId, binding.parentSessionId))
+      const first = Buffer.alloc(Math.min(stat.size, READ_BYTES));
+      const firstRead = await handle.read(first, 0, first.length, 0);
+      const prefixData = first.subarray(0, firstRead.bytesRead);
+      if (binding && !childMetadata(prefixData, provider, sessionId, binding.parentSessionId))
         throw new Error('Child identity unavailable');
       // Validate the complete previously projected window, not two sampled sentinels.
-      // Rebuild from a bounded tail on change: no retained turn can outlive its raw evidence.
-      const prefixLength = state.prefixLength || Math.min(stat.size, 4096);
-      const prefix = Buffer.alloc(prefixLength);
-      const prefixRead = await handle.read(prefix, 0, prefix.length, 0);
-      const prefixHash = crypto.createHash('sha256').update(prefix.subarray(0, prefixRead.bytesRead)).digest('hex');
+      // Reuse this header for identity, old-prefix proof and any projection rebuild.
+      const prefixLength = state.prefixLength || prefixData.length;
+      const prefixHash = crypto.createHash('sha256').update(prefixData.subarray(0, prefixLength)).digest('hex');
       let windowChanged = false;
       if (state.anchor) {
         const previous = Buffer.alloc(state.anchor.length);
@@ -325,12 +433,7 @@ function makeTranscriptObserver(options = {}) {
       state.calls.clear(); state.tool = null; state.verified = false;
       state.projection = inspector.createProjection();
       if (generation) state.projection.generation = generation;
-      if (!first) {
-        first = Buffer.alloc(Math.min(stat.size, READ_BYTES));
-        firstRead = await handle.read(first, 0, first.length, 0);
-      }
       let identityConflict = false, beginningConsumed = false;
-      const prefixData = first.subarray(0, firstRead.bytesRead);
       const completePrefix = prefixData.subarray(0, Math.max(0, prefixData.lastIndexOf(10)));
       for (const line of completePrefix.toString('utf8').split('\n')) {
         try {
@@ -380,7 +483,8 @@ function makeTranscriptObserver(options = {}) {
       }
       if (identityConflict) throw new Error('Transcript identity conflict');
       await verifyPath(resource, await handle.stat());
-      state.prefix = prefixHash; state.prefixLength = prefixRead.bytesRead;
+      // The projection retains metadata throughout this header, including after file growth.
+      state.prefix = crypto.createHash('sha256').update(prefixData).digest('hex'); state.prefixLength = prefixData.length;
       state.device = stat.dev; state.inode = stat.ino; state.mtime = stat.mtimeMs; state.file = full;
       state.offset = offset + bytesRead; state.anchor = Buffer.from(data); state.observedAt = now();
       if (detailed) return { available: true, ...inspector.snapshot(state.projection, provider, now()) };
@@ -407,11 +511,14 @@ function makeTranscriptObserver(options = {}) {
       if (!spawn || spawn.parentBinding && !await verifySpawn(spawn.parentBinding, seen)) return false;
       const parent = await read(spawn.parentId, 'claude', spawn.parentSessionId, false, spawn.parentBinding);
       const projection = states.get(spawn.parentId)?.projection;
-      const proof = projection?.helperSpawns.get(current.sessionId);
+      const index = spawn.parentFile ? await spawnIndex(spawn.parentFile, spawn.parentSessionId, spawn.parentBinding || undefined) : null;
+      const claims = mergedClaims(projection, index);
+      if (!claims.available) return false;
+      const proof = claims.spawn(current.sessionId);
       // The selected chain is already in seen before its ancestors are reread.
       // Even a null (ambiguous) claim contradicts another immediate parent.
       const conflictingParent = [...seen].some(child => child.parentSessionId === current.parentSessionId &&
-        child.spawn?.parentId !== spawn.parentId && projection?.helperSpawns.has(child.sessionId));
+        child.spawn?.parentId !== spawn.parentId && claims.has(child.sessionId));
       return parent.available && !conflictingParent && proof?.toolUseId === spawn.toolUseId &&
         await corroborateClaudeSpawn(current.file, spawn, spawn.parentBinding);
     }
@@ -420,9 +527,13 @@ function makeTranscriptObserver(options = {}) {
     return await verifySpawn() ? result : { available: false };
   }
   function retain(ids) {
+    for (const id of claudeClaimSnapshots.keys()) if (!ids.has(id)) claudeClaimSnapshots.delete(id);
     for (const selected of [states, detailStates]) for (const id of selected.keys()) if (!ids.has(id)) selected.delete(id);
+    for (const [key, state] of spawnIndices) if (!state.promise && now() - state.usedAt > 10 * 60000) spawnIndices.delete(key);
   }
+  // Test and shutdown hook: settles any spawn index scan still running in the background.
+  const spawnIndexIdle = () => Promise.all([...spawnIndices.values()].map(state => state.promise).filter(Boolean));
   return { beginDiscovery, helperMetadata: id => states.get(id)?.projection, read, inspect: (id, provider, sessionId) => read(id, provider, sessionId, true), retain,
-    bindChild, claudeCandidates, inspectChild };
+    bindChild, claudeCandidates, claudeClaims: id => claudeClaimSnapshots.get(id), inspectChild, spawnIndexIdle };
 }
 module.exports = { makeTranscriptObserver };

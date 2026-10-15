@@ -64,11 +64,17 @@ const positiveTime = value => Number.isSafeInteger(value) && value > 0 ? value :
 const evidenceTime = record => timestamp(record.timestamp) ? Date.parse(record.timestamp) : null;
 function boundedSet(map, key, value) {
   map.set(key, value);
-  if (map.size > 512) map.delete(map.keys().next().value);
+  if (map.size <= 512) return false;
+  map.delete(map.keys().next().value);
+  return true;
+}
+// Evicted calls can hide later spawn results; evicted spawns can hide conflicts.
+function putClaim(state, map, key, value) {
+  if (boundedSet(map, key, value)) state.helperClaimsPartial = true;
 }
 function putSpawn(state, child, spawn) {
   const previous = state.helperSpawns.get(child);
-  boundedSet(state.helperSpawns, child, previous === null || previous && previous.toolUseId !== spawn.toolUseId ? null : spawn);
+  putClaim(state, state.helperSpawns, child, previous === null || previous && previous.toolUseId !== spawn.toolUseId ? null : spawn);
 }
 function putEvent(state, child, event) {
   const previous = state.helperEvents.get(child);
@@ -82,7 +88,7 @@ function consumeHelperMetadata(state, record, provider, sessionId, binding) {
   if (provider === 'claude') {
     if (belongs && record.type === 'assistant' && Array.isArray(record.message?.content)) {
       for (const block of record.message.content) if (block?.type === 'tool_use' && ['Agent', 'Task'].includes(block.name) && typeof block.id === 'string') {
-        boundedSet(state.helperCalls, block.id, assignment(block.input?.description, 'claude:Agent', at));
+        putClaim(state, state.helperCalls, block.id, assignment(block.input?.description, 'claude:Agent', at));
       }
     }
     if (belongs && record.type === 'user' && record.toolUseResult?.status === 'async_launched' &&
@@ -127,11 +133,11 @@ function consumeHelperMetadata(state, record, provider, sessionId, binding) {
       if (!state.ownTask || state.ownTask.observedAt == null || observedAt != null && observedAt >= state.ownTask.observedAt) state.ownTask = event;
     }
     if (record.type === 'response_item' && p?.type === 'function_call' && p.name === 'spawn_agent') {
-      try { const args = JSON.parse(p.arguments); boundedSet(state.helperCalls, p.call_id,
+      try { const args = JSON.parse(p.arguments); putClaim(state, state.helperCalls, p.call_id,
         assignment(args.task_name, 'codex:spawn_agent', at)); } catch (_) { /* Invalid native arguments carry no assignment. */ }
     }
     if (record.type === 'event_msg' && p?.type === 'collab_agent_spawn_begin' && p.sender_thread_id === sessionId)
-      boundedSet(state.helperCalls, p.call_id, assignment(null, 'codex:collab_agent_spawn', at ?? positiveTime(p.started_at_ms)));
+      putClaim(state, state.helperCalls, p.call_id, assignment(null, 'codex:collab_agent_spawn', at ?? positiveTime(p.started_at_ms)));
     if (record.type === 'event_msg' && p?.type === 'collab_agent_spawn_end' && p.sender_thread_id === sessionId && p.new_thread_id && state.helperCalls.has(p.call_id))
       putSpawn(state, p.new_thread_id, { ...state.helperCalls.get(p.call_id), toolUseId: p.call_id });
     const item = record.type === 'event_msg' && ['item_started', 'item_completed'].includes(p?.type) ? p.item : null;
@@ -150,7 +156,7 @@ function consumeHelperMetadata(state, record, provider, sessionId, binding) {
 
 function createProjection() {
   return { generation: crypto.randomUUID(), turns: new Map(), usage: new Map(), totals: null, model: null,
-    helperCalls: new Map(), helperSpawns: new Map(), helperEvents: new Map(), ownTask: null,
+    helperCalls: new Map(), helperSpawns: new Map(), helperEvents: new Map(), helperClaimsPartial: false, ownTask: null,
     startedAt: null, lastActivityAt: null, lastEntryAt: null, truncated: false, bounded: false, usagePartial: false, modelPartial: false };
 }
 function unavailable(id, reason, now) {
@@ -266,4 +272,4 @@ function snapshot(state, provider, now) {
   return { health: 'available', reason: null, stats, turns: Array.from(state.turns.values()),
     truncated: state.truncated, window: WINDOW, generation: state.generation };
 }
-module.exports = { createProjection, consumeMetadata, metadata, consume, snapshot, unavailable, recordBelongsToSession, redactText };
+module.exports = { createProjection, consumeMetadata, consumeHelperMetadata, metadata, consume, snapshot, unavailable, recordBelongsToSession, redactText };

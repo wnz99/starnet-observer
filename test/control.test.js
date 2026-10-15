@@ -43,7 +43,8 @@ const { makePresentationObserver } = require('../sidecar/presentation.js');
   const spawned = await control.spawn('w1:p2');
   assert.deepEqual(spawned, { ok: true, action: 'spawn', paneId: 'w1:p3', name: 'proj-120000', project: 'proj' });
   const order = calls.map(call => call.slice(0, 3).join(' '));
-  assert.deepEqual(order, ['herdr agent list', 'herdr agent get', 'herdr pane get', 'herdr tab create', 'herdr pane wait-output', 'herdr agent start', 'herdr agent get', 'osascript -e ' + calls.at(-1)[2]]);
+  assert.deepEqual(order, ['herdr agent list', 'herdr agent get', 'herdr pane get', 'herdr tab create', 'herdr pane wait-output', 'herdr agent start', 'herdr agent get']);
+  assert.ok(!calls.some(call => call[0] === 'osascript'), 'spawn never opens a Terminal; only attach does');
   const start = calls.find(call => call[1] === 'agent' && call[2] === 'start');
   assert.deepEqual(start.slice(3), ['proj-120000', '--kind', 'claude', '--pane', 'w1:p3', '--timeout', '60000', '--', '--dangerously-skip-permissions']);
   assert.deepEqual(calls[3].slice(3), ['--workspace', 'w1', '--cwd', '/Users/x/dev/proj', '--label', 'proj-120000', '--no-focus']);
@@ -147,7 +148,7 @@ const { makePresentationObserver } = require('../sidecar/presentation.js');
       const before = hits.length;
       const rejected = await post(on.base, '/api/control/overseer', body);
       assert.equal(rejected.status, 400);
-      assert.deepEqual(await rejected.json(), { error: 'invalid-provider' });
+      assert.deepEqual(await rejected.json(), { error: !body || Array.isArray(body) ? 'JSON object required' : 'invalid-provider' });
       assert.equal(hits.length, before, 'route rejects invalid provider before control dispatch');
     }
     for (const provider of ['claude', 'codex']) {

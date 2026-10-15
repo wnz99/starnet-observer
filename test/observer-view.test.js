@@ -740,9 +740,9 @@ for (const [name, ids, suffixes] of [
     return { result, scene };
   }
   const digest = result => crypto.createHash('sha256').update(JSON.stringify(Object.fromEntries(Object.entries(result).map(([name, value]) => [name, value.log])))).digest('hex');
-  // Characterization of the pre-theme literal painter (HEAD 196d86d), recorded with this exact scenario set.
-  // Updated for PR #8's intentional extra resting motes and crackle; theme/default equivalence remains checked.
-  const HEAD_DEFAULT = '45c7717d1ff113517da5f17a673d74f1b480b0f9eea53f4caba7e1ba66da52a2';
+  // Characterization of the pre-theme literal painter (HEAD 196d86d), recorded with this exact scenario set, plus two
+  // additive passes only (no upstream entry changed or removed): the blocked-agent "!" marker and idle resting sparks.
+  const HEAD_DEFAULT = '34af845124c658b747ab067c08f736f20dc396362025095406cefc32e3782953';
   const omitted = record(undefined).result;
   assert.equal(digest(omitted), HEAD_DEFAULT, 'default paint colours, order and count match the idle-aging baseline');
   assert.equal(digest(record(require('../frontend/app/theme-pack.js').getDefault()).result), HEAD_DEFAULT, 'the canonical snapshot paints the same default');

@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_phase_name: 0 planned
 status: planning
-stopped_at: "PR #12 conflict repair complete; publication verification"
-last_updated: "2026-10-15T17:28:32.617Z"
-last_activity: 2026-10-15
-last_activity_desc: "PR #12 main integration 60eed0b; all 27 test files passed on Bun 1.3.13; independent integration review approved."
-state_head: 60eed0b48605bfcd6ce42a86b5a56df2159b3a8a
+stopped_at: "PR #11 fixes verified and final review clean; PR remains open"
+last_updated: "2026-10-15T21:04:53.333597+00:00"
+last_activity: 2026-10-16
+last_activity_desc: "PR #11 synced to main; host and relay defects fixed; 37 Bun test files passed; independent full-scope review clean."
+state_head: d1268c1437baba01814f7f6dd1b7202de8c2c749
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** PR #8 merged; PR #12 delivery verified and authorized for merge. No active milestone or phase.
+**Current focus:** PRs #9 and #10 merged. PR #11 fixes verified and independently approved; PR remains open.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: PR #12 complete and verified; final user-authorized merge pending
-Last activity: 2026-10-15 — PR #8 merged; PR #12 integrated main through PR #14 and PR #8, all 27 Bun test files passed, fresh independent integration review approved.
+Status: PR #11 fixes complete; zero unresolved review findings; PR open
+Last activity: 2026-10-16 — PR #11 includes published main; all 37 Bun test files passed and independent full-scope review approved.
 
 ## Quick Tasks Completed
 
@@ -44,6 +44,9 @@ Last activity: 2026-10-15 — PR #8 merged; PR #12 integrated main through PR #1
 | 261015-sar | Resolve PR 12 conflicts with main | 2026-10-15 | 60eed0b | Verified; independent review approved | [261015-sar-resolve-pr-12-conflicts-with-main-preser](./quick/261015-sar-resolve-pr-12-conflicts-with-main-preser/) |
 | 261015-mjy | Overseer providers and checkout sections | 2026-10-15 | [PR #12](https://github.com/wnz99/starnet-observer/pull/12) | Complete; merge authorized | [261015-mjy](./quick/261015-mjy-overseer-providers-and-checkout-sections/) |
 | 261015-sb0 | Resolve PR 8 conflicts with main | 2026-10-15 | 27353b2 | Verified; independent review approved | [261015-sb0-resolve-pr-8-conflicts-with-main-preserv](./quick/261015-sb0-resolve-pr-8-conflicts-with-main-preserv/) |
+| 261015-vnn | Sync PR 9 and fix arrangement preferences and courier bugs | 2026-10-15 | [PR #9](https://github.com/wnz99/starnet-observer/pull/9) | Complete; merged | [261015-vnn-sync-pr-9-with-main-preserving-existing-](./quick/261015-vnn-sync-pr-9-with-main-preserving-existing-/) |
+| 261015-vtr | Sync PR 10 and fix helper index lineage proof bugs | 2026-10-15 | [PR #10](https://github.com/wnz99/starnet-observer/pull/10) | Complete; merged | [261015-vtr-sync-pr-10-and-fix-helper-index-lineage-](./quick/261015-vtr-sync-pr-10-and-fix-helper-index-lineage-/) |
+| 261015-vno | Sync PR 11 and fix host, relay and mail defects | 2026-10-15 | [PR #11](https://github.com/wnz99/starnet-observer/pull/11) | Complete; verified; independent final review clean | [261015-vno](./quick/261015-vno-sync-pr-11-with-main-preserving-existing/) |
 
 ## Accumulated Context
 
@@ -64,10 +67,10 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 
 ## Session Continuity
 
-Last session: 2026-10-15
-Stopped at: PR #12 final delivery records before authorized merge
+Last session: 2026-10-16
+Stopped at: PR #11 fix delivery verified; PR remains open
 Resume file: None
-Next action: Push final PR #12 records and merge with a merge commit; verify GitHub merge proof.
+Next action: Await PR #11 merge decision. No unresolved review finding remains; live SSH/desktop/browser integration was not exercised.
 
 ### Registered Work
 

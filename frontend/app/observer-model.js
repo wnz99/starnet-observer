@@ -6,10 +6,14 @@ const ObserverModel = (() => {
   // Ten fixed floor slots: names and order belong to the application; displayed accents come from the theme pack.
   const FLOORS = ['cobalt', 'teal', 'verdant', 'moss', 'amber', 'ember', 'crimson', 'orchid', 'violet', 'indigo'];
   const palette = FLOORS.map((floor, index) => [floor, Themes.getDefault().scene.projectAccents[index]]);
-  const projectKey = row => row.projectId || 'folder:' + (row.project || 'Unassigned');
+  // A remote host's rows never join a local room: their key carries the host (ids are already host-scoped by the hub).
+  const hostOf = row => typeof row.host === 'string' && row.host ? row.host : null;
+  const projectKey = row => (hostOf(row) ? 'host:' + hostOf(row) + '|' : '') + (row.projectId || 'folder:' + (row.project || 'Unassigned'));
   const repoKey = row => row.repoId || projectKey(row);
   // Checkout proof owns identity; labels and basenames never distinguish sections.
   const folderOf = row => typeof row.folder === 'string' ? row.folder : '';
+  // A room for the user's home folder reads "~ home" rather than the bare user name (display only).
+  const projectName = row => row.projectHome ? '~ home' : (row.project || 'Unassigned');
   const checkoutIdOf = row => typeof row.checkoutId === 'string' && row.checkoutId ? row.checkoutId : null;
   const checkoutKey = row => JSON.stringify([repoKey(row), checkoutIdOf(row)]);
   const sectionKey = row => JSON.stringify([repoKey(row), checkoutIdOf(row), folderOf(row)]);
@@ -24,9 +28,9 @@ const ObserverModel = (() => {
     while (length < max && others.some(other => other.slice(-length) === id.slice(-length))) length++;
     return id.slice(-length);
   }
-  const sectionLabel = row => (row.repo || row.project || 'Unassigned') + ' · ' + checkoutLabel(row) + (folderOf(row) ? ' / ' + folderOf(row) : '');
+  const sectionLabel = row => (row.projectHome && row.repoKind !== 'repository' ? '~ home' : row.repo || row.project || 'Unassigned') + ' · ' + checkoutLabel(row) + (folderOf(row) ? ' / ' + folderOf(row) : '');
   const sectionData = row => ({ checkoutId: checkoutIdOf(row), checkoutKind: row.checkoutKind || null, worktree: row.worktree || null,
-    repoLabel: row.repo || row.project || 'Unassigned', checkoutLabel: checkoutLabel(row), folder: folderOf(row), label: sectionLabel(row) });
+    repoLabel: row.projectHome && row.repoKind !== 'repository' ? '~ home' : row.repo || row.project || 'Unassigned', checkoutLabel: checkoutLabel(row), folder: folderOf(row), label: sectionLabel(row) });
   // Gaps between reserved root desks; a section shares eight safe stations.
   const helperStations = [6, 9].flatMap(y => [4.25, 8.25, 14.25, 18].map(x => ({ x, y, w: 1, h: 0.72 })));
   const isHelper = row => row.source === 'helper' || Object.hasOwn(row, 'parentId');
@@ -100,7 +104,7 @@ const ObserverModel = (() => {
   function createLayout({ projectAccents } = {}) {
     const accents = palette.map(([, fallback], index) => Array.isArray(projectAccents) && typeof projectAccents[index] === 'string' ? projectAccents[index] : fallback);
     const hueColor = index => ({ floor: palette[index][0], accent: accents[index] });
-    const panes = new Map(), helpers = new Map(), wings = new Map(), names = new Map(), roomSlots = new Map();
+    const panes = new Map(), helpers = new Map(), wings = new Map(), names = new Map(), roomSlots = new Map(), owners = new Map();
     let hues = new Map(), rooms = [];
     // Holes are reused but surviving desks never move; a new block is appended only when none is free.
     function allocate(project, repo, label, section = repo) {
@@ -120,8 +124,10 @@ const ObserverModel = (() => {
        shows that hue, so the annex keeps its colour and nobody else is recoloured. Each deck holds at most eight
        rooms, so the search ends at the first deck without that hue. */
     function freeSlot(project) {
-      const used = new Set(roomSlots.values()), hue = hues.get(project);
-      const clash = slot => hue !== undefined && Array.from(roomSlots).some(([key, other]) =>
+      // Each host (ship) has its own slot space, so a remote room never pushes a local room to another deck.
+      const host = owners.get(project) ?? null, mine = Array.from(roomSlots).filter(([key]) => (owners.get(ownerOf(key)) ?? null) === host);
+      const used = new Set(mine.map(([, slot]) => slot)), hue = hues.get(project);
+      const clash = slot => hue !== undefined && mine.some(([key, other]) =>
         deckOf(other) === deckOf(slot) && ownerOf(key) !== project && hues.get(ownerOf(key)) === hue);
       let slot = 0; while (used.has(slot) || clash(slot)) slot++;
       return slot;
@@ -154,7 +160,7 @@ const ObserverModel = (() => {
       for (const id of panes.keys()) if (!live.has(id)) { panes.delete(id); removed.push(id); changed = true; }
       for (const row of roots) {
         const project = projectKey(row), repo = repoKey(row), section = sectionKey(row), previous = panes.get(row.id);
-        names.set(project, row.project || 'Unassigned');
+        names.set(project, projectName(row)); owners.set(project, hostOf(row));
         if (previous && previous.project === project && previous.repo === repo && previous.section === section) {
           const block = wings.get(project)[previous.block], data = sectionData(row);
           if (JSON.stringify(block) !== JSON.stringify({ ...block, ...data })) { Object.assign(block, data); changed = true; }
@@ -168,11 +174,11 @@ const ObserverModel = (() => {
       for (const [project, blocks] of wings) {
         const used = new Set(Array.from(panes.values()).filter(pane => pane.project === project).map(pane => pane.block));
         while (blocks.length && !used.has(blocks.length - 1)) { blocks.pop(); changed = true; }
-        if (!blocks.length) { wings.delete(project); names.delete(project); }
+        if (!blocks.length) { wings.delete(project); names.delete(project); owners.delete(project); }
       }
       const units = new Map();
       for (const [project, blocks] of wings) for (let annex = 0; annex * BLOCKS_PER_ROOM < blocks.length; annex++) {
-        units.set(project + ':' + annex, { key: project + ':' + annex, projectId: project, name: names.get(project), annex,
+        units.set(project + ':' + annex, { key: project + ':' + annex, projectId: project, name: names.get(project), annex, ...(owners.get(project) ? { host: owners.get(project) } : {}),
           blocks: blocks.slice(annex * BLOCKS_PER_ROOM, (annex + 1) * BLOCKS_PER_ROOM), rows: [] });
       }
       for (const [id, pane] of panes) {
@@ -228,6 +234,13 @@ const ObserverModel = (() => {
     return { reconcile, pages, onPage, pageFor, colorFor,
       seatFor: id => { const pane = panes.get(id); return pane ? pane.block * BLOCK_SEATS + pane.seat : undefined; } };
   }
-  return { projectKey, repoKey, checkoutKey, checkoutLabel, checkoutSuffix, sectionKey, helperStations, hash, palette, activity, age, idleAge, taskTitle, hoverLabel, createLayout };
+  /* Dynamic arrangement (the ARRANGE toggle): the sidecar publishes a second grouping per row; drawing it is just
+     reading its room and section in place of the folder project and repository. Rows without one keep folder grouping. */
+  function arranged(row) {
+    const value = row && row.arrangement;
+    if (!value || typeof value.roomId !== 'string' || typeof value.sectionId !== 'string') return row;
+    return { ...row, projectId: value.roomId, project: value.room, projectKind: 'group', repoId: value.sectionId, repo: value.section || value.room, folder: '' };
+  }
+  return { projectName, hostOf, projectKey, repoKey, arranged, checkoutKey, checkoutLabel, checkoutSuffix, sectionKey, helperStations, hash, palette, activity, age, idleAge, taskTitle, hoverLabel, createLayout };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = ObserverModel;

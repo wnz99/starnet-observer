@@ -38,8 +38,9 @@ function aggregateRows(rows, now) {
       /^helper:obs_[a-f0-9]{24}$/.test(row.inspectionIdentity || '');
     const verified = helper || row.source !== 'desktop' && ['codex', 'claude'].includes(row.provider) &&
       UUID.test(row.sessionId || '') && !!row.inspectionIdentity;
-    const key = helper ? row.provider + ':' + row.inspectionIdentity : verified ?
+    const identity = helper ? row.provider + ':' + row.inspectionIdentity : verified ?
       row.provider + ':' + row.sessionId.toLowerCase() : 'presence:' + row.id;
+    const key = JSON.stringify([row.host || null, identity]);
     if (!groups.has(key)) groups.set(key, { verified, rows: [] });
     groups.get(key).rows.push(row);
   }
@@ -106,7 +107,7 @@ function makeObserver(options = {}) {
   const execute = options.execute || ((command, args, settings) => new Promise((resolve, reject) => {
     childProcess.execFile(command, args, settings, (error, stdout) => error ? reject(error) : resolve({ stdout }));
   }));
-  const projects = options.projects || makeProjectResolver({ execute, now });
+  const projects = options.projects || makeProjectResolver({ execute, now, arrange: options.arrange || null });
   const transcripts = options.transcripts || makeTranscriptObserver({ now });
   const sqlite = !options.helpers || !options.bus ? makeSqliteClient({ now }) : null;
   const helpers = options.helpers || makeHelperObserver({ transcripts, now, readEdges: sqlite.readHelperEdges });
@@ -486,4 +487,4 @@ function makeObserver(options = {}) {
   }
   return { get, controlTarget, inspect: (id, expectedIdentity) => inspect(id, expectedIdentity), inspectMessage: (id, expectedIdentity) => closed ? Promise.resolve({ id, health: 'unavailable', reason: 'unreadable', text: null }) : bus.inspect(id, expectedIdentity), close };
 }
-module.exports = { makeObserver, lastActivity };
+module.exports = { makeObserver, aggregateRows, lastActivity };

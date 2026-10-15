@@ -5,6 +5,7 @@ node_modules/
 .env.*
 coverage/
 observer.config.json
+rooms.json
 
 # Local private theme references and installed packs
 .planning/sketches/

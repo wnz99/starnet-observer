@@ -205,6 +205,7 @@ const call = (id, name = 'exec_command') => ({ type: 'response_item', timestamp:
     assert((await observer.inspectChild('bound', binding)).turns.some(turn => turn.text === 'BOUND CHILD'));
     await fs.writeFile(file, line(meta(ID)) + line(message('assistant', 'UNBOUND')));
     assert.equal((await observer.inspectChild('bound', binding)).available, false);
+    await headerReadBudget(root);
     await observerWarmReuse(root);
     await metadataReadBudget(root);
     await childDiscoveryWindows(root);
@@ -408,7 +409,7 @@ async function metadataReadBudget(temp) {
   assert.equal(light.usage.coverage, 'bounded-transcript'); assert.equal(light.usage.observedAt, 1000);
   assert(!JSON.stringify(light).includes('PRIVATE')); assert(!light.turns);
   const size = (await fs.stat(file)).size;
-  assert.deepEqual([opens, calls, bytes], [1, 3, size * 3], 'metadata uses existing prefix, identity and tail reads');
+  assert.deepEqual([opens, calls, bytes], [1, 2, size * 2], 'metadata shares one header read for prefix and identity, followed by the tail');
   const detail = await observer.inspect('row', 'claude', ID);
   assert.equal(detail.stats.startedAt.value, '2026-10-11T00:00:00.000Z', 'metadata before first message does not hide verified start');
   for (const key of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'])
@@ -522,7 +523,7 @@ async function observerWarmReuse(temp) {
     const concurrent = observer.inspect(row.id, 'codex:' + ID);
     release(); const warmed = await concurrent;
     assert(warmed.turns.some(turn => turn.text === 'WARM CONTENT'));
-    assert.equal(reads - warmStartReads, 3, 'overlapping warm and explicit reads share one cold projection read');
+    assert.equal(reads - warmStartReads, 2, 'overlapping warm and explicit reads share one cold projection read');
     const before = reads;
     const reused = await observer.inspect(row.id, 'codex:' + ID);
     assert.equal(reads - before, 2, 'warm projection needs only fresh prefix/window validation on click');
@@ -531,7 +532,7 @@ async function observerWarmReuse(temp) {
     const beforeExpiry = reads;
     const expired = await transcripts.inspect(row.id, 'codex', ID);
     assert.notEqual(expired.generation, reused.generation, 'an expired detail projection is rebuilt');
-    assert.equal(reads - beforeExpiry, 3, 'expiry takes the bounded cold path rather than a second response cache');
+    assert.equal(reads - beforeExpiry, 2, 'expiry takes the bounded cold path rather than a second response cache');
     await fs.writeFile(file + '.new', body('REPLACEMENT'));
     await fs.rename(file + '.new', file);
     const replaced = await observer.inspect(row.id, 'codex:' + ID);
@@ -567,4 +568,41 @@ async function idleEntryEvidence(temp) {
   await fs.writeFile(xf, line(meta(ID)) + line({ type: 'event_msg', timestamp: '2026-10-15T10:00:00Z', payload: { type: 'token_count' } }) +
     line({ type: 'turn_context', timestamp: '2026-10-15T11:00:00Z', payload: {} }));
   assert.equal((await observer.read('idle-x', 'codex', ID)).lastEntryAt, at('2026-10-15T10:00:00Z'), 'Codex counts response and event rows, not turn context');
+}
+
+// Header identity, retained-prefix proof and rebuild parsing share one disk read.
+async function headerReadBudget(temp) {
+  const directory = path.join(temp, 'header-budget'); await fs.mkdir(directory);
+  let bytes = 0;
+  const observer = makeTranscriptObserver({ now: () => 1000, roots: { codex: directory }, fs: {
+    ...fs, open: async (...args) => {
+      const handle = await fs.open(...args);
+      return { stat: () => handle.stat(), close: () => handle.close(), read: async (...values) => {
+        const result = await handle.read(...values); bytes += result.bytesRead; return result;
+      } };
+    }
+  } });
+  const padding = Array.from({ length: 1100 }, () => line({ type: 'response_item', payload: {
+    type: 'message', role: 'assistant', content: 'x'.repeat(1000) } })).join('');
+  for (const bound of [false, true]) {
+    const sessionId = bound ? OTHER : ID, id = bound ? 'bound-budget' : 'ordinary-budget';
+    const file = path.join(directory, sessionId + '.jsonl');
+    const identity = line({ type: 'session_meta', payload: { id: sessionId, ...(bound ? { parent_thread_id: ID } : {}) } });
+    await fs.writeFile(file, identity + padding + line(call('initial')));
+    observer.beginDiscovery();
+    const binding = bound ? await observer.bindChild('codex', sessionId, ID, file) : undefined;
+    if (bound) assert(binding);
+    let detail = await observer.read(id, 'codex', sessionId, true, binding);
+    assert(detail.available);
+    for (const change of ['append', 'rewrite']) {
+      if (change === 'append') await fs.appendFile(file, line(call('grown', 'grown-tool')));
+      else await fs.writeFile(file, identity + padding + line(call('changed', 'changed-tool')));
+      bytes = 0;
+      detail = await observer.read(id, 'codex', sessionId, true, binding);
+      assert(detail.available);
+      assert.equal(detail.window.maxDiskReadBytes, 790528, 'published disk budget stays unchanged');
+      assert(bytes <= detail.window.maxDiskReadBytes, (bound ? 'bound ' : 'ordinary ') + change + ' fits published disk-read budget: ' + bytes);
+      assert(detail.turns.some(turn => turn.tool?.name === (change === 'append' ? 'grown-tool' : 'changed-tool')), 'budgeted read still publishes the current tool evidence');
+    }
+  }
 }

@@ -223,6 +223,18 @@ body.control .session-row .row-top { padding-right:98px; } body.control .session
 .control-notice { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:60; max-width:min(80vw,720px); padding:8px 14px; font:14px/1.3 var(--term); color:var(--ink); background:var(--inspect-control-bg); border:1px solid var(--phosphor); border-radius:4px; box-shadow:0 0 14px var(--glow); }
 .control-notice.error { color:var(--danger-notice-ink); border-color:var(--danger); box-shadow:0 0 14px var(--danger-notice-glow); }
 
+/* Multi-host: host tabs choose whose crew the panel lists; a ship click on the station does the same. */
+.host-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 6px; clear:both; }
+.host-tab { min-height:26px; padding:2px 10px; font:14px/1 var(--term); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); background:var(--control-bg); border:1px solid var(--line); border-radius:2px 8px 2px 2px; }
+.host-tab .host-dot { display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--dim); vertical-align:middle; }
+.host-tab.live .host-dot { background:var(--working); box-shadow:0 0 6px var(--glow); } .host-tab.remote.live .host-dot { background:var(--stale); box-shadow:0 0 6px var(--stale-glow); }
+.host-tab[aria-selected=true],.host-tab[aria-selected=true]:not(:disabled):hover { color:var(--tab-ink); background:var(--phosphor); border-color:var(--phosphor); box-shadow:0 0 10px var(--glow); }
+.host-health { margin:2px 0 0; font:14px/1.3 var(--term); color:var(--dim); } .host-health.live { color:var(--working); } .host-health.down { color:var(--stale); }
+.host-spawn { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 18px 0 22px; padding:8px 10px; border:1px dashed var(--line); border-radius:2px 8px 2px 2px; font:15px/1.2 var(--term); color:var(--ink); }
+/* Needs attention: a blocked agent (startup dialog, permission prompt) reads as waiting for input, attach first. */
+.session-item.needs-input .session-row { border-color:var(--blocked); box-shadow:inset 3px 0 0 var(--blocked); }
+.session-item.needs-input .status.blocked { font-weight:bold; text-shadow:0 0 6px var(--mail-glow); }
+.row-attach.prominent { color:var(--danger-tab-ink); background:var(--blocked); border-color:var(--blocked); box-shadow:0 0 10px var(--mail-glow); }
 /* Provider choice is an explicit launch confirmation; native dialog owns keyboard modality. */
 .overseer-chooser { max-width: min(30rem, calc(100vw - 2rem)); padding: 1.5rem; color: var(--ink); background: var(--panel); border: 1px solid var(--chrome); border-radius: var(--shape-panel); }
 .overseer-chooser::backdrop { background: var(--modal-backdrop); }

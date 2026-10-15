@@ -217,7 +217,6 @@ assert.equal(Model.hoverLabel({ source: 'helper', provider: 'codex', title: 'Ada
   assert.equal(Model.hoverLabel({ provider: 'claude', source: 'herdr', status: 'idle', title: 'Ship it', lastActivityAt: minutes(192) }, false, now), 'Claude — Ship it · idle 3h 12m');
   assert.equal(Model.hoverLabel({ provider: 'claude', source: 'herdr', status: 'idle', title: 'Ship it', lastActivityAt: minutes(2) }, false, now), 'Claude — Ship it');
 }
-
 // Theme project accents recolour the ten slots only: same rooms, slots, floor names and desks as the default palette.
 {
   const defaults = require('../frontend/assets/themes/starnet/theme.json').scene.projectAccents;
