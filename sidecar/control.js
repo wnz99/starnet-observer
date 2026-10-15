@@ -18,9 +18,11 @@
 const path = require("node:path");
 const os = require("node:os");
 const fsp = require("node:fs/promises");
-const { stationChildEnv } = require("./child-env.js");
+const { stationChildEnv } = require("../src/sidecar/child-env.ts");
 const { makeOverseerState, defaultOverseerHome, resolveEndpoint } = require("./overseer-state.js");
-const childProcess = require("./child-env.js").guardChildProcess(require("node:child_process"));
+const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
+  require("node:child_process"),
+);
 
 const PANE = /^[A-Za-z0-9:_-]{1,100}$/;
 const TARGET = /^(?:([a-z0-9][a-z0-9-]{0,31})\/)?([A-Za-z0-9:_-]{1,100})$/;

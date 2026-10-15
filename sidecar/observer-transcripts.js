@@ -4,7 +4,7 @@ const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const inspector = require("./observer-inspector.js");
-const { note: failNote } = require("./failopen.js");
+const { note: failNote } = require("../src/sidecar/failopen.ts");
 
 const READ_BYTES = 256 * 1024;
 // Claude spawn index: the bounded tail window loses the Agent spawn records of long-running parents, so their

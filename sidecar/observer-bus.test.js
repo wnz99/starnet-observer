@@ -14,7 +14,7 @@ test("observer-bus regression contracts", async () => {
     defaultBusPath,
     makePrivateSnapshotQuery,
   } = require("./observer-bus.js");
-  const failopen = require("./failopen.js");
+  const failopen = require("../src/sidecar/failopen.ts");
 
   assert.throws(() => makeBusReader(), /requires an injected now clock/);
   const S1 = "11111111-1111-4111-8111-111111111111",

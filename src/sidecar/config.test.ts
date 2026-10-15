@@ -1,37 +1,41 @@
-"use strict";
-const { test } = require("bun:test");
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
+import assert from "node:assert/strict";
+import { test } from "bun:test";
+import { loadConfig, validateConfig, DEFAULT_ROOMS } from "./config/index.js";
 
-test("config regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const fs = require("node:fs");
-  const os = require("node:os");
-  const path = require("node:path");
-  const { spawnSync } = require("node:child_process");
-  const { loadConfig, validateConfig } = require("./config.js");
+const ENABLED = true;
+const DISABLED = false;
+
+test("config regression contracts", () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "observer-config-"));
   const file = path.join(folder, "settings.json"),
     missing = path.join(folder, "missing.json");
-  const write = (value) => fs.writeFileSync(file, JSON.stringify(value));
+  const write = (value: unknown) => {
+    fs.writeFileSync(file, JSON.stringify(value));
+  };
   try {
-    const defaults = loadConfig([], missing);
-    assert.equal(defaults.presentation, false);
+    const defaults = settings([], missing);
+    assert.equal(defaults.presentation, DISABLED);
     assert.equal(defaults.labels.company, "Helioforge");
-    assert.equal(loadConfig(["--presentation"], missing).presentation, true);
+    assert.equal(settings(["--presentation"], missing).presentation, ENABLED);
     write({
       presentation: true,
       company: "Orbit Works",
       repoPrefix: "orbit",
       rooms: [{ name: "Delivery", repos: ["orbit-api"] }],
     });
-    const configured = loadConfig([], file);
-    assert.equal(configured.presentation, true);
+    const configured = settings([], file);
+    assert.equal(configured.presentation, ENABLED);
     assert.equal(configured.labels.company, "Orbit Works");
     assert.deepEqual(configured.labels.rooms, [{ name: "Delivery", repos: ["orbit-api"] }]);
-    const overridden = loadConfig(
+    const overridden = settings(
       ["--config", file, "--company", "Acme Studio", "--repo-prefix", "acme", "--no-presentation"],
       missing,
     );
-    assert.equal(overridden.presentation, false);
+    assert.equal(overridden.presentation, DISABLED);
     assert.equal(overridden.labels.company, "Acme Studio");
     assert.equal(overridden.labels.repoPrefix, "acme");
     assert.deepEqual(
@@ -40,22 +44,22 @@ test("config regression contracts", async () => {
       "explicit aliases are kept verbatim",
     );
     write({ presentation: false, repoPrefix: "orbit" });
-    const enabled = loadConfig(["--presentation"], file);
-    assert.equal(enabled.presentation, true);
-    assert.equal(enabled.labels.rooms[0].repos[0], "orbit-web");
+    const enabled = settings(["--presentation"], file);
+    assert.equal(enabled.presentation, ENABLED);
+    assert.equal(enabled.labels.rooms.at(0)?.repos.at(0), "orbit-web");
     assert.equal(
-      loadConfig(["--repo-prefix", "custom"], missing).labels.rooms[0].repos[0],
+      settings(["--repo-prefix", "custom"], missing).labels.rooms.at(0)?.repos.at(0),
       "custom-web",
     );
     write({ theme: { fx: false, colors: { accent: "#ABCDEF" } } });
-    assert.deepEqual(loadConfig(["--fx"], file).theme, { fx: true, colors: { accent: "#ABCDEF" } });
-    assert.equal(loadConfig(["--no-fx"], file).theme.fx, false);
+    assert.deepEqual(settings(["--fx"], file).theme, { fx: true, colors: { accent: "#ABCDEF" } });
+    assert.equal(settings(["--no-fx"], file).theme.fx, DISABLED);
     // Dynamic arrangement: theme default and the rooms file path (relative to the config file, default next to server.js).
     write({ theme: { arrange: true }, roomsFile: "my-rooms.json" });
-    const arranged = loadConfig([], file);
-    assert.equal(arranged.theme.arrange, true);
+    const arranged = settings([], file);
+    assert.equal(arranged.theme.arrange, ENABLED);
     assert.equal(arranged.roomsFile, path.join(folder, "my-rooms.json"));
-    assert.equal(loadConfig([], missing).roomsFile, require("./config.js").DEFAULT_ROOMS);
+    assert.equal(settings([], missing).roomsFile, DEFAULT_ROOMS);
     for (const bad of [
       { theme: { arrange: "yes" } },
       { roomsFile: "" },
@@ -63,7 +67,7 @@ test("config regression contracts", async () => {
       { roomsFile: "a\u0000b" },
     ])
       assert.throws(() => validateConfig(bad));
-    assert.throws(() => loadConfig(["--fx", "--no-fx"], missing));
+    assert.throws(() => settings(["--fx", "--no-fx"], missing));
     for (const theme of [
       null,
       [],
@@ -78,27 +82,27 @@ test("config regression contracts", async () => {
       theme: { pack: "starnet" },
     });
     write({ theme: { pack: "sample", fx: false } });
-    assert.deepEqual(loadConfig(["--fx"], file).theme, { pack: "sample", fx: true });
+    assert.deepEqual(settings(["--fx"], file).theme, { pack: "sample", fx: true });
     for (const pack of ["", "../sample", "Sample", "-sample", "a".repeat(33), null, 1])
       assert.throws(() => validateConfig({ theme: { pack } }), /theme.pack/);
-    const basic = loadConfig(["--config", path.join(__dirname, "../themes/basic.json")], missing);
-    assert.equal(basic.presentation, false);
-    assert.equal(basic.theme.fx, false);
-    const helio = loadConfig(
-      ["--config", path.join(__dirname, "../themes/helioforge.json")],
+    const basic = settings(["--config", path.join(__dirname, "../../themes/basic.json")], missing);
+    assert.equal(basic.presentation, DISABLED);
+    assert.equal(basic.theme.fx, DISABLED);
+    const helio = settings(
+      ["--config", path.join(__dirname, "../../themes/helioforge.json")],
       missing,
     );
-    assert.equal(helio.presentation, true);
+    assert.equal(helio.presentation, ENABLED);
     assert.equal(helio.labels.company, "Helioforge");
-    assert.equal(helio.theme.fx, true);
-    assert.equal(helio.theme.colors.accent, "#77dce8");
-    assert.equal(loadConfig(["--help"], file).help, true);
-    assert.throws(() => loadConfig(["--presentaton"], missing));
-    assert.throws(() => loadConfig(["unexpected"], missing));
-    assert.throws(() => loadConfig(["--presentation", "--no-presentation"], missing));
-    assert.throws(() => loadConfig(["--company"], missing));
-    assert.throws(() => loadConfig(["--config", missing], missing), /Cannot load/);
-    assert.throws(() => loadConfig(["--config", ""], missing), /nonempty/);
+    assert.equal(helio.theme.fx, ENABLED);
+    assert.equal(helio.theme.colors?.accent, "#77dce8");
+    assert.equal("help" in loadConfig(["--help"], file), ENABLED);
+    assert.throws(() => settings(["--presentaton"], missing));
+    assert.throws(() => settings(["unexpected"], missing));
+    assert.throws(() => settings(["--presentation", "--no-presentation"], missing));
+    assert.throws(() => settings(["--company"], missing));
+    assert.throws(() => settings(["--config", missing], missing), /Cannot load/);
+    assert.throws(() => settings(["--config", ""], missing), /nonempty/);
     for (const input of [
       null,
       [],
@@ -124,15 +128,15 @@ test("config regression contracts", async () => {
       assert.throws(() => validateConfig(input));
     write({ presentation: true, compny: "Typo" });
     assert.throws(
-      () => loadConfig(["--company", "Override"], file),
+      () => settings(["--company", "Override"], file),
       /Unknown/,
       "invalid file cannot silently disable masking or be hidden by flags",
     );
     fs.writeFileSync(file, "{invalid private text");
-    assert.throws(() => loadConfig([], file), /invalid JSON/);
+    assert.throws(() => settings([], file), /invalid JSON/);
     fs.writeFileSync(file, " ".repeat(65537));
-    assert.throws(() => loadConfig([], file), /64 KiB/);
-    const server = path.join(__dirname, "../server.js");
+    assert.throws(() => settings([], file), /64 KiB/);
+    const server = path.join(__dirname, "../../server.js");
     const invalid = spawnSync(process.execPath, ["--no-env-file", server, "--config", file], {
       cwd: folder,
       encoding: "utf8",
@@ -167,26 +171,26 @@ test("config regression contracts", async () => {
     assert.match(executable.stdout, /Usage: bun --no-env-file server\.js/);
     for (const script of ["start", "presentation"]) {
       const launched = spawnSync(process.execPath, ["run", script, "--help"], {
-        cwd: path.join(__dirname, ".."),
+        cwd: path.join(__dirname, "../.."),
         encoding: "utf8",
         timeout: 3000,
       });
       assert.equal(launched.status, 0, launched.stderr);
       assert.match(launched.stdout, /Usage: bun --no-env-file server\.js/);
     }
-    const example = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../observer.config.example.json"), "utf8"),
+    const example: unknown = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../../observer.config.example.json"), "utf8"),
     );
     validateConfig(example);
     // Remotes: validated ids, ssh targets that can never be read as ssh options, plain dirs, defaults.
-    assert.deepEqual(loadConfig([], missing).remotes, []);
+    assert.deepEqual(settings([], missing).remotes, []);
     write({
       remotes: [
         { id: "herdr-dev-2", ssh: "nick@34.153.167.160" },
         { id: "box", ssh: "devbox", dir: "/srv/observer" },
       ],
     });
-    assert.deepEqual(loadConfig([], file).remotes, [
+    assert.deepEqual(settings([], file).remotes, [
       { id: "herdr-dev-2", ssh: "nick@34.153.167.160", dir: "~/starnet-observer" },
       { id: "box", ssh: "devbox", dir: "/srv/observer" },
     ]);
@@ -197,7 +201,7 @@ test("config regression contracts", async () => {
     );
     for (const remotes of [
       {},
-      Array.from({ length: 17 }, (_, i) => ({ id: "h" + i, ssh: "h" })),
+      Array.from({ length: 17 }, (_, i) => ({ id: `h${String(i)}`, ssh: "h" })),
       [{ id: "A", ssh: "h" }],
       [{ id: "local", ssh: "h" }],
       [
@@ -220,3 +224,41 @@ test("config regression contracts", async () => {
     fs.rmSync(folder, { recursive: true, force: true });
   }
 }, 30000);
+
+test("injected install root keeps automatic files separate from explicit cwd paths", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "observer-root-"));
+  const cwd = path.join(root, "caller");
+  fs.mkdirSync(cwd);
+  try {
+    fs.writeFileSync(
+      path.join(root, "observer.config.json"),
+      JSON.stringify({ company: "Installed", theme: { arrange: true } }),
+    );
+    fs.writeFileSync(
+      path.join(cwd, "selected.json"),
+      JSON.stringify({ company: "Explicit", roomsFile: "custom-rooms.json" }),
+    );
+    const automatic = settings([], undefined, { installRoot: root, cwd });
+    assert.equal(automatic.labels.company, "Installed");
+    assert.equal(automatic.roomsFile, path.join(root, "rooms.json"));
+    assert.equal(automatic.theme.arrange, ENABLED);
+    const explicit = settings(["--config", "selected.json"], undefined, { installRoot: root, cwd });
+    assert.equal(explicit.labels.company, "Explicit");
+    assert.equal(explicit.roomsFile, path.join(cwd, "custom-rooms.json"));
+    fs.writeFileSync(path.join(root, "observer.config.json"), "{broken");
+    assert.throws(() => settings([], undefined, { installRoot: root, cwd }), /invalid JSON/);
+    fs.writeFileSync(path.join(root, "observer.config.json"), JSON.stringify({ unknown: true }));
+    assert.throws(
+      () => settings([], undefined, { installRoot: root, cwd }),
+      /Unknown config field/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function settings(...args: Parameters<typeof loadConfig>) {
+  const value = loadConfig(...args);
+  if ("help" in value) throw new Error("unexpected help");
+  return value;
+}

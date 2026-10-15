@@ -10,7 +10,7 @@ test("observer-sqlite-worker regression contracts", async () => {
     const path = require("node:path");
     const { Database } = require("bun:sqlite");
     const { makeSqliteClient } = require("./observer-sqlite-client.js");
-    const { setKnownSecretSource } = require("./redaction.js");
+    const { setKnownSecretSource } = require("../src/sidecar/redaction.ts");
     const { createServer } = require("../server.js");
     async function waitFor(predicate) {
       const deadline = Date.now() + 2000;

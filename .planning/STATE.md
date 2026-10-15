@@ -1,11 +1,11 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: 0 planned
-status: planning
-stopped_at: "PR #11 fixes verified and final review clean; PR remains open"
-last_updated: "2026-10-15T21:04:53.333597+00:00"
+current_phase_name: "TypeScript refactor"
+status: executing
+stopped_at: "TypeScript Tasks 1–3 independently approved; adapter migration next"
+last_updated: "2026-10-15T22:49:35.453791+00:00"
 last_activity: 2026-10-16
-last_activity_desc: "PR #11 synced to main; host and relay defects fixed; 37 Bun test files passed; independent full-scope review clean."
+last_activity_desc: "TypeScript Tasks 1–3 approved; 48 tests passed; adapter migration next."
 state_head: d1268c1437baba01814f7f6dd1b7202de8c2c749
 progress:
   total_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** PRs #9 and #10 merged. PR #11 fixes verified and independently approved; PR remains open.
+**Current focus:** Full TypeScript refactor and repository quality baseline, registered as quick task 261016-0z8.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: PR #11 fixes complete; zero unresolved review findings; PR open
-Last activity: 2026-10-16 — PR #11 includes published main; all 37 Bun test files passed and independent full-scope review approved.
+Status: TypeScript Tasks 1–3 complete and independently approved; Tasks 4–8 pending
+Last activity: 2026-10-16 — Typed policy migration approved; 48 tests passed and owned strict checks passed.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Stopped at: PR #11 fix delivery verified; PR remains open
+Stopped at: TypeScript Task 3 independently approved; adapter migration next
 Resume file: None
-Next action: Await PR #11 merge decision. No unresolved review finding remains; live SSH/desktop/browser integration was not exercised.
+Next action: Continue approved sequential TypeScript Tasks 4–8, then PR review/fix loops and merge after final checks. Preserve authorization across compaction. No paid/live integration approval is inferred.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Tasks 1–2 independently approved; TypeScript source migration next | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Tasks 1–3 independently approved; adapter migration next | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

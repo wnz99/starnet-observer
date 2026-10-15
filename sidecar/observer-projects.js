@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
-const { stationChildEnv } = require("./child-env.js");
+const { stationChildEnv } = require("../src/sidecar/child-env.ts");
 const { makeArranger, UNASSIGNED } = require("./observer-arrangement.js");
 
 const opaque = (prefix, value) =>

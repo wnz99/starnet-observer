@@ -29,6 +29,7 @@
       "project": [
         "server.{js,ts}",
         "sidecar/**/*.{js,ts}",
+        "src/**/*.{js,ts}",
         "frontend/**/*.{js,ts}",
         "scripts/**/*.{js,mjs,ts}",
         "tools/**/*.{mjs,ts}",

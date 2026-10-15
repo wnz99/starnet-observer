@@ -7,7 +7,9 @@
    and ids are re-derived under the host so a remote can never collide with (or impersonate) a local row. */
 "use strict";
 const crypto = require("node:crypto");
-const childProcess = require("./child-env.js").guardChildProcess(require("node:child_process"));
+const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
+  require("node:child_process"),
+);
 const { aggregateRows } = require("./observer.js");
 const { unavailable } = require("./observer-inspector.js");
 

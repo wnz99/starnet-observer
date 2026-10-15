@@ -1,6 +1,6 @@
 "use strict";
 const crypto = require("node:crypto");
-const { redact } = require("./redaction.js");
+const { redact } = require("../src/sidecar/redaction.ts");
 
 // readBytes is the conversation chunk; cold identity verification and rewrite-prefix checking add bounded IO.
 // Revalidating the previous bounded window adds at most another readBytes of IO.

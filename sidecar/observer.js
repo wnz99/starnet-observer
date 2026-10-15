@@ -1,6 +1,8 @@
 "use strict";
 const crypto = require("node:crypto");
-const childProcess = require("./child-env.js").guardChildProcess(require("node:child_process"));
+const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
+  require("node:child_process"),
+);
 const { makeDesktopObserver } = require("./observer-desktop.js");
 const { makeProjectResolver } = require("./observer-projects.js");
 const { makeTranscriptObserver } = require("./observer-transcripts.js");
@@ -8,7 +10,7 @@ const { makeHelperObserver, grouping } = require("./observer-helpers.js");
 const { publicBus } = require("./observer-bus.js");
 const { makeSqliteClient } = require("./observer-sqlite-client.js");
 const { unavailable, redactText } = require("./observer-inspector.js");
-const { stationChildEnv } = require("./child-env.js");
+const { stationChildEnv } = require("../src/sidecar/child-env.ts");
 const { makeOverseerState, resolveEndpoint } = require("./overseer-state.js");
 const { makeIdentityResolver } = require("./observer-identity.js");
 

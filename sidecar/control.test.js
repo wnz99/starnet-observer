@@ -1,7 +1,7 @@
 "use strict";
 const { test, afterEach } = require("bun:test");
 
-afterEach(() => require("./redaction.js").setKnownSecretSource(null));
+afterEach(() => require("../src/sidecar/redaction.ts").setKnownSecretSource(null));
 
 test("control regression contracts", async () => {
   const assert = require("node:assert/strict");
@@ -11,7 +11,7 @@ test("control regression contracts", async () => {
   const { makeOverseerState } = require("./overseer-state.js");
   const { makeControl } = require("./control.js");
   const { createServer } = require("../server.js");
-  const { setKnownSecretSource } = require("./redaction.js");
+  const { setKnownSecretSource } = require("../src/sidecar/redaction.ts");
   const { makeObserver } = require("./observer.js");
   const { makePresentationObserver } = require("./presentation.js");
   await (async () => {

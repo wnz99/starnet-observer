@@ -7,6 +7,12 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": ["server.ts", "sidecar/**/*.ts", "scripts/**/*.ts"],
+  "include": [
+    "server.ts",
+    "sidecar/**/*.ts",
+    "scripts/**/*.ts",
+    "src/sidecar/**/*.ts",
+    "src/shared/**/*.ts"
+  ],
   "exclude": ["**/*.test.ts", "**/*.fixture.ts"]
 }

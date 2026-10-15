@@ -4,8 +4,8 @@
    away) or on SIGTERM/SIGHUP/SIGPIPE. Run by the hub as `ssh <host> 'cd <dir> && bun --no-env-file scripts/stream.js'`. */
 "use strict";
 const { makeObserver } = require("../sidecar/observer.js");
-const { setKnownSecretSource } = require("../sidecar/redaction.js");
-const { setClock } = require("../sidecar/failopen.js");
+const { setKnownSecretSource } = require("../src/sidecar/redaction.ts");
+const { setClock } = require("../src/sidecar/failopen.ts");
 
 const INTERVAL = 2000,
   MAX_LINE = 4 * 1024 * 1024;

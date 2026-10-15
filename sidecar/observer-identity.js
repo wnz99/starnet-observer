@@ -4,8 +4,10 @@ const path = require("node:path");
 const os = require("node:os");
 const net = require("node:net");
 const { StringDecoder } = require("node:string_decoder");
-const childProcess = require("./child-env.js").guardChildProcess(require("node:child_process"));
-const { note: failNote } = require("./failopen.js");
+const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
+  require("node:child_process"),
+);
+const { note: failNote } = require("../src/sidecar/failopen.ts");
 const UUID_TEXT = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
 const UUID = new RegExp("^" + UUID_TEXT + "$", "i");
 const MAX_RESPONSE = 32768,

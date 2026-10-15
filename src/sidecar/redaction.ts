@@ -1,6 +1,6 @@
-"use strict";
+import { isIterable } from "./iterable.js";
 // Secret redaction extracted from StarNet; see LICENSE and NOTICE.md.
-const SECRET_PATTERNS = [
+const SECRET_PATTERNS: [RegExp, string][] = [
   // A MASKED or TRUNCATED key is still part of a key. OpenAI's 401 echoes `Incorrect API key provided:
   // sk-proj-Ab12****…Wx9Z`, and a truncated log line ends `sk-or-v1-abc…`. The mask characters break every
   // full-key pattern below, so the visible head/tail went into diag.errors.json verbatim (reported against
@@ -14,17 +14,17 @@ const SECRET_PATTERNS = [
     /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/g,
     "[redacted-private-key]",
   ],
-  [/sk-or-v1-[A-Za-z0-9_\-]{8,}/g, "[redacted-key]"], // OpenRouter
-  [/sk-ant-[A-Za-z0-9_\-]{8,}/g, "[redacted-key]"], // Anthropic
-  [/sk-proj-[A-Za-z0-9_\-]{16,}/g, "[redacted-key]"], // OpenAI project key
+  [/sk-or-v1-[A-Za-z0-9_-]{8,}/g, "[redacted-key]"], // OpenRouter
+  [/sk-ant-[A-Za-z0-9_-]{8,}/g, "[redacted-key]"], // Anthropic
+  [/sk-proj-[A-Za-z0-9_-]{16,}/g, "[redacted-key]"], // OpenAI project key
   [/\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b/g, "[redacted-key]"], // Stripe secret/restricted
   [/\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b/g, "[redacted-key]"], // AWS access key id
-  [/\bAIza[0-9A-Za-z_\-]{35}\b/g, "[redacted-key]"], // Google API key
-  [/\bya29\.[0-9A-Za-z_\-]{20,}/g, "[redacted-key]"], // Google OAuth access token
-  [/\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, "[redacted-key]"], // GitHub token (classic)
+  [/\bAIza[0-9A-Za-z_-]{35}\b/g, "[redacted-key]"], // Google credentials use the API key prefix below.
+  [/\bya29\.[0-9A-Za-z_-]{20,}/g, "[redacted-key]"], // Google OAuth access token
+  [/\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, "[redacted-key]"], // Classic GitHub credential
   [/\bgithub_pat_[A-Za-z0-9_]{60,}\b/g, "[redacted-key]"], // GitHub fine-grained PAT
-  [/\bglpat-[A-Za-z0-9_\-]{20,}\b/g, "[redacted-key]"], // GitLab PAT
-  [/\bxox[abeprs]-[A-Za-z0-9-]{10,}\b/g, "[redacted-key]"], // Slack token (bot/user/app/refresh/config)
+  [/\bglpat-[A-Za-z0-9_-]{20,}\b/g, "[redacted-key]"], // GitLab PAT
+  [/\bxox[abeprs]-[A-Za-z0-9-]{10,}\b/g, "[redacted-key]"], // Slack credentials include bot, user, app, refresh and config variants.
   [/\bxapp-\d-[A-Za-z0-9-]{10,}\b/g, "[redacted-key]"], // Slack app-level (Socket Mode) token
   [/\b[MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,40}\b/g, "[redacted-token]"], // Discord bot token
   [/\bsyt_[A-Za-z0-9_]{10,}\b/g, "[redacted-token]"], // Matrix (Synapse) access token
@@ -34,14 +34,14 @@ const SECRET_PATTERNS = [
   [/\bntn_[A-Za-z0-9]{20,}\b/g, "[redacted-key]"], // Notion integration token
   [/\blin_api_[A-Za-z0-9]{20,}\b/g, "[redacted-key]"], // Linear API key
   [/\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/g, "[redacted-key]"], // SendGrid
-  [/\bwhk_[A-Za-z0-9_-]{20,}/g, "[redacted-secret]"], // StarNet line-trigger webhook secret (routing/triggers.js)
+  [/\bwhk_[A-Za-z0-9_-]{20,}/g, "[redacted-secret]"], // StarNet line-trigger webhook credentials live in routing/triggers.js.
   [/\bhf_[A-Za-z0-9]{30,}\b/g, "[redacted-key]"], // HuggingFace
   [/\bxai-[A-Za-z0-9]{20,}\b/g, "[redacted-key]"], // xAI
   [/\bAC[a-f0-9]{32}\b/g, "[redacted-key]"], // Twilio account SID
-  [/\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}/g, "[redacted-jwt]"], // JWT
-  [/\b\d{8,10}:[A-Za-z0-9_\-]{30,}\b/g, "[redacted-token]"], // Telegram bot token (this app uses these)
-  [/sk-[A-Za-z0-9_\-]{16,}/g, "[redacted-key]"], // generic OpenAI-style (broad — keep last)
-  [/\bBearer\s+[A-Za-z0-9._\-]{12,}/g, "Bearer [redacted-key]"], // Authorization: Bearer <token>
+  [/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "[redacted-jwt]"], // JWT
+  [/\b\d{8,10}:[A-Za-z0-9_-]{30,}\b/g, "[redacted-token]"], // Telegram bot credentials used by this app.
+  [/sk-[A-Za-z0-9_-]{16,}/g, "[redacted-key]"], // generic OpenAI-style (broad — keep last)
+  [/\bBearer\s+[A-Za-z0-9._-]{12,}/g, "Bearer [redacted-key]"], // Authorization header containing a Bearer credential
   // Synthetic/local connectors frequently use ordinary canaries rather than vendor-shaped tokens. Scrub
   // explicit credential assignments too, including URL query strings, so upstream diagnostics cannot turn a
   // `password=...` or `client_secret: ...` value into a credential disclosure.
@@ -61,8 +61,8 @@ const SECRET_PATTERNS = [
      The source is read once per top-level redact() call; values shorter than KNOWN_MIN are ignored (too likely
      to collide with ordinary text). A throwing source degrades to shape-only redaction, never to a crash. */
 const KNOWN_MIN = 8;
-let knownSecretSource = null;
-function setKnownSecretSource(fn) {
+let knownSecretSource: (() => unknown) | null = null;
+export function setKnownSecretSource(fn?: (() => unknown) | null) {
   knownSecretSource = typeof fn === "function" ? fn : null;
 }
 function knownSecrets() {
@@ -70,47 +70,47 @@ function knownSecrets() {
   let raw;
   try {
     raw = knownSecretSource();
-  } catch (_) {
+  } catch {
     return null;
   }
-  if (!raw || typeof raw[Symbol.iterator] !== "function") return null;
-  const seen = new Set();
+  if (!isIterable(raw)) return null;
+  const seen = new Set<string>();
   for (const v of raw) {
     if (typeof v !== "string") continue;
     const t = v.trim();
     if (t.length >= KNOWN_MIN && t.indexOf("[redacted-") < 0) seen.add(t);
   }
-  if (!seen.size) return null;
+  if (seen.size === 0) return null;
   // longest first: a key that contains another known key is scrubbed whole, never left as a partial tail
   return Array.from(seen).sort((a, b) => b.length - a.length);
 }
-function redactStr(s, known) {
+function redactStr(input: string, known: string[] | null): string {
+  let s = input;
   if (known)
-    for (let i = 0; i < known.length; i++)
-      if (s.indexOf(known[i]) >= 0) s = s.split(known[i]).join("[redacted-secret]");
-  for (let i = 0; i < SECRET_PATTERNS.length; i++)
-    s = s.replace(SECRET_PATTERNS[i][0], SECRET_PATTERNS[i][1]);
+    for (const secret of known)
+      if (s.includes(secret)) s = s.split(secret).join("[redacted-secret]");
+  for (const [pattern, replacement] of SECRET_PATTERNS) s = s.replace(pattern, replacement);
   return s;
 }
 const SECRET_FIELD =
   /^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|authorization|cookie|credentials?)$/i;
-function redactWith(x, known) {
+function redactWith(x: unknown, known: string[] | null): unknown {
   if (typeof x === "string") return redactStr(x, known);
   if (Array.isArray(x)) return x.map((v) => redactWith(v, known));
   if (x && typeof x === "object") {
-    const o = {};
+    const o: Record<string, unknown> = {};
     // own keys only, and never re-create an object-model key: a parsed '__proto__' member would otherwise
     // re-parent the copy (and an inherited, polluted key would be copied into every redacted payload).
-    for (const k of Object.keys(x)) {
+    for (const [k, value] of Object.entries(x)) {
       if (k === "__proto__") continue;
-      o[k] = SECRET_FIELD.test(k) ? "[redacted-secret]" : redactWith(x[k], known);
+      o[k] = SECRET_FIELD.test(k) ? "[redacted-secret]" : redactWith(value, known);
     }
     return o;
   }
   return x;
 }
-function redact(x) {
+export function redact(x: string): string;
+export function redact(x: unknown): unknown;
+export function redact(x: unknown): unknown {
   return redactWith(x, knownSecrets());
 }
-
-module.exports = { redact, setKnownSecretSource };

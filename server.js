@@ -6,9 +6,9 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { makeObserver } = require("./sidecar/observer.js");
 const { makePresentationObserver } = require("./sidecar/presentation.js");
-const { redact, setKnownSecretSource } = require("./sidecar/redaction.js");
-const { setClock } = require("./sidecar/failopen.js");
-const { loadConfig, HELP } = require("./sidecar/config.js");
+const { redact, setKnownSecretSource } = require("./src/sidecar/redaction.ts");
+const { setClock } = require("./src/sidecar/failopen.ts");
+const { loadConfig, HELP } = require("./src/sidecar/config/index.ts");
 const { loadThemePack } = require("./sidecar/theme-packs.js");
 const canonicalTheme = require("./frontend/assets/themes/starnet/theme.json");
 const { makeOverseerState, resolveEndpoint } = require("./sidecar/overseer-state.js");
@@ -301,7 +301,7 @@ function createServer({
 if (require.main === module) {
   let config;
   try {
-    config = loadConfig();
+    config = loadConfig(process.argv.slice(2), undefined, { installRoot: __dirname });
   } catch (error) {
     console.error("[observer config]", redact(String(error.message)));
     process.exit(1);

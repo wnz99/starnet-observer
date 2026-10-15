@@ -49,6 +49,8 @@ export default tseslint.config(
     files: [
       "server.ts",
       "sidecar/**/*.ts",
+      "src/sidecar/**/*.ts",
+      "src/shared/**/*.ts",
       "scripts/**/*.ts",
       "tools/**/*.ts",
       "**/*.test.ts",

@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 const { redactText } = require("./observer-inspector.js");
-const { note: failNote } = require("./failopen.js");
+const { note: failNote } = require("../src/sidecar/failopen.ts");
 
 /* Read-only view of local llm-bus delivery metadata. Bodies are read only for explicit inspection; folders and wake reasons are never selected;
    raw addresses stay in this process and only exact pane joins or 'external'/'ambiguous' reach the browser. */
