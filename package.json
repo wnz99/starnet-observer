@@ -9,9 +9,10 @@
   },
   "scripts": {
     "start": "bun --no-env-file server.js",
-    "test": "bun --no-env-file scripts/test.js",
+    "test": "bun --no-env-file test",
     "presentation": "bun --no-env-file server.js --presentation",
-    "validate:themes": "bun --no-env-file scripts/validate-theme-packs.mjs"
+    "validate:themes": "bun --no-env-file scripts/validate-theme-packs.mjs",
+    "verify:acceptance": "bun --no-env-file tools/acceptance.ts"
   },
   "bin": {
     "starnet-observer": "server.js"

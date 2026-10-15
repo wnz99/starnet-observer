@@ -348,10 +348,16 @@ bun install --frozen-lockfile
 bun run start
 ```
 
-For the regression suite:
+Tests live beside their owning modules. Bun discovers and awaits these suites directly:
 
 ```sh
 bun run test
+```
+
+Check that assertion failures, empty discovery, rejected promises, and incomplete subprocess fixtures fail visibly:
+
+```sh
+bun run verify:acceptance -- tests
 ```
 
 ## Credits

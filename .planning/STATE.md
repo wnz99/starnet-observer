@@ -76,4 +76,4 @@ Next action: Await PR #11 merge decision. No unresolved review finding remains; 
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Registered; approved revision 3; Tasks 1–8 pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Task 1 verified and independently approved; Tasks 2–8 pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
