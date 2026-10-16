@@ -1,9 +1,14 @@
-const Harness = globalThis.Harness;
-const { test } = require("bun:test");
-const assert = require("node:assert/strict");
-const { makeObserver } = require("./index.ts");
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import { makeObserver } from "./index.js";
+import { makeIdentityResolver } from "../identity/index.js";
+import { createQuerySpine } from "../../browser/queryspine.js";
+import type { ObserverOptions } from "./contracts.js";
+import type { ObserverSnapshot } from "../../shared/observer.js";
+import { must, fixtureString, busFixture } from "./testing.fixture.js";
+const NO_MATCH = false;
 const ID = "00000000-0000-0000-0000-000000000001";
-const pane = (id, session = ID) => ({
+const pane = (id: string, session = ID) => ({
   pane_id: id,
   agent: "codex",
   agent_status: "working",
@@ -11,58 +16,63 @@ const pane = (id, session = ID) => ({
   cwd: "/private/project",
   agent_session: { agent: "codex", kind: "id", value: session },
 });
-const makeCoreObserver = (options) =>
+const makeCoreObserver = (options: ObserverOptions) =>
   makeObserver({
-    overseerState: { read: async () => ({ state: "empty" }), match: async () => false },
+    overseerState: {
+      read: () => Promise.resolve({ state: "empty" }),
+      match: () => Promise.resolve(NO_MATCH),
+    },
     ...options,
   });
 test("observer queryspine polling freshness", async () => {
   await pollingFreshness();
   async function pollingFreshness() {
-    const Q = require("../../../frontend/app/queryspine.fixture.js").loadQuerySpine();
-    const { makeIdentityResolver } = require("../identity/index.ts");
     let clock = 0,
       serial = 0,
       inventoryMode = "healthy",
       holdHelpers = false,
-      releaseHelpers;
-    const events = [],
-      intervals = new Map(),
-      starts = [],
-      publications = [],
-      rpcCounts = new Map(),
-      birthCounts = new Map();
+      releaseHelpers: () => void = () => {
+        throw new Error("fixture gate missing");
+      };
+    const events: { at: number; run: () => void }[] = [],
+      intervals = new Set<number>(),
+      starts: number[] = [],
+      publications: { at: number; data: ObserverSnapshot }[] = [],
+      rpcCounts = new Map<string, number>(),
+      birthCounts = new Map<number, number>();
     const panes = Array.from({ length: 20 }, (_, index) => ({
-      ...pane("timing:" + index),
-      terminal_id: "terminal_" + index,
+      ...pane(`timing:${String(index)}`),
+      terminal_id: `terminal_${String(index)}`,
     }));
-    const helperGate = new Promise((resolve) => {
+    const helperGate = new Promise<void>((resolve) => {
       releaseHelpers = resolve;
     });
-    const delay = (ms) => new Promise((resolve) => events.push({ at: clock + ms, run: resolve }));
-    const flush = () => new Promise((resolve) => setImmediate(resolve));
-    const herdrRows = (data) => data.sessions.filter((row) => row.source === "herdr");
+    const delay = (ms: number) =>
+      new Promise<void>((resolve) => events.push({ at: clock + ms, run: resolve }));
+    const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+    const herdrRows = (data: ObserverSnapshot) =>
+      data.sessions.filter((row) => row.source === "herdr");
     function assertHealthyAge() {
-      const data = Q.state("observer.sessions").data;
-      if (!data || clock >= 8000) return;
+      if (!Q.state("observer.sessions").hasData || clock >= 8000) return;
+      const data = stateData();
       assert(
-        clock - data.sources.herdr.observedAt < 6000,
+        clock - must(data.sources.herdr.observedAt) < 6000,
         "healthy source never ages beyond six seconds while pending",
       );
       for (const row of herdrRows(data))
         assert(
-          clock - row.observedAt < 6000,
+          clock - must(row.observedAt) < 6000,
           "healthy row never ages beyond six seconds while pending",
         );
     }
-    async function advance(target) {
+    async function advance(target: number) {
       await flush();
-      while (true) {
+      for (;;) {
         events.sort((a, b) => a.at - b.at);
-        if (!events.length || events[0].at > target) break;
-        clock = events[0].at;
+        if (events.length === 0 || must(events[0]).at > target) break;
+        clock = must(events[0]).at;
         assertHealthyAge();
-        while (events[0]?.at === clock) events.shift().run();
+        while (events[0]?.at === clock) must(events.shift()).run();
         await flush();
         assertHealthyAge();
       }
@@ -72,14 +82,14 @@ test("observer queryspine polling freshness", async () => {
     }
     const identities = makeIdentityResolver({
       now: () => clock,
-      readConfiguration: async () => "configured",
+      readConfiguration: () => Promise.resolve("configured"),
       readProcessBirth: async (pid) => {
         birthCounts.set(pid, (birthCounts.get(pid) || 0) + 1);
         await delay(25);
         return { pid, startSeconds: 1, startMicroseconds: 2 };
       },
       rpc: async (method, params) => {
-        const id = params.pane_id || params.target,
+        const id = fixtureString(params.pane_id || params.target),
           index = Number(id.split(":")[1]);
         const count = (rpcCounts.get(id) || 0) + 1;
         rpcCounts.set(id, count);
@@ -112,17 +122,17 @@ test("observer queryspine polling freshness", async () => {
     const observer = makeCoreObserver({
       now: () => clock,
       identities,
-      execute: async () => {
+      execute: () => {
         starts.push(clock);
         rpcCounts.clear();
         birthCounts.clear();
         if (inventoryMode === "failed") throw Error("synthetic outage");
-        return {
+        return Promise.resolve({
           stdout: JSON.stringify({ result: { agents: inventoryMode === "empty" ? [] : panes } }),
-        };
+        });
       },
-      projects: { resolve: async () => ({ projectId: "fixture" }) },
-      transcripts: { read: async () => ({ available: false }), retain() {} },
+      projects: { resolve: () => Promise.resolve({ projectId: "fixture" }) },
+      transcripts: { read: () => Promise.resolve({ available: false }), retain() {} },
       helpers: {
         children: async () => {
           if (holdHelpers) {
@@ -133,43 +143,57 @@ test("observer queryspine polling freshness", async () => {
           return { rows: [], annotations: new Map(), overflow: new Map() };
         },
       },
-      bus: { read: () => ({ rows: [] }) },
+      bus: { read: () => busFixture() },
       desktop: {
-        inventory: async () => ({
-          health: "available",
-          observedAt: -7000,
-          windows: [{ id: "old-desktop", status: "idle" }],
-        }),
+        inventory: () =>
+          Promise.resolve({
+            health: "available",
+            observedAt: -7000,
+            windows: [{ id: "old-desktop", provider: "codex", status: "idle" }],
+          }),
       },
     });
-    Q._resetForTest();
-    Q.define("observer.sessions", {
-      path: "/api/observer/sessions",
-      ttlMs: 2000,
-      pollMs: 2000,
-      timeoutMs: 10000,
-      validate: (data) => Array.isArray(data.sessions),
-    });
-    Q._setClockForTest(() => clock);
-    Q._setGetForTest(() => observer.get());
-    Q._setTimersForTest(
-      (fn, ms) => {
+    const observed = new WeakSet();
+    function isObserved(value: unknown): value is ObserverSnapshot {
+      return value !== null && typeof value === "object" && observed.has(value);
+    }
+    const Q = createQuerySpine({
+      now: () => clock,
+      getJson: async () => {
+        const value = await observer.get();
+        observed.add(value);
+        return value;
+      },
+      interval: (fn, ms) => {
         const id = ++serial;
-        intervals.set(id, true);
+        intervals.add(id);
         const tick = () => {
           if (!intervals.has(id)) return;
           fn();
           events.push({ at: clock + ms, run: tick });
         };
         events.push({ at: clock + ms, run: tick });
-        return id;
+        return () => {
+          intervals.delete(id);
+        };
       },
-      (id) => intervals.delete(id),
-    );
-    let unsubscribe;
+    });
+    function stateData() {
+      const data = Q.state("observer.sessions").data;
+      assert(isObserved(data), "query cache keeps actual observer snapshot identity");
+      return data;
+    }
+    Q.define("observer.sessions", {
+      path: "/api/observer/sessions",
+      ttlMs: 2000,
+      pollMs: 2000,
+      timeoutMs: 10000,
+      validate: isObserved,
+    });
+    let unsubscribe: (() => void) | undefined;
     try {
       unsubscribe = Q.subscribe("observer.sessions", (state) => {
-        if (state.hasData && !state.pending) publications.push({ at: clock, data: state.data });
+        if (state.hasData && !state.pending) publications.push({ at: clock, data: stateData() });
       });
       for (const start of [0, 2000, 4000, 6000]) {
         await advance(start + 1700);
@@ -178,8 +202,9 @@ test("observer queryspine polling freshness", async () => {
           [0, 2000, 4000, 6000].filter((time) => time <= start),
           "actual poll callback starts inventory every two seconds",
         );
-        const publication = publications.at(-1);
-        assert.equal(publication.data.sources.herdr.observedAt, start);
+        const publication = must(publications.at(-1));
+        const publishedSources = publication.data.sources;
+        assert.equal(publishedSources.herdr.observedAt, start);
         assert(
           publication.at - start <= 1700,
           "four capture workers plus first admission and downstream fit synthetic budget",
@@ -192,19 +217,19 @@ test("observer queryspine polling freshness", async () => {
         );
         assert.deepEqual([...rpcCounts.values()], Array(20).fill(9));
         assert.deepEqual([...birthCounts.values()], Array(20).fill(2));
-        assert.equal(publication.data.sources.desktop.observedAt, -7000);
+        assert.equal(publishedSources.desktop.observedAt, -7000);
         assert.equal(
-          publication.data.sessions.find((row) => row.source === "desktop").observedAt,
+          publication.data.sessions.find((row) => row.source === "desktop")?.observedAt,
           -7000,
         );
         assert(
-          clock - publication.data.sources.desktop.observedAt > 6000,
+          clock - must(publishedSources.desktop.observedAt) > 6000,
           "fresh Herdr never renews old Desktop",
         );
       }
       holdHelpers = true;
       await advance(13700);
-      const duringHelpers = Q.state("observer.sessions").data;
+      const duringHelpers = stateData();
       assert.equal(
         duringHelpers.sources.herdr.observedAt,
         12000,
@@ -216,7 +241,7 @@ test("observer queryspine polling freshness", async () => {
       await advance(14100);
       inventoryMode = "failed";
       await advance(16100);
-      const unavailable = Q.state("observer.sessions").data;
+      const unavailable = stateData();
       assert.equal(unavailable.sources.herdr.health, "unavailable");
       assert.equal(unavailable.sources.herdr.observedAt, 14000);
       assert.equal(herdrRows(unavailable).length, 20);
@@ -227,16 +252,16 @@ test("observer queryspine polling freshness", async () => {
       );
       inventoryMode = "empty";
       await advance(18100);
-      assert.equal(Q.state("observer.sessions").data.sources.herdr.health, "available");
-      assert.equal(Q.state("observer.sessions").data.sources.herdr.observedAt, 18000);
+      assert.equal(stateData().sources.herdr.health, "available");
+      assert.equal(stateData().sources.herdr.observedAt, 18000);
       assert.deepEqual(
-        herdrRows(Q.state("observer.sessions").data),
+        herdrRows(stateData()),
         [],
         "authoritative empty inventory removes retained rows",
       );
       inventoryMode = "healthy";
       await advance(21700);
-      const recovered = Q.state("observer.sessions").data;
+      const recovered = stateData();
       assert.equal(recovered.sources.herdr.observedAt, 20000);
       assert.equal(herdrRows(recovered).length, 20);
       assert(
@@ -252,20 +277,9 @@ test("observer queryspine polling freshness", async () => {
       // Settle any deferred transport before resetting: QuerySpine clears its request timeout on settlement.
       try {
         await advance(clock + 1700);
-        assert.equal(Q._debug("observer.sessions").inFlight, false);
+        assert(!Q.state("observer.sessions").pending);
         assert.equal(intervals.size, 0);
       } finally {
-        Q._resetForTest();
-        Q._setClockForTest(() => Date.now());
-        Q._setTimersForTest(
-          (fn, ms) => setInterval(fn, ms),
-          (id) => clearInterval(id),
-        );
-        Q._setGetForTest((url, options) =>
-          typeof Harness !== "undefined" && Harness.api
-            ? Harness.api.get(url, options)
-            : Promise.reject(Error("Harness.api.get unavailable")),
-        );
         events.length = 0;
       }
     }

@@ -1,19 +1,21 @@
-const { test } = require("bun:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const os = require("node:os");
-const path = require("node:path");
-const { promisify } = require("node:util");
-const execFile = promisify(require("node:child_process").execFile);
-const { makeProjectResolver } = require("../projects/index.ts");
-const Model = require("../../../frontend/app/observer-model.js");
-// Task 5-P/model ports these real-model coordinating assertions after the model becomes typed.
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { promisify } from "node:util";
+import { execFile as executeFile } from "node:child_process";
+import { makeProjectResolver } from "../projects/index.js";
+import { createModel } from "../../browser/model.js";
+import { canonicalTheme } from "../../browser/theme.fixture.js";
+const execFile = promisify(executeFile);
+const Model = createModel(canonicalTheme());
 test("arrangement preserves linked checkout sections through the actual browser model", async () => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "arrangement-model-"));
   try {
     const root = path.join(temp, "mono"),
       linked = path.join(temp, "mono-linked");
-    const git = (folder, args) =>
+    const git = (folder: string, args: string[]) =>
       execFile("git", [
         "-c",
         "core.hooksPath=/dev/null",
@@ -95,7 +97,7 @@ test("arrangement browser toggle groups actual rows and preserves seats", () => 
   arrangedLayout.reconcile([row, second].map(Model.arranged));
   assert.equal(layout.onPage(0).length, 2, "folder grouping: two rooms");
   assert.equal(arrangedLayout.onPage(0).length, 1, "arranged: one room");
-  assert.equal(arrangedLayout.onPage(0)[0].name, "banqora");
+  assert.equal(arrangedLayout.onPage(0)[0]?.name, "banqora");
   const seats = [row, second].map((value) => arrangedLayout.seatFor(value.id));
   arrangedLayout.reconcile([row, second].map(Model.arranged));
   assert.deepEqual(
