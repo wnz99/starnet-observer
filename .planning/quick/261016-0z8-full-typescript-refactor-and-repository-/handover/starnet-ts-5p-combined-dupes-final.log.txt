@@ -1,7 +1,0 @@
-Duplication Summary
-
-      23  Clone families
-      32  Clone groups
-     628  Duplicated lines
-    2.0%  Duplication rate
-Duplication (2.0%) exceeds threshold (1.0%)

@@ -1,9 +1,0 @@
-$ fallow dead-code --summary --quiet && fallow dupes --summary --quiet
-   0.451205704s  WARN Graph cache decoded but not reused: resolver, entry points, or plugins changed
-[W] Type-aware refinement: 151 candidates, 133 confirmed uses, 18 preserved contracts, 0 candidates without static references (0 guarded fixes), 0 unresolved findings, 0 abstained findings
-Duplication Summary
-
-      10  Clone families
-      11  Clone groups
-     177  Duplicated lines
-    0.4%  Duplication rate

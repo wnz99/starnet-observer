@@ -1,7 +1,0 @@
-{
-  "command": "git rm --cached --force acceptance-format.ts",
-  "status": 0,
-  "worktreeBytesPreserved": true,
-  "indexEntryRemoved": true,
-  "scope": "synthetic disposable cleanup only; full hooks pending exact-head CI"
-}

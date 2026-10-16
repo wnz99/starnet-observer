@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: TypeScript refactor
-status: In progress; Tasks 1–7 accepted; Task 8 implementation integrated; final review and CI gate delivery.
-last_updated: "2026-10-16T19:50:50.397319+00:00"
+status: In progress; PR 15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending.
+last_updated: "2026-10-16T20:25:07.915651+00:00"
 last_activity: 2026-10-16
-last_activity_desc: Task 8 integrated as 299a23e; scoped checks and review fixes recorded; final aggregate and exact-head CI next.
-state_head: 299a23e
-stopped_at: Final aggregate review, mandatory local push gate and exact-head Linux/macOS CI before merge
+last_activity_desc: PR 15 head f459415 reviewed clean; Ubuntu CI running; stale planning artifacts removed by user request.
+state_head: f45941579dfa6e458cdde96f1a992e52778bca15
+stopped_at: Final Ubuntu CI before merge and authorized stale branch/worktree cleanup; macOS CI waived, native macOS unverified
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: In progress; Tasks 1–7 accepted; Task 8 implementation integrated, final delivery gates pending.
-Last activity: 2026-10-16 — Integrated Task 8, preserved scoped reviews and native receipts; user requested deduplicated final verification.
+Status: In progress; PR #15 R3 review clean; final Ubuntu CI running; merge and stale checkout cleanup pending.
+Last activity: 2026-10-16 — Removed stale refactor artifacts by user request; retained PLAN, CONTEXT and SUMMARY with fixed Git history recovery.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Current work: Task 8 integrated as 299a23e; one fresh aggregate review validates final fixes and cross-system integration. Exact-head hosted CI supplies full tests, isolation, browser, acceptance and matching-platform native proof.
-Resume file: [TypeScript handover](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-HANDOVER.md)
-Next action: Run mandatory pre-push static gate, create delivery PR, complete aggregate review and Linux/macOS CI, fix actual failures, then merge when ready. Reuse unchanged accepted reviews and avoid duplicate full local runs per explicit user streamlining. No paid/live runs or optional settings. See [resume evidence](./quick/261016-0z8-full-typescript-refactor-and-repository-/resume-evidence/README.md).
+Current work: PR #15 head f45941579dfa6e458cdde96f1a992e52778bca15 has clean independent R3 review. Required Ubuntu CI is running. Hosted macOS CI is waived; native macOS verification remains unverified.
+Resume file: [TypeScript context](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-CONTEXT.md)
+Next action: Check final Ubuntu CI, fix concrete failures, merge when ready, then clean authorized stale branches/worktrees. Reuse accepted unchanged reviews and avoid duplicate full local runs. No paid/live runs or optional settings. See [current summary](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-SUMMARY.md).
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Tasks 1–7 accepted; Task 8 implementation integrated; final aggregate/CI/PR/merge pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | PR #15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

@@ -1,3 +1,0 @@
-PASS docs: parsed YAML, index, links, license, schema, pending options and exact bootstrap digests verified
-
-EXIT_STATUS=0
