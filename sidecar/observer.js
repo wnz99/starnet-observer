@@ -5,7 +5,7 @@ const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
 );
 const { makeDesktopObserver } = require("../src/sidecar/desktop/index.ts");
 const { makeProjectResolver } = require("./observer-projects.js");
-const { makeTranscriptObserver } = require("./observer-transcripts.js");
+const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
 const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
 const { grouping } = require("../src/sidecar/helpers/evidence.ts");
 const { publicBus } = require("../src/sidecar/bus/public.ts");

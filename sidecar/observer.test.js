@@ -635,7 +635,7 @@ test("observer regression contracts", async () => {
   }
 
   async function helperComposition() {
-    const { makeTranscriptObserver } = require("./observer-transcripts.js");
+    const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-helper-composition-"));
     try {
@@ -791,7 +791,7 @@ test("observer regression contracts", async () => {
   }
 
   async function deepHelperOwnership() {
-    const { makeTranscriptObserver } = require("./observer-transcripts.js");
+    const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-deep-pane-"));
     try {
@@ -870,7 +870,7 @@ test("observer regression contracts", async () => {
   }
 
   async function cappedHelperOwnership() {
-    const { makeTranscriptObserver } = require("./observer-transcripts.js");
+    const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-capped-pane-"));
     try {
@@ -1590,7 +1590,7 @@ test("observer regression contracts", async () => {
   // observed child nor its synthetic descendant has a supported atomic proofset.
   async function footerAncestryProofSet() {
     const { makeIdentityResolver } = require("./observer-identity.js");
-    const { makeTranscriptObserver } = require("./observer-transcripts.js");
+    const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const child = "00000000-0000-0000-0000-000000000002",
       descendant = "00000000-0000-0000-0000-000000000003";
@@ -2050,7 +2050,7 @@ test("observer regression contracts", async () => {
   }
 
   async function claudeHelperNamespaces() {
-    const { makeTranscriptObserver } = require("./observer-transcripts.js");
+    const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-claude-namespaces-"));
     try {

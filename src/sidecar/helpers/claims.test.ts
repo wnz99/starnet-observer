@@ -1,16 +1,24 @@
-"use strict";
-const { test } = require("bun:test");
+import {
+  expectBoolean,
+  required,
+  deferred,
+  parseRecord,
+  firstContent,
+} from "../transcripts/testing.fixture.js";
+import type { TranscriptHandle, TranscriptIO } from "../transcripts/contracts.js";
+import type { Root } from "../helpers/contracts.js";
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { makeHelperObserver } from "./index.js";
+import { makeTranscriptObserver } from "../transcripts/index.js";
 
 test("observer-helpers-index regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const fs = require("node:fs/promises");
-  const path = require("node:path");
-  const os = require("node:os");
-  const { makeHelperObserver } = require("./index.ts");
-  const { makeTranscriptObserver } = require("../../../sidecar/observer-transcripts.js");
   const ID = "00000000-0000-0000-0000-000000000001";
-  const line = (row) => JSON.stringify(row) + "\n";
-  const spawn = (child, call = "spawn-" + child, description = "Task " + child) =>
+  const line = (row: unknown) => JSON.stringify(row) + "\n";
+  const spawn = (child: string, call = "spawn-" + child, description = "Task " + child) =>
     [
       {
         type: "assistant",
@@ -37,16 +45,16 @@ test("observer-helpers-index regression contracts", async () => {
       .map(line)
       .join("");
   // Ordinary parent conversation, well past the bounded tail window (≈790KB) so early spawns fall out of it.
-  const padding = (rows, tag = "p") =>
+  const padding = (rows: number, tag = "p") =>
     Array.from({ length: rows }, (_, i) =>
       line({
         type: "user",
         sessionId: ID,
         timestamp: "2026-10-15T10:30:00Z",
-        message: { content: tag + i + " " + "x".repeat(600) },
+        message: { content: tag + String(i) + " " + "x".repeat(600) },
       }),
     ).join("");
-  const childRow = (child, timestamp) =>
+  const childRow = (child: string, timestamp: string) =>
     line({
       type: "assistant",
       sessionId: ID,
@@ -55,7 +63,7 @@ test("observer-helpers-index regression contracts", async () => {
       timestamp,
       message: { id: "m-" + child, usage: { input_tokens: 3 }, content: "CHILD " + child },
     });
-  const notification = (child, status) =>
+  const notification = (child: string, status: string) =>
     line({
       type: "queue-operation",
       operation: "enqueue",
@@ -82,7 +90,13 @@ test("observer-helpers-index regression contracts", async () => {
       const directory = path.join(claude, ID, "subagents");
       await fs.mkdir(directory, { recursive: true });
       const parentFile = path.join(claude, ID + ".jsonl");
-      const child = async (name, { meta = "spawn-" + name, at = "2026-10-15T10:01:00Z" } = {}) => {
+      const child = async (
+        name: string,
+        {
+          meta = "spawn-" + name,
+          at = "2026-10-15T10:01:00Z",
+        }: { meta?: string | null; at?: string } = {},
+      ) => {
         await fs.writeFile(path.join(directory, "agent-" + name + ".jsonl"), childRow(name, at));
         if (meta)
           await fs.writeFile(
@@ -116,7 +130,7 @@ test("observer-helpers-index regression contracts", async () => {
       assert((await fs.stat(parentFile)).size > 1024 * 1024, "fixture parent exceeds 1MB");
       const transcripts = makeTranscriptObserver({ now, roots: { claude, codex } });
       const helpers = makeHelperObserver({ now, transcripts, readEdges: () => ({ rows: [] }) });
-      const parent = {
+      const parent: Root = {
         id: "parent",
         provider: "claude",
         sessionId: ID,
@@ -126,7 +140,9 @@ test("observer-helpers-index regression contracts", async () => {
         projectId: "p",
         project: "P",
       };
-      const names = (result) => result.rows.map((row) => row.sessionId).sort();
+      const names = (
+        result: Awaited<ReturnType<ReturnType<typeof makeHelperObserver>["children"]>>,
+      ) => result.rows.map((row) => row.sessionId).sort();
 
       // First pass sees only the tail window; the full-file index builds in the background.
       let result = await helpers.children([parent]);
@@ -139,16 +155,17 @@ test("observer-helpers-index regression contracts", async () => {
         "index finds spawns far outside the window; mismatched sidecar is rejected",
       );
       assert.equal(
-        result.rows.find((row) => row.sessionId === "early1").taskEvidence.summary,
+        required(required(result.rows.find((row) => row.sessionId === "early1")).taskEvidence)
+          .summary,
         "Task early1",
       );
       assert(!JSON.stringify(result.rows).includes("PRIVATE PROMPT"));
       const early = result.rows.find((row) => row.sessionId === "early1");
-      assert.equal(
-        (await helpers.inspect(early)).available,
-        true,
-        "index-proven helper stays inspectable",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(required(early))).available,
+        expected: true,
+        message: "index-proven helper stays inspectable",
+      });
 
       // Appends are followed incrementally, even when the new spawn is itself pushed out of the tail.
       await child("appended");
@@ -169,18 +186,18 @@ test("observer-helpers-index regression contracts", async () => {
         result = await helpers.children([parent]);
         const revoked = result.rows.find((row) => row.sessionId === "revoked");
         assert(revoked);
-        assert.equal((await helpers.inspect(revoked)).available, true);
+        expectBoolean({ actual: (await helpers.inspect(revoked)).available, expected: true });
         const after = before.replace('"Agent"', '"Other"');
         assert.equal(Buffer.byteLength(after), Buffer.byteLength(before));
         await fs.writeFile(
           parentFile,
           after + (append ? padding(20, "appended-after-rewrite") : ""),
         );
-        assert.equal(
-          (await helpers.inspect(revoked)).available,
-          false,
-          "middle rewrite revokes private inspection, including when followed by append",
-        );
+        expectBoolean({
+          actual: (await helpers.inspect(revoked)).available,
+          expected: false,
+          message: "middle rewrite revokes private inspection, including when followed by append",
+        });
         result = await helpers.children([parent]);
         assert(
           !names(result).includes("revoked"),
@@ -197,9 +214,9 @@ test("observer-helpers-index regression contracts", async () => {
       // Terminal events outside the tail are indexed too, so a finished early helper reads done, not unknown.
       await fs.appendFile(parentFile, notification("early2", "completed"));
       result = await helpers.children([parent]);
-      assert.equal(result.rows.find((row) => row.sessionId === "early2").status, "done");
+      assert.equal(required(result.rows.find((row) => row.sessionId === "early2")).status, "done");
 
-      // A conflicting second spawn claim for the same child is ambiguous and drops it.
+      // A conflicting second spawn claim concerning the same child is ambiguous and drops it.
       await fs.appendFile(parentFile, spawn("early1", "spawn-early1-again"));
       result = await helpers.children([parent]);
       assert(
@@ -230,14 +247,14 @@ test("observer-helpers-index regression contracts", async () => {
       await transcripts.spawnIndexIdle();
       result = await helpers.children([parent]);
       assert.equal(
-        result.rows.find((row) => row.sessionId === "live").status,
+        required(result.rows.find((row) => row.sessionId === "live")).status,
         "working",
         "own row 5s ago reads working",
       );
       clock += 30000;
       result = await helpers.children([parent]);
       assert.equal(
-        result.rows.find((row) => row.sessionId === "live").status,
+        required(result.rows.find((row) => row.sessionId === "live")).status,
         "unknown",
         "own row 35s ago is not evidence of work",
       );
@@ -248,20 +265,20 @@ test("observer-helpers-index regression contracts", async () => {
       await fs.appendFile(parentFile, notification("live", "completed"));
       result = await helpers.children([parent]);
       assert.equal(
-        result.rows.find((row) => row.sessionId === "live").status,
+        required(result.rows.find((row) => row.sessionId === "live")).status,
         "done",
         "terminal event wins over a recent row",
       );
 
       // Root ambiguity lives outside both bounded windows. A nested valid claim cannot
-      // choose a parent for that same canonical child, even when root's merged value is null.
+      // choose that same canonical child's parent, even when root's merged value is null.
       await child("scout");
       await child("nested");
       const scoutFile = path.join(directory, "agent-scout.jsonl");
       const nestedSpawn = spawn("nested", "spawn-nested", "Nested task")
         .split("\n")
         .filter(Boolean)
-        .map((row) => line({ ...JSON.parse(row), agentId: "scout", isSidechain: true }))
+        .map((row) => line({ ...parseRecord(row), agentId: "scout", isSidechain: true }))
         .join("");
       await fs.appendFile(scoutFile, nestedSpawn);
       await fs.writeFile(parentFile, head + padding(500, "h") + spawn("scout") + padding(1700));
@@ -270,7 +287,7 @@ test("observer-helpers-index regression contracts", async () => {
       result = await helpers.children([parent]);
       const nested = result.rows.find((row) => row.sessionId === "nested");
       assert(nested, "nested helper starts with an unambiguous immediate parent");
-      assert.equal((await helpers.inspect(nested)).available, true);
+      expectBoolean({ actual: (await helpers.inspect(nested)).available, expected: true });
       await fs.writeFile(
         parentFile,
         head +
@@ -280,11 +297,11 @@ test("observer-helpers-index regression contracts", async () => {
           spawn("nested", "root-two") +
           padding(1700),
       );
-      assert.equal(
-        (await helpers.inspect(nested)).available,
-        false,
-        "indexed ambiguous ancestor revokes the existing private binding",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(nested)).available,
+        expected: false,
+        message: "indexed ambiguous ancestor revokes the existing private binding",
+      });
       result = await helpers.children([parent]);
       assert.deepEqual(
         names(result),
@@ -304,30 +321,22 @@ test("observer-helpers-index regression contracts", async () => {
           spawn("scout"),
       );
       const indexedFile = await fs.realpath(parentFile);
-      let releaseIndex, indexStarted;
-      const indexGate = new Promise((resolve) => {
-        releaseIndex = resolve;
-      });
-      const started = new Promise((resolve) => {
-        indexStarted = resolve;
-      });
-      const delayedFs = Object.create(fs);
-      delayedFs.open = async (file, ...args) => {
+      const { promise: indexGate, resolve: releaseIndex } = deferred();
+      const { promise: started, resolve: indexStarted } = deferred();
+      const delayedFs: TranscriptIO = { ...fs };
+      delayedFs.open = async (file, ...args): Promise<TranscriptHandle> => {
         const handle = await fs.open(file, ...args);
-        return new Proxy(handle, {
-          get(target, name) {
-            if (name === "read")
-              return async (buffer, offset, length, position) => {
-                if (file === indexedFile && length > 256 * 1024) {
-                  indexStarted();
-                  await indexGate;
-                }
-                return target.read(buffer, offset, length, position);
-              };
-            const value = target[name];
-            return typeof value === "function" ? value.bind(target) : value;
+        return {
+          stat: () => handle.stat(),
+          close: () => handle.close(),
+          read: async (buffer, offset, length, position) => {
+            if (file === indexedFile && length > 256 * 1024) {
+              indexStarted();
+              await indexGate;
+            }
+            return handle.read(buffer, offset, length, position);
           },
-        });
+        };
       };
       const coldTranscripts = makeTranscriptObserver({
         now,
@@ -341,10 +350,9 @@ test("observer-helpers-index regression contracts", async () => {
       });
       let deadline;
       const timeout = new Promise((_, reject) => {
-        deadline = setTimeout(
-          () => reject(new Error("Cold-index snapshot or inspection blocked on background scan")),
-          3000,
-        );
+        deadline = setTimeout(() => {
+          reject(new Error("Cold-index snapshot or inspection blocked on background scan"));
+        }, 3000);
       });
       try {
         await Promise.race([
@@ -356,11 +364,11 @@ test("observer-helpers-index regression contracts", async () => {
               ["scout"],
               "cold snapshot keeps tail helper but withholds nested ancestry until ancestor claims are complete",
             );
-            assert.equal(
-              (await coldHelpers.inspect(result.rows[0])).available,
-              false,
-              "pending full index denies private inspection even for a valid tail helper",
-            );
+            expectBoolean({
+              actual: (await coldHelpers.inspect(required(result.rows[0]))).available,
+              expected: false,
+              message: "pending full index denies private inspection even for a valid tail helper",
+            });
             // Exercise the private transcript boundary using real proved child bindings,
             // independently of traversal's new rule withholding the nested public row.
             const scoutCandidate = (
@@ -370,11 +378,11 @@ test("observer-helpers-index regression contracts", async () => {
               "claude",
               "scout",
               ID,
-              scoutCandidate.file,
-              scoutCandidate.spawn,
+              required(scoutCandidate).file,
+              required(scoutCandidate).spawn,
             );
             const nestedCandidate = (
-              await coldTranscripts.claudeCandidates("scout", scoutBinding, "cold-scout")
+              await coldTranscripts.claudeCandidates("scout", required(scoutBinding), "cold-scout")
             ).find((value) => value.sessionId === "nested");
             assert(nestedCandidate);
             const nestedBinding = await coldTranscripts.bindChild(
@@ -385,11 +393,11 @@ test("observer-helpers-index regression contracts", async () => {
               nestedCandidate.spawn,
             );
             assert(nestedBinding);
-            assert.equal(
-              (await coldTranscripts.inspectChild("cold-nested", nestedBinding)).available,
-              false,
-              "pending ancestor index cannot authorize private nested content",
-            );
+            expectBoolean({
+              actual: (await coldTranscripts.inspectChild("cold-nested", nestedBinding)).available,
+              expected: false,
+              message: "pending ancestor index cannot authorize private nested content",
+            });
           })(),
           timeout,
         ]);
@@ -404,13 +412,13 @@ test("observer-helpers-index regression contracts", async () => {
         ["scout"],
         "completed root ambiguity continues to suppress nested helper",
       );
-      assert.equal(
-        (await coldHelpers.inspect(result.rows[0])).available,
-        true,
-        "complete proof unlocks valid tail helper inspection",
-      );
+      expectBoolean({
+        actual: (await coldHelpers.inspect(required(result.rows[0]))).available,
+        expected: true,
+        message: "complete proof unlocks valid tail helper inspection",
+      });
 
-      // Preserve the bounded reader's exact prefix/tail/mtime while changing an
+      // Preserve the bounded reader's exact prefix/tail/mtime during an edit to an
       // unvalidated header spawn and making a middle run too large to index fully.
       await child("partial-header");
       const partialTime = new Date("2026-10-15T13:00:00Z");
@@ -427,54 +435,55 @@ test("observer-helpers-index regression contracts", async () => {
       result = await helpers.children([parent]);
       const partialSelected = result.rows.find((row) => row.sessionId === "partial-header");
       assert(partialSelected);
-      assert.equal((await helpers.inspect(partialSelected)).available, true);
+      expectBoolean({ actual: (await helpers.inspect(partialSelected)).available, expected: true });
       const partialAfter = partialBefore
         .replace('"Agent"', '"Other"')
         .replace(partialMiddle, partialMiddle.replaceAll("\n", " "));
       assert.equal(Buffer.byteLength(partialAfter), Buffer.byteLength(partialBefore));
       await fs.writeFile(parentFile, partialAfter);
       await fs.utimes(parentFile, partialTime, partialTime);
-      assert.equal(
-        (await helpers.inspect(partialSelected)).available,
-        false,
-        "partial index denies private stale-header proof",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(partialSelected)).available,
+        expected: false,
+        message: "partial index denies private stale-header proof",
+      });
       result = await helpers.children([parent]);
       assert.deepEqual(
         names(result),
         [],
         "partial full index cannot resurrect stale header claim during discovery",
       );
-      assert.equal(
-        (await helpers.inspect(partialSelected)).available,
-        false,
-        "private denial persists after stale row withdrawal",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(partialSelected)).available,
+        expected: false,
+        message: "private denial persists after stale row withdrawal",
+      });
 
       // Losing either a spawn or its pending call makes negative ancestry evidence
       // incomplete. Exercise each cap independently; status-only eviction is separate.
-      const splitSpawn = (name, call) => spawn(name, call).trim().split("\n").map(JSON.parse);
+      const splitSpawn = (name: string, call: string) =>
+        spawn(name, call).trim().split("\n").map(parseRecord);
       const [fillerCall, fillerResult] = splitSpawn("filler", "filler-call");
       const [firstCall, firstResult] = splitSpawn("nested", "root-one");
       const [secondCall, secondResult] = splitSpawn("nested", "root-two");
       const manyResults = Array.from({ length: 513 }, (_, i) =>
         line({
-          ...fillerResult,
-          toolUseResult: { status: "async_launched", agentId: "filler-" + i },
+          ...required(fillerResult),
+          toolUseResult: { status: "async_launched", agentId: "filler-" + String(i) },
         }),
       ).join("");
       const manyCalls = Array.from({ length: 513 }, (_, i) =>
         line({
-          ...fillerCall,
-          message: { content: [{ ...fillerCall.message.content[0], id: "call-" + i }] },
+          ...required(fillerCall),
+          message: { content: [{ ...firstContent(fillerCall), id: "call-" + String(i) }] },
         }),
       ).join("");
       const oversized = line({
-        ...firstCall,
+        ...required(firstCall),
         message: {
           content: [
             {
-              ...firstCall.message.content[0],
+              ...firstContent(firstCall),
               input: { description: "Large task", prompt: "PRIVATE OVERSIZED ".repeat(80000) },
             },
           ],
@@ -508,22 +517,22 @@ test("observer-helpers-index regression contracts", async () => {
         await transcripts.spawnIndexIdle();
         result = await helpers.children([parent]);
         const selected = result.rows.find((row) => row.sessionId === "nested");
-        assert(selected, label + ": complete evidence initially permits nested helper");
-        assert.equal((await helpers.inspect(selected)).available, true);
+        assert(selected, String(label) + ": complete evidence initially permits nested helper");
+        expectBoolean({ actual: (await helpers.inspect(selected)).available, expected: true });
         await fs.writeFile(
           parentFile,
-          head + padding(500, "h") + incomplete + padding(1700) + spawn("scout"),
+          head + padding(500, "h") + String(incomplete) + padding(1700) + spawn("scout"),
         );
-        assert.equal(
-          (await helpers.inspect(selected)).available,
-          false,
-          label + ": incomplete ancestor proof revokes private binding",
-        );
+        expectBoolean({
+          actual: (await helpers.inspect(selected)).available,
+          expected: false,
+          message: String(label) + ": incomplete ancestor proof revokes private binding",
+        });
         result = await helpers.children([parent]);
         assert.deepEqual(
           names(result),
           [],
-          label +
+          String(label) +
             ": incomplete index cannot prove a unique helper even with readable tail metadata",
         );
         assert(!JSON.stringify(result).includes("PRIVATE OVERSIZED"));
@@ -546,7 +555,7 @@ test("observer-helpers-index regression contracts", async () => {
       );
 
       const manyEvents = Array.from({ length: 513 }, (_, i) =>
-        notification("event-" + i, "completed"),
+        notification("event-" + String(i), "completed"),
       ).join("");
       await fs.writeFile(
         parentFile,
@@ -558,17 +567,17 @@ test("observer-helpers-index regression contracts", async () => {
         afterEventOverflow,
         "status-event eviction does not erase complete spawn-absence proof",
       );
-      assert.equal(
-        (await helpers.inspect(afterEventOverflow)).available,
-        true,
-        "status-only overflow does not deny complete private ancestry proof",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(afterEventOverflow)).available,
+        expected: true,
+        message: "status-only overflow does not deny complete private ancestry proof",
+      });
 
       // The header projection validates only its short prefix and tail on reuse.
       // Restore exact mtime after a header-only edit: the full index must still own absence.
       await child("header");
       const fixedTime = new Date("2026-10-15T12:00:00Z");
-      const rewriteAtFixedTime = async (text) => {
+      const rewriteAtFixedTime = async (text: string) => {
         await fs.writeFile(parentFile, text);
         await fs.utimes(parentFile, fixedTime, fixedTime);
       };
@@ -577,24 +586,25 @@ test("observer-helpers-index regression contracts", async () => {
       result = await helpers.children([parent]);
       const selectedHeader = result.rows.find((row) => row.sessionId === "header");
       assert(selectedHeader);
-      assert.equal((await helpers.inspect(selectedHeader)).available, true);
+      expectBoolean({ actual: (await helpers.inspect(selectedHeader)).available, expected: true });
       await rewriteAtFixedTime(headerClaim.replace('"Agent"', '"Other"'));
-      assert.equal(
-        (await helpers.inspect(selectedHeader)).available,
-        false,
-        "full-index absence revokes stale header proof before discovery despite restored mtime",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(selectedHeader)).available,
+        expected: false,
+        message:
+          "full-index absence revokes stale header proof before discovery despite restored mtime",
+      });
       result = await helpers.children([parent]);
       assert.deepEqual(
         names(result),
         [],
         "full-index absence withdraws the helper despite cached header claim",
       );
-      assert.equal(
-        (await helpers.inspect(selectedHeader)).available,
-        false,
-        "revocation persists after discovery",
-      );
+      expectBoolean({
+        actual: (await helpers.inspect(selectedHeader)).available,
+        expected: false,
+        message: "revocation persists after discovery",
+      });
 
       // A rejected stale header claim must not survive as an undefined map entry
       // whose presence would wrongly contradict a valid nested immediate parent.
@@ -614,10 +624,12 @@ test("observer-helpers-index regression contracts", async () => {
         ["nested", "scout"],
         "absent indexed claim is absent from ancestor presence lookup",
       );
-      assert.equal(
-        (await helpers.inspect(result.rows.find((row) => row.sessionId === "nested"))).available,
-        true,
-      );
+      expectBoolean({
+        actual: (
+          await helpers.inspect(required(result.rows.find((row) => row.sessionId === "nested")))
+        ).available,
+        expected: true,
+      });
 
       const headerEvent =
         head +
@@ -627,13 +639,13 @@ test("observer-helpers-index regression contracts", async () => {
         padding(1700, "tail");
       await rewriteAtFixedTime(headerEvent);
       result = await helpers.children([parent]);
-      assert.equal(result.rows[0].status, "done");
+      assert.equal(required(result.rows[0]).status, "done");
       await rewriteAtFixedTime(
         headerEvent.replace("<status>completed</status>", "<status>unrelated</status>"),
       );
       result = await helpers.children([parent]);
       assert.equal(
-        result.rows[0].status,
+        required(result.rows[0]).status,
         "unknown",
         "full-index event absence withdraws stale cached terminal status",
       );
@@ -645,38 +657,35 @@ test("observer-helpers-index regression contracts", async () => {
       await headerProof.read("header-proof", "claude", ID);
       await rewriteAtFixedTime(headerClaim);
       await headerProof.read("header-proof", "claude", ID);
-      assert(headerProof.helperMetadata("header-proof").helperSpawns.has("header"));
+      assert(required(headerProof.helperMetadata("header-proof")).helperSpawns.has("header"));
       await rewriteAtFixedTime(headerClaim.replace('"Agent"', '"Other"'));
       await headerProof.read("header-proof", "claude", ID);
-      assert.equal(
-        headerProof.helperMetadata("header-proof").helperSpawns.has("header"),
-        false,
-        "grown header proof covers every retained helper record",
-      );
+      expectBoolean({
+        actual: required(headerProof.helperMetadata("header-proof")).helperSpawns.has("header"),
+        expected: false,
+        message: "grown header proof covers every retained helper record",
+      });
 
       // A failed or rejected full scan is unavailable proof, never a fresh cold
       // scan whose bounded positive metadata can establish uniqueness by fallback.
       await rewriteAtFixedTime(headerClaim);
       let failIndexReads = false,
-        holdIndexRead = null;
-      const unavailableFs = Object.create(fs),
+        holdIndexRead: Promise<void> | null = null;
+      const unavailableFs: TranscriptIO = { ...fs },
         unavailableParentFile = await fs.realpath(parentFile);
-      unavailableFs.open = async (file, ...args) => {
+      unavailableFs.open = async (file, ...args): Promise<TranscriptHandle> => {
         const handle = await fs.open(file, ...args);
-        return new Proxy(handle, {
-          get(target, name) {
-            if (name === "read")
-              return async (buffer, offset, length, position) => {
-                if (file === unavailableParentFile && length > 256 * 1024) {
-                  if (failIndexReads) throw new Error("Index read unavailable");
-                  if (holdIndexRead) await holdIndexRead;
-                }
-                return target.read(buffer, offset, length, position);
-              };
-            const value = target[name];
-            return typeof value === "function" ? value.bind(target) : value;
+        return {
+          stat: () => handle.stat(),
+          close: () => handle.close(),
+          read: async (buffer, offset, length, position) => {
+            if (file === unavailableParentFile && length > 256 * 1024) {
+              if (failIndexReads) throw new Error("Index read unavailable");
+              if (holdIndexRead) await holdIndexRead;
+            }
+            return handle.read(buffer, offset, length, position);
           },
-        });
+        };
       };
       const unavailableTranscripts = makeTranscriptObserver({
         now,
@@ -694,7 +703,10 @@ test("observer-helpers-index regression contracts", async () => {
       const beforeFailure = result.rows.find((row) => row.sessionId === "header");
       assert(beforeFailure);
       failIndexReads = true;
-      assert.equal((await unavailableHelpers.inspect(beforeFailure)).available, false);
+      expectBoolean({
+        actual: (await unavailableHelpers.inspect(beforeFailure)).available,
+        expected: false,
+      });
       result = await unavailableHelpers.children([parent]);
       assert.deepEqual(
         names(result),
@@ -723,13 +735,15 @@ test("observer-helpers-index regression contracts", async () => {
         ["header"],
         "oversized rejection clears old digest evidence and recovers after shrink",
       );
-      assert.equal((await unavailableHelpers.inspect(result.rows[0])).available, true);
+      expectBoolean({
+        actual: (await unavailableHelpers.inspect(required(result.rows[0]))).available,
+        expected: true,
+      });
 
       await rewriteAtFixedTime(head + manyCalls + spawn("header") + padding(1700, "tail"));
-      let releasePartialCold;
-      holdIndexRead = new Promise((resolve) => {
-        releasePartialCold = resolve;
-      });
+      const partialCold = deferred();
+      const releasePartialCold = partialCold.resolve;
+      holdIndexRead = partialCold.promise;
       const partialColdTranscripts = makeTranscriptObserver({
         now,
         fs: unavailableFs,
@@ -754,59 +768,45 @@ test("observer-helpers-index regression contracts", async () => {
       }
 
       // Saturating cold discovery must not detach pending scans from their cache
-      // entries or shutdown tracking. Delay each index while ordinary reads finish.
+      // entries or shutdown tracking. Delay each index until ordinary reads finish.
       const capacityRoot = path.join(root, "capacity");
       await fs.mkdir(capacityRoot);
       const capacityIds = Array.from(
         { length: 66 },
         (_, i) => "10000000-0000-0000-0000-" + String(i).padStart(12, "0"),
       );
-      const opens = new Map(),
-        gates = new Map();
+      const opens = new Map<string, number>(),
+        gates = new Map<string, () => void>();
       let startedCount = 0,
         closedCount = 0,
-        allStarted,
-        othersClosed,
         released = false;
-      const started64 = new Promise((resolve) => {
-        allStarted = resolve;
-      });
-      const closed63 = new Promise((resolve) => {
-        othersClosed = resolve;
-      });
-      const capacityFs = Object.create(fs);
-      capacityFs.open = async (file, ...args) => {
+      const { promise: started64, resolve: allStarted } = deferred();
+      const { promise: closed63, resolve: othersClosed } = deferred();
+      const capacityFs: TranscriptIO = { ...fs };
+      capacityFs.open = async (file, ...args): Promise<TranscriptHandle> => {
         const count = (opens.get(file) || 0) + 1;
         opens.set(file, count);
         const handle = await fs.open(file, ...args);
         if (count === 1) return handle;
-        let release;
-        const gate = new Promise((resolve) => {
-          release = resolve;
-        });
+        const { promise: gate, resolve: release } = deferred();
         gates.set(file, release);
         if (released) release();
         let startedScan = false;
-        return new Proxy(handle, {
-          get(target, name) {
-            if (name === "read")
-              return async (...values) => {
-                if (!startedScan) {
-                  startedScan = true;
-                  if (++startedCount === 64) allStarted();
-                }
-                await gate;
-                return target.read(...values);
-              };
-            if (name === "close")
-              return async () => {
-                await target.close();
-                if (++closedCount === 63) othersClosed();
-              };
-            const value = target[name];
-            return typeof value === "function" ? value.bind(target) : value;
+        return {
+          stat: () => handle.stat(),
+          read: async (...values) => {
+            if (!startedScan) {
+              startedScan = true;
+              if (++startedCount === 64) allStarted();
+            }
+            await gate;
+            return handle.read(...values);
           },
-        });
+          close: async () => {
+            await handle.close();
+            if (++closedCount === 63) othersClosed();
+          },
+        };
       };
       const capacityTranscripts = makeTranscriptObserver({
         now,
@@ -815,10 +815,9 @@ test("observer-helpers-index regression contracts", async () => {
       });
       let capacityDeadline;
       const capacityTimeout = new Promise((_, reject) => {
-        capacityDeadline = setTimeout(
-          () => reject(new Error("Capacity scan tracking did not settle")),
-          3000,
-        );
+        capacityDeadline = setTimeout(() => {
+          reject(new Error("Capacity scan tracking did not settle"));
+        }, 3000);
       });
       try {
         await Promise.race([
@@ -831,18 +830,25 @@ test("observer-helpers-index regression contracts", async () => {
                     ? spawn("refused")
                         .trim()
                         .split("\n")
-                        .map((row) => line({ ...JSON.parse(row), sessionId: id }))
+                        .map((row) => line({ ...parseRecord(row), sessionId: id }))
                         .join("")
                     : ""),
               );
-            const refusedDirectory = path.join(capacityRoot, capacityIds[64], "subagents");
+            const refusedDirectory = path.join(
+              capacityRoot,
+              required(capacityIds[64]),
+              "subagents",
+            );
             await fs.mkdir(refusedDirectory, { recursive: true });
             await fs.writeFile(
               path.join(refusedDirectory, "agent-refused.jsonl"),
               childRow("refused", "2026-10-15T10:00:00Z"),
             );
             for (const id of capacityIds) {
-              assert.equal((await capacityTranscripts.read(id, "claude", id)).available, true);
+              expectBoolean({
+                actual: (await capacityTranscripts.read(id, "claude", id)).available,
+                expected: true,
+              });
               const candidates = await capacityTranscripts.claudeCandidates(id, undefined, id);
               if (id === capacityIds[64])
                 assert.deepEqual(
@@ -852,27 +858,33 @@ test("observer-helpers-index regression contracts", async () => {
                 );
             }
             await started64;
-            const firstFile = await fs.realpath(path.join(capacityRoot, capacityIds[0] + ".jsonl"));
-            await capacityTranscripts.claudeCandidates(capacityIds[0], undefined, capacityIds[0]);
+            const firstFile = await fs.realpath(
+              path.join(capacityRoot, String(capacityIds[0]) + ".jsonl"),
+            );
+            await capacityTranscripts.claudeCandidates(
+              required(capacityIds[0]),
+              undefined,
+              required(capacityIds[0]),
+            );
             assert.equal(startedCount, 64, "only 64 full scans may remain pending");
             for (const id of capacityIds.slice(64))
-              assert.equal(
-                capacityTranscripts.claudeClaims(id).available,
-                false,
-                "capacity refusal exposes unavailable proof",
-              );
+              expectBoolean({
+                actual: required(capacityTranscripts.claudeClaims(id)).available,
+                expected: false,
+                message: "capacity refusal exposes unavailable proof",
+              });
             let idle = false;
             const settling = capacityTranscripts.spawnIndexIdle().then(() => {
               idle = true;
             });
             for (const [file, release] of gates) if (file !== firstFile) release();
             await closed63;
-            assert.equal(
-              idle,
-              false,
-              "idle still tracks the oldest pending scan after later roots arrive",
-            );
-            gates.get(firstFile)();
+            expectBoolean({
+              actual: idle,
+              expected: false,
+              message: "idle still tracks the oldest pending scan after later roots arrive",
+            });
+            required(gates.get(firstFile))();
             await settling;
             assert.equal(
               startedCount,
@@ -886,7 +898,11 @@ test("observer-helpers-index regression contracts", async () => {
               "oldest parent retains its one ordinary read and one shared scan",
             );
             released = true;
-            await capacityTranscripts.claudeCandidates(capacityIds[64], undefined, capacityIds[64]);
+            await capacityTranscripts.claudeCandidates(
+              required(capacityIds[64]),
+              undefined,
+              required(capacityIds[64]),
+            );
             await capacityTranscripts.spawnIndexIdle();
             assert.equal(
               startedCount,

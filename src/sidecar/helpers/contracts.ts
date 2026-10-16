@@ -1,44 +1,18 @@
+import type {
+  TaskEvent,
+  Spawn,
+  ChildBinding,
+  Projection,
+  ChildInspection,
+} from "../inspector/contracts.js";
+export type { TaskEvent, ChildBinding } from "../inspector/contracts.js";
 import type { ObserverRow } from "../../shared/observer.js";
-import type { SessionInspection } from "../../shared/inspection.js";
 import type { HelperEdges } from "./edges.js";
 import type { SnapshotOptions } from "../sqlite/snapshots.js";
 export type HelperRow = { id: string; provider: ObserverRow["provider"] } & {
   [K in keyof ObserverRow]?: ObserverRow[K] | undefined;
 };
 export type Root = HelperRow & { sessionId: string };
-export interface TaskEvent {
-  status: string;
-  source: string;
-  observedAt: number | null;
-  toolUseId?: string | null;
-}
-interface Spawn {
-  summary: string | null;
-  source: string;
-  observedAt: number | null;
-  partial?: boolean;
-  toolUseId?: string;
-  parentId?: string;
-  parentBinding?: ChildBinding | null;
-  parentSessionId?: string;
-  parentFile?: string;
-}
-interface HelperProjection {
-  helperSpawns: Map<string, Spawn | null>;
-  helperEvents: Map<string, TaskEvent>;
-  ownTask: TaskEvent | null;
-  lastActivityAt: string | null;
-}
-export interface ChildBinding {
-  provider: ObserverRow["provider"];
-  sessionId: string;
-  parentSessionId: string;
-  file?: string;
-  nickname?: string | null;
-  projection?: HelperProjection;
-  usage?: ObserverRow["usage"];
-  spawn?: Spawn | undefined;
-}
 export interface Candidate {
   child: string;
   state: string;
@@ -53,13 +27,6 @@ interface Claims {
   has(child: string): boolean;
 }
 type Awaitable<T> = T | Promise<T>;
-interface ChildInspection {
-  available: boolean;
-  inspection?: SessionInspection;
-  usage?: ObserverRow["usage"];
-  lastEntryAt?: number | null;
-  last?: ObserverRow["tool"]["last"];
-}
 export interface HelperTranscripts {
   read(
     id: string,
@@ -78,7 +45,7 @@ export interface HelperTranscripts {
     binding: ChildBinding | undefined,
     id: string,
   ): Awaitable<(Omit<Candidate, "child" | "state"> & { sessionId: string })[]>;
-  helperMetadata?(id: string): HelperProjection | undefined;
+  helperMetadata?(id: string): Projection | undefined;
   claudeClaims?(id: string): Claims | undefined;
   inspectChild(id: string, binding: ChildBinding): Awaitable<ChildInspection>;
 }

@@ -1180,7 +1180,7 @@ test("observer-inspector regression contracts", async () => {
 
   // Canonical disk identity owns stats; snake-case transport identity is unrelated.
   {
-    const backend = require("../../sidecar/observer-inspector.js");
+    const backend = require("../../src/sidecar/inspector/index.ts");
     const session = "00000000-0000-0000-0000-000000000001";
     const record = {
       type: "assistant",
