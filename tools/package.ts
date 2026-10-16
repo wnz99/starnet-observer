@@ -3,8 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
-import { buildRuntime } from "./runtime-build.js";
-import { buildPublic, generatedRoot } from "./public.js";
+import { buildRuntime, buildPublic, generatedRoot } from "./build.js";
 const LICENSE = "LICENSE",
   NOTICE = "NOTICE.md",
   OUTPUT_LIMIT = 4194304,

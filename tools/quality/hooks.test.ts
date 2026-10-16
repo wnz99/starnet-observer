@@ -38,8 +38,8 @@ function createFixture() {
   const root = mkdtempSync(join(tmpdir(), "observer-staged-hygiene-"));
   fixtureGit(root, ["init", "--quiet"]);
   mkdirSync(join(root, "tools/quality"), { recursive: true });
-  // Formatting is a separate staged-snapshot contract; keep this fixture dependency-free.
-  writeFileSync(join(root, "tools/quality/format-index.sh"), "#!/bin/sh\nexit 0\n");
+  // Stub the external formatter in this disposable checkout; staged-format tests replace it.
+  executable(root, "bin/bun", "#!/bin/sh\nexit 0\n");
   writeFileSync(join(root, "tools/quality/hooks.sh"), readFileSync(hooks));
   writeFileSync(join(root, ".gitignore"), ".agent-local.json\n");
   fixtureGit(root, ["add", "."]);
@@ -121,11 +121,31 @@ function executable(root: string, file: string, content: string) {
 test("staged formatting selects index bytes and preserves index and worktree", () => {
   const root = createFixture();
   try {
-    writeFileSync(
-      join(root, "tools/quality/format-index.sh"),
-      readFileSync(resolve(import.meta.dirname, "format-index.sh")),
+    writeFileSync(join(root, ".prettierrc.json"), '{"semi": true}\n');
+    writeFileSync(join(root, ".prettierignore"), "ignored-staged.ts\n");
+    fixtureGit(root, ["add", ".prettierrc.json", ".prettierignore"]);
+    writeFileSync(join(root, ".prettierrc.json"), '{"semi": false}\n');
+    writeFileSync(join(root, ".prettierignore"), "ignored-working.ts\n");
+    executable(
+      root,
+      "bin/bun",
+      `#!/bin/sh
+set -eu
+repo_root=\${OBSERVER_HOOK_COMMANDS%/.git/commands}
+test "$#" -eq 8
+test "$1" = "$repo_root/node_modules/prettier/bin/prettier.cjs"
+test "$2" = --config
+test "$3" = "$PWD/.prettierrc.json"
+test "$4" = --ignore-path
+test "$5" = "$PWD/.prettierignore"
+test "$6" = --check
+test "$7" = --ignore-unknown
+test "$8" = .
+test "$(cat .prettierrc.json)" = '{"semi": true}'
+test "$(cat .prettierignore)" = ignored-staged.ts
+test "$(cat format.ts)" = "export const value = 1;"
+`,
     );
-    executable(root, "bin/bun", '#!/bin/sh\ntest "$(cat format.ts)" = "export const value = 1;"\n');
     for (const [staged, working, status] of [
       ["export const value=1", "export const value = 1;", 1],
       ["export const value = 1;", "export const value=1", 0],
@@ -173,9 +193,8 @@ test("pre-push checks only clean HEAD and skips deleted refs", () => {
 test("hook installation preserves existing owner and isolates linked worktrees", () => {
   const root = createFixture();
   const linked = root + "-linked";
-  const installer = resolve(import.meta.dirname, "install-hooks.sh");
   const install = () =>
-    spawnSync("sh", [installer], { cwd: root, encoding: "utf8", env: gitEnvironment });
+    spawnSync("sh", [hooks, "install"], { cwd: root, encoding: "utf8", env: gitEnvironment });
   const linkedConfiguration = () =>
     spawnSync("git", ["config", "--get", "core.hooksPath"], {
       cwd: linked,

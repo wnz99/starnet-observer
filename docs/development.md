@@ -1,17 +1,18 @@
 # Development
 
-Use the Bun, Node and uv versions pinned by `package.json`, `.node-version` and `tools/quality/check-versions.sh`. Bun runs the application and native SQLite. Node and uv serve development tooling; the installed application has no package dependencies.
+Use the Bun, Node and uv versions pinned by `package.json`, `.node-version` and `bun run check:versions`. Bun runs the application and native SQLite. Node and uv serve development tooling; the installed application has no package dependencies.
 
 ## Setup and local checks
 
 ```sh
-sh tools/quality/setup.sh
+bun install --frozen-lockfile
+bun run hooks:install
 bun run lint
 bun run typecheck
 bun run start
 ```
 
-Setup installs frozen dependencies, checks versions and installs hooks for the current checkout. It refuses another hook owner and preserves other worktrees' settings. Pre-commit checks formatting and hygiene against the staged snapshot. Pre-push requires a clean checkout of pushed HEAD and runs only lint and all five strict compiler projects. Build and tests are CI work.
+Install frozen dependencies, then opt into hooks for the current checkout. Hook installation refuses another owner and preserves other worktrees' settings. Both Git hooks verify tool versions before their checks. Pre-commit checks formatting and hygiene against the staged snapshot. Pre-push requires a clean checkout of pushed HEAD and runs only lint and all five strict compiler projects. Build and tests are CI work.
 
 Use `bun run format` or `bun run fix` for explicit edits. Ordinary checks do not change source. Keep tests beside their owners. Runtime, browser and tools/test compiler projects enforce distinct ambient boundaries; browser application code cannot depend on Bun or Node globals.
 
@@ -44,3 +45,5 @@ bun node_modules/@playwright/test/cli.js install --with-deps chromium
 `eslint.config.mjs`, `knip.json`, `.fallowrc.json` and the TypeScript projects own executable quality policy. The baseline was adapted from [repo-starters at c37e2b33f4c957575ad13c6512bdb555aa932b54](https://github.com/wnz99/repo-starters/tree/c37e2b33f4c957575ad13c6512bdb555aa932b54/profiles/typescript); reusable starter helpers carry CC0-1.0 notices. Project and bundled-resource attribution lives in LICENSE and NOTICE.
 
 Agent skills and semantic MCP are optional local development aids, installed outside this repository. Neither application operation nor hooks/CI require them. Keep their settings, credentials, corpus and machine-specific paths outside version control. Do not run live controls, provider calls, paid jobs or external configuration changes as part of routine verification.
+
+The executable tool owners are `build.ts` (runtime/public assets), `start.ts` (launch and signal handling), `package.ts` (clean archive), `isolation.ts` (installed-package CI) and `quality/hooks.sh` (Git checks and installation). Build helpers share their actual owner; tests and process fixtures remain colocated. ESLint classification tests live beside `eslint.config.mjs`.

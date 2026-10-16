@@ -1,8 +1,7 @@
 import { test, expect } from "bun:test";
 import { ESLint } from "eslint";
-import path from "node:path";
 
-const cwd = path.resolve(import.meta.dir, "../..");
+const cwd = import.meta.dir;
 const rule = "clean-code/no-boolean-flag-arguments";
 const ESLINT_PROJECT_TIMEOUT = 60000;
 async function ruleReports(source: string, ruleId = rule) {

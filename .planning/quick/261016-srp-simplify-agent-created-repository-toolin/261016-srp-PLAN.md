@@ -15,3 +15,7 @@ Remove agent-created maintenance scaffolding without changing observer features,
 Parallel read-only audits identified these concrete cuts. Implement tooling and source changes in disjoint paths; the controller owns documentation, integration and commits. Independent review covers the complete final diff and all affected callers. No speculative rewrite of lifecycle, DOM ports, source discovery, runtime validation or privacy guards.
 
 Run lint and all five strict compiler projects locally through the real pre-push hook. No local builds or tests. GitHub Ubuntu CI runs full static checks, builds, existing meaningful tests, installed consumers and Chromium. Remove tests only when their sole purpose is retaining deleted scaffolding; preserve hook safety, archive privacy, native fixtures and application behavior coverage. Fix actual review/CI failures before completion. No paid/live runs, external tool installation or optional external configuration changes.
+
+## Essential-tools follow-up
+
+The user requested keeping only essential tools after PR #16. Consolidate runtime/public/staging functions under build.ts and their tests under build.test.ts. Consolidate version checks, staged formatting and safe installation under hooks.sh; delete the setup wrapper. Keep the real child-process launcher fixture, packaging/install verification and all behavior assertions. Move lint classification tests beside their actual root config owner. Preserve pre-push lint/types only and full build/test CI. Open a reviewed PR and merge when ready, as explicitly requested.

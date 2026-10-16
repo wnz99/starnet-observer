@@ -6,6 +6,56 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 case "${1:-}" in
+  versions)
+    case "$(uv tool run --from uv==0.13.1 uv --version)" in
+      "uv 0.13.1"|"uv 0.13.1 "*) ;;
+      *) printf "%s\n" "Wrong uv version" >&2; exit 1 ;;
+    esac
+    test "$(bun --version)" = "1.3.13"
+    test "$(node --version)" = "v24.19.0"
+    ;;
+  install)
+    if [ ! -x .githooks/pre-commit ] || [ ! -x .githooks/pre-push ]; then
+      printf '%s\n' 'Executable pre-commit and pre-push stubs are required.' >&2
+      exit 1
+    fi
+    configured=$(git config --get core.hooksPath) || {
+      status=$?
+      [ "$status" -eq 1 ] || exit "$status"
+    }
+    if [ "$configured" = '.githooks' ]; then
+      exit 0
+    fi
+    if [ -n "$configured" ]; then
+      printf '%s\n' 'Existing hooksPath preserved; integrate this baseline with its owner.' >&2
+      exit 1
+    fi
+    hooks_directory=$(git rev-parse --git-path hooks)
+    for hook in "$hooks_directory"/*; do
+      [ -e "$hook" ] || continue
+      case "$hook" in *.sample) continue ;; esac
+      printf '%s\n' 'Existing hooks preserved; integrate this baseline with their owner.' >&2
+      exit 1
+    done
+
+    # The extension is shared, but hooksPath must apply only to this checkout.
+    # Refuse dormant configuration that enabling the extension would activate.
+    if [ "$(git config --get extensions.worktreeConfig || true)" != true ]; then
+      common_directory=$(git rev-parse --git-common-dir)
+      for config in "$common_directory/config.worktree" "$common_directory"/worktrees/*/config.worktree; do
+        [ -e "$config" ] || continue
+        printf '%s\n' 'Dormant worktree configuration preserved; enable the extension with its owner.' >&2
+        exit 1
+      done
+      if git config --local --get core.worktree >/dev/null ||
+         [ "$(git config --local --get core.bare || true)" = true ]; then
+        printf '%s\n' 'Shared worktree/bare configuration requires owner migration before activation.' >&2
+        exit 1
+      fi
+      git config --local extensions.worktreeConfig true
+    fi
+    git config --worktree core.hooksPath .githooks
+    ;;
   hygiene)
     if [ -n "$(git ls-files -- .agent-local.json)" ]; then
       printf '%s\n' 'Local-only .agent-local.json must not be tracked.' >&2
@@ -30,7 +80,8 @@ case "${1:-}" in
     # Use staged ignore files with the original index; unstaged rules cannot change this verdict.
     GIT_DIR=$(git rev-parse --absolute-git-dir) GIT_WORK_TREE="$snapshot_root" \
       sh "$repo_root/tools/quality/hooks.sh" hygiene
-    sh "$repo_root/tools/quality/format-index.sh" "$repo_root" "$snapshot_root"
+    cd "$snapshot_root"
+    bun "$repo_root/node_modules/prettier/bin/prettier.cjs" --config "$snapshot_root/.prettierrc.json" --ignore-path "$snapshot_root/.prettierignore" --check --ignore-unknown .
     ;;
   pre-push)
     if ! git diff --quiet || ! git diff --cached --quiet ||
@@ -53,5 +104,5 @@ case "${1:-}" in
       bun run typecheck
     fi
     ;;
-  *) printf '%s\n' 'Usage: hooks.sh {hygiene|pre-commit|pre-push}' >&2; exit 64 ;;
+  *) printf '%s\n' 'Usage: hooks.sh {versions|install|hygiene|pre-commit|pre-push}' >&2; exit 64 ;;
 esac
