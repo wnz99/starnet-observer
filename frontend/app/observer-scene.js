@@ -3,7 +3,9 @@
 const ObserverScene = (() => {
   const Model =
     typeof module !== "undefined" && module.exports
-      ? require("./observer-model.js")
+      ? require("../../src/browser/model.ts").createModel(
+          require("../assets/themes/starnet/theme.json"),
+        )
       : ObserverModel;
   const project = ({ x, y, z = 0 }) => ({ x: 24 * (x - y), y: 12 * (x + y) - 24 * z });
   const unproject = ({ x, y }) => ({ x: x / 48 + y / 24, y: y / 24 - x / 48, z: 0 });

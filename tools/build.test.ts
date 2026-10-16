@@ -132,7 +132,7 @@ test("runtime build closes emitted typed leaf imports, preserves private resourc
     );
     assert.deepEqual(JSON.parse(resultPaths.stdout), {
       installRoot: repository,
-      publicRoot: path.join(repository, "frontend"),
+      publicRoot: path.join(repository, "dist", "public"),
     });
   } finally {
     await fs.rm(folder, { recursive: true, force: true });

@@ -9,12 +9,13 @@ test("observer-ui regression contracts", async () => {
   const assert = require("node:assert/strict");
   const fs = require("node:fs");
   const vm = require("node:vm");
-  const ObserverModel = require("./observer-model.js");
-  const ObserverMail = require("./observer-mail.js");
-  const ObserverInspector = require("./observer-inspector.js");
-  const ObserverMailInspector = require("./observer-mail-inspector.js");
+  const migrated = require("../../src/browser/legacy-modules.fixture.ts").legacyModules();
+  const ObserverModel = migrated.Model;
+  const ObserverMail = migrated.Mail;
+  const ObserverInspector = migrated.Inspector;
+  const ObserverMailInspector = migrated.MailInspector;
   const ObserverScene = require("./observer-scene.js");
-  const ThemePack = require("./theme-pack.js");
+  const ThemePack = migrated.ThemePack;
   let document;
   // DOM double with real move semantics: inserting an attached node detaches it first, as the browser does.
   let created = 0,
@@ -33,6 +34,10 @@ test("observer-ui regression contracts", async () => {
       style: { setProperty() {} },
       parent: null,
       classList: { toggle() {} },
+      appendChild(node) {
+        this.append(node);
+        return node;
+      },
       append(...nodes) {
         for (const node of nodes) {
           if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1);
@@ -152,23 +157,18 @@ test("observer-ui regression contracts", async () => {
       ),
       "logo slot follows the mark without replacing heading or READ ONLY label",
     );
-    // Office art: the role table, then the loader/composition, both before the view that owns the load.
+    // The bridge publishes role and art capabilities before their classic consumers.
     const scripts = [...page.matchAll(/<script src="([^"]+)"><\/script>/g)].map(
       (match) => match[1],
     );
     const at = (name) => scripts.indexOf(name);
     assert.ok(
-      at("app/scene-art-roles.js") >= 0 &&
-        at("app/scene-art-roles.js") < at("app/observer-office-art.js") &&
-        at("app/observer-office-art.js") < at("app/observer-view.js"),
-      "scene-art-roles.js and observer-office-art.js load once, before observer-view.js",
+      at("app/legacy-bridge.js") >= 0 &&
+        at("app/legacy-bridge.js") < at("app/observer-scene.js") &&
+        at("app/observer-scene.js") < at("app/observer-view.js") &&
+        at("app/observer-view.js") < at("app/observer.js"),
     );
-    assert.equal(
-      scripts.filter(
-        (name) => name === "app/observer-office-art.js" || name === "app/scene-art-roles.js",
-      ).length,
-      2,
-    );
+    assert.equal(scripts.filter((name) => name === "app/legacy-bridge.js").length, 1);
   }
   await (async () => {
     const elements = Object.fromEntries(
@@ -1550,7 +1550,13 @@ test("observer-ui regression contracts", async () => {
             },
           },
         });
-        vm.runInContext(fs.readFileSync(require.resolve("./queryspine.js"), "utf8"), sandbox);
+        sandbox.QuerySpine = require("../../src/browser/queryspine.ts").createQuerySpine({
+          getJson: (path, options) => sandbox.Harness.api.get(path, options),
+          interval: (callback, milliseconds) => {
+            const timer = sandbox.setInterval(callback, milliseconds);
+            return () => sandbox.clearInterval(timer);
+          },
+        });
         vm.runInContext(fs.readFileSync(require.resolve("./observer.js"), "utf8"), sandbox);
         const flush = async () => {
           for (let i = 0; i < 6; i++) await new Promise((resolve) => setImmediate(resolve));

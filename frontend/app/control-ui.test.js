@@ -9,12 +9,13 @@ test("control-ui regression contracts", async () => {
   const assert = require("node:assert/strict");
   const fs = require("node:fs");
   const vm = require("node:vm");
-  const ObserverModel = require("./observer-model.js");
-  const ObserverMail = require("./observer-mail.js");
-  const ObserverInspector = require("./observer-inspector.js");
-  const ObserverMailInspector = require("./observer-mail-inspector.js");
+  const migrated = require("../../src/browser/legacy-modules.fixture.ts").legacyModules();
+  const ObserverModel = migrated.Model;
+  const ObserverMail = migrated.Mail;
+  const ObserverInspector = migrated.Inspector;
+  const ObserverMailInspector = migrated.MailInspector;
   const ObserverScene = require("./observer-scene.js");
-  const ThemePack = require("./theme-pack.js");
+  const ThemePack = migrated.ThemePack;
   let document;
   function element() {
     return {
@@ -30,6 +31,10 @@ test("control-ui regression contracts", async () => {
       parent: null,
       disabled: false,
       classList: { toggle() {}, add() {} },
+      appendChild(node) {
+        this.append(node);
+        return node;
+      },
       append(...nodes) {
         for (const node of nodes) {
           if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1);

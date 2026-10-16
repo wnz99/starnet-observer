@@ -1,8 +1,9 @@
 import type { InspectorDocument, InspectorNode } from "./dom.js";
+export const focusCalls: FixtureNode[] = [];
 export class FixtureNode implements InspectorNode {
   id = "";
   className = "";
-  textContent: string | null = "";
+  textContent = "";
   hidden = false;
   readonly dataset: Record<string, string | undefined> = {};
   readonly attributes = new Map<string, string>();
@@ -24,7 +25,19 @@ export class FixtureNode implements InspectorNode {
   addEventListener(name: string, listener: () => void) {
     this.handlers.set(name, listener);
   }
-  focus() {}
+  focus() {
+    focusCalls.push(this);
+  }
+  child(index: number): FixtureNode {
+    const node = this.children[index];
+    if (!node) throw new Error(`Missing fixture child ${String(index)}`);
+    return node;
+  }
+  emit(name: string) {
+    const handler = this.handlers.get(name);
+    if (!handler) throw new Error(`Missing fixture handler ${name}`);
+    handler();
+  }
   remove() {
     const siblings = this.parent?.children;
     if (siblings) {

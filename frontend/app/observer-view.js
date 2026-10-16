@@ -10,17 +10,23 @@ const ObserverView = (() => {
       : ObserverScene;
   const Model =
     typeof module !== "undefined" && module.exports
-      ? require("./observer-model.js")
+      ? require("../../src/browser/model.ts").createModel(
+          require("../assets/themes/starnet/theme.json"),
+        )
       : ObserverModel;
   const Themes =
-    typeof module !== "undefined" && module.exports ? require("./theme-pack.js") : ThemePack;
+    typeof module !== "undefined" && module.exports
+      ? require("../../src/browser/theme.ts").createThemePack(
+          require("../assets/themes/starnet/theme.json"),
+        )
+      : ThemePack;
   const OfficeArt =
     typeof module !== "undefined" && module.exports
-      ? require("./observer-office-art.js")
+      ? require("../../src/browser/office-art.ts")
       : ObserverOfficeArt;
   const ROLES =
     typeof module !== "undefined" && module.exports
-      ? require("./scene-art-roles.js").SCENE_ART_ROLES
+      ? require("../../src/shared/scene-art-roles.ts").SCENE_ART_ROLES
       : SCENE_ART_ROLES;
   /* Every scene colour comes from the canonical default pack, overlaid per view by a resolved snapshot. PALETTE and
      STATUS are read-only views of that default for helpers and tests; no view ever mutates them. */

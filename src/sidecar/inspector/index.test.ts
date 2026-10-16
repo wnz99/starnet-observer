@@ -1,7 +1,7 @@
-import { test } from "bun:test";
+import { test, expect } from "bun:test";
 import assert from "node:assert/strict";
-import type { Provider } from "./contracts.js";
-import { consume, createProjection, snapshot } from "./index.js";
+import type { ChildBinding, Provider } from "./contracts.js";
+import { consume, createProjection, snapshot, recordBelongsToSession } from "./index.js";
 
 const SESSION = "00000000-0000-0000-0000-000000000001";
 const AT = "2026-10-16T00:00:00Z";
@@ -185,4 +185,46 @@ test("only exact analysis and summary channels exclude ordinary Codex messages",
     );
     assert.equal(state.turns.size, channel === "analysis" || channel === "summary" ? 0 : 1);
   }
+});
+
+test("original canonical disk session owns stats despite unrelated transport id", () => {
+  const session = "00000000-0000-0000-0000-000000000001";
+  const record = {
+    type: "assistant",
+    sessionId: session,
+    session_id: "transport-id",
+    uuid: "block",
+    timestamp: "2026-10-11T00:00:00Z",
+    message: {
+      id: "message",
+      model: "claude-model",
+      content: [{ type: "text", text: "fixture" }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    },
+  };
+  expect(recordBelongsToSession(record, "claude", session)).toBeTrue();
+  for (const extra of [
+    { sessionId: undefined },
+    { sessionId: "foreign" },
+    { isSidechain: true },
+    { isMeta: true },
+  ])
+    expect(recordBelongsToSession({ ...record, ...extra }, "claude", session)).toBeFalse();
+  const binding: ChildBinding = {
+    provider: "claude",
+    parentSessionId: session,
+    sessionId: "child",
+  };
+  const child = { ...record, isSidechain: true, agentId: "child" };
+  expect(recordBelongsToSession(child, "claude", "child", binding)).toBeTrue();
+  for (const extra of [{ sessionId: "foreign" }, { agentId: "foreign" }, { isSidechain: false }])
+    expect(recordBelongsToSession({ ...child, ...extra }, "claude", "child", binding)).toBeFalse();
+  const projection = createProjection();
+  consume(projection, record, "claude", 150, session, null, { beginning: true });
+  const stats = snapshot(projection, "claude", Date.parse("2026-10-11T01:00:00Z")).stats;
+  assert.deepEqual(stats.inputTokens, { value: 10, state: "available" });
+  assert.equal(stats.startedAt.value, "2026-10-11T00:00:00.000Z");
+  const tail = createProjection();
+  consume(tail, record, "claude", 300000, session);
+  assert.equal(snapshot(tail, "claude", 1000).stats.startedAt.value, null);
 });

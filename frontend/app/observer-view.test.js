@@ -3,7 +3,9 @@ const { test } = require("bun:test");
 
 test("observer-view regression contracts", async () => {
   const assert = require("node:assert/strict");
-  const Model = require("./observer-model.js");
+  const Model = require("../../src/browser/model.ts").createModel(
+    require("../assets/themes/starnet/theme.json"),
+  );
   const Scene = require("./observer-scene.js");
   const View = require("./observer-view.js");
 
@@ -1784,7 +1786,7 @@ test("observer-view regression contracts", async () => {
   }
   // Task 3: offscreen crew go through the shared sprite seam: every body's state advances, only on-stage bodies paint.
   const crewChecks = readinessChecks.then(async () => {
-    const runtime = await require("../js/sprite-runtime.fixture.js").load();
+    const runtime = await require("../../src/browser/sprites/runtime.fixture.ts").load();
     const stateOf = (b) =>
       JSON.stringify(
         Object.keys(b)
@@ -1988,7 +1990,9 @@ test("observer-view regression contracts", async () => {
   // ---------- Theme: instance palette, effect modes and replacement loading ----------
   {
     const crypto = require("node:crypto");
-    const Mail = require("./observer-mail.js");
+    const Mail = require("../../src/browser/mail.ts").createMail(
+      require("../assets/themes/starnet/theme.json"),
+    );
     const base = require("../assets/themes/starnet/theme.json").scene;
     const keys = Object.keys(base.colors);
     /* Recording context: every colour reaching fillStyle/strokeStyle or a gradient stop, plus each stroke's style and dash,
@@ -2163,7 +2167,13 @@ test("observer-view regression contracts", async () => {
       "default paint colours, order and count match the idle-aging baseline",
     );
     assert.equal(
-      digest(record(require("./theme-pack.js").getDefault()).result),
+      digest(
+        record(
+          require("../../src/browser/theme.ts")
+            .createThemePack(require("../assets/themes/starnet/theme.json"))
+            .getDefault(),
+        ).result,
+      ),
       HEAD_DEFAULT,
       "the canonical snapshot paints the same default",
     );
@@ -2444,8 +2454,10 @@ test("observer-view regression contracts", async () => {
 
   // ---------- Home-office art: atomic activation, canonical station crew while pending/failed, resumable load ----------
   await (async () => {
-    const { SCENE_ART_ROLES } = require("./scene-art-roles.js");
-    const ThemePack = require("./theme-pack.js");
+    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
+    const ThemePack = require("../../src/browser/theme.ts").createThemePack(
+      require("../assets/themes/starnet/theme.json"),
+    );
     const flush = async () => {
       for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve));
     };
@@ -2819,9 +2831,13 @@ test("observer-view regression contracts", async () => {
 
   // ---------- Home-office art: every station role translated to its fixed PNG role, same passes, depth and hits ----------
   await (async () => {
-    const { SCENE_ART_ROLES } = require("./scene-art-roles.js");
-    const ThemePack = require("./theme-pack.js");
-    const Mail = require("./observer-mail.js");
+    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
+    const ThemePack = require("../../src/browser/theme.ts").createThemePack(
+      require("../assets/themes/starnet/theme.json"),
+    );
+    const Mail = require("../../src/browser/mail.ts").createMail(
+      require("../assets/themes/starnet/theme.json"),
+    );
     const flush = async () => {
       for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve));
     };
@@ -3321,7 +3337,7 @@ test("observer-view regression contracts", async () => {
     /* The real sprite engine, with ready review-metadata replacement groups: seated main and helper crew keep the
      station's seat placement in the office, so their returned extents and every hit region stay identical. */
     {
-      const { load } = require("../js/sprite-runtime.fixture.js");
+      const { load } = require("../../src/browser/sprites/runtime.fixture.ts");
       const canonicalCrew = require("../assets/themes/starnet/theme.json").crew;
       const runtime = async () => {
         const sprites = { sprites: {} },
@@ -3399,7 +3415,7 @@ test("observer-view regression contracts", async () => {
 
   // Idle tint composes with themed sprite selection and office fallback without leaking into other canvas work.
   await (async () => {
-    const { SCENE_ART_ROLES } = require("./scene-art-roles.js");
+    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
     const assets = Object.fromEntries(
       Object.keys(SCENE_ART_ROLES).map((role) => [
         role,

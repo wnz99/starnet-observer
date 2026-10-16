@@ -26,12 +26,14 @@
     "hooks:install": "sh tools/quality/install-hooks.sh",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit && tsc -p tsconfig.browser-tests.json",
-    "start": "bun --no-env-file server.js",
+    "start": "bun run build && bun --no-env-file server.js",
     "test": "bun --no-env-file test",
-    "presentation": "bun --no-env-file server.js --presentation",
+    "presentation": "bun run build && bun --no-env-file server.js --presentation",
     "validate:themes": "bun --no-env-file scripts/validate-theme-packs.mjs",
     "verify:acceptance": "bun --no-env-file tools/acceptance.ts",
-    "build:runtime": "bun --no-env-file tools/build.ts runtime"
+    "build:runtime": "bun --no-env-file tools/build.ts runtime",
+    "build": "bun --no-env-file tools/build.ts local",
+    "dev": "bun run build && bun --no-env-file server.js"
   },
   "bin": {
     "starnet-observer": "server.js"

@@ -19,7 +19,13 @@ test("shared request, exact TTL boundary, validated mutation and honest last-goo
     calls++;
     return wire.promise;
   };
-  const query = createQuerySpine({ getJson: () => getJson(), now: () => clock });
+  const query = createQuerySpine({
+    getJson: (path) => {
+      expect(path).toBe("/rows");
+      return getJson();
+    },
+    now: () => clock,
+  });
   query.define("rows", { path: "/rows", ttlMs: 50 });
   const first = query.get("rows");
   expect(query.get("rows")).toBe(first);
@@ -54,6 +60,7 @@ test("shared request, exact TTL boundary, validated mutation and honest last-goo
   expect(query.update("write", { ok: true, revision: 9 })).toMatchObject({
     stale: false,
     hasData: true,
+    data: { ok: true, revision: 9 },
   });
   expect(() => query.update("write", { ok: false })).toThrow("invalid response");
 });
@@ -80,7 +87,13 @@ test("new generations recover without waiting; obsolete responses never publish"
   expect((await current).data).toEqual({ revision: 2 });
   wire.release({ revision: 1 });
   await old;
-  expect(query.state("race").data).toEqual({ revision: 2 });
+  expect(calls).toBe(2);
+  expect(query.state("race")).toMatchObject({
+    data: { revision: 2 },
+    stale: false,
+    pending: false,
+    error: null,
+  });
   expect(published.filter((state) => JSON.stringify(state.data) === '{"revision":1}')).toEqual([]);
   off();
 });
@@ -101,8 +114,28 @@ test("subscribers own one timer and ephemeral reads cannot restore a discarded b
     },
   });
   query.define("inspect", { path: "/inspect", pollMs: 60, retainOnUnsubscribe: false });
-  const offA = query.subscribe("inspect", () => {}, { refresh: false });
-  const offB = query.subscribe("inspect", () => {}, { refresh: false });
+  const receivedA: QuerySnapshot[] = [],
+    receivedB: QuerySnapshot[] = [];
+  const offA = query.subscribe(
+    "inspect",
+    (value) => {
+      receivedA.push(value);
+    },
+    { refresh: false },
+  );
+  const offB = query.subscribe(
+    "inspect",
+    (value) => {
+      receivedB.push(value);
+    },
+    { refresh: false },
+  );
+  expect(receivedA).toHaveLength(1);
+  expect(receivedB).toHaveLength(1);
+  expect(receivedA[0]).toMatchObject({ hasData: false, pending: false });
+  expect(receivedB[0]).toMatchObject({ hasData: false, pending: false });
+  query.update("inspect", { text: "old cached body" });
+  expect(query.state("inspect").data).toEqual({ text: "old cached body" });
   const detached = query.refresh("inspect");
   await Promise.resolve();
   expect(timers.size).toBe(1);
@@ -110,6 +143,7 @@ test("subscribers own one timer and ephemeral reads cannot restore a discarded b
   expect(timers.size).toBe(1);
   offB();
   offB();
+  const deliveries = [receivedA.length, receivedB.length];
   expect(timers.size).toBe(0);
   expect(cleared).toBe(1);
   expect(() => query.state("inspect")).toThrow("unknown query resource");
@@ -120,6 +154,7 @@ test("subscribers own one timer and ephemeral reads cannot restore a discarded b
   wire.release({ text: "obsolete session" });
   await detached;
   expect(query.state("inspect").data).toEqual({ text: "new session" });
+  expect([receivedA.length, receivedB.length]).toEqual(deliveries);
 });
 test("timeouts abort and cannot poison a recovered generation", async () => {
   let calls = 0;
@@ -140,4 +175,21 @@ test("timeouts abort and cannot poison a recovered generation", async () => {
   await failure;
   expect(signal?.aborted).toBeTruthy();
   expect(query.state("hung")).toMatchObject({ error: null, pending: false });
+});
+
+test("cached invalidation retains stale last-good data and ordinary get reads a new revision", async () => {
+  let calls = 0;
+  const query = createQuerySpine({ getJson: () => Promise.resolve({ revision: ++calls }) });
+  query.define("cached", { path: "/cached", ttlMs: 100000 });
+  expect((await query.get("cached")).data).toEqual({ revision: 1 });
+  expect((await query.get("cached")).data).toEqual({ revision: 1 });
+  expect(calls).toBe(1);
+  void query.invalidate("cached");
+  expect(query.state("cached")).toMatchObject({
+    hasData: true,
+    data: { revision: 1 },
+    stale: true,
+  });
+  expect((await query.get("cached")).data).toEqual({ revision: 2 });
+  expect(calls).toBe(2);
 });

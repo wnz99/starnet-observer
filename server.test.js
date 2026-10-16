@@ -52,7 +52,7 @@ test("server regression contracts", async () => {
       assert.equal(response.headers["cache-control"], "no-store");
       assert.equal(response.headers.etag, undefined);
     };
-    const fixture = await fs.mkdtemp(path.join(__dirname, "./frontend/test-cache-"));
+    const fixture = await fs.mkdtemp(path.join(__dirname, "./dist/public/test-cache-"));
     const fixtureUrl = "/" + path.basename(fixture);
     try {
       const asset = path.join(fixture, "mutable.json");
@@ -111,7 +111,7 @@ test("server regression contracts", async () => {
         "<html><head></head><body>public</body></html>",
       );
       await fs.symlink(
-        path.join(__dirname, "./frontend/observer.html"),
+        path.join(__dirname, "./dist/public/observer.html"),
         path.join(fixture, "observer-alias.js"),
       );
       await fs.symlink(asset, path.join(fixture, "requested.html"));
@@ -175,12 +175,12 @@ test("server regression contracts", async () => {
         "/assets/sprites/approved_android/rot_south.png",
       );
       assert.ok(
-        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/observer-model.js"),
+        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/legacy-bridge.js"),
         "startup snapshot precedes consumers",
       );
       assert.ok(
-        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/theme-pack.js") &&
-          html.indexOf("app/theme-pack.js") < html.indexOf("</head>"),
+        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/prepaint.js") &&
+          html.indexOf("app/prepaint.js") < html.indexOf("</head>"),
         "boot data precedes the head theme helper",
       );
       assert.ok(!html.includes("<!--observer-boot-->"), "boot marker is replaced");
@@ -285,7 +285,7 @@ test("server regression contracts", async () => {
       for (const frame of frames)
         assert.equal((await get("/assets/sprites/" + frame)).status, 200, frame);
       assert.equal((await get("/assets/fonts/vt323.woff2")).status, 200);
-      const link = path.join(__dirname, "./frontend/test-outside-link");
+      const link = path.join(__dirname, "./dist/public/test-outside-link");
       await fs.symlink(path.join(__dirname, "./package.json"), link);
       try {
         assert.equal((await get("/test-outside-link")).status, 403);

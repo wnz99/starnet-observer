@@ -9,7 +9,7 @@ const { makePresentationObserver } = require("./sidecar/presentation.js");
 const { redact, setKnownSecretSource } = require("./src/sidecar/redaction.ts");
 const { setClock } = require("./src/sidecar/failopen.ts");
 const { loadConfig, HELP } = require("./src/sidecar/config/index.ts");
-const { loadThemePack } = require("./sidecar/theme-packs.js");
+const { loadThemePack } = require("./src/sidecar/themes/index.ts");
 const canonicalTheme = require("./frontend/assets/themes/starnet/theme.json");
 const { makeOverseerState, resolveEndpoint } = require("./src/sidecar/overseer-state/index.ts");
 const { makeControl, PANE, TARGET } = require("./sidecar/control.js");
@@ -17,7 +17,7 @@ const { makeRemoteHosts, makeFederatedObserver } = require("./sidecar/observer-r
 const { resolveRuntimePaths } = require("./src/server/runtime-paths.ts");
 const { installRoot, publicRoot: ROOT } = resolveRuntimePaths({
   installRoot: __dirname,
-  publicRoot: path.join(__dirname, "frontend"),
+  publicRoot: path.join(__dirname, "dist", "public"),
 });
 const MIME = {
   ".html": "text/html; charset=utf-8",

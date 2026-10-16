@@ -1,29 +1,11 @@
-"use strict";
-const { test } = require("bun:test");
-
-test("observer-model regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const Model = require("./observer-model.js");
-  const Scene = require("./observer-scene.js");
-  // Canonical checkout IDs can share their last four hash characters. Only extend the collision.
-  {
-    const ids = [
-      "checkout_7785594026262a4b150b",
-      "checkout_95a43a6b39b11304150b",
-      "checkout_otherabcd",
-    ];
-    for (const peers of [ids, ids.slice().reverse(), [...ids, ids[0]]]) {
-      assert.deepEqual(
-        ids.map((id) => Model.checkoutSuffix(id, peers)),
-        ["b150b", "4150b", "abcd"],
-      );
-    }
-    assert.equal(
-      Model.checkoutSuffix(null, ids),
-      "",
-      "missing checkout proof has no discriminator",
-    );
-  }
+import assert from "node:assert/strict";
+import { test } from "bun:test";
+import { createModel } from "./model.js";
+import { canonicalTheme } from "./theme.fixture.js";
+import Scene from "../../frontend/app/observer-scene.js";
+// Task 7-V ports this real classic Scene handoff to TypeScript, then removes this file.
+const Model = createModel(canonicalTheme());
+test("original model allocation, lineage, checkout and theme geometry with real Scene", () => {
   const worker = (repo, index, project = "Mama") => ({
     id: repo + "_" + index,
     project,
@@ -197,51 +179,6 @@ test("observer-model regression contracts", async () => {
     );
     assert.equal(layout.pageFor(grower + "_23"), 0, "existing seats stay in the main room");
   }
-
-  assert.equal(Model.activity({ tool: { available: false } }), "Tool detail unavailable");
-  assert.equal(
-    Model.activity({ tool: { available: true, last: { name: "Bash", phase: "started" } } }),
-    "Last observed: running a command · result not yet observed",
-  );
-  assert.equal(
-    Model.activity({
-      tool: { available: true, last: { name: "apply_patch", phase: "finished", outcome: "error" } },
-    }),
-    "Last observed: editing files · error",
-  );
-  assert.equal(Model.age(null), "");
-  assert.equal(Model.age(1000, 4000), "3s ago");
-  assert.equal(
-    Model.hoverLabel({ provider: "claude", title: "" }),
-    "Claude — title not yet published by Herdr",
-  );
-  assert.equal(
-    Model.hoverLabel({ provider: "claude", title: " Claude " }),
-    "Claude — title not yet published by Herdr",
-    "a provider-only title is unpublished",
-  );
-  assert.equal(
-    Model.hoverLabel({ provider: "claude", title: "Claude review pass" }),
-    "Claude — Claude review pass",
-  );
-  assert.equal(
-    Model.hoverLabel({ provider: "claude", title: "Claude Code" }),
-    "Claude — title not yet published by Herdr",
-    "the Claude Code startup title is not a task summary",
-  );
-  assert.equal(Model.taskTitle({ title: "claude  code" }), null);
-  assert.equal(
-    Model.hoverLabel({ provider: "codex", title: "Ship it" }, true),
-    "Codex — Ship it · stale",
-  );
-  console.log(
-    "observer hover label: provider, Herdr title, unpublished fallback and stale marker OK",
-  );
-
-  console.log(
-    "observer allocation: stable growth/reorder/holes/moves, annexes, deck hues and activity OK",
-  );
-
   {
     const layout = Model.createLayout(),
       root = worker("child-repo", 0, "Parent folder");
@@ -349,63 +286,6 @@ test("observer-model regression contracts", async () => {
     layout.reconcile([child, grandchild]);
     assert.equal(layout.onPage(0).length, 0, "helper-only snapshot cannot keep a room");
   }
-  assert.match(
-    Model.hoverLabel({
-      source: "desktop",
-      provider: "chatgpt",
-      title: "A private title",
-      status: "unknown",
-      inventoryHealth: "unavailable",
-      observedAt: "2026-01-01",
-    }),
-    /ChatGPT.*A private title.*unknown.*stale.*last observed/,
-  );
-  assert.match(
-    Model.hoverLabel({
-      source: "helper",
-      provider: "codex",
-      taskEvidence: { state: "unavailable" },
-      status: "unknown",
-    }),
-    /Codex.*task unavailable.*unknown/,
-  );
-  console.log("source rooms, inherited bounded helpers, invalid lineage and source-aware hover OK");
-
-  assert.equal(
-    Model.hoverLabel(
-      {
-        source: "helper",
-        provider: "codex",
-        title: "Ada",
-        task: "Task unavailable.",
-        status: "unknown",
-        observedAt: 1000,
-      },
-      false,
-      4000,
-    ),
-    "Codex — Ada · task unavailable · unknown · last observed 3s ago",
-  );
-
-  {
-    const layout = Model.createLayout();
-    layout.reconcile([
-      {
-        id: "group-only-pane",
-        source: "herdr",
-        projectId: "parent",
-        repoId: "repo",
-        status: "idle",
-      },
-    ]);
-    assert.equal(
-      layout.seatFor("group-only-pane"),
-      0,
-      "authoritative group-only pane beyond represented lineage remains an ordinary root",
-    );
-    assert.equal(layout.onPage(0)[0].rows[0].kind, "session");
-  }
-
   {
     const layout = Model.createLayout();
     const rows = ["main", "left", "right"].map((checkoutId, index) => ({
@@ -468,98 +348,9 @@ test("observer-model regression contracts", async () => {
       Model.sectionKey({ repoId: "a", checkoutId: "b#c", folder: "d" }),
     );
   }
-
-  {
-    // Idle age: fresh under ten minutes, log-eased, quantised, capped at eight hours; working and untimed rows never age.
-    const now = 100 * 3600000,
-      minutes = (m) => now - m * 60000,
-      idle = (m, extra = {}) =>
-        Model.idleAge({ status: "idle", lastActivityAt: minutes(m), ...extra }, now);
-    assert.deepEqual(
-      idle(9),
-      { ms: 9 * 60000, level: 0, vigour: 1, label: "" },
-      "under ten minutes is fresh",
-    );
-    // Sparkle vigour: a longer clock than the tint, so today, yesterday and last week still differ; eighths; none at 3 days.
-    const vigour = [9, 60, 480, 24 * 60, 48 * 60, 72 * 60, 200 * 60].map((m) => idle(m).vigour);
-    assert.deepEqual(
-      vigour,
-      [...vigour].sort((a, b) => b - a),
-      "vigour only fades with time",
-    );
-    assert.equal(vigour[0], 1);
-    assert.ok(vigour[2] > 0.4, "still lively at eight hours");
-    assert.ok(vigour[3] > vigour[4] && vigour[4] > 0, "a day and two days apart differ");
-    assert.equal(idle(72 * 60).vigour, 0);
-    assert.equal(idle(200 * 60).vigour, 0, "no sparks after three days");
-    assert.ok(
-      vigour.every((value) => Number.isInteger(Math.round(value * 8 * 1e9) / 1e9)),
-      "vigour is quantised to eighths",
-    );
-    assert.equal(
-      Model.idleAge({ status: "working", lastActivityAt: minutes(6000) }, now).vigour,
-      1,
-      "working is always lively",
-    );
-    assert.equal(Model.idleAge({ status: "idle" }, now).vigour, 1, "untimed rows are not faded");
-    assert.equal(idle(11).label, "idle 11m");
-    assert.equal(idle(192).label, "idle 3h 12m");
-    assert.equal(idle(26 * 60).label, "idle 1d 2h");
-    const levels = [11, 30, 60, 120, 240, 480, 2000].map((m) => idle(m).level);
-    assert.deepEqual(
-      levels,
-      [...levels].sort((a, b) => a - b),
-      "age only darkens with time",
-    );
-    assert.equal(idle(480).level, 1);
-    assert.equal(idle(5000).level, 1, "capped at eight hours");
-    assert.ok(
-      levels.every((level) => Number.isInteger(level * 6)),
-      "levels are quantised to sixths",
-    );
-    assert.equal(
-      Model.idleAge({ status: "working", lastActivityAt: minutes(600) }, now).level,
-      0,
-      "a working pane is active now",
-    );
-    assert.equal(Model.idleAge({ status: "idle" }, now).level, 0, "no timestamp, no age");
-    assert.equal(
-      Model.idleAge({ status: "idle", lastActivityAt: now + 60000 }, now).level,
-      0,
-      "a future time is fresh",
-    );
-    assert.equal(
-      Model.hoverLabel(
-        {
-          provider: "claude",
-          source: "herdr",
-          status: "idle",
-          title: "Ship it",
-          lastActivityAt: minutes(192),
-        },
-        false,
-        now,
-      ),
-      "Claude — Ship it · idle 3h 12m",
-    );
-    assert.equal(
-      Model.hoverLabel(
-        {
-          provider: "claude",
-          source: "herdr",
-          status: "idle",
-          title: "Ship it",
-          lastActivityAt: minutes(2),
-        },
-        false,
-        now,
-      ),
-      "Claude — Ship it",
-    );
-  }
   // Theme project accents recolour the ten slots only: same rooms, slots, floor names and desks as the default palette.
   {
-    const defaults = require("../assets/themes/starnet/theme.json").scene.projectAccents;
+    const defaults = canonicalTheme().scene.projectAccents;
     assert.deepEqual(
       Model.palette.map(([, accent]) => accent),
       defaults,
@@ -628,8 +419,5 @@ test("observer-model regression contracts", async () => {
         custom[Model.palette.findIndex(([floor]) => floor === plain.colorFor(project).floor)],
       );
     }
-    console.log(
-      "theme project accents: slot colours only, same rooms, floor names and geometry OK",
-    );
   }
-}, 30000);
+});

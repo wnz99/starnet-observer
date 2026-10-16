@@ -1,5 +1,5 @@
 /* Resolved snapshots only; inheritance and resource validation belong to the server. */
-import type { ThemeDefault, ThemeSnapshot } from "../shared/theme.js";
+import type { ThemeDefault } from "../shared/theme.js";
 import { applyLogo } from "./theme/assets.js";
 import type { RuntimeThemeWarning, ThemeDocument, ThemeFont } from "./theme/dom.js";
 import { createStatus } from "./theme/status.js";
@@ -9,10 +9,10 @@ export function createThemePack(defaults: ThemeDefault, font?: ThemeFont) {
   let active: ReturnType<typeof createStatus> | null = null;
   const canonical = freezeSnapshot(defaults);
   const getDefault = () => canonical;
-  function start(snapshot: ThemeDefault | ThemeSnapshot, document: ThemeDocument) {
+  function start(snapshot: unknown, document: ThemeDocument) {
     const status = createStatus(snapshot, document);
     active = status;
-    applyInterface(snapshot, document, status.report, font);
+    applyInterface(snapshot, document, { defaults: canonical, report: status.report, font });
     const mount = () => {
       status.mount();
       applyLogo(snapshot, document, status.report);
@@ -29,11 +29,11 @@ export function createThemePack(defaults: ThemeDefault, font?: ThemeFont) {
     applyLogo,
     start,
     applyInterface(
-      snapshot: ThemeDefault | ThemeSnapshot,
+      snapshot: unknown,
       document: ThemeDocument,
       report: (warning: RuntimeThemeWarning) => void = () => {},
     ) {
-      applyInterface(snapshot, document, report, font);
+      applyInterface(snapshot, document, { defaults: canonical, report, font });
     },
     reportWarning(warning: RuntimeThemeWarning) {
       active?.report(warning);

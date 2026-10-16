@@ -3,7 +3,9 @@ const { test } = require("bun:test");
 
 test("observer-scene regression contracts", async () => {
   const assert = require("node:assert/strict");
-  const Model = require("./observer-model.js");
+  const Model = require("../../src/browser/model.ts").createModel(
+    require("../assets/themes/starnet/theme.json"),
+  );
   const Scene = require("./observer-scene.js");
   const row = (i, project = "p", repo = "r") => ({
     id: "obs_" + i,

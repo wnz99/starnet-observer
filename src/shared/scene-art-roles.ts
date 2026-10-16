@@ -1,7 +1,7 @@
 /* Application-owned native footprints. Theme authors supply PNG paths only.
    Foot anchors refer to the existing role origin; chairs use their centered seat anchor.
    Integer source bounds round each projected edge outward, never fit or rescale a prop. */
-export interface SceneArtRole {
+interface SceneArtRole {
   readonly source: { readonly width: number; readonly height: number };
   readonly foot: { readonly x: number; readonly y: number };
   readonly extent: { readonly w: number; readonly h: number; readonly height: number };

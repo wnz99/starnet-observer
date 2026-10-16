@@ -107,3 +107,47 @@ test("font and logo URLs cannot load remote resources or mismatched font files",
   expect(installs).toBe(0);
   expect(document.image.attributes.has("src")).toBeFalsy();
 });
+
+test("snapshot and queued warnings mount as bounded text with exact requested/effective order", () => {
+  const hostile = '<img src=x onerror="alert(1)">';
+  const document = new ThemeFixtureDocument();
+  document.region.hidden = true;
+  const theme = createThemePack(canonicalTheme());
+  const status = theme.start(
+    {
+      requestedId: "sample",
+      effectiveId: "starnet",
+      warnings: [{ code: "theme-pack-invalid", pack: "sample", message: hostile }],
+    },
+    document,
+  );
+  expect(document.region.hidden).toBeTruthy();
+  theme.reportWarning({
+    code: "crew-load",
+    pack: "sample",
+    group: "blank",
+    message: "Theme pack sample crew blank did not load.",
+  });
+  document.mount();
+  expect(document.region.children.map((line) => line.textContent)).toEqual([
+    "Theme pack sample requested; showing starnet.",
+    hostile,
+    "Theme pack sample crew blank did not load.",
+  ]);
+  expect(
+    document.region.children.every((line) => line.children.length === 0 && !("innerHTML" in line)),
+  ).toBeTruthy();
+  for (let index = 0; index < 20; index++)
+    status.report({
+      code: "crew-load",
+      pack: "sample",
+      group: `g${String(index)}`,
+      message: "x".repeat(500),
+    });
+  status.report({ code: "crew-load", pack: "sample", group: "blank", message: "duplicate" });
+  expect(document.region.children).toHaveLength(9);
+  expect(
+    document.region.children.every((line) => (line.textContent?.length ?? 0) <= 200),
+  ).toBeTruthy();
+  expect(document.region.children.some((line) => line.textContent === "duplicate")).toBeFalsy();
+});

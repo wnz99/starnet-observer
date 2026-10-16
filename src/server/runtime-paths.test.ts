@@ -15,7 +15,7 @@ test("runtime roots honor explicit package and public roots", () => {
   const installRoot = path.join(os.tmpdir(), "synthetic-install");
   assert.deepEqual(resolveRuntimePaths({ installRoot }), {
     installRoot,
-    publicRoot: path.join(installRoot, "frontend"),
+    publicRoot: path.join(installRoot, "dist", "public"),
   });
   const publicRoot = path.join(os.tmpdir(), "synthetic-public");
   assert.deepEqual(resolveRuntimePaths({ installRoot, publicRoot }), { installRoot, publicRoot });
@@ -36,7 +36,7 @@ test("source defaults ignore caller cwd", async () => {
     );
     assert.deepEqual(JSON.parse(result.stdout), {
       installRoot: path.resolve(repository),
-      publicRoot: path.join(repository, "frontend"),
+      publicRoot: path.join(repository, "dist", "public"),
     });
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
@@ -83,7 +83,7 @@ test("compiled defaults derive installed package roots from their emitted locati
     );
     assert.deepEqual(JSON.parse(result.stdout), {
       installRoot: folder,
-      publicRoot: path.join(folder, "frontend"),
+      publicRoot: path.join(folder, "dist", "public"),
     });
   } finally {
     await fs.rm(folder, { recursive: true, force: true });

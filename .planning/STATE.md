@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: TypeScript refactor
-status: In progress; Task 4 independently approved; integrating approved browser preparation and Task 5 runtime wiring.
-last_updated: "2026-10-16T10:06:46.616Z"
+status: In progress; Task 5 independently approved; preparing isolated remotes, control/presentation and scene/view migration.
+last_updated: "2026-10-16T11:44:03.696Z"
 last_activity: 2026-10-16
-last_activity_desc: Explicitly resumed; verified transfer snapshots and restored isolated worktrees.
-state_head: 981c1f8e2abf9f0d0de35b5f1b11a12e7cebe04f
-stopped_at: Task 5 browser, theme and public-build integration
+last_activity_desc: Task 5 accepted after full fixture verification and independent review; preparing approved P2 worktrees.
+state_head: 046be38a057b6401068953275719be9f8fce7399
+stopped_at: Task 6 and Task 7 isolated parallel package preparation
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: In progress; Task 4 independently approved; integrating approved browser preparation and Task 5 runtime wiring.
-Last activity: 2026-10-16 — User explicitly resumed approved revision 4; transfer evidence verified and isolated continuation started.
+Status: In progress; Task 5 independently approved; preparing isolated remotes, control/presentation and scene/view migration.
+Last activity: 2026-10-16 — Task 5 approved after final 131-test run, emitted build, strict checks and independent review.
 
 ## Quick Tasks Completed
 
@@ -76,4 +76,4 @@ Next action: Integrate reviewed browser preparation and complete Task 5 under ap
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Task 4 accepted, Task 5 integration underway | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Tasks 1–5 accepted; P2 preparation | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

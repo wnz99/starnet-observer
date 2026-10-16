@@ -967,7 +967,9 @@ test("observer-remotes regression contracts", async () => {
     stream.stop();
     assert.equal(ticks.timers[0].cleared, true);
     // ── Ships: remote rooms get their own slot space and an offset ship; single-host scenes carry no ships at all.
-    const Model = require("../frontend/app/observer-model.js"),
+    const Model = require("../src/browser/model.ts").createModel(
+        require("../frontend/assets/themes/starnet/theme.json"),
+      ),
       Scene = require("../frontend/app/observer-scene.js");
     const layout = Model.createLayout();
     const localRows = [row({ id: "obs_" + "1".repeat(24), host: null })];

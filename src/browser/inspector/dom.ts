@@ -25,24 +25,6 @@ export interface InspectorDocument<N extends InspectorNode> {
   replaceChildren(parent: N, ...children: N[]): void;
   insertBefore(parent: N, node: N, before: N | null): void;
 }
-export function browserInspectorDocument(document: Document): InspectorDocument<HTMLElement> {
-  return {
-    createElement: (tag) => document.createElement(tag),
-    children: (node) =>
-      Array.from(node.children).filter(
-        (child): child is HTMLElement => child instanceof HTMLElement,
-      ),
-    attach(parent, ...children) {
-      for (const child of children) parent.appendChild(child);
-    },
-    replaceChildren(parent, ...children) {
-      parent.replaceChildren(...children);
-    },
-    insertBefore(parent, node, before) {
-      parent.insertBefore(node, before);
-    },
-  };
-}
 export function panelMaker<N extends InspectorNode>(
   document: InspectorDocument<N>,
   number: number,

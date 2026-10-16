@@ -1,5 +1,6 @@
 import type { ObserverRow } from "../../shared/observer.js";
-export type DisplayRow = Partial<Omit<ObserverRow, "provider" | "source">> & {
+export type DisplayRow = Partial<Omit<ObserverRow, "provider" | "source" | "observedAt">> & {
+  observedAt?: number | string | null;
   provider?: string;
   source?: string;
 };

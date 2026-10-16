@@ -1,3 +1,4 @@
+import { fixtureRoot } from "./root.fixture.js";
 import type { ThemeDocument, ThemeLine } from "./dom.js";
 class ThemeFixtureNode implements ThemeLine {
   hidden: boolean | string = false;
@@ -16,18 +17,10 @@ class ThemeFixtureNode implements ThemeLine {
   }
 }
 export class ThemeFixtureDocument implements ThemeDocument {
-  readonly properties = new Map<string, string>();
-  readonly attributes = new Map<string, string>();
-  readonly documentElement = {
-    style: {
-      setProperty: (name: string, value: string) => {
-        this.properties.set(name, value);
-      },
-    },
-    setAttribute: (name: string, value: string) => {
-      this.attributes.set(name, value);
-    },
-  };
+  private readonly root = fixtureRoot();
+  readonly properties = this.root.properties;
+  readonly attributes = this.root.attributes;
+  readonly documentElement = this.root.documentElement;
   readyState = "loading";
   readonly region = new ThemeFixtureNode();
   readonly image = new ThemeFixtureNode();

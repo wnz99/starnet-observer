@@ -17,6 +17,6 @@ export function resolveRuntimePaths({
     );
   return {
     installRoot: packageRoot,
-    publicRoot: publicRoot ?? path.join(packageRoot, "frontend"),
+    publicRoot: publicRoot ?? path.join(packageRoot, "dist", "public"),
   };
 }
