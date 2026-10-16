@@ -10,7 +10,7 @@ const crypto = require("node:crypto");
 const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
   require("node:child_process"),
 );
-const { aggregateRows } = require("./observer.js");
+const { aggregateRows } = require("../src/sidecar/observer/index.ts");
 const { unavailable } = require("../src/sidecar/inspector/fields.ts");
 
 const MAX_LINE = 4 * 1024 * 1024,

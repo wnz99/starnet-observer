@@ -9,7 +9,7 @@ const ID = "00000000-0000-0000-0000-000000000001";
 const line = (record) => JSON.stringify(record) + "\n";
 const meta = (id) => ({ type: "session_meta", payload: { id } });
 async function observerWarmReuse(temp) {
-  const { makeObserver } = require("./observer.js");
+  const { makeObserver } = require("../src/sidecar/observer/index.ts");
   const directory = path.join(temp, "warm-reuse");
   await fs.mkdir(directory);
   const file = path.join(directory, ID + ".jsonl");

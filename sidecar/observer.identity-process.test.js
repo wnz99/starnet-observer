@@ -13,7 +13,7 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
       return;
     }
     const { spawn } = require("node:child_process");
-    const { makeObserver } = require("./observer.js");
+    const { makeObserver } = require("../src/sidecar/observer/index.ts");
     // Only this test owns the exited child; no Herdr pane or external process is read.
     const child = spawn(process.execPath, ["--no-env-file", "-e", ""], {
       stdio: "ignore",

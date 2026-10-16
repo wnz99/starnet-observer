@@ -3,7 +3,7 @@
    snapshot /api/observer/sessions returns, every interval to stdout, and exits when stdin closes (the hub's ssh went
    away) or on SIGTERM/SIGHUP/SIGPIPE. Run by the hub as `ssh <host> 'cd <dir> && bun --no-env-file scripts/stream.js'`. */
 "use strict";
-const { makeObserver } = require("../sidecar/observer.js");
+const { makeObserver } = require("../src/sidecar/observer/index.ts");
 const { setKnownSecretSource } = require("../src/sidecar/redaction.ts");
 const { setClock } = require("../src/sidecar/failopen.ts");
 

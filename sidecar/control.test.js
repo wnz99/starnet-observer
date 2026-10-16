@@ -12,7 +12,7 @@ test("control regression contracts", async () => {
   const { makeControl } = require("./control.js");
   const { createServer } = require("../server.js");
   const { setKnownSecretSource } = require("../src/sidecar/redaction.ts");
-  const { makeObserver } = require("./observer.js");
+  const { makeObserver } = require("../src/sidecar/observer/index.ts");
   const { makePresentationObserver } = require("./presentation.js");
   await (async () => {
     // ---- sidecar: every action goes through Herdr, invalid targets never reach a process ----

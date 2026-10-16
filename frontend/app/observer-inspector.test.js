@@ -971,7 +971,7 @@ test("observer-inspector regression contracts", async () => {
   // Task 5 review 3: the panel's own read can make the server re-read its inventory and find session B behind the row
   // before the browser's roster stops showing A. Real sidecar observer + real QuerySpine + the inspector instance.
   const bindingChecks = coverChecks.then(async () => {
-    const { makeObserver } = require("../../sidecar/observer.js");
+    const { makeObserver } = require("../../src/sidecar/observer/index.ts");
     const Q = require("./queryspine.fixture.js").loadQuerySpine();
     Q._resetForTest();
     Q._setTimersForTest(

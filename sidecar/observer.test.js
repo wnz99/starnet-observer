@@ -3,7 +3,7 @@ const { test } = require("bun:test");
 
 test("observer regression contracts", async () => {
   const assert = require("node:assert/strict");
-  const { makeObserver: makeNativeObserver, aggregateRows } = require("./observer.js");
+  const { makeObserver: makeNativeObserver, aggregateRows } = require("../src/sidecar/observer/index.ts");
   // Inventory fixtures never consult a developer's real private overseer record.
   const emptyOverseerState = { read: async () => ({ state: "empty" }), match: async () => false };
   const makeCoreObserver = (options) =>
@@ -57,7 +57,7 @@ test("observer regression contracts", async () => {
     };
   }
   const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
-  const { lastActivity } = require("./observer.js");
+  const { lastActivity } = require("../src/sidecar/observer/index.ts");
   const { makeDesktopObserver } = require("../src/sidecar/desktop/index.ts");
   const fs = require("node:fs/promises");
   const os = require("node:os");
