@@ -1,6 +1,6 @@
 {
   "source_directory": "/tmp/starnet-ts-resume",
-  "purpose": "Immutable Task 7 review and verification evidence; Task 8 remains separate.",
+  "purpose": "Immutable scoped Task 7 and Task 8 evidence; raw log bytes use tracked .txt names. Final delivery outcomes are recorded in the PR.",
   "files": [
     {
       "path": "i7-app-full-review-r1.md",
@@ -13,14 +13,16 @@
       "sha256": "d4c362dcff4692b0ecee3635a6622d60ce149c2eeabf3328cde04bdb2c59b53d"
     },
     {
-      "path": "i7-approved-final-fallow.log",
+      "path": "i7-approved-final-fallow.txt",
       "bytes": 484,
-      "sha256": "365a869cd36519be627bb21027fd9799a87a683d2c62de121dc4fe93e2897102"
+      "sha256": "365a869cd36519be627bb21027fd9799a87a683d2c62de121dc4fe93e2897102",
+      "source_name": "i7-approved-final-fallow.log"
     },
     {
-      "path": "i7-approved-final-tests.log",
+      "path": "i7-approved-final-tests.txt",
       "bytes": 40437,
-      "sha256": "4b79921757a4d9477c71a2f8ca09036693d6b90abcd7189e915de132d0de4bf2"
+      "sha256": "4b79921757a4d9477c71a2f8ca09036693d6b90abcd7189e915de132d0de4bf2",
+      "source_name": "i7-approved-final-tests.log"
     },
     {
       "path": "i7-directive-classifier-review-r1.md",
@@ -28,9 +30,10 @@
       "sha256": "473258ab43ab4edc9076f20b1478bf968779003b1f0ac57be5cae6cee03bf1ee"
     },
     {
-      "path": "i7-directive-classifier-tests.log",
+      "path": "i7-directive-classifier-tests.txt",
       "bytes": 450,
-      "sha256": "70d4add21bd11f0d15a1ed7d7059fd24168d057e8addfe1232ae099cb0f16d18"
+      "sha256": "70d4add21bd11f0d15a1ed7d7059fd24168d057e8addfe1232ae099cb0f16d18",
+      "source_name": "i7-directive-classifier-tests.log"
     },
     {
       "path": "i7-entry-review-r1.md",
@@ -48,9 +51,10 @@
       "sha256": "fd0a84174e00dc8b07519fb1686044cf1ac1520bcb34e9e8b0ea91be6d5dbd20"
     },
     {
-      "path": "i7-final-complete-static-r2.log",
+      "path": "i7-final-complete-static-r2.txt",
       "bytes": 1707,
-      "sha256": "d7a4f695cf1f3f67c8e793d1598c8a5ecf6ce5b69677469b710777c5f89595e2"
+      "sha256": "d7a4f695cf1f3f67c8e793d1598c8a5ecf6ce5b69677469b710777c5f89595e2",
+      "source_name": "i7-final-complete-static-r2.log"
     },
     {
       "path": "i7-final-effective-coverage.json",
@@ -63,9 +67,10 @@
       "sha256": "5c104d749274806c8b24f4cf54c6aa09eb86e6d5825af8ea8b1d01f1c4c06533"
     },
     {
-      "path": "i7-final-official-tests.log",
+      "path": "i7-final-official-tests.txt",
       "bytes": 40338,
-      "sha256": "fe9d4e0673d99cfb31c265ce61fde99a7f6df2c8da9de0723e6b27c4015cc3a1"
+      "sha256": "fe9d4e0673d99cfb31c265ce61fde99a7f6df2c8da9de0723e6b27c4015cc3a1",
+      "source_name": "i7-final-official-tests.log"
     },
     {
       "path": "i7-original-78-final-disposition.json",
@@ -86,6 +91,131 @@
       "path": "i7-ui-oracle-review-r1.md",
       "bytes": 17009,
       "sha256": "30ddd880ebd0658fb7f2d57be0dd402f0a6520accbd43ad19244471922b98715"
+    },
+    {
+      "path": "i8-acceptance-aggregate.txt",
+      "bytes": 16795,
+      "sha256": "d0eb2c88635bd11f030a69da6ccd72f91c67427390abbf61567c0b861418c45b",
+      "source_name": "i8-acceptance-aggregate.log"
+    },
+    {
+      "path": "i8-browser-canonical.png",
+      "bytes": 280835,
+      "sha256": "bc3ab46bc52c42c512119bb934b417fc22bce4c14216894087a405b188dcb304"
+    },
+    {
+      "path": "i8-browser-receipt.json",
+      "bytes": 618,
+      "sha256": "eda850741e6171f77508b10cf520a779a4ecdb1e9eab3bf4772d9cf40729b1a1"
+    },
+    {
+      "path": "i8-browser-synthetic-private.png",
+      "bytes": 279590,
+      "sha256": "c475ccb816f4987401a0681219e4729a7baae01dbe33ca48ec6d51d17bdc7ba8"
+    },
+    {
+      "path": "i8-ci-native-review-r1.md",
+      "bytes": 7506,
+      "sha256": "a6c67c023ea5d15101337856f6e901142bda4ce334063044af2b2ca6b93a5d97"
+    },
+    {
+      "path": "i8-ci-native-review-r2.md",
+      "bytes": 6357,
+      "sha256": "8393d46eb22c5587656bf971442c7b9a8e316d0bca5052ed0581ed513f8c9be7"
+    },
+    {
+      "path": "i8-core-review-r1.md",
+      "bytes": 13191,
+      "sha256": "978f96112d3a185fe41de4136c715740f0a75397f6e17eda0a89693cc88eac84"
+    },
+    {
+      "path": "i8-delivery-report.md",
+      "bytes": 9465,
+      "sha256": "840a9c70f69f518935ac7c31b886b591d75a1e2d7d43e170ebb52196fb8849ba"
+    },
+    {
+      "path": "i8-docs-committed.txt",
+      "bytes": 123,
+      "sha256": "12f9643b31ad36eee739c79862e5434b0143c1059750c11387b786eaf017ed35",
+      "source_name": "i8-docs-committed.log"
+    },
+    {
+      "path": "i8-final-core-tests.txt",
+      "bytes": 565,
+      "sha256": "7fcb40a35f7fffe7b4a7a3ac51add56d12e3d056359e77e8d78d1bbd56b05cda",
+      "source_name": "i8-final-core-tests.log"
+    },
+    {
+      "path": "i8-final-frozen-sha256.txt",
+      "bytes": 2979,
+      "sha256": "7383243018be396beee588680c51445bc80d4a3846af147f019f70a57e0a0835"
+    },
+    {
+      "path": "i8-fixbatch-root-types.txt",
+      "bytes": 15,
+      "sha256": "5d3ef99083b15a7dc019919549d09b4968089a3cf8d3d6ccb989589362a532ed",
+      "source_name": "i8-fixbatch-root-types.log"
+    },
+    {
+      "path": "i8-fixbatch-tests.txt",
+      "bytes": 408,
+      "sha256": "3f3899c1c6b708aba1d07d7ca1f296585ee928dc69aa2f72e223e37d8a11a6ef",
+      "source_name": "i8-fixbatch-tests.log"
+    },
+    {
+      "path": "i8-fixbatch-tools-types.txt",
+      "bytes": 15,
+      "sha256": "5d3ef99083b15a7dc019919549d09b4968089a3cf8d3d6ccb989589362a532ed",
+      "source_name": "i8-fixbatch-tools-types.log"
+    },
+    {
+      "path": "i8-helper-red.txt",
+      "bytes": 49193,
+      "sha256": "e61480fc0e3930770bd2ccec302807ce17b07e33c83049045b6075cbb636effc",
+      "source_name": "i8-helper-red.log"
+    },
+    {
+      "path": "i8-hook-cleanup-proof.json",
+      "bytes": 224,
+      "sha256": "a099419915991b1aa17ca15980106ac42627674fdb68a0e3f8543225b4faed45"
+    },
+    {
+      "path": "i8-isolation-second.txt",
+      "bytes": 1097,
+      "sha256": "938d0cf7462349dc6956618df289a6137958b301bc2c10b364085cd8a45108f2",
+      "source_name": "i8-isolation-second.log"
+    },
+    {
+      "path": "i8-keyboard-fix-review-r2.md",
+      "bytes": 8547,
+      "sha256": "689e5e49683c2da9a33393a183b42c786a0ad3f4a7907b1bc9d2eae6a6d0ab29"
+    },
+    {
+      "path": "i8-keyboard-red-restored.txt",
+      "bytes": 2131,
+      "sha256": "0ddb28b287e002ac2c3ea67e266c85c47bd2fb5dbfe8e2d3c897b1debcf8f088",
+      "source_name": "i8-keyboard-red-restored.log"
+    },
+    {
+      "path": "i8-manual-visual-receipt.json",
+      "bytes": 1999,
+      "sha256": "a5455b77627b2a49f9bc6df152480a11315b539ff3fac9e3a792ae1cf93ea396"
+    },
+    {
+      "path": "i8-mcp-receipt.json",
+      "bytes": 651,
+      "sha256": "ed42c5d335e90b7bfdb6adbee52ed456082fc379ec312c231cb4e9dcb4555a67"
+    },
+    {
+      "path": "i8-private-pack-red.txt",
+      "bytes": 103,
+      "sha256": "b858ebfaaa583173d2f95e3e04a81a5ce07c74aa8def46dc8baa5be8ade75119",
+      "source_name": "i8-private-pack-red.log"
+    },
+    {
+      "path": "i8-remaining-review-r1.md",
+      "bytes": 16982,
+      "sha256": "e85993875efac08ba4279aefa68d35c307ce3070c55db08646fd12643b3b42d8"
     }
   ]
 }

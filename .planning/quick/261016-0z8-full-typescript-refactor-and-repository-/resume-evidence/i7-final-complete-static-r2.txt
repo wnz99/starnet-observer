@@ -1,0 +1,25 @@
+$ bun run check:root && bun run format-check && bun run build && bun run lint && bun run typecheck
+$ bun run check:versions && bun run check:hygiene && bun run check:shell && bun run check:format && bun run check:helpers && bun run check:knip && bun run check:fallow
+$ sh tools/quality/check-versions.sh
+$ sh tools/quality/hooks.sh hygiene
+$ uv tool run --from uv==0.13.1 uv tool run --from shellcheck-py==0.11.0.1 shellcheck .githooks/pre-commit .githooks/pre-push tools/quality/check-static.sh tools/quality/check-versions.sh tools/quality/check.sh tools/quality/format-index.sh tools/quality/hooks.sh tools/quality/install-hooks.sh tools/quality/setup.sh
+$ prettier --check --ignore-unknown .
+Checking formatting...
+All matched files use Prettier code style!
+$ eslint eslint.config.mjs tools/quality --max-warnings 0
+$ knip --no-progress --no-config-hints
+$ fallow dead-code --summary --quiet && fallow dupes --summary --quiet
+   0.180440542s  WARN Graph cache decoded but not reused: resolver, entry points, or plugins changed
+[W] Type-aware refinement: 151 candidates, 133 confirmed uses, 18 preserved contracts, 0 candidates without static references (0 guarded fixes), 0 unresolved findings, 0 abstained findings
+Duplication Summary
+
+      10  Clone families
+      11  Clone groups
+     177  Duplicated lines
+    0.4%  Duplication rate
+$ prettier --check --ignore-unknown .
+Checking formatting...
+All matched files use Prettier code style!
+$ bun --no-env-file tools/build.ts local
+$ eslint . --max-warnings 0
+$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit && tsc -p tsconfig.browser-tests.json

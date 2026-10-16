@@ -1,0 +1,11 @@
+bun test v1.3.13 (bf2e2cec)
+
+tools/quality/lint-classification.test.ts:
+(pass) Node assertion expected booleans remain values while real mode flags are reported [13884.01ms]
+(pass) assertion recognition follows the actual imported binding and preserves nested flags [537.04ms]
+(pass) native Fallow directives remain metadata while commented-out code is still reported [499.04ms]
+
+ 3 pass
+ 0 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [15.16s]

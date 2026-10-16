@@ -1,0 +1,36 @@
+{
+  "status": "passed within inspected visual scope",
+  "reviewer": "root controller; separate from automated assertions",
+  "viewport": "1440x1000",
+  "browser": "Chromium 156.0.8078.4 via Playwright 1.64.1",
+  "capture": "Fresh contexts, reduced motion, fonts and two paints settled, captured before interactions.",
+  "observations": [
+    "Canonical typography, green framing, repository/session panels and canvas station are legible with no visible clipping or overlapping UI.",
+    "Synthetic private fixture changes ink to #123456 and shows explicitly enabled fixture controls; station geometry and panel placement remain consistent with its paired canonical capture.",
+    "Baseline shares pixel typography, framing, floor/observatory/mailroom roles and session layout; different fixture metadata adds a remote dock and changes camera fit and missing-source labels."
+  ],
+  "limits": [
+    "Static screenshot inspection; interaction/security/freshness behavior relies on separate automated browser assertions.",
+    "No exact pixel-parity claim against the older baseline because fixture data, camera fit and FX differ.",
+    "The intentionally dark synthetic ink is an override/prepaint probe, not accessibility approval of a user-selected palette.",
+    "No live desktop/provider/Herdr/SSH/control run."
+  ],
+  "artifacts": [
+    {
+      "path": "/tmp/observer-browser-evidence-dQPpHl/canonical.png",
+      "sha256": "bc3ab46bc52c42c512119bb934b417fc22bce4c14216894087a405b188dcb304"
+    },
+    {
+      "path": "/tmp/observer-browser-evidence-dQPpHl/synthetic-private.png",
+      "sha256": "c475ccb816f4987401a0681219e4729a7baae01dbe33ca48ec6d51d17bdc7ba8"
+    },
+    {
+      "path": "/tmp/observer-browser-evidence-dQPpHl/receipt.json",
+      "sha256": "eda850741e6171f77508b10cf520a779a4ecdb1e9eab3bf4772d9cf40729b1a1"
+    },
+    {
+      "path": "/tmp/starnet-ts-resume/browser-baseline.png",
+      "sha256": "c6a8b3880ddfc79d72f88149c6e83ca9ddaf84bea92d0c32ee5394a50b2bd5ad"
+    }
+  ]
+}

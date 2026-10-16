@@ -1,0 +1,535 @@
+$ bun run build && bun --no-env-file test
+$ bun --no-env-file tools/build.ts local
+bun test v1.3.13 (bf2e2cec)
+
+tools/acceptance.test.ts:
+(pass) native runner rejects wrong results, no discovery, rejected promises and incomplete exit fixtures [190.01ms]
+
+tools/public.test.ts:
+(pass) public build closes script URLs, includes ignored local packs and preserves selection semantics and source bytes [940.07ms]
+(pass) public build rejects escaped files/packs and aliases before replacement, retaining last-good output [559.04ms]
+(pass) public build rejects required-directory and output collisions [120.01ms]
+(pass) public build preserves contained file and directory links and pack-alias fallback [1601.12ms]
+(pass) public build stages canonical directory-link dependencies outside resource roots [359.03ms]
+(pass) public build preserves contained top-level resource directory links [340.02ms]
+(pass) public build resolves authored frontend aliases and rejects overlapping generated roots [352.03ms]
+
+tools/start.test.ts:
+(pass) launcher builds first, forwards args/environment, disables dotenv, and propagates child exits [224.02ms]
+(pass) parent and terminal-group signals reach child once and await asynchronous shutdown [885.06ms]
+(pass) launcher propagates signal exits and does not start main after interrupted build [237.02ms]
+
+tools/build.test.ts:
+(pass) runtime build closes emitted typed leaf imports, preserves private resources, and runs emitted native cache fixtures [10626.77ms]
+(pass) runtime build preserves last good output and local resources when strict compilation fails [6722.49ms]
+(pass) runtime build rejects aliased generated directories before touching local resources [2.00ms]
+
+scripts/validate-theme-packs.test.ts:
+(pass) theme validator keeps authored default, explicit root and sanitized failure semantics from another cwd [291.02ms]
+
+scripts/stream.test.ts:
+(pass) stop during an inventory read prevents late publication and scheduling [1.00ms]
+(pass) backpressure blocks the next read; stopping during a write remains final [1.00ms]
+(pass) stream transports only native control proof fields and bounds oversized snapshots [11.00ms]
+
+tools/quality/lint-classification.test.ts:
+(pass) Node assertion expected booleans remain values while real mode flags are reported [13734.00ms]
+(pass) assertion recognition follows the actual imported binding and preserves nested flags [284.02ms]
+(pass) native Fallow directives remain metadata while commented-out code is still reported [342.02ms]
+
+tools/quality/hooks.test.ts:
+(pass) pre-commit uses staged ignore rules in root directory [159.01ms]
+(pass) pre-commit uses staged ignore rules in nested directory [133.01ms]
+
+src/sidecar/child-env.test.ts:
+child-env: filtering, explicit overrides, guarded callbacks/limits, dotenv controls and observable control passed
+(pass) child-env regression contracts [338.02ms]
+(pass) guard retains prototype, explicit environment and callback order [1.00ms]
+(pass) environment builder hands native options strings and preserves scalar coercion
+
+src/sidecar/config.test.ts:
+config: defaults, optional/explicit files, CLI precedence, custom names, strict validation, help and fail-before-startup passed
+(pass) config regression contracts [25588.86ms]
+(pass) injected install root keeps automatic files separate from explicit cwd paths [3.00ms]
+
+src/sidecar/redaction.test.ts:
+(pass) redaction preserves unknown primitives and recursively protects secret fields [3.00ms]
+(pass) known secrets stay live, longest first, and tolerate throwing or invalid collectors
+
+src/sidecar/failopen.test.ts:
+(pass) fail-open callbacks preserve fallback values and count failures with unavailable clock [2.00ms]
+(pass) finite clock stamps survive later clock failure and warnings remain throttled [3.00ms]
+
+src/browser/data-shim.test.ts:
+(pass) application skin labels retain canonical crew metadata [2.00ms]
+
+src/browser/prepaint.test.ts:
+(pass) emitted prepaint IIFE applies bootstrapped interface before body mount [35.00ms]
+
+src/browser/bootstrap.test.ts:
+(pass) canonical manifest and resolved snapshot remain distinct, immutable bootstrap values [5.00ms]
+(pass) missing token and optional invalid pack fall back without a new startup failure [10.00ms]
+(pass) missing or structurally invalid canonical default fails before theme use [6.00ms]
+(pass) home-office bootstrap proves every native role while retaining extra string fields [11.00ms]
+
+src/browser/theme.test.ts:
+(pass) theme applies interface synchronously, mounts status later and bounds plain warning text [3.00ms]
+(pass) local font and logo decoding failures restore fallbacks and deduplicate warnings [4.00ms]
+(pass) font and logo URLs cannot load remote resources or mismatched font files [2.00ms]
+(pass) snapshot and queued warnings mount as bounded text with exact requested/effective order [2.00ms]
+
+src/browser/harness.test.ts:
+(pass) authentication headers, abort and one reload for a rejected launch token [3.00ms]
+(pass) non-token failures never schedule reload and malformed errors use status
+(pass) POST forwards the caller abort signal without changing its request contract [1.00ms]
+
+src/browser/composition.test.ts:
+(pass) theme status mounts and inspector composition retains the supplied dialog node [4.00ms]
+
+src/browser/mail.test.ts:
+(pass) original courier route, recovery, frame and theme contracts [10.00ms]
+(pass) partial observed buses never invent a courier flight [5.00ms]
+
+src/browser/model.test.ts:
+(pass) original model checkout suffix collision proofs [1.00ms]
+(pass) original model activity and source title evidence [1.00ms]
+(pass) original model source-aware desktop and helper labels [1.00ms]
+(pass) original model authoritative group-only root [4.00ms]
+(pass) original model idle age vitality and labels [1.00ms]
+(pass) layout preserves desks across reorder/removal/growth and annex color identity [7.00ms]
+(pass) project hues remain unique per deck; remote ships keep independent room slots [12.00ms]
+(pass) helper chains resolve exact roots, bounded stations never manufacture rooms [3.00ms]
+(pass) unavailable checkout proof and generic Codex title keep explicit fallback labels
+(pass) partial helper evidence keeps observed names, task fallback and optional tool outcomes
+
+src/browser/mail-inspector.test.ts:
+(pass) original mail inspector validation, identity, read and visibility lifecycle [38.00ms]
+(pass) terminal mail disposal aborts one panel and rejects queued reads and retained close [3.00ms]
+
+src/browser/office-art.test.ts:
+(pass) native composition keeps foot anchors, clipped repetition and fallback human bounds [6.00ms]
+
+src/browser/queryspine.test.ts:
+(pass) shared request, exact TTL boundary, validated mutation and honest last-good failures [3.00ms]
+(pass) new generations recover without waiting; obsolete responses never publish [2.00ms]
+(pass) subscribers own one timer and ephemeral reads cannot restore a discarded body [1.00ms]
+(pass) timeouts abort and cannot poison a recovered generation [7.00ms]
+(pass) cached invalidation retains stale last-good data and ordinary get reads a new revision
+(pass) last subscriber cancels every active generation and deadlines while retaining last-good cache [1.00ms]
+(pass) unsubscribe before deferred transport starts acquires nothing and permits a fresh read [1.00ms]
+(pass) terminal disposal releases jobs and makes every retained registry entry point closed [1.00ms]
+(pass) terminal disposal before transport microtask and during immediate delivery cannot acquire reads [1.00ms]
+(pass) abort-aware cancellation stays silent after resubscription and leaves other resources running [1.00ms]
+(pass) disposal during transport acquisition clears the already-owned deadline
+(pass) disposal inside invalidation delivery prevents refresh and remaining deliveries [1.00ms]
+(pass) disposal during timeout acquisition cancels the returned deadline before transport [1.00ms]
+(pass) failed timeout acquisition starts no transport and a later read remains retryable
+(pass) disposal during interval acquisition releases its returned poll without immediate delivery [1.00ms]
+(pass) synchronous transport acquisition failure releases its deadline and permits retry [1.00ms]
+
+src/browser/model.scene.integration.test.ts:
+(pass) original model allocation, lineage, checkout and theme geometry with real Scene [62.00ms]
+
+src/browser/prepaint.integration.test.ts:
+(pass) emitted head applies selected colors and exact native fonts before mount without owning application state [27.00ms]
+
+src/browser/inspector.test.ts:
+(pass) original inspector formatting, follow, pause, visibility locks and stable nodes [25.00ms]
+(pass) original loaded-window query generation and withdrawal [6.00ms]
+(pass) original real-query cover transcript identity and window re-read [5.00ms]
+(pass) terminal inspector disposal releases only its panel and rejects retained callbacks [2.00ms]
+(pass) disposing one real-query inspector preserves another subscriber and pending read [12.00ms]
+
+src/server/http.security.test.ts:
+(pass) raw control URL, GET-only methods, token byte equality and response nonces remain distinct boundaries [83.01ms]
+(pass) server close stays synchronous, waits for observer teardown, and shares repeated callbacks [15.00ms]
+(pass) bootstrap serialization runs only for canonical HTML and leaves API/assets usable [40.00ms]
+[observer] null is not an object (evaluating 'data.reason')
+[observer] undefined is not an object (evaluating 'data.reason')
+(pass) nullish inspector failures keep the original 500 response boundary [40.00ms]
+(pass) presentation checks raw overseer pane fields after validation without tightening ordinary extras [97.01ms]
+
+src/server/main.test.ts:
+(pass) source and emitted main imports stay inert; --help exits before discovery from another cwd [660.05ms]
+(pass) emitted HTTP factory serves fixture observations and public bootstrap from external cwd, then closes [237.02ms]
+
+src/server/http.sqlite-oracle.test.ts:
+
+src/server/runtime-paths.test.ts:
+(pass) runtime roots honor explicit package and public roots
+(pass) source defaults ignore caller cwd [38.00ms]
+(pass) compiled defaults derive installed package roots from their emitted location [3517.26ms]
+
+src/server/http.sqlite.test.ts:
+cleanup failure contained; no replacement before cleanup; demand and close retry; sanitized idempotent close failure
+native stall: 11000 ms; request timeout 205 ms; close 0 ms; unref subprocess exit 86 ms; scratch empty after continuation
+SQLite worker: native copies, identity, stale retention, redaction, HTTP responsiveness, bounded queue and teardown OK
+(pass) observer-sqlite-worker regression contracts [12485.91ms]
+
+src/server/http.test.ts:
+standalone server: static ETag/304 and byte replacement, HTML/API/error no-store, conditional origin/token/path guards, raw empty 304 body, page scripts, 192 sprite files, font, and symlink confinement passed
+(pass) server regression contracts [536.04ms]
+
+src/shared/observer.test.ts:
+(pass) unknown remote snapshots require runtime narrowing
+
+src/shared/scene-art-roles.test.ts:
+(pass) native role geometry preserves independent projected bounds [2.00ms]
+
+src/sidecar/bus/index.test.ts:
+observer bus: private snapshot reads (WAL live writer visible, source files and listing unchanged, copy removed on success/unstable/failure), metadata-only window, joins, ACK/wake refresh, stale retention OK
+(pass) observer-bus regression contracts [1169.09ms]
+
+src/sidecar/bus/relay.test.ts:
+observer bus relay: host-only binding, per-message direction/peer/state, per-machine roster with llm-bus idle rule, no bodies or session ids, never aliased, malformed tables degrade to local OK
+(pass) observer-bus-relay regression contracts [466.03ms]
+
+src/sidecar/observer/warm-transcripts.test.ts:
+observer warm projection: cached click performs 2 validation reads; replacement and deletion revoke old content
+(pass) observer warm transcript projection regression contracts [64.00ms]
+
+src/sidecar/observer/identity-process.test.ts:
+observer identity: local libproc boundary requires macOS; skipped
+(pass) observer isolates exited owned PID while retaining healthy pane inspection [1.00ms]
+
+src/sidecar/observer/index.test.ts:
+[failopen] observer.identity.revalidate (x1): Live footer identity verification unavailable
+[failopen] observer.identity.revalidate (x2): Live footer identity verification unavailable
+[failopen] observer.identity.resolve (x1): Live footer identity unavailable
+[failopen] observer.identity.resolve (x2): Live footer identity unavailable
+[failopen] observer.identity.resolve (x3): Live footer identity unavailable
+[failopen] observer.identity.resolve (x4): Live footer identity unavailable
+observer stalled endpoint: 1517ms, one timed-out request, socket closed, retry recovered
+observer: shared refresh, stable panes, cache freshness, stale retention and authoritative removal OK
+(pass) observer regression contracts [3042.22ms]
+
+src/sidecar/observer/inspector.integration.test.ts:
+(pass) original observer query inspector binding rejects replaced session and foreign helper parent [10.00ms]
+
+src/sidecar/observer/queryspine.integration.test.ts:
+(pass) observer queryspine polling freshness [226.02ms]
+
+src/sidecar/transcripts/index.test.ts:
+observer transcripts: exact identity, redaction, split UTF-8, partial rows, dedupe, truncation, replacement, oversized rows, symlink jail OK
+(pass) observer-transcripts regression contracts [1001.07ms]
+(pass) child binding timestamps completed transcript validation [12.00ms]
+(pass) malformed Claude identity rows cannot establish ordinary or child bindings [51.00ms]
+
+src/sidecar/projects/index.test.ts:
+observer projects: home-folder flag, Git roots, worktrees inside and outside Projects, canonical parent/direct/Personal roots, symlinked root, same names and no full paths OK
+(pass) observer-projects regression contracts [932.07ms]
+
+src/sidecar/arrangement/index.test.ts:
+observer arrangement: remotes, strict rooms file, monorepo sections, nested repos, org rooms (2+), non-Git units under workspace roots, stickiness, rooms-file overrides/reload and no paths OK
+(pass) observer-arrangement regression contracts [1036.08ms]
+
+src/sidecar/arrangement/model.integration.test.ts:
+(pass) arrangement preserves linked checkout sections through the actual browser model [99.01ms]
+observer arrangement: page toggle swaps grouping, identity without arrangement, one room per arranged project, stable seats OK
+(pass) arrangement browser toggle groups actual rows and preserves seats [2.00ms]
+
+src/sidecar/presentation/presentation.integration.test.ts:
+presentation: stable fictional labels, real status/topology/totals/mail, no private fields, source immutability, and blocked HTTP inspectors passed
+(pass) presentation regression contracts [82.01ms]
+
+src/sidecar/presentation/index.test.ts:
+(pass) presentation preserves the original missing-source fallback [1.00ms]
+(pass) partial presentation keeps aggregate type and guards private timestamps [2.00ms]
+(pass) partial relay arrays keep empty fallbacks and stable private aliases [1.00ms]
+
+src/sidecar/control/transport.test.ts:
+(pass) malformed native envelopes cannot report successful actions [1.00ms]
+(pass) pinned Bun native execFile retains legacy private argv conversion [98.01ms]
+
+src/sidecar/control/control-remote.integration.test.ts:
+control remote: ssh routing, fresh streamed proof re-checked on the host, mismatch/stale/foreign refusals, no Terminal on spawn, proof wire shape, hub freshness, routes and presentation refusal OK
+(pass) control-remote regression contracts [200.01ms]
+
+src/sidecar/control/overseer.test.ts:
+(pass) uncertain overseer ownership survives restart until confirmed absent [41.00ms]
+(pass) provider briefs retain user files and launch native provider [130.01ms]
+(pass) reserved malformed pane ids retain raw ownership until native absence is proven [6.00ms]
+(pass) overseer rejects unknown provider values before state or native work [1.00ms]
+
+src/sidecar/control/spawn.test.ts:
+(pass) truthy malformed workspace inventory rejects before any mutation [1.00ms]
+(pass) absent, falsy, and empty workspace inventory retain host spawn fallback [4.00ms]
+(pass) failed workspace query retains host spawn fallback [2.00ms]
+
+src/sidecar/control/control.integration.test.ts:
+control: overseer brief/409, pane validation, Herdr-gated close, spawn command order, terminal launch, opt-in routes, token/origin/body guards OK
+(pass) control regression contracts [307.02ms]
+
+src/sidecar/identity/index.test.ts:
+[failopen] observer.identity.resolve (x5): Live footer identity unavailable
+[failopen] observer.identity.revalidate (x3): Live footer identity verification unavailable
+[failopen] observer.identity.config (x1): Footer configuration verification unavailable
+[failopen] observer.identity.config (x2): Footer configuration verification unavailable
+observer identity: local libproc boundary requires macOS; skipped
+observer identity: exact footer, native compatibility, withdrawal and terminal/thread races OK
+(pass) observer-identity regression contracts [2206.16ms]
+
+src/sidecar/inspector/index.test.ts:
+(pass) Claude JSON discriminators cannot fabricate ordinary rows or native assignments [2.00ms]
+(pass) message and tool text use exact block and role discriminators [1.00ms]
+(pass) Codex activity and item discriminators require exact literals [1.00ms]
+(pass) only exact analysis and summary channels exclude ordinary Codex messages
+(pass) original canonical disk session owns stats despite unrelated transport id [1.00ms]
+
+src/sidecar/sqlite/client.test.ts:
+(pass) source and emitted SQLite workers validate requests, isolate environment and leave synthetic source hashes unchanged [12517.91ms]
+(pass) client quarantines malformed correlated replies and never exposes a mismatched message body [24.00ms]
+Emitted SQLite lifecycle:
+bun test v1.3.13 (bf2e2cec)
+cleanup failure contained; no replacement before cleanup; demand and close retry; sanitized idempotent close failure
+native stall: 11000 ms; request timeout 200 ms; close 0 ms; unref subprocess exit 96 ms; scratch empty after continuation
+SQLite worker: native copies, identity, stale retention, redaction, HTTP responsiveness, bounded queue and teardown OK
+(pass) emitted SQLite client preserves native lifecycle regression contracts [24011.75ms]
+
+src/sidecar/sqlite/protocol.test.ts:
+(pass) SQLite transport accepts bounded domain data and rejects SQL, functions and malformed operation payloads [2.00ms]
+
+src/sidecar/desktop/index.test.ts:
+observer desktop: compile-once, private cache, allowlist, independent identity, unknown partial evidence, redaction, reuse and late withdrawal OK
+(pass) observer-desktop regression contracts [96.01ms]
+
+src/sidecar/desktop/cache.test.ts:
+(pass) native cache keys include exact sibling Swift source, architecture and compiler version [16.00ms]
+
+src/sidecar/helpers/index.test.ts:
+observer helpers: exact lineage, conflict/cycle, independent projection, withdrawal and containment PASS
+(pass) observer-helpers regression contracts [1657.12ms]
+
+src/sidecar/helpers/claims.test.ts:
+observer helpers index: spawns outside the tail, append, conflict, rewrite/replacement reset, sidecar corroboration and activity status PASS
+(pass) observer-helpers-index regression contracts [4831.35ms]
+
+src/sidecar/overseer-state/index.test.ts:
+overseer-state: private persistence, restart, exact proof, reservation and corrupt fail-closed OK
+(pass) overseer-state regression contracts [91.01ms]
+
+src/sidecar/remotes/targets.test.ts:
+(pass) target proofs consume only readonly source, pane and health rows
+
+src/sidecar/remotes/index.test.ts:
+(pass) observer-remotes regression contracts [105.01ms]
+
+src/sidecar/remotes/hosts.test.ts:
+(pass) close withdraws every host proof before any child teardown callback [1.00ms]
+
+src/sidecar/remotes/scene.integration.test.ts:
+(pass) remote ships preserve actual model and scene integration [12.00ms]
+
+src/sidecar/remotes/federation.test.ts:
+(pass) real observer composes through federation and presentation with precise sources [9.00ms]
+(pass) federation keeps compact local snapshots and inferred local control proof [1.00ms]
+
+src/sidecar/remotes/control.integration.test.ts:
+(pass) remote namespaced pane cannot match actual control pane grammar [5.00ms]
+
+src/sidecar/themes/index.test.ts:
+(pass) theme pure resolution and manifest schema preserve canonical contracts [8.00ms]
+(pass) bounded synthetic theme installation contracts [2758.20ms]
+
+src/browser/view/index.test.ts:
+observer view: helper scale/footprint/overflow, Observatory, double-click precedence/suppression/platform fit/resize/removal and per-row freshness OK
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+observer view: LOD/plate/cache budget helpers, DPR equivalence, resize refit, click vs drag, live hover, cursor and pinch zoom, keyboard, clamps, sprite poses and fallback, stale/reduced freeze, cache reuse, lifecycle and focus OK, frozen single paint, invalidation sources, sprite/font readiness, camera report dedupe and offscreen furniture culling OK
+theme view: HEAD-equal default paint, complete custom palette, isolated simultaneous views, backgroundFx/ambientFx layers OK
+theme view: loading replacement crew watch and settled repaint OK
+office view: pending/failed station crew, single activation and cache rebuild, ready humans or procedural fallback, stopped settlement, pending/ready resume, bounded failure warnings OK
+[SPRITES] startup sets loaded: approved_android, @replacement:blank, @replacement:blank_blue, @replacement:blank_amber — 84 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank, @replacement:blank_blue, @replacement:blank_amber — 84 animation tracks
+office art: all 34 roles at native size and whole pixels, native chairs, carriers at drone points, no station primitives or glow, two-tone outlined faces, steady statuses, depth and hits OK
+(pass) observer-view regression contracts [9728.71ms]
+
+src/browser/view/hosts.test.ts:
+observer hosts view: "~ home" labels, blocked "!" badge (fresh only, overview too), ship floor/label selection, observation/relay labels, links only with remotes OK
+(pass) observer-hosts-view regression contracts [69.01ms]
+
+src/browser/office-art/loading.test.ts:
+(pass) office group preserves atomic publication, fail-fast and URL dedupe [28.00ms]
+(pass) event fallback preserves native image objects; synchronous staging failure stays bounded [4.00ms]
+
+src/browser/scene/index.test.ts:
+observer scene: stable seats/decks, connected routes, truthful endpoints, projection/camera/hit tests, contained capped movement and stale/reduced/work return OK
+repository partition geometry and safe movement OK
+per-worker freshness, frozen transitions, recovery and boolean/default movement parity OK
+Observatory, platform target geometry, helper collision/overflow/tethers and safe stationary lifecycle OK
+Verified formations: eight safe departures/turns/returns, deterministic polls, nested freshness/work/closure and bounded lifecycle cleanup OK
+Compact public coverage 1 {"windows":38,"compactFrames":1759,"headings":["0,1","0,-1","-1,0","1,0"],"runs":[{"windows":13,"compactFrames":649,"headings":["0,1","0,-1","-1,0"],"rowFrames":[649],"lineFrames":0,"passageFrames":[0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":16,"compactFrames":565,"headings":["-1,0","0,-1","0,1","1,0"],"rowFrames":[565],"lineFrames":0,"passageFrames":[0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":9,"compactFrames":545,"headings":["-1,0","0,-1","0,1"],"rowFrames":[545],"lineFrames":0,"passageFrames":[0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0}]}
+Compact public coverage 2 {"windows":6,"compactFrames":236,"headings":["-1,0","0,1","1,0"],"runs":[{"windows":2,"compactFrames":93,"headings":["-1,0","0,1"],"rowFrames":[93],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":78,"headings":["1,0","-1,0"],"rowFrames":[78],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":65,"headings":["-1,0","0,1"],"rowFrames":[65],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0}]}
+Compact public coverage 3 {"windows":5,"compactFrames":220,"headings":["-1,0","0,1","1,0"],"runs":[{"windows":2,"compactFrames":91,"headings":["-1,0","0,1"],"rowFrames":[91,91],"lineFrames":0,"passageFrames":[0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":1,"compactFrames":63,"headings":["1,0"],"rowFrames":[63,63],"lineFrames":0,"passageFrames":[0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":66,"headings":["-1,0","0,1"],"rowFrames":[66,66],"lineFrames":0,"passageFrames":[0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0],"maxWidthRatio":0,"maxHeightRatio":0}]}
+Compact public coverage 7 {"windows":3,"compactFrames":130,"headings":["-1,0","1,0"],"runs":[{"windows":1,"compactFrames":53,"headings":["-1,0"],"rowFrames":[53,53,53,53],"lineFrames":0,"passageFrames":[0,0,0,0,0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0,0,0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":1,"compactFrames":43,"headings":["1,0"],"rowFrames":[43,43,43,43],"lineFrames":0,"passageFrames":[0,0,0,0,0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0,0,0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":1,"compactFrames":34,"headings":["-1,0"],"rowFrames":[34,34,34,34],"lineFrames":0,"passageFrames":[0,0,0,0,0,0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0,0,0,0],"maxWidthRatio":0,"maxHeightRatio":0}]}
+Compact public coverage 8 {"windows":4,"compactFrames":93,"headings":["-1,0","1,0"],"runs":[{"windows":1,"compactFrames":40,"headings":["-1,0"],"rowFrames":[40,40,40,40],"lineFrames":4199,"passageFrames":[269,378,392,187,501,296,691,394],"traversed":8,"regroupFrames":40,"turnFrames":[35,54,65,79],"maxWidthRatio":0.48762376237600186,"maxHeightRatio":0.5538793103446309},{"windows":2,"compactFrames":31,"headings":["1,0","-1,0"],"rowFrames":[31,31,31,31],"lineFrames":3945,"passageFrames":[200,211,537,318,563,477,632,525],"traversed":8,"regroupFrames":31,"turnFrames":[30,37,46,55],"maxWidthRatio":0.6242574257428621,"maxHeightRatio":0.6728448275864642},{"windows":1,"compactFrames":22,"headings":["-1,0"],"rowFrames":[22,22,22,22],"lineFrames":3713,"passageFrames":[133,386,338,427,597,328,514,412],"traversed":8,"regroupFrames":22,"turnFrames":[59,63,81,166],"maxWidthRatio":0.48762376237614996,"maxHeightRatio":0.5538793103447595}]}
+Eligible exclusion coverage {"status":"working"} [{"windows":2,"compactFrames":93,"headings":["-1,0","0,1"],"rowFrames":[93],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":78,"headings":["1,0","-1,0"],"rowFrames":[78],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0}]
+Eligible exclusion coverage {"status":"blocked"} [{"windows":2,"compactFrames":93,"headings":["-1,0","0,1"],"rowFrames":[93],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":78,"headings":["1,0","-1,0"],"rowFrames":[78],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0}]
+Eligible exclusion coverage {"stale":true} [{"windows":2,"compactFrames":93,"headings":["-1,0","0,1"],"rowFrames":[93],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0},{"windows":2,"compactFrames":78,"headings":["1,0","-1,0"],"rowFrames":[78],"lineFrames":0,"passageFrames":[0,0],"traversed":0,"regroupFrames":0,"turnFrames":[0],"maxWidthRatio":0,"maxHeightRatio":0}]
+Compact historical pair/turn/passage/regroup oracle, eligible gaps, own stale/work/closed precedence and inaccessible-departure fallback OK
+observer scene: overseer seating OK
+(pass) observer-scene regression contracts [15751.15ms]
+
+src/browser/scene/relay.test.ts:
+relay scene: networks and shadows from bus bindings, ghost crew rows, shadow ships docked beside their member, unchanged crew and ssh links, desk-to-desk relay couriers and truthful pending spots OK
+(pass) observer-relay-scene regression contracts [11.00ms]
+
+src/browser/theme/lifecycle.test.ts:
+(pass) theme disposal removes readiness and retained callbacks cannot mount or report [3.00ms]
+(pass) disposed font and logo settlements leave the former theme DOM untouched [3.00ms]
+(pass) replacing an active theme releases its readiness and retained status owner [2.00ms]
+(pass) disposal during font acquisition prevents the remaining pair and readiness acquisition [2.00ms]
+
+src/browser/theme/assets.test.ts:
+(pass) DM Sans and pixel fonts retain exact family/resource bindings and whole-pair guards [4.00ms]
+(pass) one sanitized font warning covers independent pair failures without changing source health [18.00ms]
+(pass) logo stays hidden until decode, restores the mark on failure and excludes nonlocal URLs [23.00ms]
+
+src/browser/theme/configuration.test.ts:
+(pass) authored palette and CSS resource inventory remain complete [17.00ms]
+(pass) numeric readouts preserve their fixed font and spacing [22.00ms]
+(pass) pixel typography and frames stay independent without clipping focus surfaces [4.00ms]
+
+src/browser/theme/native.test.ts:
+(pass) head and main adapters share exact native font resources without an application global
+(pass) native font rejection remains observable to the active theme owner [1.00ms]
+(pass) native descriptor normalization does not duplicate the admitted font resource
+(pass) emitted native adapter forwards document readiness when a theme is replaced [7.00ms]
+
+src/browser/theme/style.test.ts:
+(pass) all canonical style bindings and independent sparse-field fallbacks remain exact [5.00ms]
+(pass) shapes, decoration and independent chrome/type attributes preserve local fallback [8.00ms]
+
+src/browser/sprites/drawing.test.ts:
+[SPRITES] startup sets loaded: canonical_blank — 21 animation tracks
+[SPRITES] startup sets loaded: canonical_blank — 21 animation tracks
+(pass) changed canonical bootstrap drives default startup, inherited tracks and portrait scale [15.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) pre-manifest skin requests recover; default south unlocks paint before a delayed animation [2.00ms]
+[SPRITES] startup sets loaded:  — 0 animation tracks
+[SPRITES] startup sets loaded:  — 0 animation tracks
+(pass) missing or malformed manifests settle to procedural fallback [1.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) native master geometry, device snapping, pose dissolve and premultiplied walk tween stay distinct [9.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) per-frame alpha packing and genuine stride separation govern walking feet [22.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) culling advances identical render state without warm-frame paint or light work; destination re-entry warms before shadows [14.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) light cache promotes stable frames, recycles probation and rebuilds after context restoration [25.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) kept light pixels stay within budget and context failures still paint the original master [32.00ms]
+[SPRITES] startup sets loaded: tester — 35 animation tracks
+(pass) failed prime pose still starts from other canonical tracks [2.00ms]
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+(pass) replacement decode rejection and a throwing degradation listener settle on canonical frames [6.00ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) conservative visibility bounds cover transformed speech, master pixels and contact rings [5.00ms]
+
+src/browser/sprites/load-plan.test.ts:
+(pass) startup planning copies valid tracks, deduplicates sets and counts only selected frames
+
+src/browser/sprites/assets.test.ts:
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+sprite-theme: atomic success, delay, load/dimension failure, canonical drawing and metadata passed
+(pass) sprite-theme atomic replacement contracts [32.00ms]
+
+src/browser/app/observer-arrange-ui.test.ts:
+observer arrange UI: default off, toggle on/off, remembered choice, stable desks while arranged, theme default and viewer override OK
+(pass) observer-arrange-ui regression contracts [122.01ms]
+
+src/browser/app/mount-spawn.test.ts:
+(pass) spawn selection observes the next inventory and queued selection cannot survive terminal disposal [21.00ms]
+
+src/browser/app/mount.test.ts:
+(pass) an initially hidden mount acquires nothing and terminal disposal prevents retained work [5.00ms]
+(pass) visible mount releases an in-flight inventory and every retained deadline on terminal disposal [7.00ms]
+(pass) hidden suspension releases all work and resumes with a fresh inventory generation [11.00ms]
+(pass) terminal disposal suppresses pending control success and its finally mutations [10.00ms]
+(pass) terminal disposal suppresses pending control failure and its finally mutations [9.00ms]
+(pass) a hidden token rejection keeps its original reload deadline and terminal disposal clears it [8.00ms]
+(pass) a freshness deadline acquired during disposal is released before mount can retain it [7.00ms]
+
+src/browser/app/observer-ui.test.ts:
+observer UI: live summaries, 16 stable desks, focused selection across polls, filters independent of floor, replacement/stale/removal/lifecycle OK
+observer UI: optional bus field, recent-window counts, pending row text, ledger focus/unknown endpoints, mail frames, dynamic hover and missing bus OK
+observer UI: unresolved, rejected and throwing sprite init never block startup OK
+observer UI: snapshot reaches view, layout accents, courier colours and crew init; crew degradation warns and repaints OK
+observer UI: pending-only/equal snapshots keep nodes, keyed in-place updates, scene rebuild only on floor change, stale deadline, hidden/visible lifecycle and inspector proof OK
+observer UI: per-source/row freshness, helper and Desktop naming/order/counts, row-scoped inspection, loaded-UI snapshots, withdrawal and platform zoom OK
+observer UI: lifecycle/verification-only fresh polls reach real movement; own status, geometry, camera, static cache and bodies preserved OK
+observer UI: exact-target panel stack, title/magnifier toggles, top-only polling, reveal state, lower close, cap, covered/hidden reconcile, modal swap, Escape/focus and mail transport proof OK
+observer UI: aggregate totals (null unavailable, partial, coverage, Herdr deadline), exact repository toggles, helper task/lifecycle evidence and controls help OK
+observer UI: presentation-projected activity and authoritative usage expire during pending poll while inventory stays live, then recover
+(pass) observer-ui regression contracts [3547.26ms]
+(pass) observer entry preserves synchronous prepaint and one module after the DOM [1.00ms]
+
+src/browser/app/auth-reload.test.ts:
+(pass) terminal auth cleanup releases the actual deadline and retained callbacks
+(pass) hidden auth keeps the original due time without owning a deadline [1.00ms]
+(pass) a token rejection received hidden records intent without acquiring a timer [1.00ms]
+(pass) auth deadline acquired during synchronous disposal is immediately released
+
+src/browser/app/format.test.ts:
+(pass) worker names use exact parents, current seats, nickname and bounded chains [1.00ms]
+(pass) inspection identity preserves explicit source identity and null before native fallback
+(pass) task text distinguishes verified partial assignments, native titles and Desktop windows
+(pass) helper status and closure require their own positive evidence [1.00ms]
+(pass) lineage order follows exact parents before orphan and cycle fallback
+
+src/browser/app/mount-control-json.test.ts:
+(pass) attach and close preserve successful null and primitive JSON bodies [12.00ms]
+(pass) spawn preserves ordinary primitive property access and nullish read failure [8.00ms]
+
+src/browser/app/admission.test.ts:
+(pass) dashboard snapshot admission > keeps partial observations and their object identities [11.00ms]
+(pass) dashboard snapshot admission > requires a sessions envelope and usable consumed field shapes
+(pass) dashboard snapshot admission > preserves unavailable, absent, null and zero observations
+
+src/browser/app/control-ui.test.ts:
+control UI: four-action mode/result matrix, real pane targets, stale rejection, focus, provider truth and overseer deck retention OK
+(pass) control-ui regression contracts [209.02ms]
+
+src/browser/app/dom.fixture.test.ts:
+(pass) moving nodes preserves identity and order but releases removed focus [1.00ms]
+(pass) removing or replacing a focused subtree releases focus and detached focus is inert
+(pass) native close dispatch is queued and removal requires the same callback
+(pass) controlled deadlines cancel precisely and intervals retain one active resource [1.00ms]
+(pass) live lookup excludes removed ids and finds ids assigned after insertion [3.00ms]
+(pass) storage denial and removed media callbacks remain observable without live dispatch [2.00ms]
+(pass) canvas teardown matches callback and capture while retaining removed callbacks [1.00ms]
+(pass) actual arrange requires explicit focus restoration and unchanged order retains focus
+(pass) actual text replacement drops child elements and their focus without rebuilding unchanged text
+
+src/browser/app/control-ui-hosts.test.ts:
+control UI hosts: remote rows, host tabs/ship selection, blocked hint, New agent in ~, spawn-then-select, per-host mail panel and remembered host tab OK
+(pass) control-ui-hosts regression contracts [411.03ms]
+
+src/browser/app/observer-prefs-ui.test.ts:
+observer view settings: restore on load, observer.* keys, saved over theme over built-in, invalid values and throwing storage OK
+(pass) observer-prefs-ui regression contracts [236.02ms]
+
+src/browser/app/roster/roster.test.ts:
+(pass) nested checkout/folder grouping keeps exact repository identities and helper order [14.00ms]
+(pass) keyed equal-content updates reuse nodes; status reorder restores actual focus and scroll [9.00ms]
+(pass) search/filter preserve cached rows and unfiltered repository toggles; removed identities release events [10.00ms]
+(pass) title and magnifier preserve exact panel guard, selection, ARIA and presentation behavior [7.00ms]
+(pass) controls read latest source proof, keep pending disabled across paints, and confirm exact close [7.00ms]
+(pass) tool/mail optional evidence ages separately; helper lifecycle composes with native pane [7.00ms]
+(pass) hidden and terminal callbacks stay inert; disposal releases every owned listener and node [2.00ms]
+(pass) fresh project spawn uses matching live Herdr seed; disabled controls expose no action buttons [10.00ms]
+(pass) checkout collisions extend opaque suffixes and empty states distinguish filtering from unavailable inventory [8.00ms]
+
+ 232 pass
+ 0 fail
+ 844 expect() calls
+Ran 232 tests across 94 files. [171.95s]

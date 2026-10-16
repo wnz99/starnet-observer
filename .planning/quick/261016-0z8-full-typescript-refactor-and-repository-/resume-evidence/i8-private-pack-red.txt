@@ -1,0 +1,1 @@
+RED: naive local dist archive contains SYNTHETIC_PRIVATE_SENTINEL; controlled disposable fixture only.
