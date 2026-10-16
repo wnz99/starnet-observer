@@ -1,13 +1,14 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+const gitEnvironment = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
 const hooks = resolve(import.meta.dirname, "hooks.sh");
 
 function fixtureGit(root: string, arguments_: string[]) {
-  const result = spawnSync("git", arguments_, { cwd: root, encoding: "utf8" });
+  const result = spawnSync("git", arguments_, { cwd: root, encoding: "utf8", env: gitEnvironment });
   expect(result.status).toBe(0);
   return result.stdout;
 }
@@ -20,8 +21,17 @@ function fixtureState(root: string) {
   };
 }
 
-function runHook(root: string, mode: "hygiene" | "pre-commit") {
-  return spawnSync("sh", [hooks, mode], { cwd: root, encoding: "utf8" });
+function runHook(root: string, mode: "hygiene" | "pre-commit" | "pre-push", input = "") {
+  return spawnSync("sh", [hooks, mode], {
+    cwd: root,
+    encoding: "utf8",
+    input,
+    env: {
+      ...gitEnvironment,
+      PATH: `${root}/bin:${process.env.PATH ?? ""}`,
+      OBSERVER_HOOK_COMMANDS: join(root, ".git/commands"),
+    },
+  });
 }
 
 function createFixture() {
@@ -67,3 +77,135 @@ for (const folder of ["", "nested"]) {
     }
   });
 }
+
+test("hygiene rejects forced tracked local state without changing files or index", () => {
+  const root = createFixture();
+  try {
+    writeFileSync(join(root, ".agent-local.json"), "SYNTHETIC_SENTINEL_ONLY\n");
+    expect(runHook(root, "hygiene").status).toBe(0);
+    fixtureGit(root, ["add", "--force", ".agent-local.json"]);
+    const before = fixtureState(root);
+    expect(runHook(root, "hygiene").stderr).toContain(
+      "Local-only .agent-local.json must not be tracked",
+    );
+    expect(fixtureState(root)).toEqual(before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function commitFixture(root: string) {
+  fixtureGit(root, ["add", "."]);
+  fixtureGit(root, [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "commit",
+    "--quiet",
+    "--allow-empty",
+    "-m",
+    "fixture",
+  ]);
+  return fixtureGit(root, ["rev-parse", "HEAD"]).trim();
+}
+function executable(root: string, file: string, content: string) {
+  const target = join(root, file);
+  mkdirSync(resolve(target, ".."), { recursive: true });
+  writeFileSync(target, content);
+  chmodSync(target, 0o755);
+}
+
+test("staged formatting selects index bytes and preserves index and worktree", () => {
+  const root = createFixture();
+  try {
+    writeFileSync(
+      join(root, "tools/quality/format-index.sh"),
+      readFileSync(resolve(import.meta.dirname, "format-index.sh")),
+    );
+    executable(root, "bin/bun", '#!/bin/sh\ntest "$(cat format.ts)" = "export const value = 1;"\n');
+    for (const [staged, working, status] of [
+      ["export const value=1", "export const value = 1;", 1],
+      ["export const value = 1;", "export const value=1", 0],
+    ] as const) {
+      writeFileSync(join(root, "format.ts"), staged);
+      fixtureGit(root, ["add", "format.ts"]);
+      writeFileSync(join(root, "format.ts"), working);
+      const before = fixtureState(root);
+      expect(runHook(root, "pre-commit").status).toBe(status);
+      expect(fixtureState(root)).toEqual(before);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("pre-push checks only clean HEAD and skips deleted refs", () => {
+  const root = createFixture();
+  const zero = "0".repeat(40);
+  const push = (oid: string) =>
+    runHook(root, "pre-push", `refs/heads/fixture ${oid} refs/heads/fixture ${zero}\n`);
+  try {
+    writeFileSync(
+      join(root, "tools/quality/check-static.sh"),
+      readFileSync(resolve(import.meta.dirname, "check-static.sh")),
+    );
+    executable(root, "bin/bun", '#!/bin/sh\nprintf "%s\\n" "$*" >> "$OBSERVER_HOOK_COMMANDS"\n');
+    const head = commitFixture(root);
+    expect(push(head).status).toBe(0);
+    expect(readFileSync(join(root, ".git/commands"), "utf8")).toBe("run lint\nrun typecheck\n");
+    rmSync(join(root, ".git/commands"));
+    expect(push(zero).status).toBe(0);
+    writeFileSync(join(root, ".gitignore"), ".agent-local.json\nextra\n");
+    expect(push(head).status).toBe(1);
+    fixtureGit(root, ["restore", ".gitignore"]);
+    writeFileSync(join(root, "dirty.txt"), "fixture");
+    expect(push(head).stderr).toContain("requires a clean checkout");
+    fixtureGit(root, ["add", "dirty.txt"]);
+    expect(push(head).status).toBe(1);
+    const next = commitFixture(root);
+    expect(next).not.toBe(head);
+    expect(push(head).stderr).toContain("other than checked-out HEAD");
+    expect(() => readFileSync(join(root, ".git/commands"))).toThrow();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hook installation preserves existing owner and isolates linked worktrees", () => {
+  const root = createFixture();
+  const linked = root + "-linked";
+  const installer = resolve(import.meta.dirname, "install-hooks.sh");
+  const install = () =>
+    spawnSync("sh", [installer], { cwd: root, encoding: "utf8", env: gitEnvironment });
+  const linkedConfiguration = () =>
+    spawnSync("git", ["config", "--get", "core.hooksPath"], {
+      cwd: linked,
+      encoding: "utf8",
+      env: gitEnvironment,
+    });
+  try {
+    for (const hook of ["pre-commit", "pre-push"])
+      executable(root, `.githooks/${hook}`, "#!/bin/sh\nexit 0\n");
+    commitFixture(root);
+    fixtureGit(root, ["config", "core.hooksPath", "existing-owner"]);
+    expect(install().stderr).toContain("Existing hooksPath preserved");
+    expect(fixtureGit(root, ["config", "--get", "core.hooksPath"]).trim()).toBe("existing-owner");
+    fixtureGit(root, ["config", "--unset", "core.hooksPath"]);
+    fixtureGit(root, ["worktree", "add", "--detach", linked]);
+    const before = linkedConfiguration();
+    expect(before.status).toBe(1);
+    expect(install().status).toBe(0);
+    expect(install().status).toBe(0);
+    expect(linkedConfiguration().status).toBe(before.status);
+    expect(linkedConfiguration().stdout).toBe(before.stdout);
+    expect(fixtureGit(root, ["config", "--worktree", "--get", "core.hooksPath"]).trim()).toBe(
+      ".githooks",
+    );
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", linked], { cwd: root, env: gitEnvironment });
+    rmSync(root, { recursive: true, force: true });
+  }
+});

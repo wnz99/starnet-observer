@@ -1,15 +1,14 @@
 # Development rules
 
-- Read README.md, docs/index.md and .bootstrap.json before changing setup. Preserve unrelated edits, MIT LICENSE/NOTICE and existing hook ownership.
-- Use Bun 1.3.13, Node 24.19.0 for tooling and pinned uv 0.13.1. Follow package.json commands. Keep checks read-only; use explicit format/fix commands for changes.
-- Preserve strict compiler flags and deterministic Clean Code/SonarJS/Unicorn rules. Keep Knip/Fallow, tests, builds and isolated consumers connected. Never hide migration findings with blanket exclusions or weaker rules.
-- Keep tests beside tested files. Runtime, browser and tools/test compiler projects own distinct ambient boundaries; browser source must not depend on privileged Bun/Node globals.
-- Preserve --no-env-file on supported Bun launch commands and bunfig.toml env=false. Exported variables remain supported. Preserve child/worker environment restrictions.
-- Trace public entrypoints, HTML scripts, dynamic workers and external contracts before removing code. Use fresh applicable verification before completion.
-- Use trusted shared documentation, independent reviewer, test-quality and language skills; see docs/sources.md for exact provenance. Semantic Clean Code MCP supports concrete local hypotheses; it is advisory and never a hook dependency.
-- Keep credentials and machine-specific state outside version control. Project MCP configuration is ignored and local. Preserve existing registration/settings when integrating it.
-- Keep docs/index.md canonical. Concept documents use YAML type/title/description; final bootstrap digests follow docs/bootstrap-records.md after validation.
-- Leave unanswered optional integrations pending. Do not publish, deploy, provision, run paid/live integrations or change account-wide settings without authorization. No Co-Authored-By trailers or timeline estimates.
-
-- Package only through `bun run package`; tracked clean staging excludes private packs and local dist. Preserve external production-first installed consumers and their frozen graph.
-- Browser verification uses locked Playwright 1.64.1 and emitted synthetic fixtures. Keep real controls, inventories, provider calls and MCP outside deterministic checks/CI.
+- Read README.md and docs/development.md. Package scripts and lockfiles own tool versions and commands.
+- Use Bun for the application and native SQLite; Node runs development tooling. Keep production free of package dependencies.
+- Preserve strict compiler settings, deterministic lint rules, Knip and Fallow. Trace HTML entries, dynamic workers and installed-package consumers before removing code.
+- Keep tests beside their owners. Browser source must not acquire privileged Bun/Node globals; runtime, browser and test compiler projects preserve their ambient boundaries.
+- Pre-push runs lint and type checking only, with tool-version and Git safety checks. CI owns builds, tests, packaged consumers and Chromium checks.
+- Checks are read-only; use explicit format/fix commands to change files. Preserve staged-snapshot formatting and existing hook ownership across worktrees.
+- Preserve loopback/token/origin checks, identity validation, bounded reads, redaction and stale observations. Missing sources remain unavailable; never guess transcript identities.
+- Preserve `--no-env-file`, `bunfig.toml` environment restrictions and child/worker environment filtering. Exported variables remain supported.
+- Package through `bun run package`; clean tracked staging excludes private packs, local configuration and generated dist. Keep production-first installed-package verification.
+- Browser checks use pinned Playwright and synthetic data. Real controls, inventories, provider calls and MCP stay outside deterministic CI.
+- Keep credentials, local MCP configuration and machine-specific state outside version control. Do not alter shared tools, optional integrations or account settings without authorization.
+- Preserve MIT LICENSE, NOTICE and bundled resource licenses. No paid/live runs, deployment, Co-Authored-By trailers or timeline estimates.

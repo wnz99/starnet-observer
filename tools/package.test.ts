@@ -56,7 +56,7 @@ test("tracked package staging excludes synthetic ignored private and generated i
     await fs.rm(root, { recursive: true, force: true });
   }
 });
-import { fixture, command } from "./acceptance/fixture.js";
+import { fixture, command } from "./package.fixture.js";
 import { packageApplication } from "./package.js";
 test("clean archive excludes disposable private sentinels and preserves executable resources", async () => {
   await fixture(async (root) => {

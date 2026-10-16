@@ -8,11 +8,9 @@
 .agents/
 .serena/
 .agent-local.json
-.bootstrap.json
-.bootstrap-lock.json
 bun.lock
 uv.lock
-quality/isolation/**/consumer.json
+tools/fixtures/consumer/bun.lock
 **/.fallow/
 
 # Existing local-only project assets and generated package copies

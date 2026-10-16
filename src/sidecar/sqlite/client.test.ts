@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { buildRuntime } from "../../../tools/build.js";
+import { buildRuntime } from "../../../tools/runtime-build.js";
 import { makeSqliteClient } from "./client.js";
 const execute = promisify(execFile);
 const ASSERTION_TIMEOUT = 10000;

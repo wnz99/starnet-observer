@@ -3,7 +3,6 @@ import { load, prepare, manifest } from "./runtime.fixture.js";
 import type { FixtureImage, FixtureCanvas, DrawLog } from "./runtime.fixture.js";
 import type { SpriteBody, SpriteAppearance } from "./types.js";
 import { readBootstrap } from "../bootstrap.js";
-import { createData } from "../data-shim.js";
 import { canonicalTheme } from "../theme.fixture.js";
 type Body = SpriteBody<FixtureImage | FixtureCanvas>;
 const body = (overrides: Partial<Body> = {}): Body => ({
@@ -47,7 +46,7 @@ test("changed canonical bootstrap drives default startup, inherited tracks and p
     ]),
   );
   const boot = readBootstrap({ __OBSERVER_THEME_DEFAULT__: { ...defaults, crew } }),
-    data = createData(boot.defaultTheme);
+    data = { DEFAULT_SKIN: "blank", SKINS: boot.defaultTheme.crew };
   const sprites = {
     sprites: Object.fromEntries(
       Object.values(boot.defaultTheme.crew).flatMap((group) =>

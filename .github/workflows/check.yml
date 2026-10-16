@@ -31,6 +31,5 @@ jobs:
           if [ "$(uname -s)" = Darwin ]; then swiftc --version; fi
       - run: bun install --frozen-lockfile
       - run: bun node_modules/@playwright/test/cli.js install --with-deps chromium
-      - run: sh tools/quality/check.sh
+      - run: bun run check
       - run: bun run test:browser
-      - run: bun run verify:acceptance

@@ -126,24 +126,7 @@ class StationArt<R extends SpriteResource> {
   };
 }
 export function paintersFor<R extends SpriteResource>(look: Look) {
-  const art = new StationArt<R>(look);
-  return {
-    furnishing: art.furnishing,
-    furnishings: art.furnishings,
-    paintStatic: art.paintStatic,
-    paintObservatoryScreen: art.paintObservatoryScreen,
-    paintTelescope: art.paintTelescope,
-    paintPlant: art.paintPlant,
-    paintLamp: art.paintLamp,
-    paintViewer: art.paintViewer,
-    paintDesk: art.paintDesk,
-    paintHelperDesk: art.paintHelperDesk,
-    paintChair: art.paintChair,
-    paintPartition: art.paintPartition,
-    paintApronProp: art.paintApronProp,
-    paintPlanningDesk: art.paintPlanningDesk,
-    paintDrone: art.paintDrone,
-  };
+  return new StationArt<R>(look);
 }
 // Status-driven light pools: the screen glow on a seated worker, never title or timestamp driven.
 function paintPools<R extends SpriteResource>(scene: Scene, station: Stations<R>) {

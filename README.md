@@ -345,7 +345,7 @@ a "!" badge on the station and "waiting for input" in its row; press `⇱` to at
 
 ## Update and test
 
-See [development setup](docs/development.md) and the [documentation index](docs/index.md) for pinned quality tooling, hooks and migration verification status.
+See [development setup](docs/development.md) for pinned tooling, hooks, packaging and CI checks.
 
 Stop the observer before updating:
 
@@ -355,20 +355,14 @@ bun install --frozen-lockfile
 bun run start
 ```
 
-Tests live beside their owning modules. The test command builds the runtime and public assets, then Bun discovers and awaits the suites directly:
+Tests live beside their owning modules. Pre-push runs lint and type checking:
 
 ```sh
-bun run test
+bun run lint
+bun run typecheck
 ```
 
-Verify clean packaging, installed consumers, browser behavior, and disposable positive/negative acceptance probes:
-
-```sh
-bun run verify:acceptance
-bun run package
-bun run dependency-isolation
-bun run test:browser
-```
+CI builds runtime/public assets, runs native tests, verifies the clean archive in an isolated installation, and exercises emitted browser behavior with Chromium.
 
 ## Credits
 

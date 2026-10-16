@@ -22,6 +22,20 @@ import { createThemePack } from "../theme.js";
 import type { Resource } from "./drawing.fixture.js";
 import { drawing, Handlers, present } from "./drawing.fixture.js";
 import { createViewFactory } from "./index.js";
+import { CORNER_KINDS, WALL_KINDS, wallUnits } from "./furnishing.js";
+import {
+  cacheResolution,
+  idleFilter,
+  lodFor,
+  placePlates,
+  SPRITE_SCALE,
+  stackEnvelopes,
+  stagePlates,
+} from "./helpers.js";
+import { palette, resolveLook } from "./look.js";
+import { officeFurnishing } from "./office-furnishing.js";
+import { paintersFor } from "./painters.js";
+import { visibleFaces } from "./primitives.js";
 import type {
   AppearanceTheme,
   ViewContext,
@@ -30,24 +44,24 @@ import type {
   ViewSprites,
   ZoomLimits,
 } from "./types.js";
+const canonicalLook = resolveLook(undefined, canonicalTheme());
+const canonicalPalette = palette(canonicalTheme().scene.colors);
+const art = paintersFor(canonicalLook);
 const Model = createModel(canonicalTheme());
 const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
 
 test("observer-view regression contracts", async () => {
   // Pure helpers: zoom tiers, plate priority and the static-layer budget.
-  assert.equal(View.idleFilter(0), "none");
+  assert.equal(idleFilter(0), "none");
   assert.equal(
-    View.idleFilter(1),
+    idleFilter(1),
     "grayscale(0.85) brightness(0.45)",
     "full age is mostly grey, 55% darker",
   );
-  assert.equal(View.idleFilter(1 / 3), "grayscale(0.28) brightness(0.82)");
-  assert.equal(View.idleFilter(7), View.idleFilter(1), "clamped");
-  assert.deepEqual(
-    [View.lodFor(0.3), View.lodFor(0.8), View.lodFor(1.5)],
-    ["overview", "sections", "detail"],
-  );
-  const placed = View.placePlates([
+  assert.equal(idleFilter(1 / 3), "grayscale(0.28) brightness(0.82)");
+  assert.equal(idleFilter(7), idleFilter(1), "clamped");
+  assert.deepEqual([lodFor(0.3), lodFor(0.8), lodFor(1.5)], ["overview", "sections", "detail"]);
+  const placed = placePlates([
     { x: 0, y: 0, w: 50, h: 10, priority: 10, text: "repo" },
     { x: 20, y: 0, w: 50, h: 10, priority: 70, text: "waiting" },
     { x: 200, y: 0, w: 20, h: 10, priority: 1, text: "far" },
@@ -58,7 +72,7 @@ test("observer-view regression contracts", async () => {
     "a colliding lower-priority plate is dropped, not overlapped",
   );
   // Camera-facing skirts: across corner winding, exactly the +y (left, shaded) and +x (right, lit) faces are emitted.
-  const faces = View.visibleFaces([
+  const faces = visibleFaces([
     { x: 0, y: 0 },
     { x: 0, y: 4 },
     { x: 6, y: 4 },
@@ -71,7 +85,7 @@ test("observer-view regression contracts", async () => {
       ["right", { x: 6, y: 4 }, { x: 6, y: 0 }],
     ],
   );
-  const octagon = View.visibleFaces([
+  const octagon = visibleFaces([
     { x: 2, y: 0 },
     { x: 0, y: 2 },
     { x: 0, y: 10 },
@@ -86,7 +100,7 @@ test("observer-view regression contracts", async () => {
     ["left", "mid", "right"],
     "the hub pad shows its front, chamfer and right skirts",
   );
-  const forced = View.placePlates([
+  const forced = placePlates([
     { x: 10, y: 10, w: 80, h: 14, priority: 90, force: true, text: "focus" },
     { x: 30, y: 12, w: 80, h: 14, priority: 100, force: true, text: "hover" },
   ]);
@@ -96,7 +110,7 @@ test("observer-view regression contracts", async () => {
     "force never bypasses priority: hover beats a colliding focus plate",
   );
   // Off-stage anchors are discarded before collisions; forced hover/focus plates are clamped into view first.
-  const staged = View.stagePlates(
+  const staged = stagePlates(
     [
       { text: "off", x: 900, y: 700, w: 40, h: 12, priority: 10 },
       { text: "off2", x: 905, y: 702, w: 40, h: 12, priority: 10 },
@@ -112,13 +126,13 @@ test("observer-view regression contracts", async () => {
   );
   assert.deepEqual([present(staged[0]).x, present(staged[0]).y], [800 - 60 - 4, 500 - 14 - 4]);
   const huge = { minX: 0, minY: 0, maxX: 20000, maxY: 9000 },
-    resolution = View.cacheResolution(huge, 3, 2);
+    resolution = cacheResolution(huge, 3, 2);
   assert(
     20000 * resolution <= 4096 + 1e-6 && 20000 * 9000 * resolution * resolution <= 4e6 + 1,
     "the static layer honours the axis and pixel ceilings",
   );
   assert.equal(
-    View.cacheResolution({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, 0.6, 1),
+    cacheResolution({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, 0.6, 1),
     1,
     "zoom buckets",
   );
@@ -144,7 +158,7 @@ test("observer-view regression contracts", async () => {
         x + pad <= r.x + r.w + 1e-9 &&
         y - pad >= r.y - 1e-9 &&
         y + pad <= r.y + r.h + 1e-9;
-    const outside = (part: ReturnType<typeof View.furnishing>[number], r: Rect) =>
+    const outside = (part: ReturnType<typeof art.furnishing>[number], r: Rect) =>
       part.box
         ? !(
             within(r, part.box.x, part.box.y) &&
@@ -160,9 +174,9 @@ test("observer-view regression contracts", async () => {
     for (const platform of scene.platforms)
       platform.decorationRegions.forEach((region, index) => {
         if (region.kind !== "wall" && region.kind !== "corner") return;
-        for (const unit of View.wallUnits(region))
-          for (const kind of region.kind === "corner" ? View.CORNER_KINDS : View.WALL_KINDS)
-            for (const part of View.furnishing(kind, unit, region.edge)) {
+        for (const unit of wallUnits(region))
+          for (const kind of region.kind === "corner" ? CORNER_KINDS : WALL_KINDS)
+            for (const part of art.furnishing(kind, unit, region.edge)) {
               checked++;
               assert(
                 !outside(part, region.rect),
@@ -170,7 +184,7 @@ test("observer-view regression contracts", async () => {
               );
             }
         assert(
-          View.furnishings(platform, region, index).every((part) => !outside(part, region.rect)),
+          art.furnishings(platform, region, index).every((part) => !outside(part, region.rect)),
         );
       });
     assert(checked > 100, "every kind is exercised on every wall edge");
@@ -356,7 +370,7 @@ test("observer-view regression contracts", async () => {
     const region = regionOf(one.view, "obs_0"),
       zoom = one.view.camera().zoom;
     assert(
-      Math.abs(region.width - Math.max(20, 30 * View.SPRITE_SCALE * zoom)) < 1e-6,
+      Math.abs(region.width - Math.max(20, 30 * SPRITE_SCALE * zoom)) < 1e-6,
       "hit width is the painted sprite extent, at least 20 CSS px",
     );
     // Resize refits the overview.
@@ -652,7 +666,7 @@ test("observer-view regression contracts", async () => {
         { point: pod, count: 1, mark: true, label: "D2", alpha: 1, color: "#ffbd5c" },
       ];
     assert.deepEqual(
-      View.stackEnvelopes(envelopes).map((entry) => [entry.envelope.label, entry.lift]),
+      stackEnvelopes(envelopes).map((entry) => [entry.envelope.label, entry.lift]),
       [
         ["D2", 0],
         ["D3", 14],
@@ -841,7 +855,7 @@ test("observer-view regression contracts", async () => {
     const ctx = node.ctx,
       counting = new Proxy(ctx, {
         set: (t, key, value: unknown) => {
-          if (key === "fillStyle" && value === View.PALETTE.consoleTop) desks++;
+          if (key === "fillStyle" && value === canonicalPalette.consoleTop) desks++;
           return Reflect.set(t, key, value);
         },
       });
@@ -1181,9 +1195,9 @@ test("observer-view regression contracts", async () => {
     const zoom = view.camera().zoom,
       helperRegion = fitted.map((worker) => regionOf(view, worker.id)).find(Boolean);
     assert(helperRegion, "a fitted helper near its parent is painted and hit-testable");
-    assert(Math.abs(regionOf(view, "obs_r").height - 60 * View.SPRITE_SCALE * zoom) < 1e-6);
+    assert(Math.abs(regionOf(view, "obs_r").height - 60 * SPRITE_SCALE * zoom) < 1e-6);
     assert(
-      Math.abs(helperRegion.height - 60 * View.SPRITE_SCALE * 0.72 * zoom) < 1e-6,
+      Math.abs(helperRegion.height - 60 * SPRITE_SCALE * 0.72 * zoom) < 1e-6,
       "a helper body is drawn and hit at 0.72 scale",
     );
     assert(
@@ -1214,13 +1228,13 @@ test("observer-view regression contracts", async () => {
         y >= 12 * (desk.x + desk.y) - 24 * 1.1 - 1e-6 &&
         y <= 12 * (desk.x + desk.w + desk.y + desk.h) + 1e-6;
     const effectsEnabled = true;
-    View.paintHelperDesk(recorder, present(fitted[0]), 0, effectsEnabled);
+    art.paintHelperDesk(recorder, present(fitted[0]), 0, effectsEnabled);
     assert(
       points.length > 10 && points.every(inside),
       "the helper station paints inside its desk footprint",
     );
     points.length = 0;
-    View.paintDesk(recorder, present(fitted[0]), 0, effectsEnabled);
+    art.paintDesk(recorder, present(fitted[0]), 0, effectsEnabled);
     assert(!points.every(inside), "control: the two-unit root console exceeds a helper desk");
     // Observatory: signed, ambient Viewer labelled at detail, never a hit target.
     view.overview();
@@ -1228,7 +1242,7 @@ test("observer-view regression contracts", async () => {
     recordedCalls(node).fills = {};
     view.paint(24);
     assert.equal(
-      recordedCalls(node).fills[View.PALETTE.consoleTop],
+      recordedCalls(node).fills[canonicalPalette.consoleTop],
       1,
       "one root console; the eight helpers get jump seats, not root desks",
     );
@@ -1759,7 +1773,7 @@ test("observer-view regression contracts", async () => {
     now += 16;
     view.paint(now);
     assert.notEqual(
-      View.lodFor(view.camera().zoom),
+      lodFor(view.camera().zoom),
       "overview",
       "fixture: section signs are drawn at this zoom",
     );
@@ -1812,7 +1826,7 @@ test("observer-view regression contracts", async () => {
     now += 16;
     view.paint(now);
     const rings = strokes
-      .filter(([style]) => style === View.PALETTE.repo)
+      .filter(([style]) => style === canonicalPalette.repo)
       .map(([, width]) => width)
       .sort();
     assert.deepEqual(
@@ -1821,7 +1835,7 @@ test("observer-view regression contracts", async () => {
       "repo_a: a working double ring and an idle ring; repo_b is not ringed",
     );
     assert(
-      texts.some(([text, style]) => text === "api" && style === View.PALETTE.repo),
+      texts.some(([text, style]) => text === "api" && style === canonicalPalette.repo),
       "the selected sign is recoloured",
     );
     assert.deepEqual(view.signRegions(), signs, "selection never moves sign placement");
@@ -1831,7 +1845,7 @@ test("observer-view regression contracts", async () => {
     view.paint(now);
     assert.deepEqual(
       strokes
-        .filter(([style]) => style === View.PALETTE.repo)
+        .filter(([style]) => style === canonicalPalette.repo)
         .map(([, width]) => width)
         .sort(),
       [1.5, 1.5],
@@ -2463,9 +2477,9 @@ test("observer-view regression contracts", async () => {
     );
     assert.notDeepEqual(present(other["fx-on"]).log, present(before["fx-on"]).log);
     assert(
-      Object.isFrozen(View.PALETTE) &&
-        View.PALETTE.cyan === base.colors.cyan &&
-        View.STATUS.blocked === base.colors.blocked,
+      Object.isFrozen(canonicalPalette) &&
+        canonicalPalette.cyan === base.colors.cyan &&
+        canonicalLook.status.blocked === base.colors.blocked,
       "exported defaults stay canonical",
     );
 
@@ -3576,16 +3590,16 @@ test("observer-view regression contracts", async () => {
       region: SceneGeometry["platforms"][number]["decorationRegions"][number],
     ) {
       if (region.kind !== "wall" && region.kind !== "corner") return;
-      for (const unit of View.wallUnits(region))
-        for (const kind of region.kind === "corner" ? View.CORNER_KINDS : View.WALL_KINDS)
+      for (const unit of wallUnits(region))
+        for (const kind of region.kind === "corner" ? CORNER_KINDS : WALL_KINDS)
           verifyOfficeFurnishing(kind, unit, region);
     }
     function verifyOfficeFurnishing(
-      kind: Parameters<typeof View.officeFurnishing>[0],
-      unit: Parameters<typeof View.officeFurnishing>[1],
+      kind: Parameters<typeof officeFurnishing>[0],
+      unit: Parameters<typeof officeFurnishing>[1],
       region: SceneGeometry["platforms"][number]["decorationRegions"][number],
     ) {
-      const { role, rect } = View.officeFurnishing(kind, unit, region.edge),
+      const { role, rect } = officeFurnishing(kind, unit, region.edge),
         r = region.rect;
       assert(
         rect.x >= r.x - 1e-9 &&
@@ -3742,7 +3756,7 @@ test("observer-view regression contracts", async () => {
       };
       const fill = node.ctx.fill.bind(node.ctx);
       node.ctx.fill = (...args) => {
-        if (node.ctx.filter === View.idleFilter(1)) tintedFills.push(node.ctx.fillStyle);
+        if (node.ctx.filter === idleFilter(1)) tintedFills.push(node.ctx.fillStyle);
         fill(...args);
       };
       const view = View.create({
@@ -3773,7 +3787,7 @@ test("observer-view regression contracts", async () => {
       if (office) {
         assert.equal(bodies.length, 0, "unready office never substitutes station sprites");
         assert(tintedFills.length > 0, "procedural office body receives idle tint");
-      } else assert.deepEqual(bodies, [View.idleFilter(1)], "station sprite receives idle tint");
+      } else assert.deepEqual(bodies, [idleFilter(1)], "station sprite receives idle tint");
       assert.equal(node.ctx.filter, "none", "body tint is restored after painting");
       view.stop();
     }

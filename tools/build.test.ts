@@ -7,7 +7,7 @@ import ts from "typescript";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { buildRuntime } from "./build.js";
+import { buildRuntime } from "./runtime-build.js";
 
 const execute = promisify(execFile);
 const repository = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
