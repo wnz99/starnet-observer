@@ -10,7 +10,12 @@
     "rootDir": ".",
     "outDir": "dist/runtime"
   },
-  "include": ["src/sidecar/**/*.ts", "src/server/runtime-paths.ts", "src/shared/**/*.ts"],
+  "include": [
+    "src/sidecar/**/*.ts",
+    "src/server/runtime-paths.ts",
+    "src/shared/**/*.ts",
+    "scripts/stream.ts"
+  ],
   "exclude": ["**/*.test.ts", "**/*.fixture.ts"],
   "files": ["src/sidecar/sqlite/worker.ts"]
 }

@@ -270,16 +270,19 @@ Controls also work in presentation mode with `OBSERVER_CONTROL=1 bun run present
 ## Optional remote hosts (multi-host)
 
 Agents on other machines (for example a VPS running Herdr) can appear as their own ships next to this machine's
-station. Install the observer on each remote as usual, then list the remotes in `observer.config.json`:
+station. Install the observer on each remote as usual and run `bun run build` there before connecting the hub.
+Then list the remotes in `observer.config.json`:
 
 ```json
 { "remotes": [{ "id": "vm1", "ssh": "nick@203.0.113.10", "dir": "~/starnet-observer" }] }
 ```
 
-The hub keeps one `ssh -o BatchMode=yes` stream per remote running `bun --no-env-file scripts/stream.js`, which prints
+The hub keeps one `ssh -o BatchMode=yes` stream per remote running `bun --no-env-file dist/runtime/scripts/stream.js`, which prints
 one snapshot per line and opens no port. Key authentication must already work non-interactively. Remote rows and mail
 are sanitised and re-identified per host, remote ships dim with "last seen" when their stream goes quiet, and
 transcript or message inspection never reaches a remote.
+
+For explicit source development, use `bun --no-env-file scripts/stream.ts` after installing development tooling.
 
 llm-bus is per host, so each remote ship has its own mailroom showing that host's own bus; its couriers and crew stay
 on their own ship, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their

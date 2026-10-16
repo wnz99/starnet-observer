@@ -9,8 +9,8 @@ test("control-remote regression contracts", async () => {
     makeRemoteHosts,
     makeFederatedObserver,
     sanitizeTargets,
-  } = require("./observer-remotes.js");
-  const { nativeProof } = require("../scripts/stream.js");
+  } = require("../src/sidecar/remotes/index.ts");
+  const { nativeProof } = require("../scripts/stream.ts");
   // Remote control meets the local bar: a fresh streamed native proof, re-checked on that host over ssh before acting.
   await (async () => {
     const at = new Date("2026-10-14T12:00:00").getTime();

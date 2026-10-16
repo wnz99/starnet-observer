@@ -13,7 +13,7 @@ const { loadThemePack } = require("./src/sidecar/themes/index.ts");
 const canonicalTheme = require("./frontend/assets/themes/starnet/theme.json");
 const { makeOverseerState, resolveEndpoint } = require("./src/sidecar/overseer-state/index.ts");
 const { makeControl, PANE, TARGET } = require("./sidecar/control.js");
-const { makeRemoteHosts, makeFederatedObserver } = require("./sidecar/observer-remotes.js");
+const { makeRemoteHosts, makeFederatedObserver } = require("./src/sidecar/remotes/index.ts");
 const { resolveRuntimePaths } = require("./src/server/runtime-paths.ts");
 const { installRoot, publicRoot: ROOT } = resolveRuntimePaths({
   installRoot: __dirname,
