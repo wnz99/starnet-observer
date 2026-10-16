@@ -47,9 +47,10 @@ export function createHarness(environment: HarnessEnvironment) {
           headers: { "X-Observer-Token": environment.token },
         });
       },
-      post(path: string, payload?: unknown) {
+      post(path: string, payload?: unknown, options: { signal?: AbortSignal } = {}) {
         return request(path, {
           method: POST_METHOD,
+          ...(options.signal ? { signal: options.signal } : {}),
           cache: "no-store",
           credentials: "same-origin",
           headers: { "X-Observer-Token": environment.token, "Content-Type": "application/json" },

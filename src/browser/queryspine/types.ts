@@ -25,5 +25,6 @@ export interface QuerySpec {
 export interface QueryEnvironment {
   readonly getJson: (path: string, options: { signal: AbortSignal }) => Promise<unknown>;
   readonly now?: () => number;
+  readonly timeout?: (callback: () => void, milliseconds: number) => () => void;
   readonly interval?: (callback: () => void, milliseconds: number) => () => void;
 }

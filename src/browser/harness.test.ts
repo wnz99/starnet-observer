@@ -72,3 +72,28 @@ test("non-token failures never schedule reload and malformed errors use status",
   await assert.rejects(harness.api.get("/x"), /Observer request failed \(403\)/);
   expect(scheduled).toEqual([]);
 });
+
+test("POST forwards the caller abort signal without changing its request contract", async () => {
+  const calls: RequestInit[] = [];
+  const harness = createHarness({
+    token: "launch-token",
+    reload() {},
+    schedule() {},
+    fetch: (_path, options) => {
+      calls.push(options);
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) });
+    },
+  });
+  const controller = new AbortController();
+  await harness.api.post("/api/control/attach", { paneId: "w1:p1" }, { signal: controller.signal });
+  expect(calls[0]).toEqual({
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    signal: controller.signal,
+    headers: { "X-Observer-Token": "launch-token", "Content-Type": "application/json" },
+    body: '{"paneId":"w1:p1"}',
+  });
+  controller.abort();
+  expect(calls[0]?.signal?.aborted).toBeTruthy();
+});

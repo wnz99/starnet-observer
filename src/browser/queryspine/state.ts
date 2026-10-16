@@ -20,6 +20,8 @@ export class Resource {
   inFlight: Promise<QuerySnapshot> | null = null;
   inFlightGeneration = 0;
   readonly listeners = new Set<(snapshot: QuerySnapshot) => void>();
+  disposed = false;
+  private readonly activeReads = new Set<() => void>();
   private cancelTimer: (() => void) | null = null;
   constructor(key: string, spec: QuerySpec) {
     this.key = key;
@@ -52,6 +54,7 @@ export class Resource {
   notify(now: () => number) {
     const snapshot = this.snapshot(now);
     for (const listener of Array.from(this.listeners)) {
+      if (this.disposed) return;
       try {
         listener(snapshot);
       } catch {
@@ -79,19 +82,41 @@ export class Resource {
     this.hasData = false;
     this.data = undefined;
   }
+  cancelReads() {
+    if (this.activeReads.size === 0) return;
+    this.invalidate();
+    this.inFlight = null;
+    for (const cancel of this.activeReads) cancel();
+    this.activeReads.clear();
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.listeners.clear();
+    this.stopTimer();
+    this.cancelReads();
+    this.discard();
+  }
   failed(error: QueryError, now: () => number) {
     this.error = error;
     this.errorAt = now();
   }
-  begin(pending: Promise<QuerySnapshot>, generation: number) {
+  begin(pending: Promise<QuerySnapshot>, generation: number, cancel: () => void) {
+    this.activeReads.add(cancel);
     this.inFlight = pending;
     this.inFlightGeneration = generation;
   }
-  complete(pending: Promise<QuerySnapshot>) {
+  complete(pending: Promise<QuerySnapshot>, cancel: () => void) {
+    this.activeReads.delete(cancel);
     if (this.inFlight === pending) this.inFlight = null;
   }
   startTimer(arm: () => () => void) {
-    if (this.cancelTimer === null) this.cancelTimer = arm();
+    if (this.cancelTimer !== null || this.disposed) return;
+    this.adoptTimer(arm());
+  }
+  private adoptTimer(cancel: () => void) {
+    if (this.disposed) cancel();
+    else this.cancelTimer = cancel;
   }
   stopTimer() {
     this.cancelTimer?.();

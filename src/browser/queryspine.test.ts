@@ -193,3 +193,414 @@ test("cached invalidation retains stale last-good data and ordinary get reads a 
   expect((await query.get("cached")).data).toEqual({ revision: 2 });
   expect(calls).toBe(2);
 });
+
+function lifecycleWire() {
+  const deadlines = new Map<() => void, number>();
+  const polls = new Set<() => void>();
+  const signals: AbortSignal[] = [];
+  const reads: ReturnType<typeof deferred>[] = [];
+  const query = createQuerySpine({
+    getJson: (_path, { signal }) => {
+      signals.push(signal);
+      const read = deferred();
+      reads.push(read);
+      return read.promise;
+    },
+    timeout: (callback, milliseconds) => {
+      deadlines.set(callback, milliseconds);
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+    interval: (callback) => {
+      polls.add(callback);
+      return () => {
+        polls.delete(callback);
+      };
+    },
+  });
+  query.define("rows", { path: "/rows", pollMs: 60, timeoutMs: 9000 });
+  return { query, deadlines, polls, signals, reads };
+}
+
+test("last subscriber cancels every active generation and deadlines while retaining last-good cache", async () => {
+  const { query, deadlines, polls, signals, reads } = lifecycleWire();
+  const cache = { revision: "cached" };
+  query.update("rows", cache);
+  const delivered: QuerySnapshot[] = [];
+  const offA = query.subscribe(
+    "rows",
+    (state) => {
+      delivered.push(state);
+    },
+    { refresh: false },
+  );
+  const offB = query.subscribe("rows", () => {}, { refresh: false });
+  const capturedPoll = [...polls][0];
+  const old = query.refresh("rows");
+  await Promise.resolve();
+  void query.invalidate("rows");
+  const newer = query.refresh("rows");
+  await Promise.resolve();
+  expect(signals).toHaveLength(2);
+  expect(deadlines.size).toBe(2);
+  const capturedDeadlines = [...deadlines.keys()];
+  offA();
+  expect(signals.every((signal) => !signal.aborted)).toBeTruthy();
+  expect(deadlines.size).toBe(2);
+  offB();
+  offB();
+  expect(signals.every((signal) => signal.aborted)).toBeTruthy();
+  expect(deadlines.size).toBe(0);
+  expect(polls.size).toBe(0);
+  expect(query.state("rows")).toMatchObject({ pending: false, stale: true, error: null });
+  expect(query.state("rows").data).toBe(cache);
+  const offResume = query.subscribe("rows", (state) => {
+    delivered.push(state);
+  });
+  await Promise.resolve();
+  expect(reads).toHaveLength(3);
+  const resumed = query.get("rows");
+  capturedPoll?.();
+  expect(reads).toHaveLength(3);
+  const beforeOld = delivered.length;
+  for (const callback of capturedDeadlines) callback();
+  reads[0]?.release({ revision: "obsolete" });
+  reads[1]?.release({ revision: "also obsolete" });
+  await Promise.all([old, newer]);
+  expect(delivered).toHaveLength(beforeOld);
+  expect(query.state("rows").data).toBe(cache);
+  expect(query.state("rows").error).toBeNull();
+  reads[2]?.release({ revision: "resumed" });
+  expect((await resumed).data).toEqual({ revision: "resumed" });
+  expect(deadlines.size).toBe(0);
+  capturedPoll?.();
+  await Promise.resolve();
+  expect(reads).toHaveLength(3);
+  expect(deadlines.size).toBe(0);
+  offResume();
+});
+
+test("unsubscribe before deferred transport starts acquires nothing and permits a fresh read", async () => {
+  const { query, deadlines, polls, reads } = lifecycleWire();
+  const off = query.subscribe("rows", () => {}, { refresh: false });
+  const pending = query.refresh("rows");
+  off();
+  await pending;
+  expect(reads).toHaveLength(0);
+  expect(deadlines.size).toBe(0);
+  expect(polls.size).toBe(0);
+  const current = query.get("rows");
+  await Promise.resolve();
+  expect(reads).toHaveLength(1);
+  reads[0]?.release({ fresh: true });
+  expect((await current).data).toEqual({ fresh: true });
+});
+
+test("terminal disposal releases jobs and makes every retained registry entry point closed", async () => {
+  const { query, deadlines, polls, signals, reads } = lifecycleWire();
+  const published: QuerySnapshot[] = [];
+  const off = query.subscribe(
+    "rows",
+    (state) => {
+      published.push(state);
+    },
+    { refresh: false },
+  );
+  const capturedPoll = [...polls][0];
+  const pending = query.get("rows");
+  await Promise.resolve();
+  const capturedDeadline = [...deadlines.keys()][0];
+  expect(signals[0]?.aborted).toBeFalsy();
+  const get = query.get,
+    refresh = query.refresh,
+    subscribe = query.subscribe;
+  const define = query.define,
+    update = query.update,
+    invalidate = query.invalidate;
+  query.dispose();
+  query.dispose();
+  off();
+  expect(signals[0]?.aborted).toBeTruthy();
+  expect(deadlines.size).toBe(0);
+  expect(polls.size).toBe(0);
+  const deliveries = published.length;
+  capturedPoll?.();
+  capturedDeadline?.();
+  for (const invoke of [
+    () => get("rows"),
+    () => refresh("rows"),
+    () => subscribe("rows", () => {}),
+    () => define("new", { path: "/new" }),
+    () => update("rows", {}),
+    () => invalidate("rows", { refresh: true }),
+    () => query.state("rows"),
+  ])
+    assert.throws(invoke, /query spine disposed/);
+  reads[0]?.release({ obsolete: true });
+  await pending;
+  expect(published).toHaveLength(deliveries);
+  expect(reads).toHaveLength(1);
+  expect(deadlines.size).toBe(0);
+  expect(polls.size).toBe(0);
+});
+
+test("terminal disposal before transport microtask and during immediate delivery cannot acquire reads", async () => {
+  const first = lifecycleWire();
+  const pending = first.query.get("rows");
+  first.query.dispose();
+  await pending;
+  expect(first.reads).toHaveLength(0);
+  expect(first.deadlines.size).toBe(0);
+  const second = lifecycleWire();
+  const off = second.query.subscribe("rows", () => {
+    second.query.dispose();
+  });
+  off();
+  await Promise.resolve();
+  expect(second.reads).toHaveLength(0);
+  expect(second.deadlines.size).toBe(0);
+  expect(second.polls.size).toBe(0);
+});
+
+test("abort-aware cancellation stays silent after resubscription and leaves other resources running", async () => {
+  const signals = new Map<string, AbortSignal>();
+  const deadlines = new Set<() => void>();
+  const query = createQuerySpine({
+    getJson: (path, { signal }) => {
+      signals.set(path, signal);
+      return new Promise<never>((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => {
+            reject(new Error("transport aborted"));
+          },
+          { once: true },
+        );
+      });
+    },
+    timeout: (callback) => {
+      deadlines.add(callback);
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+  });
+  query.define("rows", { path: "/rows" });
+  query.define("other", { path: "/other" });
+  const cache = { retained: true };
+  query.update("rows", cache);
+  const off = query.subscribe("rows", () => {}, { refresh: false });
+  const pending = query.refresh("rows");
+  const rejected = assert.rejects(pending, /transport aborted/);
+  const other = query.get("other");
+  const otherRejected = assert.rejects(other, /transport aborted/);
+  await Promise.resolve();
+  expect(deadlines.size).toBe(2);
+  off();
+  const received: QuerySnapshot[] = [];
+  const offResume = query.subscribe(
+    "rows",
+    (state) => {
+      received.push(state);
+    },
+    { refresh: false },
+  );
+  const before = received.length;
+  await rejected;
+  expect(signals.get("/rows")?.aborted).toBeTruthy();
+  expect(signals.get("/other")?.aborted).toBeFalsy();
+  expect(deadlines.size).toBe(1);
+  expect(received).toHaveLength(before);
+  expect(query.state("rows")).toMatchObject({ pending: false, error: null, stale: true });
+  expect(query.state("rows").data).toBe(cache);
+  expect(query.state("other").pending).toBeTruthy();
+  offResume();
+  query.dispose();
+  await otherRejected;
+  expect(signals.get("/other")?.aborted).toBeTruthy();
+  expect(deadlines.size).toBe(0);
+});
+
+test("disposal during transport acquisition clears the already-owned deadline", async () => {
+  const deadlines = new Set<() => void>();
+  const wire = deferred();
+  let signal: AbortSignal | undefined;
+  const query = createQuerySpine({
+    getJson: (_path, options) => {
+      signal = options.signal;
+      query.dispose();
+      return wire.promise;
+    },
+    timeout: (callback) => {
+      deadlines.add(callback);
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+  });
+  const pending = query.get("cron");
+  await Promise.resolve();
+  expect(signal?.aborted).toBeTruthy();
+  expect(deadlines.size).toBe(0);
+  wire.release({ jobs: [] });
+  await pending;
+  expect(deadlines.size).toBe(0);
+});
+
+test("disposal inside invalidation delivery prevents refresh and remaining deliveries", async () => {
+  const { query, reads, deadlines, polls } = lifecycleWire();
+  query.update("rows", { retained: true });
+  const offA = query.subscribe(
+    "rows",
+    () => {
+      query.dispose();
+    },
+    { immediate: false, refresh: false },
+  );
+  let laterDeliveries = 0;
+  const offB = query.subscribe(
+    "rows",
+    () => {
+      laterDeliveries++;
+    },
+    { immediate: false, refresh: false },
+  );
+  assert.throws(() => query.invalidate("rows", { refresh: true }), /query spine disposed/);
+  await Promise.resolve();
+  expect(laterDeliveries).toBe(0);
+  expect(reads).toHaveLength(0);
+  expect(deadlines.size).toBe(0);
+  expect(polls.size).toBe(0);
+  offA();
+  offB();
+});
+
+test("disposal during timeout acquisition cancels the returned deadline before transport", async () => {
+  const deadlines = new Set<() => void>();
+  const wire = deferred();
+  let calls = 0;
+  let capturedDeadline: (() => void) | undefined;
+  const query = createQuerySpine({
+    timeout: (callback) => {
+      capturedDeadline = callback;
+      deadlines.add(callback);
+      query.dispose();
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+    getJson: () => {
+      calls++;
+      return wire.promise;
+    },
+  });
+  const pending = query.get("cron");
+  await Promise.resolve();
+  try {
+    expect(deadlines.size).toBe(0);
+    expect(calls).toBe(0);
+    capturedDeadline?.();
+    expect(deadlines.size).toBe(0);
+  } finally {
+    wire.release({ jobs: [] });
+    await pending;
+    query.dispose();
+  }
+});
+
+test("failed timeout acquisition starts no transport and a later read remains retryable", async () => {
+  const deadlines = new Set<() => void>();
+  const wire = deferred();
+  let unavailable = true;
+  let calls = 0;
+  const query = createQuerySpine({
+    timeout: (callback) => {
+      if (unavailable) throw new Error("scheduler unavailable");
+      deadlines.add(callback);
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+    getJson: () => {
+      calls++;
+      return wire.promise;
+    },
+  });
+  try {
+    await assert.rejects(query.get("cron"), /scheduler unavailable/);
+    expect(calls).toBe(0);
+    expect(deadlines.size).toBe(0);
+    expect(query.state("cron")).toMatchObject({
+      pending: false,
+      error: { message: "scheduler unavailable" },
+    });
+    unavailable = false;
+    wire.release({ jobs: [] });
+    expect((await query.get("cron")).data).toEqual({ jobs: [] });
+    expect(calls).toBe(1);
+    expect(deadlines.size).toBe(0);
+  } finally {
+    query.dispose();
+    wire.release({ jobs: [] });
+  }
+});
+
+test("disposal during interval acquisition releases its returned poll without immediate delivery", async () => {
+  const polls = new Set<() => void>();
+  let calls = 0;
+  let deliveries = 0;
+  let capturedPoll: (() => void) | undefined;
+  const query = createQuerySpine({
+    interval: (callback) => {
+      capturedPoll = callback;
+      polls.add(callback);
+      query.dispose();
+      return () => {
+        polls.delete(callback);
+      };
+    },
+    getJson: () => {
+      calls++;
+      return Promise.resolve({ jobs: [] });
+    },
+  });
+  const off = query.subscribe("cron", () => {
+    deliveries++;
+  });
+  try {
+    expect(polls.size).toBe(0);
+    expect(deliveries).toBe(0);
+    capturedPoll?.();
+    await Promise.resolve();
+    expect(calls).toBe(0);
+    expect(polls.size).toBe(0);
+    expect(deliveries).toBe(0);
+  } finally {
+    off();
+  }
+});
+
+test("synchronous transport acquisition failure releases its deadline and permits retry", async () => {
+  const deadlines = new Set<() => void>();
+  let unavailable = true;
+  const query = createQuerySpine({
+    timeout: (callback) => {
+      deadlines.add(callback);
+      return () => {
+        deadlines.delete(callback);
+      };
+    },
+    getJson: () => {
+      if (unavailable) throw new Error("transport unavailable");
+      return Promise.resolve({ jobs: [] });
+    },
+  });
+  await assert.rejects(query.get("cron"), /transport unavailable/);
+  expect(deadlines.size).toBe(0);
+  expect(query.state("cron").pending).toBeFalsy();
+  unavailable = false;
+  expect((await query.get("cron")).data).toEqual({ jobs: [] });
+  query.dispose();
+  expect(deadlines.size).toBe(0);
+});

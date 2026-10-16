@@ -27,6 +27,7 @@ function subscription(
     resource.removeListener(listener);
     if (resource.listeners.size > 0) return;
     resource.stopTimer();
+    resource.cancelReads();
     if (resource.retainOnUnsubscribe) return;
     resource.discard();
     remove(resource.key);
@@ -34,7 +35,12 @@ function subscription(
 }
 function createRegistry() {
   const resources = new Map<string, Resource>();
+  let disposed = false;
+  function assertOpen() {
+    if (disposed) throw new Error("query spine disposed");
+  }
   function define(key: string, spec: QuerySpec) {
+    assertOpen();
     const normalized = key.trim();
 
     if (!normalized) throw new Error("query resource key required");
@@ -48,6 +54,7 @@ function createRegistry() {
     return normalized;
   }
   function resource(key: string) {
+    assertOpen();
     const result = resources.get(key);
     if (!result) throw new Error(`unknown query resource: ${key}`);
     return result;
@@ -55,6 +62,12 @@ function createRegistry() {
   return {
     define,
     resource,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      for (const entry of resources.values()) entry.dispose();
+      resources.clear();
+    },
     remove: (key: string) => {
       resources.delete(key);
     },
@@ -100,17 +113,23 @@ function createSubscribers(
     const resource = registry.resource(key);
     resource.listeners.add(listener);
     if (resource.pollMs > 0 && resource.listeners.size === 1) {
-      resource.startTimer(() =>
-        (environment.interval ?? interval)(() => {
-          if (resource.listeners.size > 0)
+      resource.startTimer(() => {
+        let live = true;
+        const cancel = (environment.interval ?? interval)(() => {
+          if (live && resource.listeners.size > 0)
             void request(resource, { force: true }).catch(() => {
               /* State reports failures. */
             });
-        }, resource.pollMs),
-      );
+        }, resource.pollMs);
+        return () => {
+          live = false;
+          cancel();
+        };
+      });
     }
-    if (options.immediate !== false) deliver(listener, resource.snapshot(now));
-    if (options.refresh !== false)
+    if (!resource.disposed && options.immediate !== false)
+      deliver(listener, resource.snapshot(now));
+    if (!resource.disposed && options.refresh !== false)
       void request(resource).catch(() => {
         /* State reports failures. */
       });
@@ -124,16 +143,17 @@ export function createQuerySpine(environment: QueryEnvironment) {
   defineDefaults(registry.define);
   return {
     define: registry.define,
+    dispose: registry.dispose,
     get: (key: string) => request(registry.resource(key)),
     refresh: (key: string) => request(registry.resource(key), { force: true }),
     state: (key: string) => registry.resource(key).snapshot(now),
-    invalidate(key: string, options: { refresh?: boolean } = {}) {
+    invalidate: (key: string, options: { refresh?: boolean } = {}) => {
       const resource = registry.resource(key);
       resource.invalidate();
       resource.notify(now);
       return options.refresh ? request(resource, { force: true }) : resource.snapshot(now);
     },
-    update(key: string, data: unknown) {
+    update: (key: string, data: unknown) => {
       const resource = registry.resource(key);
       if (resource.validate && !resource.validate(data))
         throw new Error(`invalid response for ${key}`);
