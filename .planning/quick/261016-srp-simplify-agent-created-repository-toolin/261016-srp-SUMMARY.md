@@ -1,5 +1,5 @@
 ---
-status: complete
+status: incomplete
 ---
 
 # Repository simplification
@@ -15,3 +15,7 @@ Ubuntu CI at implementation head `82e4e806b8a884c588f8d28fc3ee95cb69fa1d22` pass
 Final record/CI cleanup removes a redundant standalone browser invocation already exercised by the aggregate, duplicate feature-push jobs covered by pull-request CI, and unreachable macOS version logging in the Ubuntu-only workflow. Product/tool/test/policy bytes remain identical to the passing implementation. Builds and tests ran only in CI. No paid/live runs or external settings changed; native macOS/live integration is unverified.
 
 Delivery and final review: [PR #16](https://github.com/wnz99/starnet-observer/pull/16). CI and PR records own final merge outcomes rather than copied local evidence archives.
+
+## Essential-tools follow-up
+
+User requested a stricter reduction after PR #16. Five executable owners now cover build, launch, package, installed-package CI and Git checks. Helpers/tests are consolidated under those owners; the actual child-process fixture remains separate. This follow-up still needs independent review, current pre-push verification, CI and its requested PR/merge. Prior CI above verifies only its recorded implementation.

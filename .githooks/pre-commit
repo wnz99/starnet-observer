@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
 repo_root=$(git rev-parse --show-toplevel)
-sh "$repo_root/tools/quality/check-versions.sh"
+sh "$repo_root/tools/quality/hooks.sh" versions
 exec sh "$repo_root/tools/quality/hooks.sh" pre-commit

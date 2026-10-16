@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: Repository simplification
-status: Simplification implementation verified; final delivery recorded in PR 16.
+status: Essential-tools follow-up in progress; prior simplification merged in PR 16.
 last_updated: "2026-10-16T20:48:49.053168+00:00"
 last_activity: 2026-10-16
 last_activity_desc: Simplification reviewed clean; Ubuntu CI passed 238 tests and installed/browser checks.
 state_head: 82e4e806b8a884c588f8d28fc3ee95cb69fa1d22
-stopped_at: Implementation and CI verified; final delivery and merge outcome on PR 16
+stopped_at: Essential-tools consolidation; review, pre-push, CI and requested PR/merge pending
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: Implementation verified; independent review clean; Ubuntu CI passed. Delivery: PR #16.
+Status: Essential-tools follow-up implementing after PR #16; current review and CI pending.
 Last activity: 2026-10-16 — Simplification removed bootstrap/migration scaffolding and redundant tools; 238 tests passed in Ubuntu CI.
 
 ## Quick Tasks Completed
@@ -70,7 +70,7 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Current work: Simplification implementation and Ubuntu CI are verified. PR #16 records final review and merge.
+Current work: Keep only five executable tool owners, consolidate helpers and preserve colocated behavior tests. Prior simplification merged as PR #16.
 Resume file: [Simplification summary](./quick/261016-srp-simplify-agent-created-repository-toolin/261016-srp-SUMMARY.md)
 Next action: Integrate disjoint tooling/source changes, run lint/types, obtain independent diff review, and verify builds/tests in Ubuntu CI. No local tests/builds, paid/live runs or optional external settings.
 
