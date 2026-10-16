@@ -1,4 +1,5 @@
 #!/bin/sh
 set -eu
 cd "$(git rev-parse --show-toplevel)"
-bun run check:static
+bun run lint
+bun run typecheck
