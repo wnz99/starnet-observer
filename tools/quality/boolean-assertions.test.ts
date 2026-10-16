@@ -1,0 +1,52 @@
+import { test, expect } from "bun:test";
+import { ESLint } from "eslint";
+import path from "node:path";
+
+const cwd = path.resolve(import.meta.dir, "../..");
+const rule = "clean-code/no-boolean-flag-arguments";
+const ESLINT_PROJECT_TIMEOUT = 60000;
+async function booleanReports(source: string) {
+  const eslint = new ESLint({ cwd });
+  const results = await eslint.lintText(source, { filePath: "src/shared/observer.ts" });
+  expect(results.map((result) => result.fatalErrorCount)).toEqual([0]);
+  return results.flatMap((result) => result.messages.filter((message) => message.ruleId === rule));
+}
+
+test(
+  "Node assertion expected booleans remain values while real mode flags are reported",
+  async () => {
+    const messages = await booleanReports(`import assert from "node:assert/strict";
+const observed = Boolean(Date.now());
+assert.equal(observed, false);
+assert.strictEqual(observed, true);
+function choose(enabled: boolean) { return enabled ? "yes" : "no"; }
+choose(true);
+`);
+    expect(messages.map((message) => [message.line, message.messageId])).toEqual([
+      [5, "booleanSelectorParameter"],
+      [6, "booleanCallArgument"],
+    ]);
+  },
+  ESLINT_PROJECT_TIMEOUT,
+);
+
+test(
+  "assertion recognition follows the actual imported binding and preserves nested flags",
+  async () => {
+    const messages = await booleanReports(`import check from "node:assert/strict";
+const observed = Boolean(Date.now());
+check.notEqual(observed, false);
+function nested(flag: boolean) { return flag; }
+check.equal(nested(true), false);
+function shadow(check: { equal(a: boolean, b: boolean): void }) {
+  check.equal(observed, false);
+}
+`);
+    expect(messages.map((message) => [message.line, message.messageId])).toEqual([
+      [4, "booleanSelectorParameter"],
+      [5, "booleanCallArgument"],
+      [7, "booleanCallArgument"],
+    ]);
+  },
+  ESLINT_PROJECT_TIMEOUT,
+);

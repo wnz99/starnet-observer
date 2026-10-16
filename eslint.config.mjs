@@ -5,6 +5,69 @@ import unicorn from "eslint-plugin-unicorn";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const assertionComparisons = new Set([
+  "equal",
+  "notEqual",
+  "strictEqual",
+  "notStrictEqual",
+  "deepEqual",
+  "notDeepEqual",
+  "deepStrictEqual",
+  "notDeepStrictEqual",
+]);
+function assertionExpectedOperand(sourceCode, node) {
+  const call = node.parent;
+  if (call?.type !== "CallExpression" || call.arguments[1] !== node) return false;
+  const callee = call.callee;
+  if (
+    callee.type !== "MemberExpression" ||
+    callee.computed ||
+    callee.object.type !== "Identifier" ||
+    callee.property.type !== "Identifier" ||
+    !assertionComparisons.has(callee.property.name)
+  )
+    return false;
+  let scope = sourceCode.getScope(callee.object);
+  while (scope) {
+    const variable = scope.set.get(callee.object.name);
+    if (variable)
+      return variable.defs.some(
+        (definition) =>
+          definition.type === "ImportBinding" &&
+          definition.node.type === "ImportDefaultSpecifier" &&
+          ["node:assert", "node:assert/strict"].includes(definition.parent.source.value),
+      );
+    scope = scope.upper;
+  }
+  return false;
+}
+const booleanFlags = cleanCode.rules["no-boolean-flag-arguments"];
+const assertionAwareCleanCode = {
+  ...cleanCode,
+  rules: {
+    ...cleanCode.rules,
+    "no-boolean-flag-arguments": {
+      ...booleanFlags,
+      create(context) {
+        const scoped = {
+          ...context,
+          report(descriptor) {
+            if (
+              descriptor.messageId === "booleanCallArgument" &&
+              descriptor.node &&
+              assertionExpectedOperand(context.sourceCode, descriptor.node)
+            )
+              return;
+            context.report(descriptor);
+          },
+        };
+        Object.setPrototypeOf(scoped, context);
+        return booleanFlags.create(scoped);
+      },
+    },
+  },
+};
+
 const typescriptFiles = ["**/*.{ts,tsx,mts,cts}"];
 const typed = tseslint.configs.strictTypeChecked.map((config) => ({
   ...config,
@@ -69,7 +132,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
-    plugins: { "clean-code": cleanCode, sonarjs, unicorn },
+    plugins: { "clean-code": assertionAwareCleanCode, sonarjs, unicorn },
     rules: {
       complexity: ["error", 10],
       "max-depth": ["error", 4],
