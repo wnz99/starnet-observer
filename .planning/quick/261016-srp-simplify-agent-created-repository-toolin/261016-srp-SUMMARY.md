@@ -1,5 +1,5 @@
 ---
-status: incomplete
+status: complete
 ---
 
 # Repository simplification
@@ -18,4 +18,4 @@ Delivery and final review: [PR #16](https://github.com/wnz99/starnet-observer/pu
 
 ## Essential-tools follow-up
 
-User requested a stricter reduction after PR #16. Five executable owners now cover build, launch, package, installed-package CI and Git checks. Helpers/tests are consolidated under those owners; the actual child-process fixture remains separate. This follow-up still needs independent review, current pre-push verification, CI and its requested PR/merge. Prior CI above verifies only its recorded implementation.
+User requested a stricter reduction after PR #16. Five executable owners now cover build, launch, package, installed-package CI and Git checks. Helpers/tests are consolidated under those owners; the actual child-process fixture remains separate. Tools decreased from 21 files to 11. Independent review of `ed9469bb2aeb1398bd5e442ad0c123a3321d0bea` approved the full scope with no findings. Enabled pre-commit formatting/hygiene and pre-push lint/all five compiler projects passed. [Ubuntu CI](https://github.com/wnz99/starnet-observer/actions/runs/38969805089) passed **238 tests, 0 failures, 94 files**, builds/static checks, production-only installed consumer and both installed consumers, including real Chromium. Builds and tests ran only in CI. [PR #17](https://github.com/wnz99/starnet-observer/pull/17) owns the final review and merge outcome. This final records-only update changes no verified source, tests, configuration or workflow bytes. Native macOS/live integration remains unverified.
