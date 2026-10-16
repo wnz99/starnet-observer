@@ -1,0 +1,25 @@
+**/node_modules/
+**/.venv/
+**/.nx/
+**/dist/
+**/build/
+**/coverage/
+**/__pycache__/
+.agents/
+.serena/
+.agent-local.json
+.bootstrap.json
+.bootstrap-lock.json
+bun.lock
+uv.lock
+quality/isolation/**/consumer.json
+**/.fallow/
+
+# Existing local-only project assets and generated package copies
+.codex/
+.planning/
+package-staging/
+graphify-out/
+frontend/assets/themes/mama/
+frontend/assets/themes/mama-classic/
+frontend/assets/themes/mama-pixel/

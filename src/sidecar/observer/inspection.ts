@@ -1,0 +1,130 @@
+import type { State } from "./state.js";
+import type { ObserverInputRow } from "./contracts.js";
+import type { SessionInspection } from "../../shared/inspection.js";
+import { unavailable } from "../inspector/fields.js";
+import { inspectionProof } from "./inspection-proof.js";
+import { required } from "./required.js";
+const MAX_EXPECTED_IDENTITY = 128;
+export const PREPARE_INSPECTION = true;
+const EXPECTED_IDENTITY =
+  /^(?:(?:codex|claude):[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|(?:helper:)?obs_[a-f0-9]{24})(?:\|obs_[a-f0-9]{24})?$/i;
+function invalidExpected(value: unknown) {
+  return (
+    value !== undefined &&
+    (typeof value !== "string" ||
+      value.length > MAX_EXPECTED_IDENTITY ||
+      !EXPECTED_IDENTITY.test(value))
+  );
+}
+function reason(row: ObserverInputRow | undefined) {
+  if (!row) return "unknown-session";
+  if (row.inventoryHealth !== "available") return "inventory-unavailable";
+  return row.inspectionIdentity ? null : "identity-unavailable";
+}
+async function read(s: State, row: ObserverInputRow) {
+  if (row.source === "desktop")
+    return {
+      kind: "desktop" as const,
+      data: await required(s.desktop.inspect).call(s.desktop, required(row.inspectionIdentity)),
+    };
+  const data = await (row.source === "helper" || Object.hasOwn(row, "parentId")
+    ? required(s.helpers.inspect).call(s.helpers, row)
+    : required(s.transcripts.inspect).call(s.transcripts, row.id, row.provider, row.sessionId));
+  return { kind: "transcript" as const, data };
+}
+function current(s: State, row: ObserverInputRow) {
+  const source = row.source,
+    live = source ? s.rowsBySource[source].find((value) => value.id === row.id) : undefined;
+  return {
+    live,
+    matches:
+      !!live &&
+      live.inventoryHealth === "available" &&
+      live.provider === row.provider &&
+      live.inspectionIdentity === row.inspectionIdentity &&
+      live.parentId === row.parentId &&
+      Object.hasOwn(live, "parentId") === Object.hasOwn(row, "parentId"),
+  };
+}
+function changedReason(live: ObserverInputRow | undefined, expected: unknown) {
+  return live?.inventoryHealth === "unavailable"
+    ? "inventory-unavailable"
+    : expected === undefined
+      ? "identity-unavailable"
+      : "identity-mismatch";
+}
+function project(
+  s: State,
+  result: Awaited<ReturnType<typeof read>>,
+  id: string,
+  inspectionIdentity: string,
+): SessionInspection {
+  if (result.kind === "desktop")
+    return result.data.health === "available"
+      ? { ...result.data, id, inspectionIdentity }
+      : unavailable(id, result.data.reason || "identity-unavailable", s.now());
+  const data = result.data;
+  if (!data.available || !("health" in data) || data.health === "unavailable")
+    return unavailable(id, "transcript-unavailable", s.now());
+  const projection = { ...data };
+  Reflect.deleteProperty(projection, "available");
+  return {
+    ...projection,
+    id,
+    inspectionIdentity,
+    asOf: new Date(s.now()).toISOString(),
+    provenance: { kind: "transcript", coverage: "bounded-transcript", identity: "session" },
+  };
+}
+export async function inspect(
+  s: State,
+  id: string,
+  expectedIdentity?: unknown,
+  preparing = false,
+): Promise<SessionInspection> {
+  if (s.closed) return unavailable(id, "inventory-unavailable", s.now());
+  // Bound caller input independently of HTTP; omission preserves legacy inspection callers.
+  if (invalidExpected(expectedIdentity)) return unavailable(id, "invalid-identity", s.now());
+  const inventory = await inspectionInventory(s, preparing),
+    row = inventory.sessions.find((value) => value.id === id),
+    failure = reason(row);
+  if (failure || !row) return unavailable(id, failure || "unknown-session", s.now());
+  const inspectionIdentity = expectedInspectionIdentity(row);
+  if (expectedIdentity !== undefined && expectedIdentity !== inspectionIdentity)
+    return unavailable(id, "identity-mismatch", s.now());
+  return inspectOwned(s, row, {
+    id,
+    expectedIdentity,
+    inspectionIdentity,
+    roster: inventory.sessions,
+  });
+}
+function inspectionInventory(s: State, preparing: boolean) {
+  if (!preparing) return s.snapshot.get();
+  return s.pending || Promise.resolve(s.snapshot.snapshot());
+}
+export function expectedInspectionIdentity(row: ObserverInputRow) {
+  return `${String(row.inspectionIdentity)}${row.source === "helper" || Object.hasOwn(row, "parentId") ? `|${String(row.parentId)}` : ""}`;
+}
+async function inspectOwned(
+  s: State,
+  row: ObserverInputRow,
+  request: {
+    id: string;
+    expectedIdentity: unknown;
+    inspectionIdentity: string;
+    roster: ObserverInputRow[];
+  },
+) {
+  const { id, expectedIdentity, inspectionIdentity, roster } = request;
+  const proof = inspectionProof(s, row, roster);
+  if (!proof || !(await proof.validate())) return unavailable(id, "identity-unavailable", s.now());
+  const result = await read(s, row);
+  // Concurrent roster refreshes can change or remove source identity during the read.
+  const owner = current(s, row);
+  if (!owner.matches) return unavailable(id, changedReason(owner.live, expectedIdentity), s.now());
+  if (!(await proof.validate())) return unavailable(id, "identity-unavailable", s.now());
+  // Ownership must remain current after asynchronous proof revalidation finishes.
+  if (!proof.current()) return unavailable(id, "identity-unavailable", s.now());
+  return project(s, result, id, inspectionIdentity);
+}

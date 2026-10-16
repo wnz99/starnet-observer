@@ -1,0 +1,182 @@
+{
+  "baseline": "wnz-repo-v1",
+  "ci": {
+    "actionRevisions": {
+      "bun": "0c5077e51419868618aeaa5fe8019c62421857d6",
+      "checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "node": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uv": "1c37ad07a6a961277cf70c0d37d6f313000f5884"
+    },
+    "operatingSystems": [
+      "ubuntu-24.04"
+    ],
+    "provider": "github"
+  },
+  "components": [
+    {
+      "artifact": "application",
+      "entrypoints": [
+        "src/server/main.ts",
+        "src/sidecar/sqlite/worker.ts",
+        "src/browser/prepaint.ts",
+        "src/browser/main.ts"
+      ],
+      "importPackage": null,
+      "language": "typescript",
+      "llm": {
+        "answer": "Observes existing sessions; no provider calls in application",
+        "providers": [],
+        "state": "none"
+      },
+      "mcp": {
+        "answer": "Application is not an MCP server",
+        "clients": null,
+        "protocol": null,
+        "state": "none",
+        "transport": null
+      },
+      "name": "starnet-observer",
+      "path": ".",
+      "runtimeDependencies": [],
+      "target": "bun",
+      "testDependencies": {
+        "@playwright/test": "1.64.1"
+      },
+      "validation": {
+        "answer": "Runtime TypeScript validators enforce external-data boundaries; no Python application",
+        "state": "none"
+      }
+    }
+  ],
+  "documentationLanguage": "English",
+  "license": "MIT",
+  "options": {
+    "cloud": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "merge": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "promotion": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "selfHostedCi": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    },
+    "semanticMcp": {
+      "answer": "User explicitly requested local semantic MCP.",
+      "details": {
+        "client": "Codex",
+        "configLocation": ".codex/config.toml (ignored local configuration)",
+        "revision": "c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+        "runtimeLocation": "~/.clean-code-tools/versions/c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+        "scope": "repository",
+        "source": "https://github.com/wnz99/clean-code-tools",
+        "transport": "stdio"
+      },
+      "state": "include"
+    },
+    "serena": {
+      "answer": null,
+      "details": null,
+      "state": "pending"
+    }
+  },
+  "profile": "typescript-single",
+  "purpose": "Read-only local observer for terminal agent sessions.",
+  "runtimes": {
+    "bun": "1.3.13",
+    "node": "24.19.0",
+    "nodeTypes": "24.19.2",
+    "python": null,
+    "uv": "0.13.1"
+  },
+  "skills": [
+    {
+      "digest": "2e093c8620e25c6554d0fd713b3f86a77aadc7b937b4b019780bbd92b34d3e80",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/clean-code-tools",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "UNLICENSED (upstream package.json declaration; no LICENSE file)",
+      "name": "clean-code-tools",
+      "revision": "c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a",
+      "source": "https://github.com/wnz99/clean-code-tools",
+      "subdirectory": "skills/clean-code-tools"
+    },
+    {
+      "digest": "781949fc27915c1151300742898b6aba7fb471ad88ae943f07088db316e5dfa0",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/verify-before-complete",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "not declared in trusted installed copy",
+      "name": "verify-before-complete",
+      "revision": null,
+      "source": "trusted installed copy supplied by user environment; not redistributed",
+      "subdirectory": null
+    },
+    {
+      "digest": "4c340d5a5c3816491f9519cb6d2f3bfbfaadae082adba8039405e7a3c2459754",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-clean-code-js",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "MIT",
+      "name": "wnz-clean-code-js",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-clean-code-js"
+    },
+    {
+      "digest": "6f465bbf455998673f2bb7daf04663c34d9f95a8c61485eef3f6510ea02c2830",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-code-reviewer",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "MIT",
+      "name": "wnz-code-reviewer",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-code-reviewer"
+    },
+    {
+      "digest": "258fe33ff7024d95023a6add9eef40b8b356c04126e125de9657812be2820f2e",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-doc-write-expert",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "MIT",
+      "name": "wnz-doc-write-expert",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-doc-write-expert"
+    },
+    {
+      "digest": "7f8856410513faa266df6bb820e4e06d8a665b2466c6867e4ab3c30d0bc27d1f",
+      "discovery": {
+        "client": "Codex",
+        "location": "~/.agents/skills/wnz-test-quality",
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
+      },
+      "license": "MIT",
+      "name": "wnz-test-quality",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b",
+      "source": "https://github.com/wnz99/llm-dev-skills",
+      "subdirectory": "skills/wnz-test-quality"
+    }
+  ]
+}

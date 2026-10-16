@@ -1,0 +1,35 @@
+{
+  "duplicates": {
+    "threshold": 1
+  },
+  "entry": [
+    "src/server/main.ts",
+    "src/sidecar/sqlite/worker.ts",
+    "scripts/*.ts",
+    "**/*.test.ts",
+    "eslint.config.mjs",
+    "tools/acceptance.ts",
+    "tools/quality/isolate-typescript.mjs",
+    "frontend/css/observer.css",
+    "tools/build.ts",
+    "src/browser/prepaint.ts",
+    "src/browser/main.ts",
+    "tools/start.ts",
+    "tools/package.ts",
+    "tools/browser-smoke.ts",
+    "tools/records.ts"
+  ],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.nx/**",
+    "**/package-staging/**"
+  ],
+  "typeAware": {
+    "enabled": true
+  },
+  "rules": {
+    "private-type-leaks": "off"
+  }
+}

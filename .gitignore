@@ -22,3 +22,11 @@ themes/mama-pixel.json
 # Generated codebase graphs
 graphify-out/
 .planning/graphs/
+
+# Quality outputs and local agent state
+dist/
+package-staging/
+build/
+.fallow/
+.agent-local.json
+.codex/

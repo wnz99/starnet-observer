@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: 0 planned
-status: planning
-stopped_at: "PR #11 fixes verified and final review clean; PR remains open"
-last_updated: "2026-10-15T21:04:53.333597+00:00"
+current_phase_name: TypeScript refactor
+status: In progress; PR 15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending.
+last_updated: "2026-10-16T20:25:07.915651+00:00"
 last_activity: 2026-10-16
-last_activity_desc: "PR #11 synced to main; host and relay defects fixed; 37 Bun test files passed; independent full-scope review clean."
-state_head: d1268c1437baba01814f7f6dd1b7202de8c2c749
+last_activity_desc: PR 15 head f459415 reviewed clean; Ubuntu CI running; stale planning artifacts removed by user request.
+state_head: f45941579dfa6e458cdde96f1a992e52778bca15
+stopped_at: Final Ubuntu CI before merge and authorized stale branch/worktree cleanup; macOS CI waived, native macOS unverified
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** PRs #9 and #10 merged. PR #11 fixes verified and independently approved; PR remains open.
+**Current focus:** Full TypeScript refactor and repository quality baseline, registered as quick task 261016-0z8.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: PR #11 fixes complete; zero unresolved review findings; PR open
-Last activity: 2026-10-16 — PR #11 includes published main; all 37 Bun test files passed and independent full-scope review approved.
+Status: In progress; PR #15 R3 review clean; final Ubuntu CI running; merge and stale checkout cleanup pending.
+Last activity: 2026-10-16 — Removed stale refactor artifacts by user request; retained PLAN, CONTEXT and SUMMARY with fixed Git history recovery.
 
 ## Quick Tasks Completed
 
@@ -68,10 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Stopped at: PR #11 fix delivery verified; PR remains open
-Resume file: None
-Next action: Await PR #11 merge decision. No unresolved review finding remains; live SSH/desktop/browser integration was not exercised.
+Current work: PR #15 head f45941579dfa6e458cdde96f1a992e52778bca15 has clean independent R3 review. Required Ubuntu CI is running. Hosted macOS CI is waived; native macOS verification remains unverified.
+Resume file: [TypeScript context](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-CONTEXT.md)
+Next action: Check final Ubuntu CI, fix concrete failures, merge when ready, then clean authorized stale branches/worktrees. Reuse accepted unchanged reviews and avoid duplicate full local runs. No paid/live runs or optional settings. See [current summary](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-SUMMARY.md).
 
 ### Registered Work
 
-None.
+| # | Description | Status | Directory |
+| --- | --- | --- | --- |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | PR #15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["src/browser/**/*.test.ts", "src/browser/**/*.fixture.ts"],
+  "exclude": ["node_modules", "dist", "package-staging"]
+}

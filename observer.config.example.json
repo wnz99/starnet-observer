@@ -5,32 +5,19 @@
   "rooms": [
     {
       "name": "Product",
-      "repos": [
-        "orbit-web",
-        "orbit-api",
-        "orbit-mobile"
-      ]
+      "repos": ["orbit-web", "orbit-api", "orbit-mobile"]
     },
     {
       "name": "Platform",
-      "repos": [
-        "orbit-auth",
-        "orbit-data"
-      ]
+      "repos": ["orbit-auth", "orbit-data"]
     },
     {
       "name": "Intelligence",
-      "repos": [
-        "orbit-agents",
-        "orbit-evals"
-      ]
+      "repos": ["orbit-agents", "orbit-evals"]
     },
     {
       "name": "Operations",
-      "repos": [
-        "orbit-console",
-        "orbit-ci"
-      ]
+      "repos": ["orbit-console", "orbit-ci"]
     }
   ],
   "theme": {

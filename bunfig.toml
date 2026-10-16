@@ -1,1 +1,5 @@
 env = false
+
+[test]
+# Build and package copies must never duplicate the maintained colocated suites.
+pathIgnorePatterns = ["dist/**", "package-staging/**"]
