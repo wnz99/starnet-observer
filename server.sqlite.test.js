@@ -10,8 +10,13 @@ test("observer-sqlite-worker regression contracts", async () => {
     const os = require("node:os");
     const path = require("node:path");
     const { Database } = require("bun:sqlite");
-    const { makeSqliteClient } = require("./src/sidecar/sqlite/client.ts");
-    const { setKnownSecretSource } = require("./src/sidecar/redaction.ts");
+    const clientFile =
+      process.env.STARNET_SQLITE_TEST_CLIENT ||
+      path.resolve(__dirname, "./src/sidecar/sqlite/client.ts");
+    const { makeSqliteClient } = require(clientFile);
+    const { setKnownSecretSource } = require(
+      path.resolve(path.dirname(clientFile), "../redaction" + path.extname(clientFile)),
+    );
     const { createServer } = require("./server.js");
     async function waitFor(predicate) {
       const deadline = Date.now() + 2000;
@@ -281,7 +286,7 @@ test("observer-sqlite-worker regression contracts", async () => {
         cleanupProbe,
         `
 const assert=require('node:assert/strict'),fs=require('node:fs'),asyncFs=require('node:fs/promises');
-const {makeSqliteClient}=require(${JSON.stringify(path.resolve(__dirname, "./src/sidecar/sqlite/client.ts"))});
+const {makeSqliteClient}=require(${JSON.stringify(clientFile)});
 const scratch=${JSON.stringify(cleanupScratch)}, mode=${JSON.stringify(mode)}, calls=${JSON.stringify(calls)};
 const originalRm=asyncFs.rm;let denied=true,attempts=0;
 asyncFs.rm=async(...args)=>{if(args[0].startsWith(scratch+'/')){attempts++;if(denied)throw Object.assign(new Error('private synthetic cleanup path'),{code:'EPERM'});}return originalRm(...args);};
@@ -386,7 +391,7 @@ console.log('cleanup failure contained; no replacement before cleanup; demand an
       const exitProbe = path.join(root, "exit-probe.js");
       fs.writeFileSync(
         exitProbe,
-        `const fs=require('node:fs');const {makeSqliteClient}=require(${JSON.stringify(path.resolve(__dirname, "./src/sidecar/sqlite/client.ts"))});const scratch=${JSON.stringify(scratch)};const c=makeSqliteClient({busFile:${JSON.stringify(file)},helperFile:${JSON.stringify(file)},tempRoot:scratch,workerFile:${JSON.stringify(nativeStall)}});c.readHelperEdges().catch(()=>{});while(!fs.readdirSync(scratch).some(f=>fs.existsSync(scratch+'/'+f+'/active')))await Bun.sleep(5);await c.close();if(fs.readdirSync(scratch).length)throw new Error('private root retained');console.log('closed with empty scratch');`,
+        `const fs=require('node:fs');const {makeSqliteClient}=require(${JSON.stringify(clientFile)});const scratch=${JSON.stringify(scratch)};const c=makeSqliteClient({busFile:${JSON.stringify(file)},helperFile:${JSON.stringify(file)},tempRoot:scratch,workerFile:${JSON.stringify(nativeStall)}});c.readHelperEdges().catch(()=>{});while(!fs.readdirSync(scratch).some(f=>fs.existsSync(scratch+'/'+f+'/active')))await Bun.sleep(5);await c.close();if(fs.readdirSync(scratch).length)throw new Error('private root retained');console.log('closed with empty scratch');`,
       );
       const exitStartedAt = performance.now();
       const probe = Bun.spawn([process.execPath, "--no-env-file", exitProbe], {

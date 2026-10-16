@@ -124,3 +124,34 @@ test("client quarantines malformed correlated replies and never exposes a mismat
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("emitted SQLite client preserves native lifecycle regression contracts", async () => {
+  const emitted = await buildRuntime();
+  const repository = fileURLToPath(new URL("../../../", import.meta.url));
+  const result = await execute(
+    process.execPath,
+    [
+      "--no-env-file",
+      "test",
+      "./server.sqlite.test.js",
+      "--test-name-pattern",
+      "^observer-sqlite-worker regression contracts$",
+    ],
+    {
+      cwd: repository,
+      timeout: 35000,
+      env: {
+        ...process.env,
+        STARNET_SQLITE_TEST_CLIENT: path.join(emitted, "src", "sidecar", "sqlite", "client.js"),
+        NO_COLOR: "1",
+      },
+    },
+  );
+  assert.match(result.stdout, /cleanup failure contained/);
+  assert.match(result.stdout, /native stall: 11000 ms;.*scratch empty after continuation/);
+  assert.match(result.stdout, /SQLite worker:.*bounded queue and teardown OK/);
+  assert.match(result.stderr, /1 pass/);
+  assert.match(result.stderr, /0 fail/);
+  assert.match(result.stderr, /Ran 1 test across 1 file/);
+  console.log("Emitted SQLite lifecycle:\n" + result.stdout.trim());
+}, 40000);

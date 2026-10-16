@@ -60,7 +60,7 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node, Bun: "readonly" } },
   },
   {
-    files: ["frontend/**/*.{js,ts}"],
+    files: ["frontend/**/*.{js,ts}", "src/browser/**/*.{js,ts}"],
     ignores: ["**/*.test.{js,ts}", "**/*.fixture.{js,ts}"],
     languageOptions: { globals: globals.browser },
   },

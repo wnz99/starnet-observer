@@ -7,6 +7,6 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["frontend/**/*.ts"],
+  "include": ["frontend/**/*.ts", "src/browser/**/*.ts", "src/shared/**/*.ts"],
   "exclude": ["**/*.test.ts", "**/*.fixture.ts"]
 }
