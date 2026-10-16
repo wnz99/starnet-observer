@@ -76,4 +76,4 @@ Next action: Continue approved sequential TypeScript Tasks 4–8, then PR review
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Tasks 1–3 and adapter checkpoint approved; parallel packages active | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Tasks 1–3 and Task 4 leaf packages reviewed; observer composition next; browser preparation active | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
