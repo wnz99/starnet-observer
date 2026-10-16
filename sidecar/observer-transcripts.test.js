@@ -621,7 +621,7 @@ test("observer-transcripts regression contracts", async () => {
     observer.beginDiscovery();
     assert((await observer.read("parent-sweep", "codex", OTHER)).available);
     const sweepTraversals = traversals;
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const helpers = makeHelperObserver({
       now: () => 1000,
       transcripts: observer,

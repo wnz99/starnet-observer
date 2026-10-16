@@ -4,7 +4,7 @@
   },
   "entry": [
     "server.{js,ts}",
-    "sidecar/observer-sqlite-worker.{js,ts}",
+    "src/sidecar/sqlite/worker.ts",
     "scripts/*.{js,mjs,ts}",
     "frontend/app/theme-pack.{js,ts}",
     "frontend/app/harness.{js,ts}",
@@ -25,7 +25,8 @@
     "eslint.config.mjs",
     "tools/acceptance.ts",
     "tools/quality/isolate-typescript.mjs",
-    "frontend/css/observer.css"
+    "frontend/css/observer.css",
+    "tools/build.ts"
   ],
   "ignorePatterns": [
     "**/dist/**",

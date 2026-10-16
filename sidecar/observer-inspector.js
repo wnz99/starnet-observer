@@ -2,15 +2,11 @@
 const crypto = require("node:crypto");
 const { redact } = require("../src/sidecar/redaction.ts");
 
-// readBytes is the conversation chunk; cold identity verification and rewrite-prefix checking add bounded IO.
-// Revalidating the previous bounded window adds at most another readBytes of IO.
-const WINDOW = Object.freeze({
-  maxTurns: 200,
-  maxTextChars: 8000,
-  maxTotalChars: 131072,
-  readBytes: 262144,
-  maxDiskReadBytes: 790528,
-});
+const {
+  INSPECTION_WINDOW: WINDOW,
+  field,
+  redactText,
+} = require("../src/sidecar/inspector/fields.ts");
 const KEYS = [
   "model",
   "inputTokens",
@@ -21,10 +17,6 @@ const KEYS = [
   "lastActivityAt",
   "durationMs",
 ];
-const field = (value, state = "available") => ({
-  value: value ?? null,
-  state: value == null ? "unavailable" : state,
-});
 const timestamp = (value) =>
   typeof value === "string" && Number.isFinite(Date.parse(value))
     ? new Date(value).toISOString()
@@ -46,16 +38,6 @@ const textBlocks = (content) =>
           .map((b) => b.text)
           .join("\n")
       : "";
-// External sessions can contain credentials unknown to this sidecar. Consume the entire
-// quoted assignment, including spaces/escaped quotes, before the generic shape redactor.
-function redactText(raw) {
-  return redact(
-    raw.replace(
-      /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret[_-]?key|bot[_-]?token|webhook[_-]?secret|password|passwd|authorization)\b(["']?\s*[=:]\s*)("(?:\\[\s\S]|[^"\\])*(?:"|$)|'(?:\\[\s\S]|[^'\\])*(?:'|$))/gi,
-      "$1$2[redacted-secret]",
-    ),
-  );
-}
 function recordBelongsToSession(record, provider, sessionId, binding) {
   if (binding && (binding.provider !== provider || binding.sessionId !== sessionId)) return false;
   const claudeSession = binding ? binding.parentSessionId : sessionId;
@@ -382,19 +364,6 @@ function createProjection() {
     modelPartial: false,
   };
 }
-function unavailable(id, reason, now) {
-  return {
-    id,
-    health: "unavailable",
-    asOf: new Date(now).toISOString(),
-    reason,
-    stats: Object.fromEntries(KEYS.map((key) => [key, field(null)])),
-    turns: [],
-    truncated: false,
-    window: WINDOW,
-    generation: null,
-  };
-}
 function put(state, key, role, at, raw, tool) {
   if (!raw && !tool) return;
   // Redact BEFORE clipping so a key straddling the display limit cannot leak a prefix.
@@ -603,7 +572,5 @@ module.exports = {
   metadata,
   consume,
   snapshot,
-  unavailable,
   recordBelongsToSession,
-  redactText,
 };

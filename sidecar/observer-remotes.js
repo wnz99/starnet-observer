@@ -11,7 +11,7 @@ const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
   require("node:child_process"),
 );
 const { aggregateRows } = require("./observer.js");
-const { unavailable } = require("./observer-inspector.js");
+const { unavailable } = require("../src/sidecar/inspector/fields.ts");
 
 const MAX_LINE = 4 * 1024 * 1024,
   MAX_ROWS = 512,
@@ -246,7 +246,7 @@ function sanitizeTargets(targets, rows) {
    ids stay that host's integers, and every message also carries its hub-wide key "id@host" and its host. Endpoints are
    re-derived exactly like the rows (remap), and anything that does not name a surviving row of that host becomes
    'external'. Message identities are dropped: a remote body is never inspectable from the hub. */
-// Same vocabulary as the local reader (observer-bus.js): anything else from a remote reads as 'unknown'.
+// Same vocabulary as the local reader (src/sidecar/bus/index.ts): anything else from a remote reads as 'unknown'.
 const WAKES = new Set(["requested", "failed", "unsupported", "none", "unknown"]);
 const MAX_MESSAGES = 200;
 function sanitizeBus(host, bus, rowIds, receivedAt) {
@@ -287,7 +287,7 @@ function sanitizeBus(host, bus, rowIds, receivedAt) {
     ...(remote ? { remote } : {}),
   };
 }
-/* That host's llm-bus relay view (observer-bus.js selectRemote): the same closed vocabulary, re-checked here. Times are
+/* That host's llm-bus relay view (src/sidecar/bus/relay.ts selectRemote): the same closed vocabulary, re-checked here. Times are
    the remote machine's own clock, as for every other remote timestamp. */
 const RELAY_ID = /^[A-Za-z0-9_-]{1,128}$/,
   RELAY_HOST = /^[A-Za-z0-9.-]{1,253}$/;

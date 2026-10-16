@@ -11,10 +11,14 @@ const { setClock } = require("./src/sidecar/failopen.ts");
 const { loadConfig, HELP } = require("./src/sidecar/config/index.ts");
 const { loadThemePack } = require("./sidecar/theme-packs.js");
 const canonicalTheme = require("./frontend/assets/themes/starnet/theme.json");
-const { makeOverseerState, resolveEndpoint } = require("./sidecar/overseer-state.js");
+const { makeOverseerState, resolveEndpoint } = require("./src/sidecar/overseer-state/index.ts");
 const { makeControl, PANE, TARGET } = require("./sidecar/control.js");
 const { makeRemoteHosts, makeFederatedObserver } = require("./sidecar/observer-remotes.js");
-const ROOT = path.join(__dirname, "frontend");
+const { resolveRuntimePaths } = require("./src/server/runtime-paths.ts");
+const { installRoot, publicRoot: ROOT } = resolveRuntimePaths({
+  installRoot: __dirname,
+  publicRoot: path.join(__dirname, "frontend"),
+});
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -301,7 +305,7 @@ function createServer({
 if (require.main === module) {
   let config;
   try {
-    config = loadConfig(process.argv.slice(2), undefined, { installRoot: __dirname });
+    config = loadConfig(process.argv.slice(2), undefined, { installRoot });
   } catch (error) {
     console.error("[observer config]", redact(String(error.message)));
     process.exit(1);

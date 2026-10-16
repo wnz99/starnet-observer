@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolveRuntimePaths } from "../../server/runtime-paths.js";
 export const DEFAULT_LABELS = Object.freeze({
   company: "Helioforge",
   repoPrefix: "helio",
@@ -9,7 +10,7 @@ export const DEFAULT_LABELS = Object.freeze({
     { name: "Operations", repos: ["helio-console", "helio-ci", "helio-observability"] },
   ]),
 });
-export const DEFAULT_ROOMS = path.join(import.meta.dirname, "../../..", "rooms.json");
+export const DEFAULT_ROOMS = path.join(resolveRuntimePaths().installRoot, "rooms.json");
 export const HELP = `Usage: bun --no-env-file server.js [options]
 
   --presentation          Enable private labels and block inspectors

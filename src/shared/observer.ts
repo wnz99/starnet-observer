@@ -23,7 +23,7 @@ export interface ObserverConfig {
   roomsFile: string;
   remotes: NonNullable<ConfigInput["remotes"]>;
 }
-type Health = "available" | "unavailable";
+export type Health = "available" | "unavailable";
 type Provider = "codex" | "claude";
 interface SourceHealth {
   health: Health | "stale";
@@ -42,7 +42,7 @@ interface Usage {
   coverage?: string | null;
   observedAt?: number | string | null;
 }
-interface ObserverRow {
+export interface ObserverRow {
   id: string;
   provider: Provider;
   source: "herdr" | "helper" | "desktop";

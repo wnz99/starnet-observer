@@ -3,15 +3,16 @@ const crypto = require("node:crypto");
 const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
   require("node:child_process"),
 );
-const { makeDesktopObserver } = require("./observer-desktop.js");
+const { makeDesktopObserver } = require("../src/sidecar/desktop/index.ts");
 const { makeProjectResolver } = require("./observer-projects.js");
 const { makeTranscriptObserver } = require("./observer-transcripts.js");
-const { makeHelperObserver, grouping } = require("./observer-helpers.js");
-const { publicBus } = require("./observer-bus.js");
-const { makeSqliteClient } = require("./observer-sqlite-client.js");
-const { unavailable, redactText } = require("./observer-inspector.js");
+const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
+const { grouping } = require("../src/sidecar/helpers/evidence.ts");
+const { publicBus } = require("../src/sidecar/bus/public.ts");
+const { makeSqliteClient } = require("../src/sidecar/sqlite/client.ts");
+const { unavailable, redactText } = require("../src/sidecar/inspector/fields.ts");
 const { stationChildEnv } = require("../src/sidecar/child-env.ts");
-const { makeOverseerState, resolveEndpoint } = require("./overseer-state.js");
+const { makeOverseerState, resolveEndpoint } = require("../src/sidecar/overseer-state/index.ts");
 const { makeIdentityResolver } = require("./observer-identity.js");
 
 const STATUSES = new Set(["working", "blocked", "idle", "done", "unknown"]);

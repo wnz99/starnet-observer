@@ -1,21 +1,21 @@
-"use strict";
-const { test } = require("bun:test");
+import type { Pane } from "./types.js";
+import type { SnapshotDatabase } from "../sqlite/snapshots.js";
+import { must, SnapshotFixture } from "./sqlite.fixture.js";
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import * as sqlite from "bun:sqlite";
+import { makeBusReader, defaultBusPath } from "./index.js";
+import { publicBus } from "./public.js";
+import { makePrivateSnapshotQuery } from "../sqlite/snapshots.js";
+import * as failopen from "../failopen.js";
 
-test("observer-bus regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const crypto = require("node:crypto");
-  const fs = require("node:fs");
-  const os = require("node:os");
-  const path = require("node:path");
-  const sqlite = require("bun:sqlite");
-  const {
-    makeBusReader,
-    publicBus,
-    defaultBusPath,
-    makePrivateSnapshotQuery,
-  } = require("./observer-bus.js");
-  const failopen = require("../src/sidecar/failopen.ts");
+const EXACT_TRUE = true;
 
+test("observer-bus regression contracts", () => {
   assert.throws(() => makeBusReader(), /requires an injected now clock/);
   const S1 = "11111111-1111-4111-8111-111111111111",
     S2 = "22222222-2222-4222-8222-222222222222";
@@ -27,15 +27,16 @@ test("observer-bus regression contracts", async () => {
 CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES agents(address), recipient TEXT NOT NULL REFERENCES agents(address),
   body TEXT NOT NULL, sender_cwd TEXT, recipient_cwd TEXT, sender_scope TEXT, recipient_scope TEXT,
   sent_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), acknowledged_at TEXT, wake_status TEXT, wake_via TEXT, wake_reason TEXT, wake_checked_at TEXT);`;
-  const sessions = [
+  const sessions: Pane[] = [
     { id: "obs_a", provider: "codex", sessionId: S1 },
     { id: "obs_b", provider: "claude", sessionId: S2 },
     { id: "obs_c", provider: "claude", sessionId: S2 },
     { id: "obs_d", provider: "claude", sessionId: null },
   ];
-  const digest = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  const digest = (file: string) =>
+    crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
   // Every file in a folder with its content hash: proves no journal appears and nothing is rewritten.
-  const contents = (folder) =>
+  const contents = (folder: string) =>
     fs
       .readdirSync(folder)
       .sort()
@@ -93,7 +94,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     assert.deepEqual(fs.readdirSync(scratch), []);
 
     // Failed cleanup must remain visible and secret-free.
-    const warnings = [],
+    const warnings: string[] = [],
       warn = console.warn,
       remove = fs.rmSync;
     const closeBefore = failopen.counts()["observer.bus.close"] || 0;
@@ -106,10 +107,10 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       loadSqlite: () => ({
         Database: class {
           query() {
-            return { all: () => [] };
+            return { all: () => [], get: () => null };
           }
-          close(immediate) {
-            assert.equal(immediate, true);
+          close(immediate?: boolean) {
+            assert.equal(immediate, EXACT_TRUE);
             closes++;
             throw new Error("PRIVATE CLOSE CANARY " + temp);
           }
@@ -117,9 +118,9 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       }),
     });
     fs.rmSync = (target, options) => {
-      if (options?.recursive && target.startsWith(scratch + path.sep))
+      if (options?.recursive && typeof target === "string" && target.startsWith(scratch + path.sep))
         throw new Error("PRIVATE REMOVE CANARY " + target);
-      return remove(target, options);
+      remove(target, options);
     };
     console.warn = (...args) => warnings.push(args.join(" "));
     try {
@@ -144,7 +145,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
 
     const file = path.join(busDir, "bus.sqlite3");
     const writer = new sqlite.Database(file);
-    writer.exec(SCHEMA);
+    writer.run(SCHEMA);
     const agent = writer.query(
       "INSERT INTO agents VALUES (?, ?, '/secret/project-canary', '/secret/scope-canary', '2026-10-11T10:00:00Z', NULL, '/secret/socket-canary')",
     );
@@ -153,7 +154,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       ["claude", S2],
       ["claude", S3],
       ["codex", S4],
-    ])
+    ] as const)
       agent.run(kind + ":" + id, kind);
     const send = writer.query(
       "INSERT INTO messages (sender, recipient, body, sender_cwd, recipient_cwd, sent_at, wake_status, wake_reason) VALUES (?, ?, 'BODY-CANARY', '/secret/cwd-canary', '/secret/cwd-canary', ?, ?, 'REASON-CANARY')",
@@ -161,20 +162,21 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     send.run("codex:" + S1, "claude:" + S2, "2026-10-11T10:00:00.000Z", "requested");
     send.run("claude:" + S3, "codex:" + S1, "2026-10-11T10:01:00.000Z", null);
     send.run("codex:" + S1, "codex:" + S4, "2026-10-11T10:02:00.000Z", "mystery");
-    writer.close(true);
+    writer.close(EXACT_TRUE);
     const before = contents(busDir);
     const nativeProof = makePrivateSnapshotQuery({ file, tempRoot: scratch })((
       database,
       sourceFingerprint,
     ) => {
       const stat = fs.statSync(file, { bigint: true });
-      const fields = ["dev", "ino", "size", "mtimeNs", "ctimeNs", "birthtimeNs"];
+      const fields = ["dev", "ino", "size", "mtimeNs", "ctimeNs", "birthtimeNs"] as const;
       for (const field of fields)
         assert.equal(typeof stat[field], "bigint", field + " preserves native bigint precision");
       assert(stat.birthtimeNs > 0n, "native birth time proves source incarnation");
       assert.equal(sourceFingerprint[0], fields.map((field) => stat[field]).join(":"));
       return { rows: database.query("SELECT id FROM messages").all() };
     });
+    assert("rows" in nativeProof);
     assert.equal(
       nativeProof.rows.length,
       3,
@@ -190,27 +192,27 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       closed = 0,
       clock = 5000,
       copied = 0;
-    const selectedSql = [];
+    const selectedSql: string[] = [];
     // SQLite only ever opens the private copy inside the scratch root, never the bus path.
     const loadSqlite = () => ({
-      Database: class extends sqlite.Database {
-        constructor(...args) {
-          assert.notEqual(path.dirname(args[0]), busDir);
-          assert(args[0].startsWith(scratch + path.sep), "opens only the private snapshot");
-          assert.equal((fs.statSync(path.dirname(args[0])).mode & 0o777).toString(8), "700");
+      Database: class extends SnapshotFixture {
+        constructor(file: string) {
+          assert.notEqual(path.dirname(file), busDir);
+          assert(must(file).startsWith(scratch + path.sep), "opens only the private snapshot");
+          assert.equal((fs.statSync(path.dirname(file)).mode & 0o777).toString(8), "700");
           for (const suffix of ["", "-wal", "-journal"]) {
-            if (fs.existsSync(args[0] + suffix))
-              assert.equal(fs.statSync(args[0] + suffix).mode & 0o777, 0o600);
+            if (fs.existsSync(file + suffix))
+              assert.equal(fs.statSync(file + suffix).mode & 0o777, 0o600);
           }
-          super(...args);
+          super(file);
           opened++;
         }
-        query(sql) {
+        override query(sql: string) {
           selectedSql.push(sql);
           return super.query(sql);
         }
-        close(immediate) {
-          assert.equal(immediate, true);
+        override close(immediate?: boolean) {
+          assert.equal(immediate, EXACT_TRUE);
           closed++;
           super.close(immediate);
         }
@@ -231,7 +233,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       [first.health, first.observedAt, first.rows.map((row) => row.id)],
       ["available", 5000, [3, 2, 1]],
     );
-    assert.deepEqual(Object.keys(first.rows[0]).sort(), [
+    assert.deepEqual(Object.keys(must(first.rows[0])).sort(), [
       "acknowledgedAt",
       "id",
       "identity",
@@ -253,7 +255,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
         [1, "obs_a", "ambiguous"],
       ],
     );
-    assert.deepEqual(Object.keys(view.messages[0]).sort(), [
+    assert.deepEqual(Object.keys(must(view.messages[0])).sort(), [
       "acknowledgedAt",
       "from",
       "id",
@@ -263,7 +265,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       "wake",
     ]);
     assert.equal(view.window, 100);
-    assert.equal(view.messages[2].sentAt, "2026-10-11T10:00:00.000Z");
+    assert.equal(must(view.messages[2]).sentAt, "2026-10-11T10:00:00.000Z");
     const exposed = JSON.stringify(view);
     for (const secret of ["CANARY", "/secret", S1, S2, S3, S4, "codex:", "claude:"])
       assert(!exposed.includes(secret), "bus view leaks " + secret);
@@ -289,10 +291,10 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       selectedSql.every((sql) => !/\bbody\b/i.test(sql)),
       "inventory queries never select or hash bodies",
     );
-    const identity = view.messages.find((message) => message.id === 1).identity;
+    const identity = must(must(view.messages.find((message) => message.id === 1)).identity);
     assert.match(identity, /^mail_[a-f0-9]{64}$/);
     assert.equal(
-      publicBus(first, []).messages.find((message) => message.id === 1).identity,
+      must(publicBus(first, []).messages.find((message) => message.id === 1)).identity,
       identity,
       "roster mapping does not change identity",
     );
@@ -326,15 +328,18 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     setBody.run('hello api_key="private multiword value" sk-ant-123456789ABC');
     const scrubbed = reader.inspect(1);
     assert.equal(scrubbed.health, "available");
-    assert(!scrubbed.text.includes("private"));
-    assert(!scrubbed.text.includes("123456789ABC"));
+    assert(!must(scrubbed.text).includes("private"));
+    assert(!must(scrubbed.text).includes("123456789ABC"));
     setBody.run("x".repeat(32760) + ' password="' + "private ".repeat(10000));
     const clipped = reader.inspect(1);
-    assert.equal(clipped.truncated, true);
-    assert.equal(clipped.text.length, 32768);
-    assert(!clipped.text.includes("private"), "secret crossing raw and display caps is withheld");
+    assert.equal(clipped.truncated, EXACT_TRUE);
+    assert.equal(must(clipped.text).length, 32768);
+    assert(
+      !must(clipped.text).includes("private"),
+      "secret crossing raw and display caps is withheld",
+    );
     setBody.run("BODY-CANARY");
-    secretWriter.close(true);
+    secretWriter.close(EXACT_TRUE);
     assert.deepEqual(fs.readdirSync(scratch), []);
 
     // Acknowledgement and wake changes on an existing id are observed on the next read of the latest window.
@@ -344,32 +349,32 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
         "UPDATE messages SET acknowledged_at = '2026-10-11T10:05:00.000Z', wake_status = 'failed' WHERE id = 1",
       )
       .run();
-    update.close(true);
+    update.close(EXACT_TRUE);
     clock = 6000;
-    const acked = reader.read().rows.find((row) => row.id === 1);
+    const acked = must(reader.read().rows.find((row) => row.id === 1));
     assert.equal(acked.identity, identity, "ACK/wake does not change message identity");
     assert.deepEqual([acked.acknowledgedAt, acked.wake], ["2026-10-11T10:05:00.000Z", "failed"]);
     const append = new sqlite.Database(file),
       insert = append.query(
         "INSERT INTO messages (sender, recipient, body) VALUES (?, ?, 'BODY-CANARY')",
       );
-    for (let index = 0; index < 100; index++) insert.run("codex:" + S1, "codex:" + S4);
-    append.close(true);
+    Array.from({ length: 100 }).forEach(() => insert.run("codex:" + S1, "codex:" + S4));
+    append.close(EXACT_TRUE);
     clock = 7000;
     const second = reader.read();
     assert.equal(second.rows.length, 100, "bounded to the recent window");
-    assert.equal(second.rows[0].id, 103);
-    assert.equal(second.rows.at(-1).id, 4);
+    assert.equal(must(second.rows[0]).id, 103);
+    assert.equal(must(second.rows.at(-1)).id, 4);
     assert(!second.rows.some((row) => row.id === 1), "older rows leave the window");
 
     // Production llm-bus runs in WAL mode. A live writer's committed but uncheckpointed rows sit only in -wal;
-    // the reader must see them while leaving the database, -wal and -shm byte-identical and adding no files.
+    // Reads must leave the database and both WAL journals byte-identical. No additional files may appear.
     const walDir = path.join(temp, "wal");
     fs.mkdirSync(walDir);
     const walFile = path.join(walDir, "bus.sqlite3"),
       live = new sqlite.Database(walFile);
-    live.exec("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0;");
-    live.exec(SCHEMA);
+    live.run("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0;");
+    live.run(SCHEMA);
     live
       .query(
         "INSERT INTO agents VALUES (?, 'codex', '/p', '/s', '2026-10-11T10:00:00Z', NULL, NULL)",
@@ -378,7 +383,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     const liveSend = live.query(
       "INSERT INTO messages (sender, recipient, body) VALUES (?, ?, 'BODY-CANARY')",
     );
-    for (let index = 0; index < 3; index++) liveSend.run("codex:" + S1, "codex:" + S1);
+    Array.from({ length: 3 }).forEach(() => liveSend.run("codex:" + S1, "codex:" + S1));
     assert(fs.statSync(walFile + "-wal").size > 0, "fixture rows live only in the WAL");
     const walBefore = contents(walDir);
     const walReader = makeBusReader({
@@ -407,8 +412,8 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     );
     // Explicitly checkpoint the test-owned writer and remove its journals; reading must not recreate them.
     live.fileControl(sqlite.constants.SQLITE_FCNTL_PERSIST_WAL, 0);
-    live.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-    live.close(true);
+    live.run("PRAGMA wal_checkpoint(TRUNCATE)");
+    live.close(EXACT_TRUE);
     const closedBefore = contents(walDir);
     assert.deepEqual(
       closedBefore.map((entry) => entry.split("=")[0]),
@@ -444,9 +449,15 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       file: walFile,
       tempRoot: scratch,
       loadSqlite: () => ({
-        Database: class {
+        Database: class implements SnapshotDatabase {
           constructor() {
             throw new Error("open failed");
+          }
+          query(): ReturnType<SnapshotDatabase["query"]> {
+            throw new Error("unreachable query after failed open");
+          }
+          close() {
+            throw new Error("unreachable close after failed open");
           }
         },
       }),
@@ -454,7 +465,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     assert.deepEqual([failing.health, failing.reason], ["unavailable", "unreadable"]);
     assert.deepEqual(fs.readdirSync(scratch), [], "a failed open removes the private copy");
 
-    // A successful query is unusable if its source changes after the copy or during SELECT.
+    // A source change after copying or during selection makes a successful query unusable.
     let mutationOpens = 0,
       mutate = true;
     const mutationReader = makeBusReader({
@@ -462,14 +473,15 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       file: walFile,
       tempRoot: scratch,
       loadSqlite: () => ({
-        Database: class extends sqlite.Database {
-          constructor(...args) {
-            super(...args);
+        Database: class extends SnapshotFixture {
+          constructor(file: string) {
+            super(file);
             mutationOpens++;
           }
-          query(sql) {
+          override query(sql: string) {
             const statement = super.query(sql);
             return {
+              get: (...args: (string | number)[]) => statement.get(...args),
               all: () => {
                 const result = statement.all();
                 if (mutate) {
@@ -507,14 +519,15 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       file: walFile,
       tempRoot: scratch,
       loadSqlite: () => ({
-        Database: class extends sqlite.Database {
-          constructor(...args) {
-            super(...args);
+        Database: class extends SnapshotFixture {
+          constructor(file: string) {
+            super(file);
             pairedOpens++;
           }
-          query(sql) {
+          override query(sql: string) {
             const statement = super.query(sql);
             return {
+              get: (...args: (string | number)[]) => statement.get(...args),
               all: () => {
                 const result = statement.all();
                 if (!committedDuringQuery) {
@@ -527,7 +540,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
                       )
                       .run("codex:" + S1, "codex:" + S1);
                   } finally {
-                    changed.close(true);
+                    changed.close(EXACT_TRUE);
                   }
                 }
                 return result;
@@ -538,7 +551,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       }),
     });
     assert.equal(
-      pairedReader.read().rows[0].id,
+      must(pairedReader.read().rows[0]).id,
       5,
       "post-query commit yields only newly verified rows",
     );
@@ -547,7 +560,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     assert.equal(pairedOpens, 2, "newer rows retain the matching successful fingerprint");
 
     // Same-path replacement invalidates metadata even when SQLite rows happen to match.
-    const oldMailIdentity = mutationReader.read().rows.find((row) => row.id === 1).identity;
+    const oldMailIdentity = must(mutationReader.read().rows.find((row) => row.id === 1)).identity;
     const replacementOpens = mutationOpens;
     const replacement = walFile + ".replacement";
     fs.copyFileSync(walFile, replacement);
@@ -558,7 +571,9 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       replacementOpens + 1,
       "inode replacement requires another private query",
     );
-    const replacementIdentity = mutationReader.read().rows.find((row) => row.id === 1).identity;
+    const replacementIdentity = must(
+      mutationReader.read().rows.find((row) => row.id === 1),
+    ).identity;
     assert.notEqual(
       replacementIdentity,
       oldMailIdentity,
@@ -574,7 +589,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     );
     assert.equal(replacementReader.inspect(1, replacementIdentity).identity, replacementIdentity);
     const changedMessage = new sqlite.Database(walFile);
-    changedMessage.exec(
+    changedMessage.run(
       "INSERT INTO agents (address, kind, project, scope, last_seen) VALUES ('codex:replacement', 'codex', '/p', '/s', '2026-10-12T10:00:00Z'), ('claude:replacement', 'claude', '/p', '/s', '2026-10-12T10:00:00Z')",
     );
     let previousIdentity = replacementIdentity;
@@ -584,9 +599,11 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       "recipient = 'claude:replacement'",
       "id = 900",
     ]) {
-      changedMessage.exec("UPDATE messages SET " + change + " WHERE id = 1");
+      changedMessage.run("UPDATE messages SET " + change + " WHERE id = 1");
       const id = change.startsWith("id =") ? 900 : 1;
-      const changedIdentity = replacementReader.read().rows.find((row) => row.id === id).identity;
+      const changedIdentity = must(
+        replacementReader.read().rows.find((row) => row.id === id),
+      ).identity;
       assert.notEqual(
         changedIdentity,
         previousIdentity,
@@ -599,7 +616,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       );
       previousIdentity = changedIdentity;
     }
-    changedMessage.close(true);
+    changedMessage.close(EXACT_TRUE);
 
     // Replace the source after SELECT returns: a body and identity from the old copy cannot escape together.
     let bodyQueries = 0,
@@ -609,12 +626,13 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
       now: () => clock,
       tempRoot: scratch,
       loadSqlite: () => ({
-        Database: class extends sqlite.Database {
-          query(sql) {
+        Database: class extends SnapshotFixture {
+          override query(sql: string) {
             const statement = super.query(sql);
             if (!/substr\(body/.test(sql)) return statement;
             return {
-              get: (...args) => {
+              all: (...args: (string | number)[]) => statement.all(...args),
+              get: (...args: (string | number)[]) => {
                 bodyQueries++;
                 const row = statement.get(...args);
                 if (!replacedDuringBody) {
@@ -645,11 +663,11 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     assert.notEqual(freshRace.identity, previousIdentity);
     assert.equal(
       freshRace.identity,
-      raceReader.read().rows.find((row) => row.id === 900).identity,
+      must(raceReader.read().rows.find((row) => row.id === 900)).identity,
       "returned body identity belongs to the verified snapshot",
     );
 
-    // A failed source proof forbids reuse, even if the exact previous fingerprint becomes readable again.
+    // Failed source proof revokes cache reuse. Restoring the previous fingerprint still requires another query.
     let sqliteSupported = true;
     const proofReader = makeBusReader({
       file: walFile,
@@ -660,14 +678,18 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     const proofGood = proofReader.read(),
       proofOpens = opened;
     const statSync = fs.statSync;
-    fs.statSync = (target, ...args) => {
-      if (target === walFile) {
-        const error = new Error("denied");
-        error.code = "EACCES";
-        throw error;
-      }
-      return statSync(target, ...args);
-    };
+    Object.defineProperty(fs, "statSync", {
+      configurable: true,
+      value: (target: fs.PathLike, options?: fs.StatSyncOptions) => {
+        if (target === walFile) {
+          const error = Object.assign(new Error("denied"), { code: "EACCES" });
+          throw error;
+        }
+        return options?.bigint
+          ? statSync(target, { ...options, bigint: true })
+          : statSync(target, { ...options, bigint: false });
+      },
+    });
     try {
       const failedProof = proofReader.read();
       assert.deepEqual(
@@ -675,7 +697,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
         ["unavailable", "unreadable", proofGood.rows, proofGood.observedAt],
       );
     } finally {
-      fs.statSync = statSync;
+      Object.defineProperty(fs, "statSync", { configurable: true, value: statSync });
     }
     proofReader.read();
     assert.equal(
@@ -730,11 +752,17 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
 
     // A filesystem without a birth-time discriminator cannot prove a replacement-safe incarnation.
     const realStat = fs.statSync;
-    fs.statSync = (target, ...args) => {
-      const stat = realStat(target, ...args);
-      if (target === walFile) stat.birthtimeNs = 0n;
-      return stat;
-    };
+    Object.defineProperty(fs, "statSync", {
+      configurable: true,
+      value: (target: fs.PathLike, options?: fs.StatSyncOptions) => {
+        if (options?.bigint) {
+          const stat = realStat(target, { ...options, bigint: true });
+          if (target === walFile) stat.birthtimeNs = 0n;
+          return stat;
+        }
+        return realStat(target, { ...options, bigint: false });
+      },
+    });
     try {
       const unproven = makeBusReader({ file: walFile, now: () => clock, tempRoot: scratch });
       assert.deepEqual([unproven.read().health, unproven.read().rows], ["unavailable", []]);
@@ -743,7 +771,7 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
         ["unavailable", null],
       );
     } finally {
-      fs.statSync = realStat;
+      Object.defineProperty(fs, "statSync", { configurable: true, value: realStat });
     }
 
     // A broken bus keeps the last good rows and their observedAt so the page can show them as stale.
@@ -759,8 +787,8 @@ CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES a
     assert.deepEqual(fs.readdirSync(scratch), []);
     const malformed = path.join(temp, "malformed.sqlite3"),
       odd = new sqlite.Database(malformed);
-    odd.exec("CREATE TABLE messages (id INTEGER PRIMARY KEY, body TEXT)");
-    odd.close(true);
+    odd.run("CREATE TABLE messages (id INTEGER PRIMARY KEY, body TEXT)");
+    odd.close(EXACT_TRUE);
     const unreadable = makeBusReader({
       now: () => 1000,
       file: malformed,

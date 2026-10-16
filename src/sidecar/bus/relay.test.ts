@@ -1,15 +1,20 @@
-"use strict";
-const { test } = require("bun:test");
+import { must, SnapshotFixture } from "./sqlite.fixture.js";
+import type { BusState } from "./types.js";
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import * as sqlite from "bun:sqlite";
+import { makeBusReader } from "./index.js";
+import { publicBus } from "./public.js";
+import { relayBinding } from "./relay.js";
+import { makeSqliteClient } from "../sqlite/client.js";
+
+const EXACT_TRUE = true;
+const EXACT_FALSE = false;
 
 test("observer-bus-relay regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const fs = require("node:fs");
-  const os = require("node:os");
-  const path = require("node:path");
-  const sqlite = require("bun:sqlite");
-  const { makeBusReader, publicBus, relayBinding } = require("./observer-bus.js");
-  const { makeSqliteClient } = require("./observer-sqlite-client.js");
-
   // The llm-bus native schema plus the remote tables exactly as llm_bus_remote_store.py creates them.
   const SCHEMA = `CREATE TABLE agents (address TEXT PRIMARY KEY, kind TEXT NOT NULL, project TEXT NOT NULL, scope TEXT NOT NULL,
   last_seen TEXT NOT NULL, ended_at TEXT, messaging_socket TEXT);
@@ -28,7 +33,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
     S2 = "22222222-2222-4222-8222-222222222222",
     R1 = "01a13f77-ab47-74e3-91d4-e7c83c17ee97";
   const NOW = Date.parse("2026-10-15T18:00:00.000Z"),
-    iso = (ms) => new Date(ms).toISOString();
+    iso = (ms: number) => new Date(ms).toISOString();
   const LOCAL = "claude:" + S1,
     OTHER = "codex:" + S2,
     FAR = "whitenoise/llm-bus/codex:" + R1,
@@ -56,13 +61,13 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         scratch = path.join(temp, "scratch");
       fs.mkdirSync(scratch);
       const db = new sqlite.Database(file);
-      db.exec(SCHEMA);
+      db.run(SCHEMA);
       for (const address of [LOCAL, OTHER, FAR])
         db.query("INSERT INTO agents VALUES (?, 'x', 'p', 's', ?, NULL, NULL)").run(
           address,
           iso(NOW),
         );
-      const insert = (sender, recipient, at, ack = null) =>
+      const insert = (sender: string, recipient: string, at: number, ack: number | null = null) =>
         db
           .query(
             "INSERT INTO messages(sender, recipient, body, sent_at, acknowledged_at) VALUES (?, ?, ?, ?, ?)",
@@ -73,10 +78,10 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
       const before = makeBusReader({ now: () => NOW, file, tempRoot: scratch }).read();
       assert.equal(before.health, "available");
       assert.equal(before.remote, null);
-      assert.equal(before.rows[0].relay, undefined);
-      assert.equal(Object.hasOwn(publicBus(before, []), "remote"), false);
+      assert.equal(must(before.rows[0]).relay, undefined);
+      assert.equal(Object.hasOwn(publicBus(before, []), "remote"), EXACT_FALSE);
 
-      db.exec(REMOTE);
+      db.run(REMOTE);
       db.query("INSERT INTO remote_binding VALUES (1, ?)").run(
         "https://llm-bus-relay.example.dev|friend-1",
       );
@@ -95,7 +100,15 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         inbound,
         JSON.stringify({ body: SECRET_BODY }),
       );
-      const peer = (machine, id, lastSeen, ended = 0, repo = "llm-bus") =>
+      const peer = (
+        ...[machine, id, lastSeen, ended = 0, repo = "llm-bus"]: [
+          string,
+          string,
+          number,
+          number?,
+          string?,
+        ]
+      ) =>
         db.query("INSERT INTO remote_peers VALUES (?, ?, ?)").run(
           machine + "/" + repo + "/codex:" + id,
           repo,
@@ -117,7 +130,15 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
       peer("friend-1", "self", NOW - 1000); // this machine's own sessions are never a peer
       peer("quiet-box", "z", NOW - 48 * 3600000);
       // This machine's published sessions (what the bridge put on the relay): one live, one ended, one malformed key.
-      const publish = (address, repo, lastSeen, ended = false, key = repo + "/" + address) =>
+      const publish = (
+        ...[address, repo, lastSeen, ended = false, key = repo + "/" + address]: [
+          string,
+          string,
+          number,
+          boolean?,
+          string?,
+        ]
+      ) =>
         db.query("INSERT INTO remote_publications VALUES (?, ?)").run(
           key,
           JSON.stringify({
@@ -128,17 +149,17 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
           }),
         );
       publish(LOCAL, "llm-bus", NOW - 60000);
-      publish(OTHER, "llm-bus", NOW - 60000, true);
-      publish("codex:" + S4OK, "llm-bus", NOW - 60000, false, "wrong/key");
+      publish(OTHER, "llm-bus", NOW - 60000, EXACT_TRUE);
+      publish("codex:" + S4OK, "llm-bus", NOW - 60000, EXACT_FALSE, "wrong/key");
       db.close();
 
       const state = makeBusReader({ now: () => NOW, file, tempRoot: scratch }).read();
       assert.equal(state.health, "available");
       const byId = new Map(state.rows.map((row) => [row.id, row]));
-      assert.equal(byId.get(Number(plain)).relay, undefined, "a local message has no relay");
-      const farPeer = byId.get(Number(out)).relay.peer;
-      assert.match(farPeer, /^peer_[a-f0-9]{24}$/, "the far agent is an opaque id");
-      assert.deepEqual(byId.get(Number(out)).relay, {
+      assert.equal(must(byId.get(Number(plain))).relay, undefined, "a local message has no relay");
+      const farPeer = must(must(byId.get(Number(out))).relay).peer;
+      assert.match(must(farPeer), /^peer_[a-f0-9]{24}$/, "the far agent is an opaque id");
+      assert.deepEqual(must(byId.get(Number(out))).relay, {
         direction: "out",
         machine: "whitenoise",
         repo: "llm-bus",
@@ -146,7 +167,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         peer: farPeer,
         state: "accepted_remote",
       });
-      assert.deepEqual(byId.get(Number(queued)).relay, {
+      assert.deepEqual(must(byId.get(Number(queued))).relay, {
         direction: "out",
         machine: "whitenoise",
         repo: "llm-bus",
@@ -155,7 +176,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         state: "queued_local",
       });
       assert.deepEqual(
-        byId.get(Number(inbound)).relay,
+        must(byId.get(Number(inbound))).relay,
         {
           direction: "in",
           machine: "whitenoise",
@@ -166,9 +187,10 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         },
         "both directions name the same far agent",
       );
-      assert.equal(state.remote.relay, "llm-bus-relay.example.dev");
-      assert.equal(state.remote.machine, "friend-1");
-      const [quiet, white] = state.remote.peers;
+      assert.equal(must(state.remote).relay, "llm-bus-relay.example.dev");
+      assert.equal(must(state.remote).machine, "friend-1");
+      const [quiet, white] = must(state.remote).peers;
+      assert(white);
       assert.deepEqual(
         quiet,
         {
@@ -209,7 +231,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         "each agent keeps its shared repo",
       );
       assert.equal(
-        state.remote.lastActivityAt,
+        must(state.remote).lastActivityAt,
         NOW - 10000,
         "newest relayed message or peer activity; this machine's own sessions do not count",
       );
@@ -219,42 +241,42 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
       for (const secret of [SECRET_BODY, R1, S2, "codex:" + R1, "codex:a", "/codex:"])
         assert.equal(
           text.includes(secret),
-          false,
+          EXACT_FALSE,
           "no body or native session id reaches the page: " + secret,
         );
       assert.deepEqual(
-        state.remote.published,
+        must(state.remote).published,
         [{ address: LOCAL, repo: "llm-bus" }],
         "only live, well-formed publications count",
       );
       assert.deepEqual(
-        view.remote.onRelay,
+        must(view.remote).onRelay,
         [{ id: "obs_local", repo: "llm-bus" }],
         "joined to its pane; the native address never reaches the page",
       );
-      assert.equal(Object.hasOwn(view.remote, "published"), false);
-      const outView = view.messages.find((message) => message.id === Number(out));
+      assert.equal(Object.hasOwn(must(view.remote), "published"), EXACT_FALSE);
+      const outView = must(view.messages.find((message) => message.id === Number(out)));
       assert.equal(outView.from, "obs_local");
       assert.equal(outView.to, "external", "the far side is never an observed pane");
-      assert.equal(outView.relay.state, "accepted_remote");
+      assert.equal(must(outView.relay).state, "accepted_remote");
       assert.deepEqual(
-        view.remote.peers.map((peer) => peer.machine),
+        must(view.remote).peers.map((peer) => peer.machine),
         ["quiet-box", "whitenoise"],
       );
-      view.remote.peers[0].repos.push("mutated");
-      view.messages[1].relay.state = "mutated";
+      must(must(view.remote).peers[0]).repos.push("mutated");
+      Object.assign(must(must(view.messages[1]).relay), { state: "mutated" });
       assert.deepEqual(
-        state.remote.peers[0].repos,
+        must(must(state.remote).peers[0]).repos,
         ["llm-bus"],
         "public view never aliases reader state",
       );
-      assert.notEqual(state.rows[1].relay.state, "mutated");
+      assert.notEqual(must(must(state.rows[1]).relay).state, "mutated");
 
-      // SQLite metadata can be unchanged while the native relay's 24-hour selection
-      // rule changes. Cache reuse must stop at actual evidence boundaries, not a TTL.
+      // Native relay roster eligibility changes over time even when SQLite metadata stays unchanged.
+      // Cache reuse stops at each evidence boundary rather than at a fixed lifetime.
       const expiryFile = path.join(temp, "expiry.sqlite3"),
         expiryDb = new sqlite.Database(expiryFile);
-      expiryDb.exec(SCHEMA + REMOTE);
+      expiryDb.run(SCHEMA + REMOTE);
       expiryDb
         .query("INSERT INTO remote_binding VALUES (1, ?)")
         .run("https://relay.example.dev|friend-1");
@@ -290,7 +312,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
           ended: false,
         }),
       );
-      expiryDb.close(true);
+      expiryDb.close(EXACT_TRUE);
       const unchangedBytes = fs.readFileSync(expiryFile);
       let clock = NOW,
         expiryOpens = 0;
@@ -299,17 +321,19 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         tempRoot: scratch,
         now: () => clock,
         loadSqlite: () => ({
-          Database: class extends sqlite.Database {
-            constructor(...args) {
-              super(...args);
+          Database: class extends SnapshotFixture {
+            constructor(file: string) {
+              super(file);
               expiryOpens++;
             }
           },
         }),
       });
-      const roster = (state) => state.remote.peers.find((peer) => peer.machine === "whitenoise");
-      const publication = (state) =>
-        publicBus(state, [{ id: "obs_local", provider: "claude", sessionId: S1 }]).remote.onRelay;
+      const roster = (state: BusState) =>
+        must(must(state.remote).peers.find((peer) => peer.machine === "whitenoise"));
+      const publication = (state: BusState) =>
+        must(publicBus(state, [{ id: "obs_local", provider: "claude", sessionId: S1 }]).remote)
+          .onRelay;
       const initial = expiring.read();
       assert.equal(roster(initial).agents, 1);
       assert.equal(roster(initial).list.length, 1);
@@ -324,7 +348,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
       clock++;
       const futureEligible = expiring.read();
       assert.equal(
-        futureEligible.remote.lastActivityAt,
+        must(futureEligible.remote).lastActivityAt,
         NOW + 120000,
         "future activity becomes eligible at the existing skew boundary without DB writes",
       );
@@ -386,7 +410,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
 
       // A malformed relay table never costs the local bus.
       const broken = new sqlite.Database(file);
-      broken.exec("DROP TABLE remote_outbox; CREATE TABLE remote_outbox (nope TEXT)");
+      broken.run("DROP TABLE remote_outbox; CREATE TABLE remote_outbox (nope TEXT)");
       broken.close();
       const degraded = makeBusReader({ now: () => NOW, file, tempRoot: scratch }).read();
       assert.equal(degraded.health, "available");

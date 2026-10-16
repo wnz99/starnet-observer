@@ -19,7 +19,7 @@ const path = require("node:path");
 const os = require("node:os");
 const fsp = require("node:fs/promises");
 const { stationChildEnv } = require("../src/sidecar/child-env.ts");
-const { makeOverseerState, defaultOverseerHome, resolveEndpoint } = require("./overseer-state.js");
+const { makeOverseerState, defaultOverseerHome, resolveEndpoint } = require("../src/sidecar/overseer-state/index.ts");
 const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
   require("node:child_process"),
 );

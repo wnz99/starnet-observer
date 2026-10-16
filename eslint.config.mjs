@@ -50,6 +50,7 @@ export default tseslint.config(
       "server.ts",
       "sidecar/**/*.ts",
       "src/sidecar/**/*.ts",
+      "src/server/**/*.ts",
       "src/shared/**/*.ts",
       "scripts/**/*.ts",
       "tools/**/*.ts",

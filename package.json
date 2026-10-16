@@ -30,7 +30,8 @@
     "test": "bun --no-env-file test",
     "presentation": "bun --no-env-file server.js --presentation",
     "validate:themes": "bun --no-env-file scripts/validate-theme-packs.mjs",
-    "verify:acceptance": "bun --no-env-file tools/acceptance.ts"
+    "verify:acceptance": "bun --no-env-file tools/acceptance.ts",
+    "build:runtime": "bun --no-env-file tools/build.ts runtime"
   },
   "bin": {
     "starnet-observer": "server.js"

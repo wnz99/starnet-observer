@@ -6,8 +6,8 @@ test("observer-helpers-index regression contracts", async () => {
   const fs = require("node:fs/promises");
   const path = require("node:path");
   const os = require("node:os");
-  const { makeHelperObserver } = require("./observer-helpers.js");
-  const { makeTranscriptObserver } = require("./observer-transcripts.js");
+  const { makeHelperObserver } = require("./index.ts");
+  const { makeTranscriptObserver } = require("../../../sidecar/observer-transcripts.js");
   const ID = "00000000-0000-0000-0000-000000000001";
   const line = (row) => JSON.stringify(row) + "\n";
   const spawn = (child, call = "spawn-" + child, description = "Task " + child) =>

@@ -7,8 +7,8 @@ test("observer-helpers regression contracts", async () => {
   const path = require("node:path");
   const { Database } = require("bun:sqlite");
   const os = require("node:os");
-  const { makeHelperObserver } = require("./observer-helpers.js");
-  const { makeTranscriptObserver } = require("./observer-transcripts.js");
+  const { makeHelperObserver } = require("./index.ts");
+  const { makeTranscriptObserver } = require("../../../sidecar/observer-transcripts.js");
   const ID = "00000000-0000-0000-0000-000000000001";
   const CHILD = "00000000-0000-0000-0000-000000000002";
   const OTHER = "00000000-0000-0000-0000-000000000003";
@@ -379,7 +379,7 @@ test("observer-helpers regression contracts", async () => {
       assert(!JSON.stringify(result.rows).includes("PRIVATE FULL PROMPT"));
       await fs.writeFile(
         cp,
-        spawn(ID, "scout", "spawn-scout", 'Label password=\"secret label\" ' + "x".repeat(300))
+        spawn(ID, "scout", "spawn-scout", 'Label password="secret label" ' + "x".repeat(300))
           .map(line)
           .join(""),
       );

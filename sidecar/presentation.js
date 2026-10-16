@@ -1,5 +1,5 @@
 "use strict";
-const { unavailable } = require("./observer-inspector.js");
+const { unavailable } = require("../src/sidecar/inspector/fields.ts");
 const { PANE } = require("./control.js");
 const { DEFAULT_LABELS } = require("../src/sidecar/config/index.ts");
 const TOOL_NAMES = new Set([

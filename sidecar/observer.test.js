@@ -56,9 +56,9 @@ test("observer regression contracts", async () => {
       },
     };
   }
-  const { makeHelperObserver } = require("./observer-helpers.js");
+  const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
   const { lastActivity } = require("./observer.js");
-  const { makeDesktopObserver } = require("./observer-desktop.js");
+  const { makeDesktopObserver } = require("../src/sidecar/desktop/index.ts");
   const fs = require("node:fs/promises");
   const os = require("node:os");
   const path = require("node:path");
@@ -636,7 +636,7 @@ test("observer regression contracts", async () => {
 
   async function helperComposition() {
     const { makeTranscriptObserver } = require("./observer-transcripts.js");
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-helper-composition-"));
     try {
       const child = "00000000-0000-0000-0000-000000000002";
@@ -703,7 +703,7 @@ test("observer regression contracts", async () => {
   }
 
   async function nestedHelperGrouping() {
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const id = (number) => "00000000-0000-0000-0000-" + String(number).padStart(12, "0");
 
     const transcripts = {
@@ -792,7 +792,7 @@ test("observer regression contracts", async () => {
 
   async function deepHelperOwnership() {
     const { makeTranscriptObserver } = require("./observer-transcripts.js");
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-deep-pane-"));
     try {
       const id = (number) => "00000000-0000-0000-0000-" + String(number).padStart(12, "0");
@@ -871,7 +871,7 @@ test("observer regression contracts", async () => {
 
   async function cappedHelperOwnership() {
     const { makeTranscriptObserver } = require("./observer-transcripts.js");
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-capped-pane-"));
     try {
       const id = (number) => "00000000-0000-0000-0000-" + String(number).padStart(12, "0");
@@ -1591,7 +1591,7 @@ test("observer regression contracts", async () => {
   async function footerAncestryProofSet() {
     const { makeIdentityResolver } = require("./observer-identity.js");
     const { makeTranscriptObserver } = require("./observer-transcripts.js");
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const child = "00000000-0000-0000-0000-000000000002",
       descendant = "00000000-0000-0000-0000-000000000003";
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "observer-footer-ancestry-"));
@@ -2051,7 +2051,7 @@ test("observer regression contracts", async () => {
 
   async function claudeHelperNamespaces() {
     const { makeTranscriptObserver } = require("./observer-transcripts.js");
-    const { makeHelperObserver } = require("./observer-helpers.js");
+    const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-claude-namespaces-"));
     try {
       const second = "00000000-0000-0000-0000-000000000002";
@@ -3608,7 +3608,7 @@ test("observer regression contracts", async () => {
   }
 
   async function overseerRoles() {
-    const { makeOverseerState } = require("./overseer-state.js");
+    const { makeOverseerState } = require("../src/sidecar/overseer-state/index.ts");
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "observer-overseer-"));
     const file = path.join(directory, "identity.json"),
       endpoint = "/fixture/observer.sock";

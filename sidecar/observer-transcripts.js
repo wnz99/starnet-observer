@@ -4,6 +4,7 @@ const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const inspector = require("./observer-inspector.js");
+const { redactText } = require("../src/sidecar/inspector/fields.ts");
 const { note: failNote } = require("../src/sidecar/failopen.ts");
 
 const READ_BYTES = 256 * 1024;
@@ -30,7 +31,7 @@ function consumeRecord(state, record, provider, position) {
     const use = provider === "claude" && record.type === "assistant" && block.type === "tool_use";
     if (call || use) {
       const callId = cleanName(call ? block.call_id : block.id),
-        name = cleanName(typeof block.name === "string" ? inspector.redactText(block.name) : "");
+        name = cleanName(typeof block.name === "string" ? redactText(block.name) : "");
       if (!callId || !name) continue;
       if (state.calls.has(callId)) continue;
       state.calls.add(callId);
@@ -217,7 +218,7 @@ function makeTranscriptObserver(options = {}) {
         verified = true;
         nickname =
           typeof record.payload.agent_nickname === "string"
-            ? cleanName(inspector.redactText(record.payload.agent_nickname))
+            ? cleanName(redactText(record.payload.agent_nickname))
             : null;
       }
       if (

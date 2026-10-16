@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolveRuntimePaths } from "../../server/runtime-paths.js";
 import { DEFAULT_LABELS } from "./defaults.js";
 import { validateConfig } from "./validation.js";
 import { parseConfigArgs } from "./cli.js";
@@ -38,7 +39,7 @@ export function loadConfig(
   defaultPath?: string,
   paths: Paths = {},
 ): ObserverConfig | { help: true } {
-  const installRoot = paths.installRoot ?? path.resolve(import.meta.dirname, "../../..");
+  const installRoot = paths.installRoot ?? resolveRuntimePaths().installRoot;
   const values = parseConfigArgs(args);
   if (values.help) return { help: true };
   const file = configPath(values.config, defaultPath, installRoot, paths.cwd);
