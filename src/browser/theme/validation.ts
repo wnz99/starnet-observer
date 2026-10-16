@@ -1,3 +1,4 @@
+import { SCENE_ART_ROLE_NAMES } from "../../shared/scene-art-roles.js";
 import {
   THEME_UI_COLORS,
   THEME_SCENE_COLORS,
@@ -100,10 +101,12 @@ function ui(value: unknown): value is ThemeContents["ui"] {
 function art(value: unknown): value is ThemeContents["scene"]["art"] {
   if (!record(value)) return false;
   if (value.style === "station") return true;
+  const assets = value.assets;
   return (
     value.style === "home-office" &&
-    record(value.assets) &&
-    Object.values(value.assets).every(string)
+    record(assets) &&
+    SCENE_ART_ROLE_NAMES.every((name) => Object.hasOwn(assets, name) && string(assets[name])) &&
+    Object.values(assets).every(string)
   );
 }
 function scene(value: unknown): value is ThemeContents["scene"] {

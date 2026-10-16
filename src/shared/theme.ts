@@ -1,3 +1,4 @@
+import type { SceneArtRoleName } from "./scene-art-roles.js";
 import type { ThemeUiColor, ThemeSceneColor, ThemeCrewId, ThemeTrack } from "./theme-keys.js";
 
 export interface ThemeWarning {
@@ -42,7 +43,7 @@ export interface ThemeContents {
       | { readonly style: "station" }
       | {
           readonly style: "home-office";
-          readonly assets: Readonly<Record<string, string>>;
+          readonly assets: Readonly<Record<SceneArtRoleName, string>>;
         };
     readonly backgroundFx: "rain" | "none";
     readonly ambientFx: "station" | "none";

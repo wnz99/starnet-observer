@@ -1,3 +1,4 @@
+import { SCENE_ART_ROLE_NAMES } from "../shared/scene-art-roles.js";
 import { test, expect } from "bun:test";
 import { readBootstrap } from "./bootstrap.js";
 import { canonicalTheme } from "./theme.fixture.js";
@@ -70,4 +71,36 @@ test("missing or structurally invalid canonical default fails before theme use",
   expect(() => readBootstrap({ __OBSERVER_THEME_DEFAULT__: unsafe })).toThrow(
     "Canonical theme default",
   );
+});
+
+test("home-office bootstrap proves every native role while retaining extra string fields", () => {
+  const canonical = canonicalTheme();
+  const assets: Record<string, unknown> = {};
+  const selected = {
+    ...canonical,
+    requestedId: "office",
+    effectiveId: "office",
+    warnings: [],
+    scene: {
+      ...canonical.scene,
+      art: { style: "home-office", assets },
+    },
+  };
+  expect(
+    readBootstrap({ __OBSERVER_THEME_DEFAULT__: canonical, __OBSERVER_THEME_PACK__: selected })
+      .themePack,
+  ).toBeNull();
+  for (const name of SCENE_ART_ROLE_NAMES) assets[name] = "/synthetic.png";
+  assets.extra = "/extra.png";
+  expect(
+    readBootstrap({ __OBSERVER_THEME_DEFAULT__: canonical, __OBSERVER_THEME_PACK__: selected })
+      .themePack,
+  ).not.toBeNull();
+  const invalid = structuredClone(selected);
+  const invalidAssets = invalid.scene.art.assets;
+  invalidAssets.floor = 1;
+  expect(
+    readBootstrap({ __OBSERVER_THEME_DEFAULT__: canonical, __OBSERVER_THEME_PACK__: invalid })
+      .themePack,
+  ).toBeNull();
 });
