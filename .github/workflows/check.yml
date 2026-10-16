@@ -1,6 +1,7 @@
 name: Check
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -28,8 +29,6 @@ jobs:
           bun --version
           node --version
           uv --version
-          if [ "$(uname -s)" = Darwin ]; then swiftc --version; fi
       - run: bun install --frozen-lockfile
       - run: bun node_modules/@playwright/test/cli.js install --with-deps chromium
       - run: bun run check
-      - run: bun run test:browser

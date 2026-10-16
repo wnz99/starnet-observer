@@ -17,7 +17,7 @@ Use `bun run format` or `bun run fix` for explicit edits. Ordinary checks do not
 
 ## Build, package and CI
 
-Ubuntu CI installs frozen dependencies and Chromium, then runs `bun run check` and `bun run test:browser`. These cover formatting, shell checks, lint, strict types, unused code/dependencies, duplicate code, builds, native Bun tests, installed-package consumers and real browser fixtures. Test and build commands remain available for CI and deliberate maintenance work:
+Ubuntu CI runs for pull requests and pushes to main. It installs frozen dependencies and Chromium, then runs `bun run check` once. These cover formatting, shell checks, lint, strict types, unused code/dependencies, duplicate code, builds, native Bun tests, installed-package consumers and real browser fixtures. Test and build commands remain available for CI and deliberate maintenance work:
 
 ```sh
 bun run build
@@ -29,7 +29,7 @@ bun run test:browser
 
 `build` emits runtime JavaScript to `dist/runtime` and browser resources to `dist/public`. Local startup includes installed private theme packs. `package` stages only tracked distributable sources and canonical assets in a temporary directory, builds there and emits `dist/starnet-observer.tgz`. Package privacy tests reject local configuration, private packs, presets, planning files and development dependencies. LICENSE, NOTICE, Swift source and canonical browser resources travel with the archive.
 
-The installed-package check creates an external temporary consumer, refuses inherited dependencies and implicit dotenv, installs production dependencies first and verifies the installed bin, HTTP endpoints, resources and native SQLite worker. It then installs the pinned browser harness from its plain Bun fixture lock and runs both colocated application consumers. Fixtures are removed afterward. macOS checks can compile the installed Swift resource; Ubuntu checks the explicit unsupported desktop fallback. Hosted CI runs Ubuntu only; it does not establish live macOS desktop or SSH integration.
+The installed-package check creates an external temporary consumer, refuses inherited dependencies and implicit dotenv, installs production dependencies first and verifies the installed bin, HTTP endpoints, resources and native SQLite worker. It then installs the pinned browser harness from `tools/fixtures/consumer/bun.lock` and runs both colocated application consumers. Fixtures are removed afterward. macOS checks can compile the installed Swift resource; Ubuntu checks the explicit unsupported desktop fallback. Hosted CI runs Ubuntu only; it does not establish live macOS desktop or SSH integration.
 
 Browser fixtures use synthetic snapshots and injected controls. Install the locked Chromium executable with:
 
