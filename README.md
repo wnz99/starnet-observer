@@ -361,10 +361,13 @@ Tests live beside their owning modules. The test command builds the runtime and 
 bun run test
 ```
 
-Check that assertion failures, empty discovery, rejected promises, and incomplete subprocess fixtures fail visibly:
+Verify clean packaging, installed consumers, browser behavior, and disposable positive/negative acceptance probes:
 
 ```sh
-bun run verify:acceptance -- tests
+bun run verify:acceptance
+bun run package
+bun run dependency-isolation
+bun run test:browser
 ```
 
 ## Credits

@@ -13,7 +13,10 @@
         "tools/build.ts",
         "src/browser/prepaint.ts",
         "src/browser/main.ts",
-        "tools/start.ts"
+        "tools/start.ts",
+        "tools/package.ts",
+        "tools/browser-smoke.ts",
+        "tools/records.ts"
       ],
       "project": ["src/**/*.ts", "scripts/**/*.ts", "tools/**/*.{mjs,ts}", "*.mjs"]
     }

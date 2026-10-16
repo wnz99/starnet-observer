@@ -1,0 +1,122 @@
+{
+  "baseline": "wnz-repo-v1",
+  "dependencies": {
+    "package.json": {
+      "@eslint/js": "10.0.1",
+      "@playwright/test": "1.64.1",
+      "@types/bun": "1.3.13",
+      "@types/node": "24.19.2",
+      "clean-code-tools": "1.0.7",
+      "eslint": "10.11.0",
+      "eslint-plugin-sonarjs": "4.2.1",
+      "eslint-plugin-unicorn": "69.0.0",
+      "fallow": "3.27.0",
+      "globals": "17.12.0",
+      "knip": "6.37.0",
+      "prettier": "3.9.8",
+      "typescript": "6.0.3",
+      "typescript-eslint": "8.70.0"
+    }
+  },
+  "files": {
+    ".bootstrap.json": "0cd4868f1a938fe6fcddee3d09f4e48121bc69a824e57f7c671754eeee1b487e",
+    ".fallowrc.json": "4da842653eb8a9f0c7b4ef13760bcb61c36ebefe58d41b8b31b66bacf84f207c",
+    ".githooks/pre-commit": "227bdc6f376527439ac64313a626b135bdbb3737292b6e6cc887b864c52535d3",
+    ".githooks/pre-push": "c1187abe064e88f5009a4d1cb18f2545a0e831894ec4b6108f4b1cf9be772d9e",
+    ".github/workflows/check.yml": "bb8c1ad754085dbc04c3d7cd5d55e57a679eaf41a4cb89530ff247801968499d",
+    ".gitignore": "ea7bcc8b94d8b35a71a6a944b2995303090fa400a1f67446fc7c5638e5213aee",
+    ".prettierignore": "14cfad6d58f274a9348724b9ae5ff6578a478715e1fab0d5459280cf7a4cbd32",
+    ".prettierrc.json": "b79ab1996af4af804642c6b1e111c9143582a42a7797c9451b00f0617dd16d26",
+    "AGENTS.md": "f9f8dbabb2c062843fa71727bc67860e8ed89e069dd65887adabcf47d02b2b0f",
+    "LICENSE": "576bf9e6651870a13ef8b0067ccbd85e4781999b6da32c767891997cf65d46b7",
+    "NOTICE.md": "ed96a00a84bd4c88f25db0d8a4c13721076dcde4d381d38cab546d41990c649c",
+    "README.md": "071aee972576dabba0f63d8c9e1641f8886728ac98e229f6ac5676d09c079cd9",
+    "bun.lock": "41bd1e98d0e00269cf822994b9e163b99753c1f2ad9a767742a4dd46e9dfe37b",
+    "bunfig.toml": "32291f904d2c467edb96f9c4bfed61d8de838d20c30a3bd71f773b327970bcfa",
+    "docs/README.md": "5629f314893fe103732ca06615dd21a118a4f0e00a6df971ed90a549c90b9aaf",
+    "docs/bootstrap-records.md": "ef02b123059448cbc170a8a2b473ffcc63a681c7ca43e4a49522eb76eaa1d629",
+    "docs/development.md": "870001cc0580086094bcc4d17a257f5d525845ec35016a0757bf737bdf4a5e27",
+    "docs/index.md": "aebff2df045af373d9353cdc5c5f5400c928b38b01818785142b5e628c7b2c7a",
+    "docs/quality.md": "a690dcf5f12ac83d3612a870a74813c18aec746c6517265f1ea3264d5a9e507d",
+    "docs/sources.md": "8eb41a2a13575500104dfeb67770d0644803a6c97b24241f8fcd94f3076c7e11",
+    "docs/verification.md": "0399b3817b6ad4444f636e960d5e11b348b6657274e6395bb827d8b00aafac04",
+    "eslint.config.mjs": "41b75c854446dd55d883ca121c1da2759c1b906eb023ee5129c661c0d482b783",
+    "knip.json": "706063a42cd1528639983caf0283f3d0db82d26d3718c3bfd34f108f2f07f876",
+    "package.json": "bda7325a2ea757c4101907d71ec013c1508a4b85bb2601833d9da0f27bdffa04",
+    "quality/isolation/b2aa54886de5099973e41c812a77be3caef293299834a9b3ed4e1f9e68a87d1b/consumer.json": "a19c6e183a05c451f7ef0aa4f735fdc1b3bc06d5deed2697c9d2a08157e1786e",
+    "tools/acceptance.test.ts": "36877113c5ec3de4685fd486c9dcd584c460bcbc13eca7c97e8070f102bde230",
+    "tools/acceptance.ts": "440a4f3c8bd82d70e30533408577b47032412dfe97144bcd526fe256adbaad26",
+    "tools/acceptance/coverage.ts": "b002d00f695df9c46ab1a005a7705571897444f0116efe0601bab820ad3a42b6",
+    "tools/acceptance/docs.ts": "6c815960fb96a5b318f552c00b538e3a46d13d907a3761bae520fded8a904cb1",
+    "tools/acceptance/fixture.ts": "d46a8eabe799f2835d1554ac531797a058f067cf157020d8000c062ce8ec7921",
+    "tools/acceptance/policy.ts": "801518b6cd2e09ffcd2fee4362d9aed6616dd31678093bacd793e4242412e659",
+    "tools/acceptance/tests.ts": "627cf01bc6609741ae5197a2662c9acac054e0738759e337862d4a98d25df968",
+    "tools/browser-smoke.test.ts": "281bb3bb0fdcf138c293539429b804154db71da7fc1ab85cf2f8e1db50e82f4d",
+    "tools/browser-smoke.ts": "036ce92504a8b28311ce3eda3d6d4856319aa6c0b994cc987acded338dfe2847",
+    "tools/build.test.ts": "8951a19f325a7f63fbb92363b61998b5f094d143dae7899f8dcca01c7b133315",
+    "tools/build.ts": "36d213d702bec9581f39f8486d89ccbdbc1502fcb07967baea5d55ed65723005",
+    "tools/package.test.ts": "02b44f3456fd8a074971621336b67950bf0821db2aaf1fabec3478bb5c6e9a5f",
+    "tools/package.ts": "e4ce8e376aacbf0b491dfbc60aafc18e209315d8b158c067e54ed7dc62129085",
+    "tools/public.fixture.ts": "2d46d4fdac8b138e2761d6362e36fddf69938ea961142e43c6b676860ef3e00b",
+    "tools/public.test.ts": "53574843706e880f3ec837e0a70e1227f5b9570a3440dd5ed5b50a8358a08aa4",
+    "tools/public.ts": "dc97c828d6b79b657d618e3bcd9123d82728ac6c236c955d283795605ba5cea7",
+    "tools/quality/check-static.sh": "def02b804fbfa51de68873414b9de81a9579b237a8e3c69e61b04443d577e3d9",
+    "tools/quality/check-versions.sh": "43f8030c21594b0fd3f1fa3b75ae2a4fe14cf8bf8a4838d5d06e60c7c74e4dbd",
+    "tools/quality/check.sh": "32f675592ae11a53b2426db2c004ca7e166d656d265af34869af17fc772e7493",
+    "tools/quality/format-index.sh": "e2d2cb629c9aa81e77fc1d056538d79906f7eaed9eb4976b8eadf375940d4022",
+    "tools/quality/hooks.sh": "11ac578715e68c80f17451af089d85359bcdd10bfa9e5e4011e36e4195b49997",
+    "tools/quality/hooks.test.ts": "51b652a8b025681a6e45360a637c6ab3d0a324837a5b445a076587562490d0f2",
+    "tools/quality/install-hooks.sh": "d5ab088ecd351e6c004a076f317c7494f533db354a83410b335103b0f26d376b",
+    "tools/quality/isolate-typescript.mjs": "0b5ec1ba27e97205e9cc37b8f39481d08b9b119bb0367d519a446ecf77a940ed",
+    "tools/quality/lint-classification.test.ts": "2bb58aa3c6461c4ce16e1fe3d1966404e0a257686458ed3dc8c5b248b8a0b8cb",
+    "tools/quality/setup.sh": "f04b4ea14aac65c750e46952b634c48f01049499ea0a2e1f05516026afbf5009",
+    "tools/record-contract.test.ts": "1abe1e2c8337a6ab2c787b2d35e7d66ca8a8ca2990338b22dfe5293efd11dc83",
+    "tools/record-contract.ts": "a90440f304b0d6d1b02b5d666519c2fdaf7734c35e9b25ceee642e01e8d74f7d",
+    "tools/records.ts": "fcbdeb99b10a1175abbf207050f1d5b06bfea65b48bfc9cf2dd3f5aa37a1362c",
+    "tools/runtime-build.ts": "ecf0200ace4efb9b7aaef51ee547b0ced1a1c61dfe6ac1cf59295a44fccc1939",
+    "tools/staging.ts": "823303b9bdd0376b67a0be8327a977288439ced37efbfb9d94c93d4c278695f2",
+    "tools/start.fixture.ts": "7f205f3e3d0d6a44fc036005fa12b8a778728c0e307d1bac5073acb66fa25862",
+    "tools/start.test.ts": "3151f6e6abfbeeef489aa69378b5ee8aec28dce4599dcb4007d46792c9fa2990",
+    "tools/start.ts": "259a72575b69760478ef39e45640eb95e5bda7a34238beb0e78cd6877e0e1aac",
+    "tsconfig.base.json": "b015715e77f59c4c137e37eeea104a14bd1dd045b51a31e3a92429f2d6720110",
+    "tsconfig.browser-tests.json": "a2e1dda6b69bd5868abe3e9754ca07b0665d6d1cb2cc7136b872c4165f18f349",
+    "tsconfig.browser.json": "b0d541e44fdf4eca24666675600e5dce96ce878a07b619e524ba2d3104df8866",
+    "tsconfig.json": "564307aa807bdd01a69a7e52a04f0224e84ed0f84975a00d04db564938fd5e33",
+    "tsconfig.runtime.json": "1b7b3ab176f5e4d71f406590b58693c45a058c38519370321c12fc70e8f9af2e",
+    "tsconfig.tools.json": "47d77ea25a012969562c4689a5fad851a2304c60e2c357a2af7c066985a9ec82"
+  },
+  "runtimes": {
+    "bun": "1.3.13",
+    "node": "24.19.0",
+    "nodeTypes": "24.19.2",
+    "python": null,
+    "uv": "0.13.1"
+  },
+  "skills": {
+    "clean-code-tools": {
+      "digest": "2e093c8620e25c6554d0fd713b3f86a77aadc7b937b4b019780bbd92b34d3e80",
+      "revision": "c51c7aa0a9ad555f81e8096e4a7e1c83f9156c1a"
+    },
+    "verify-before-complete": {
+      "digest": "781949fc27915c1151300742898b6aba7fb471ad88ae943f07088db316e5dfa0",
+      "revision": null
+    },
+    "wnz-clean-code-js": {
+      "digest": "4c340d5a5c3816491f9519cb6d2f3bfbfaadae082adba8039405e7a3c2459754",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b"
+    },
+    "wnz-code-reviewer": {
+      "digest": "6f465bbf455998673f2bb7daf04663c34d9f95a8c61485eef3f6510ea02c2830",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b"
+    },
+    "wnz-doc-write-expert": {
+      "digest": "258fe33ff7024d95023a6add9eef40b8b356c04126e125de9657812be2820f2e",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b"
+    },
+    "wnz-test-quality": {
+      "digest": "7f8856410513faa266df6bb820e4e06d8a665b2466c6867e4ab3c30d0bc27d1f",
+      "revision": "1e6b0d8cc149ee26729319bc109414ca7d77145b"
+    }
+  },
+  "specificationSha256": "ef02b123059448cbc170a8a2b473ffcc63a681c7ca43e4a49522eb76eaa1d629"
+}

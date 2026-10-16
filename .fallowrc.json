@@ -14,7 +14,10 @@
     "tools/build.ts",
     "src/browser/prepaint.ts",
     "src/browser/main.ts",
-    "tools/start.ts"
+    "tools/start.ts",
+    "tools/package.ts",
+    "tools/browser-smoke.ts",
+    "tools/records.ts"
   ],
   "ignorePatterns": [
     "**/dist/**",

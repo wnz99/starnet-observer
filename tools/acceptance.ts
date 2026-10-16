@@ -91,9 +91,31 @@ export function runTestProbes(): TestProbe[] {
   }
 }
 
+import { coverageProbe, qualityProbe } from "./acceptance/coverage.js";
+import { readonlyProbe, hygieneProbe, hooksProbe } from "./acceptance/policy.js";
+import { docsProbe, replayProbe } from "./acceptance/docs.js";
+import { actualAssertionProbe } from "./acceptance/tests.js";
+const CLI_OFFSET = 2;
+const MODES = {
+  tests: async () => {
+    await actualAssertionProbe();
+    const probes = runTestProbes();
+    for (const probe of probes) console.log(JSON.stringify(probe));
+    return `${String(probes.length)} runner negatives verified`;
+  },
+  coverage: coverageProbe,
+  quality: qualityProbe,
+  readonly: readonlyProbe,
+  hooks: hooksProbe,
+  hygiene: hygieneProbe,
+  replay: replayProbe,
+  docs: docsProbe,
+};
 if (import.meta.main) {
-  const [, , ...arguments_] = process.argv;
-  assert.deepEqual(arguments_, ["tests"], "usage: bun run verify:acceptance -- tests");
-  for (const probe of runTestProbes())
-    console.log(`PASS ${probe.name}: rejected with exit ${String(probe.status)}`);
+  const names = process.argv.slice(CLI_OFFSET).filter((value) => value !== "--");
+  for (const name of names.length > 0 ? names : Object.keys(MODES)) {
+    assert.ok(Object.hasOwn(MODES, name), `Unknown acceptance mode ${name}`);
+    const probe = MODES[name as keyof typeof MODES];
+    console.log(`PASS ${name}: ${await probe()}`);
+  }
 }

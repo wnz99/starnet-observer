@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: CC0-1.0
-import { JSON5 } from "bun";
+import { JSON5, TOML } from "bun";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   access,
   copyFile,
-  cp,
   lstat,
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   realpath,
   rename,
   rm,
@@ -113,9 +111,9 @@ try {
   await mkdir(artifacts);
   const overrides = Object.create(null);
   for (const [index, item] of order.entries()) {
-    run(["run", "build"], item.path);
+    run(["run", "package"], item.path);
     const filename = `package-${index}.tgz`;
-    run(["pm", "pack", "--ignore-scripts", "--filename", join(artifacts, filename)], item.path);
+    await copyFile(join(item.path, "dist/starnet-observer.tgz"), join(artifacts, filename));
     overrides[item.manifest.name] = `file:./artifacts/${filename}`;
   }
   const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -152,9 +150,11 @@ try {
       () => false,
     )
   ) {
-    throw new Error(
-      "Consumer registry policy must be in .npmrc; bunfig.toml requires a reviewed adapter",
-    );
+    const configuration = TOML.parse(await readFile(bunConfiguration, "utf8"));
+    const allowed = { env: false, test: { pathIgnorePatterns: ["dist/**", "package-staging/**"] } };
+    if (JSON.stringify(canonical(configuration)) !== JSON.stringify(canonical(allowed)))
+      throw new Error("Unknown bunfig policy; registry policy must be explicit .npmrc");
+    await writeFile(join(sandbox, "bunfig.toml"), "env = false\n");
   }
   const registry = join(root, ".npmrc");
   if (
@@ -185,7 +185,7 @@ try {
     ),
   );
   if (mode === "--initialize") {
-    run(["install"], sandbox);
+    run(["install", "--lockfile-only"], sandbox);
   } else {
     if (
       !(await access(lock).then(
@@ -215,7 +215,7 @@ try {
         .digest("base64")}`;
     }
     await writeFile(join(sandbox, "bun.lock"), `${JSON.stringify(localLock, null, 2)}\n`);
-    run(["install", "--frozen-lockfile"], sandbox);
+    run(["install", "--lockfile-only", "--frozen-lockfile"], sandbox);
   }
   // Runtime imports must succeed without test tools masking missing dependencies.
   await rm(join(sandbox, "node_modules"), { recursive: true, force: true });
@@ -237,29 +237,29 @@ try {
       );
     }
   }
-  run(["install", "--frozen-lockfile"], sandbox);
-  // Consumer tests must use installed package APIs/artifacts, not workspace source.
-  await cp(join(selected.path, "tests/isolation"), join(sandbox, "tests/isolation"), {
-    recursive: true,
-    dereference: false,
-    filter: async (path) => {
-      if ((await lstat(path)).isSymbolicLink())
-        throw new Error("Consumer tests cannot link outside the fixture");
-      return true;
-    },
-  });
-  if (selected.component.target === "node") {
-    const tests = (await readdir(join(sandbox, "tests/isolation"), { recursive: true }))
-      .filter((path) => path.endsWith(".test.mjs"))
-      .sort()
-      .map((path) => join("tests/isolation", path));
-    if (tests.length === 0) throw new Error("Node consumer requires at least one .test.mjs test");
-    execute("node", ["--test", ...tests], sandbox);
-  } else if (selected.component.target === "browser") {
-    run(["run", "test:isolation"], sandbox);
-  } else {
-    run(["test", "./tests/isolation"], sandbox);
+  // Only these actual owners enter the sandbox. Reject links at every path component.
+  const consumers = [
+    "src/server/application.consumer.test.ts",
+    "src/browser/application.consumer.test.ts",
+  ];
+  for (const source of consumers) {
+    let current = selected.path;
+    for (const part of source.split("/")) {
+      current = join(current, part);
+      if ((await lstat(current)).isSymbolicLink())
+        throw new Error("Consumer sources cannot be symlinks");
+    }
+    await mkdir(dirname(join(sandbox, source)), { recursive: true });
+    await copyFile(join(selected.path, source), join(sandbox, source));
   }
+  environment.OBSERVER_ISOLATED_CONSUMER = "1";
+  environment.OBSERVER_PRODUCTION_ONLY = "1";
+  run(["--no-env-file", "test", "./src/server/application.consumer.test.ts"], sandbox);
+  delete environment.OBSERVER_PRODUCTION_ONLY;
+  console.log("PASS production-only installed application before test dependencies");
+  run(["install", "--frozen-lockfile"], sandbox);
+  run(["--no-env-file", "test", ...consumers.map((source) => "./" + source)], sandbox);
+
   if (mode === "--initialize") {
     await mkdir(dirname(lock), { recursive: true });
     const transaction = await mkdtemp(join(dirname(lock), ".lock-"));

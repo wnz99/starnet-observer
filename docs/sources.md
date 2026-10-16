@@ -32,6 +32,7 @@ The original baseline pins have these acquisition sources. They are reference pi
 | npm       | `globals@17.12.0`              | [npm](https://www.npmjs.com/package/globals/v/17.12.0)              |
 | npm       | `knip@6.37.0`                  | [npm](https://www.npmjs.com/package/knip/v/6.37.0)                  |
 | npm       | `prettier@3.9.8`               | [npm](https://www.npmjs.com/package/prettier/v/3.9.8)               |
+| npm       | `@playwright/test@1.64.1`      | [npm](https://www.npmjs.com/package/@playwright/test/v/1.64.1)      |
 | npm       | `typescript@6.0.3`             | [npm](https://www.npmjs.com/package/typescript/v/6.0.3)             |
 | npm       | `typescript-eslint@8.70.0`     | [npm](https://www.npmjs.com/package/typescript-eslint/v/8.70.0)     |
 

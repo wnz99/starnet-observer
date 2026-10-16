@@ -19,7 +19,7 @@
     "check:shell": "uv tool run --from uv==0.13.1 uv tool run --from shellcheck-py==0.11.0.1 shellcheck .githooks/pre-commit .githooks/pre-push tools/quality/check-static.sh tools/quality/check-versions.sh tools/quality/check.sh tools/quality/format-index.sh tools/quality/hooks.sh tools/quality/install-hooks.sh tools/quality/setup.sh",
     "check:static": "bun run check:root && bun run format-check && bun run build && bun run lint && bun run typecheck",
     "check:versions": "sh tools/quality/check-versions.sh",
-    "dependency-isolation": "bun --no-env-file ./tools/quality/isolate-typescript.mjs observer",
+    "dependency-isolation": "bun --no-env-file tools/quality/isolate-typescript.mjs starnet-observer",
     "fix": "eslint . --fix",
     "format": "prettier --write --ignore-unknown .",
     "format-check": "prettier --check --ignore-unknown .",
@@ -33,7 +33,9 @@
     "verify:acceptance": "bun --no-env-file tools/acceptance.ts",
     "build:runtime": "bun --no-env-file tools/build.ts runtime",
     "build": "bun --no-env-file tools/build.ts local",
-    "dev": "bun run build && bun --no-env-file src/server/main.ts"
+    "dev": "bun run build && bun --no-env-file src/server/main.ts",
+    "package": "bun --no-env-file tools/package.ts",
+    "test:browser": "bun --no-env-file tools/browser-smoke.ts"
   },
   "bin": {
     "starnet-observer": "dist/runtime/src/server/main.js"
@@ -57,6 +59,13 @@
     "knip": "6.37.0",
     "prettier": "3.9.8",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.0"
-  }
+    "typescript-eslint": "8.70.0",
+    "@playwright/test": "1.64.1"
+  },
+  "files": [
+    "dist/runtime",
+    "dist/public",
+    "LICENSE",
+    "NOTICE.md"
+  ]
 }

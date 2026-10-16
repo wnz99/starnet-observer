@@ -7,30 +7,20 @@
       "node": "949feb2413d6458794dcd2491c4babbbce0c15c1",
       "uv": "1c37ad07a6a961277cf70c0d37d6f313000f5884"
     },
-    "operatingSystems": [],
-    "provider": "pending"
+    "operatingSystems": [
+      "ubuntu-24.04",
+      "macos-15"
+    ],
+    "provider": "github"
   },
   "components": [
     {
       "artifact": "application",
       "entrypoints": [
-        "server.ts",
-        "sidecar/observer-sqlite-worker.ts",
-        "frontend/app/theme-pack.ts",
-        "frontend/app/harness.ts",
-        "frontend/app/queryspine.ts",
-        "frontend/app/data-shim.ts",
-        "frontend/js/sprite-load-plan.ts",
-        "frontend/js/assets.ts",
-        "frontend/app/observer-model.ts",
-        "frontend/app/observer-scene.ts",
-        "frontend/app/observer-mail.ts",
-        "frontend/app/observer-inspector.ts",
-        "frontend/app/observer-mail-inspector.ts",
-        "frontend/app/scene-art-roles.ts",
-        "frontend/app/observer-office-art.ts",
-        "frontend/app/observer-view.ts",
-        "frontend/app/observer.ts"
+        "src/server/main.ts",
+        "src/sidecar/sqlite/worker.ts",
+        "src/browser/prepaint.ts",
+        "src/browser/main.ts"
       ],
       "importPackage": null,
       "language": "typescript",
@@ -46,13 +36,15 @@
         "state": "none",
         "transport": null
       },
-      "name": "observer",
+      "name": "starnet-observer",
       "path": ".",
       "runtimeDependencies": [],
       "target": "bun",
-      "testDependencies": {},
+      "testDependencies": {
+        "@playwright/test": "1.64.1"
+      },
       "validation": {
-        "answer": "TypeScript runtime boundary validation required during migration; no Python application",
+        "answer": "Runtime TypeScript validators enforce external-data boundaries; no Python application",
         "state": "none"
       }
     }
@@ -100,7 +92,7 @@
     }
   },
   "profile": "typescript-single",
-  "purpose": "Read-only local observer for terminal agent sessions; TypeScript migration in progress.",
+  "purpose": "Read-only local observer for terminal agent sessions.",
   "runtimes": {
     "bun": "1.3.13",
     "node": "24.19.0",
@@ -110,11 +102,11 @@
   },
   "skills": [
     {
-      "digest": "a2621e700fb24f1258c8a8eaccfd2f66cd79abd7cdd2c97981feaa062dfd3622",
+      "digest": "2e093c8620e25c6554d0fd713b3f86a77aadc7b937b4b019780bbd92b34d3e80",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/clean-code-tools",
-        "state": "installed complete pinned directory; restart for current-session skill discovery"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "UNLICENSED (upstream package.json declaration; no LICENSE file)",
       "name": "clean-code-tools",
@@ -123,11 +115,11 @@
       "subdirectory": "skills/clean-code-tools"
     },
     {
-      "digest": "176aaaee464dc96f7d4f1976a1f34773c117e67d9f9106bb78dfbc9a2e26cd3e",
+      "digest": "781949fc27915c1151300742898b6aba7fb471ad88ae943f07088db316e5dfa0",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/verify-before-complete",
-        "state": "installed; preserved in place; no invented upstream"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "not declared in trusted installed copy",
       "name": "verify-before-complete",
@@ -136,11 +128,11 @@
       "subdirectory": null
     },
     {
-      "digest": "b35df137ec604149236e9dce0e4c676542ded90fa4a8c8a69e4e558df9042544",
+      "digest": "4c340d5a5c3816491f9519cb6d2f3bfbfaadae082adba8039405e7a3c2459754",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/wnz-clean-code-js",
-        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "MIT",
       "name": "wnz-clean-code-js",
@@ -149,11 +141,11 @@
       "subdirectory": "skills/wnz-clean-code-js"
     },
     {
-      "digest": "3a49d660f8d182de73c5f6fb4fc04d5b1bd7919b30b8f8ff32da90debf0663e1",
+      "digest": "6f465bbf455998673f2bb7daf04663c34d9f95a8c61485eef3f6510ea02c2830",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/wnz-code-reviewer",
-        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "MIT",
       "name": "wnz-code-reviewer",
@@ -162,11 +154,11 @@
       "subdirectory": "skills/wnz-code-reviewer"
     },
     {
-      "digest": "88ae5a806ea51c2609f5ad6c4ccc49dcc40c2a94bbfd6045c6f4a05f60df9b42",
+      "digest": "258fe33ff7024d95023a6add9eef40b8b356c04126e125de9657812be2820f2e",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/wnz-doc-write-expert",
-        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "MIT",
       "name": "wnz-doc-write-expert",
@@ -175,11 +167,11 @@
       "subdirectory": "skills/wnz-doc-write-expert"
     },
     {
-      "digest": "cafefd8b9789a502ffc5ffc834264c119e581acdee4274a25361312bd38cedee",
+      "digest": "7f8856410513faa266df6bb820e4e06d8a665b2466c6867e4ab3c30d0bc27d1f",
       "discovery": {
         "client": "Codex",
         "location": "~/.agents/skills/wnz-test-quality",
-        "state": "installed; existing local adaptations preserved; compare pinned source before replacing"
+        "state": "installed and discovered by actual Codex app-server; existing local adaptations preserved"
       },
       "license": "MIT",
       "name": "wnz-test-quality",
