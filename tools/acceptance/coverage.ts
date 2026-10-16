@@ -7,6 +7,14 @@ interface LintDiagnostic {
   messages: { ruleId: string | null }[];
 }
 const TYPE_MISMATCH_DIAGNOSTIC = "TS2322";
+const TYPECHECK_ARGUMENTS = [
+  "node_modules/typescript/bin/tsc",
+  "-p",
+  "tsconfig.json",
+  "--noEmit",
+  "--pretty",
+  "false",
+];
 const REPRESENTATIVES = [
   "src/server",
   "src/sidecar",
@@ -28,11 +36,7 @@ export async function coverageProbe() {
         path.join(root, file),
         "export const evidence: string = 42; console.log(evidence);\n",
       );
-    const types = bun(
-      root,
-      ["node_modules/typescript/bin/tsc", "-p", "tsconfig.json", "--noEmit"],
-      1,
-    );
+    const types = bun(root, TYPECHECK_ARGUMENTS, 1);
     for (const file of files)
       assert.ok(
         types
@@ -59,7 +63,7 @@ export async function coverageProbe() {
         lint,
       );
     for (const file of files) await fs.unlink(path.join(root, file));
-    bun(root, ["node_modules/typescript/bin/tsc", "-p", "tsconfig.json", "--noEmit"]);
+    bun(root, TYPECHECK_ARGUMENTS);
     bun(root, ["run", "lint"]);
     return "all six owning categories reject bad types and Clean Code violations; restored tools pass";
   });

@@ -21,7 +21,7 @@ Run `sh tools/quality/check.sh`, `bun run test:browser` and `bun run verify:acce
 | Browser                     | Pinned Chromium renders emitted assets, canvas, preferences, host selection, panels/focus, lifecycle, token boundary and synthetic private-pack/control fixtures; screenshot judgment is separate             |
 | Replay and records          | Replay mode preserves same-input locks/settings and deliberate generated edits; docs mode detects drift and checks exact digests                                                                              |
 | Documentation               | Bun.YAML parses required string fields; canonical index, local links, license and pending-option integrity are checked                                                                                        |
-| Platform CI                 | Immutable workflow runs Ubuntu 24.04 and macOS 15; actual runner OS/architecture and native Swift compilation determine platform proof                                                                        |
+| Platform CI                 | Immutable workflow runs Ubuntu 24.04; hosted macOS CI is waived by user decision, and native macOS verification remains unverified                                                                            |
 
 The original Task 7 baseline passed 232 tests across 94 files and full strict/static checks. Task 8 requires its own changed-head evidence; the baseline does not certify delivery changes. Configured hosted CI, final independent review and merge remain controller gates until their actual results exist.
 

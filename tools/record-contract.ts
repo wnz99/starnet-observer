@@ -137,7 +137,7 @@ function validateComponent(component: Record<string, unknown>, manifest: Record<
 function validateCi(ci: Record<string, unknown>) {
   keys(ci, ["provider", "operatingSystems", "actionRevisions"]);
   assert.equal(ci.provider, "github");
-  assert.deepEqual([...array(ci.operatingSystems)].sort(), ["macos-15", "ubuntu-24.04"]);
+  assert.deepEqual([...array(ci.operatingSystems)].sort(), ["ubuntu-24.04"]);
   const actions = record(ci.actionRevisions);
   keys(actions, ["bun", "checkout", "node", "uv"]);
   for (const revision of Object.values(actions)) assert.match(text(revision), REVISION);

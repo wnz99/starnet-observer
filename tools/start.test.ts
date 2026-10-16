@@ -19,7 +19,7 @@ async function waitFile(file: string) {
   }
 }
 async function fixture(env: NodeJS.ProcessEnv) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "observer-start-"));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "observer-start-")));
   await fs.writeFile(path.join(root, ".env"), "STARNET_FIXTURE_DOTENV=must-not-load\n");
   const caller = path.join(root, "caller");
   await fs.mkdir(caller);

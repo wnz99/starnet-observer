@@ -10,7 +10,7 @@ You do **not** need to install or run StarNet. The necessary observer code, shar
 
 | Dependency                                                      | Purpose                                                                                                                                              |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS                                                           | Supported and tested platform for this initial release.                                                                                              |
+| macOS                                                           | Supported initial target; native verification remains unverified.                                                                                    |
 | [Bun](https://bun.sh/) 1.3.13 or newer                          | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
 | Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
 | [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
