@@ -2,7 +2,7 @@
   "workspaces": {
     ".": {
       "entry": [
-        "server.{js,ts}",
+        "src/server/main.ts",
         "src/sidecar/sqlite/worker.ts",
         "scripts/*.{js,mjs,ts}",
         "frontend/app/observer-scene.{js,ts}",
@@ -15,10 +15,10 @@
         "frontend/css/observer.css",
         "tools/build.ts",
         "src/browser/prepaint.ts",
-        "src/browser/legacy-bridge.ts"
+        "src/browser/legacy-bridge.ts",
+        "tools/start.ts"
       ],
       "project": [
-        "server.{js,ts}",
         "sidecar/**/*.{js,ts}",
         "src/**/*.{js,ts}",
         "frontend/**/*.{js,ts}",

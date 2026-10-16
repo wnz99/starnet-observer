@@ -3558,7 +3558,7 @@ test("observer-ui regression contracts", async () => {
         live,
         floor,
         inventory;
-      const { makePresentationObserver } = require("../../sidecar/presentation.js");
+      const { makePresentationObserver } = require("../../src/sidecar/presentation/index.ts");
       const presentation = makePresentationObserver({ get: async () => inventory });
       class EvidenceDate extends Date {
         static now() {

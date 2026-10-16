@@ -1,4 +1,4 @@
-export const BAD_REQUEST_STATUS = 400;
+const BAD_REQUEST_STATUS = 400;
 export const CONFLICT_STATUS = 409;
 export const PROOF_TTL = 6000;
 export const QUERY_TIMEOUT = 5000;

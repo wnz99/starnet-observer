@@ -65,7 +65,7 @@ test(
       write({ theme: { fx: false, colors: { accent: "#ABCDEF" } } });
       assert.deepEqual(settings(["--fx"], file).theme, { fx: true, colors: { accent: "#ABCDEF" } });
       assert.equal(settings(["--no-fx"], file).theme.fx, DISABLED);
-      // Dynamic arrangement: theme default and the rooms file path (relative to the config file, default next to server.js).
+      // Dynamic arrangement: theme default and the rooms file path (relative to the config file, default next to package.json).
       write({ theme: { arrange: true }, roomsFile: "my-rooms.json" });
       const arranged = settings([], file);
       assert.equal(arranged.theme.arrange, ENABLED);
@@ -150,7 +150,7 @@ test(
       assert.throws(() => settings([], file), /invalid JSON/);
       fs.writeFileSync(file, " ".repeat(65537));
       assert.throws(() => settings([], file), /64 KiB/);
-      const server = path.join(__dirname, "../../server.js");
+      const server = path.join(__dirname, "../../dist/runtime/src/server/main.js");
       const invalid = spawnSync(process.execPath, ["--no-env-file", server, "--config", file], {
         cwd: folder,
         encoding: "utf8",
@@ -175,14 +175,17 @@ test(
       });
       assert.equal(help.status, 0);
       assert.match(help.stdout, /--no-presentation/);
-      assert.match(help.stdout, /Usage: bun --no-env-file server\.js/);
+      assert.match(help.stdout, /Usage: bun --no-env-file dist\/runtime\/src\/server\/main\.js/);
       const executable = spawnSync(server, ["--help"], {
         cwd: folder,
         encoding: "utf8",
         timeout: 3000,
       });
       assert.equal(executable.status, 0, executable.stderr);
-      assert.match(executable.stdout, /Usage: bun --no-env-file server\.js/);
+      assert.match(
+        executable.stdout,
+        /Usage: bun --no-env-file dist\/runtime\/src\/server\/main\.js/,
+      );
       for (const script of ["start", "presentation"]) {
         const launched = spawnSync(process.execPath, ["run", script, "--help"], {
           cwd: path.join(__dirname, "../.."),
@@ -190,7 +193,10 @@ test(
           timeout: BUILD_LAUNCH_TIMEOUT,
         });
         assert.equal(launched.status, 0, launched.stderr);
-        assert.match(launched.stdout, /Usage: bun --no-env-file server\.js/);
+        assert.match(
+          launched.stdout,
+          /Usage: bun --no-env-file dist\/runtime\/src\/server\/main\.js/,
+        );
       }
       const example: unknown = JSON.parse(
         fs.readFileSync(path.join(__dirname, "../../observer.config.example.json"), "utf8"),

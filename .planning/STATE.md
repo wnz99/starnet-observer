@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: TypeScript refactor
-status: In progress; remotes and control/presentation independently approved; HTTP migration and scene/view remain.
-last_updated: "2026-10-16T12:27:29.000Z"
+status: In progress; Tasks 1–6 accepted; Scene/View and app lifecycle integration remain.
+last_updated: "2026-10-16T14:06:58.397772+00:00"
 last_activity: 2026-10-16
-last_activity_desc: Reviewed remotes and control/presentation integrated; preparing HTTP migration while Scene receives independent review.
-state_head: d408c8e8fe07984f856280c1562d8d84c0034ec8
-stopped_at: Task 6 HTTP integration; Task 7 Scene review and View continuation
+last_activity_desc: Task 6 independently approved after full source and strict verification; final View review is next.
+state_head: 92229930ff5f7d4749076d56350436e048ed9db7
+stopped_at: Task 7; Scene approved, View final verification and independent composition review
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: In progress; remotes and control/presentation independently approved; HTTP migration and scene/view remain.
-Last activity: 2026-10-16 — Reviewed remotes and control/presentation integrated with focused source/emitted fixtures; HTTP migration is next.
+Status: In progress; Tasks 1–6 accepted; Scene/View and app lifecycle integration remain.
+Last activity: 2026-10-16 — Task 6 independently approved after 163 source tests, all five strict projects and emitted closure verification.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Current work: Task 6 HTTP integration after independently approved remotes and control/presentation; Scene review and View continuation remain; no PR or merge.
+Current work: Task 7; approved Scene and bounded View cleanup await final View composition review; no PR or merge.
 Resume file: [TypeScript handover](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-HANDOVER.md)
-Next action: Continue approved Task 6 HTTP/launch migration, then integrate reviewed Scene/View for Task 7. User explicitly resumed implementation on 2026-10-16 through PR, required checks/CI and merge. No paid/live runs or optional configuration changes are authorized. User separately authorized needed local headless browser setup; pinned Chromium is ready for synthetic checks.
+Next action: Integrate independently approved Scene/View, then migrate the app lifecycle and converge the full baseline. User explicitly resumed implementation on 2026-10-16 through PR, required checks/CI and merge. No paid/live runs or optional configuration changes are authorized. User separately authorized needed local headless browser setup; pinned Chromium is ready for synthetic checks.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Tasks 1–5 accepted; reviewed remotes/control integrated; HTTP and Scene/View remain | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Tasks 1–6 accepted; Scene/View, app lifecycle and final acceptance remain | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

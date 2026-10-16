@@ -412,9 +412,8 @@ test("bounded synthetic theme installation contracts", () => {
     assert.throws(() => validateInstalledPacks(frontend), /pack-count/);
     for (let i = 0; i < 15; i++)
       fs.rmSync(path.join(frontend, `assets/themes/extra-${String(i)}`), { recursive: true });
-    const validator = new URL("../../../scripts/validate-theme-packs.mjs", import.meta.url)
-      .pathname;
-    const valid = spawnSync(process.execPath, [validator, frontend], {
+    const validator = new URL("../../../scripts/validate-theme-packs.ts", import.meta.url).pathname;
+    const valid = spawnSync(process.execPath, ["--no-env-file", validator, frontend], {
       encoding: "utf8",
       timeout: 10000,
     });
@@ -430,7 +429,7 @@ test("bounded synthetic theme installation contracts", () => {
       /typography-scale/,
       "invalid default fails startup instead of fallback",
     );
-    const invalid = spawnSync(process.execPath, [validator, frontend], {
+    const invalid = spawnSync(process.execPath, ["--no-env-file", validator, frontend], {
       encoding: "utf8",
       timeout: 10000,
     });

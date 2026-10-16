@@ -28,7 +28,7 @@ import { makeSpawn } from "./spawn.js";
 import { makeOverseer } from "./overseer.js";
 import type { ControlOptions } from "./types.js";
 import path from "node:path";
-export { PANE, TARGET, FOLDER, quote, remoteEndpoint } from "./constants.js";
+export { PANE, TARGET } from "./constants.js";
 export function makeControl(options: ControlOptions = {}) {
   const endpoint = resolveEndpoint(options);
   const overseerHome = options.overseerHome || defaultOverseerHome();

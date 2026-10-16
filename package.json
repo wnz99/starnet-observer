@@ -9,7 +9,7 @@
     "node": "24.19.0"
   },
   "scripts": {
-    "check": "bun run check:static && bun run test && bun run dependency-isolation",
+    "check": "bun run check:static && bun --no-env-file test && bun run dependency-isolation",
     "check:fallow": "fallow dead-code --summary --quiet && fallow dupes --summary --quiet",
     "check:format": "prettier --check --ignore-unknown .",
     "check:helpers": "eslint eslint.config.mjs tools/quality --max-warnings 0",
@@ -26,17 +26,17 @@
     "hooks:install": "sh tools/quality/install-hooks.sh",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit && tsc -p tsconfig.browser-tests.json",
-    "start": "bun run build && bun --no-env-file server.js",
-    "test": "bun --no-env-file test",
-    "presentation": "bun run build && bun --no-env-file server.js --presentation",
-    "validate:themes": "bun --no-env-file scripts/validate-theme-packs.mjs",
+    "start": "bun --no-env-file tools/start.ts",
+    "test": "bun run build && bun --no-env-file test",
+    "presentation": "bun --no-env-file tools/start.ts --presentation",
+    "validate:themes": "bun --no-env-file scripts/validate-theme-packs.ts",
     "verify:acceptance": "bun --no-env-file tools/acceptance.ts",
     "build:runtime": "bun --no-env-file tools/build.ts runtime",
     "build": "bun --no-env-file tools/build.ts local",
-    "dev": "bun run build && bun --no-env-file server.js"
+    "dev": "bun run build && bun --no-env-file src/server/main.ts"
   },
   "bin": {
-    "starnet-observer": "server.js"
+    "starnet-observer": "dist/runtime/src/server/main.js"
   },
   "repository": {
     "type": "git",

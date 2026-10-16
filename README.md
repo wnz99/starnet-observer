@@ -36,9 +36,9 @@ bun run start
 
 Open **http://127.0.0.1:4319** in your browser. Keep the server terminal open. Stop with **Ctrl+C**.
 
-`bun run start` builds the runtime and public assets before starting the server. `bun run dev` performs the same build and starts the source server; rebuild and restart explicitly after edits.
+`bun run start` builds the runtime and public assets before starting the server. `bun run dev` performs the same build and starts `src/server/main.ts`; rebuild and restart explicitly after edits.
 
-After `bun run build`, you can also run `bun --no-env-file server.js` directly. Start it from any directory with `bun --no-env-file /path/to/starnet-observer/server.js`. If port 4319 is occupied:
+After `bun run build`, you can also run `bun --no-env-file dist/runtime/src/server/main.js` directly. Start it from any directory with `bun --no-env-file /path/to/starnet-observer/dist/runtime/src/server/main.js`. If port 4319 is occupied:
 
 ```sh
 PORT=4320 bun run start
@@ -141,7 +141,7 @@ To make your own theme, copy the example:
 cp observer.config.example.json observer.config.json
 ```
 
-Edit it, then run `bun run start`. `observer.config.json` next to `server.js` is loaded automatically and is Git-ignored. An explicit `--config` path instead selects that file; relative paths resolve from the directory where you run the command. The selected file replaces the automatic file, then merges with built-in defaults. Restart the server and reload the browser after edits.
+Edit it, then run `bun run start`. `observer.config.json` next to `package.json` is loaded automatically and is Git-ignored. An explicit `--config` path instead selects that file; relative paths resolve from the directory where you run the command. The selected file replaces the automatic file, then merges with built-in defaults. Restart the server and reload the browser after edits.
 
 The configuration fields are:
 
@@ -163,7 +163,7 @@ CLI flags override the selected file:
 bun run start --presentation --company "Orbit Works" --repo-prefix orbit --no-fx
 bun run start --config themes/helioforge.json --company "My Demo Studio" --no-fx
 bun run start --no-presentation
-bun --no-env-file server.js --help
+bun --no-env-file dist/runtime/src/server/main.js --help
 ```
 
 Use either `--presentation` or `--no-presentation`, and either `--fx` or `--no-fx`; conflicting pairs are rejected. `--company` and `--repo-prefix` customize labels but do not enable presentation mode. Port selection remains `PORT=4320 bun run start`.
@@ -188,7 +188,7 @@ Select it with `"theme": { "pack": "example" }` in the ignored local configurati
 ```sh
 bun run validate:themes
 # An isolated authoring fixture can use its own public frontend root:
-bun --no-env-file scripts/validate-theme-packs.mjs /absolute/path/to/frontend
+bun --no-env-file scripts/validate-theme-packs.ts /absolute/path/to/frontend
 ```
 
 The author validator examines at most 16 immediate non-symlink pack directories and rejects invalid directory IDs. Startup reads only the selected pack and required default resources. A missing selected manifest stops startup. An existing selected pack with malformed data, invalid assets, or a resource-budget violation uses the complete default pack and supplies one bounded warning with requested/effective IDs. An invalid default installation stops startup. Warning metadata never contains private filesystem paths. Browser image/font decode has its own fallback checks; a valid PNG header does not prove an image can decode.
@@ -355,7 +355,7 @@ bun install --frozen-lockfile
 bun run start
 ```
 
-Tests live beside their owning modules. Bun discovers and awaits these suites directly:
+Tests live beside their owning modules. The test command builds the runtime and public assets, then Bun discovers and awaits the suites directly:
 
 ```sh
 bun run test

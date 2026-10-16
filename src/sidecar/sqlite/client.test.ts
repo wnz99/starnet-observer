@@ -127,31 +127,44 @@ test("client quarantines malformed correlated replies and never exposes a mismat
 
 test("emitted SQLite client preserves native lifecycle regression contracts", async () => {
   const emitted = await buildRuntime();
-  const repository = fileURLToPath(new URL("../../../", import.meta.url));
-  const result = await execute(
-    process.execPath,
-    [
-      "--no-env-file",
-      "test",
-      "./server.sqlite.test.js",
-      "--test-name-pattern",
-      "^observer-sqlite-worker regression contracts$",
-    ],
-    {
-      cwd: repository,
-      timeout: 35000,
-      env: {
-        ...process.env,
-        STARNET_SQLITE_TEST_CLIENT: path.join(emitted, "src", "sidecar", "sqlite", "client.js"),
-        NO_COLOR: "1",
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), "observer-emitted-sqlite-"));
+  try {
+    const clientFile = path.join(emitted, "src", "sidecar", "sqlite", "client.js");
+    const oracle = new URL("../../server/http.sqlite-oracle.test.ts", import.meta.url).href;
+    const fixture = path.join(folder, "native.test.mjs");
+    await fs.writeFile(
+      fixture,
+      `import {test} from 'bun:test';
+import {sqliteContracts} from ${JSON.stringify(oracle)};
+import {createServer} from ${JSON.stringify(pathToFileURL(path.join(emitted, "src", "server", "http.js")).href)};
+import {makeSqliteClient} from ${JSON.stringify(pathToFileURL(clientFile).href)};
+import {setKnownSecretSource} from ${JSON.stringify(pathToFileURL(path.join(emitted, "src", "sidecar", "redaction.js")).href)};
+test('observer-sqlite-worker regression contracts',()=>sqliteContracts({createServer,makeSqliteClient,setKnownSecretSource,clientFile:${JSON.stringify(clientFile)}}),30000);
+`,
+    );
+    const result = await execute(
+      process.execPath,
+      [
+        "--no-env-file",
+        "test",
+        fixture,
+        "--test-name-pattern",
+        "^observer-sqlite-worker regression contracts$",
+      ],
+      {
+        cwd: folder,
+        timeout: 35000,
+        env: { ...process.env, NO_COLOR: "1" },
       },
-    },
-  );
-  assert.match(result.stdout, /cleanup failure contained/);
-  assert.match(result.stdout, /native stall: 11000 ms;.*scratch empty after continuation/);
-  assert.match(result.stdout, /SQLite worker:.*bounded queue and teardown OK/);
-  assert.match(result.stderr, /1 pass/);
-  assert.match(result.stderr, /0 fail/);
-  assert.match(result.stderr, /Ran 1 test across 1 file/);
-  console.log("Emitted SQLite lifecycle:\n" + result.stdout.trim());
+    );
+    assert.match(result.stdout, /cleanup failure contained/);
+    assert.match(result.stdout, /native stall: 11000 ms;.*scratch empty after continuation/);
+    assert.match(result.stdout, /SQLite worker:.*bounded queue and teardown OK/);
+    assert.match(result.stderr, /1 pass/);
+    assert.match(result.stderr, /0 fail/);
+    assert.match(result.stderr, /Ran 1 test across 1 file/);
+    console.log("Emitted SQLite lifecycle:\n" + result.stdout.trim());
+  } finally {
+    await fs.rm(folder, { recursive: true, force: true });
+  }
 }, 70000);

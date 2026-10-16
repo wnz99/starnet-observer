@@ -10,7 +10,7 @@ const childProcess = guardChildProcess(nativeChildProcess);
 const DEFAULT_TIMEOUT = WAIT_TIMEOUT;
 const MAX_BUFFER = 2 * 1024 * 1024;
 const HOME_TIMEOUT = 15000;
-export const executeDefault: Execute = (command, args, settings) =>
+const executeDefault: Execute = (command, args, settings) =>
   new Promise((resolve, reject) => {
     childProcess.execFile(
       command,

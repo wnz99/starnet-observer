@@ -150,6 +150,12 @@ test("runtime build preserves last good output and local resources when strict c
     const source = path.join(desktop, "index.ts");
     await fs.writeFile(source, "export const observed: number = 1;\n");
     await fs.writeFile(path.join(desktop, "observer-desktop-macos.swift"), "fixture native source");
+    const server = path.join(folder, "src", "server");
+    await fs.mkdir(server);
+    await fs.writeFile(
+      path.join(server, "main.ts"),
+      '#!/usr/bin/env -S bun --no-env-file\nconsole.log("EMITTED_BIN_EXECUTED");\n',
+    );
     await fs.mkdir(path.join(folder, "frontend"));
     await fs.writeFile(
       path.join(folder, "frontend", "private-marker.txt"),
@@ -173,6 +179,9 @@ test("runtime build preserves last good output and local resources when strict c
     );
     const output = await buildRuntime(folder);
     const emitted = path.join(output, "src", "sidecar", "desktop", "index.js");
+    const bin = path.join(output, "src", "server", "main.js");
+    const launched = await execute(bin, [], { cwd: os.tmpdir(), timeout: 3000 });
+    assert.match(launched.stdout, /EMITTED_BIN_EXECUTED/);
     const previous = await fs.readFile(emitted);
     await fs.writeFile(source, 'export const observed: number = "invalid";\n');
     await assert.rejects(buildRuntime(folder), /Command failed/);

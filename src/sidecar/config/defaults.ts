@@ -11,7 +11,9 @@ export const DEFAULT_LABELS = Object.freeze({
   ]),
 });
 export const DEFAULT_ROOMS = path.join(resolveRuntimePaths().installRoot, "rooms.json");
-export const HELP = `Usage: bun --no-env-file server.js [options]
+export const HELP = `Usage: bun --no-env-file dist/runtime/src/server/main.js [options]
+Source checkout: bun run start [options] or bun run presentation [options]
+Prebuilt installation: starnet-observer [options]
 
   --presentation          Enable private labels and block inspectors
   --no-presentation       Disable private labels, overriding the config file
@@ -22,12 +24,12 @@ export const HELP = `Usage: bun --no-env-file server.js [options]
   --help                  Show this help
 
 Flags override config; config overrides defaults. Mode defaults to off.
-If present, observer.config.json next to server.js is loaded automatically.
+If present, observer.config.json next to package.json is loaded automatically.
 Use PORT to change the listening port (default 4319).
 Config "remotes": [{ "id": "vm1", "ssh": "user@host", "dir": "~/starnet-observer" }] adds remote hosts, each
 streamed read-only over the operator's ssh (key auth, BatchMode) and drawn as its own ship with its own mailroom.
 Cross-machine mail is drawn only from what each llm-bus reports about its own relay binding, never from config.
-Config "roomsFile" (default rooms.json next to server.js, relative to the config file) holds optional dynamic
+Config "roomsFile" (default rooms.json next to package.json, relative to the config file) holds optional dynamic
 arrangement overrides: { "rooms": [{ "name": "Banqora", "match": ["~/dev/repos/bq-*", "github.com/banqora/*"] }] }.
 Config "theme": { "arrange": true } starts the page with the dynamic arrangement on.
 `;

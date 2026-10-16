@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 const execute = promisify(execFile);
 const COMPILER_TIMEOUT = 30000;
 const COMPILER_OUTPUT_BYTES = 1048576;
+const EXECUTABLE_MODE = 0o755;
 const repository = fileURLToPath(new URL("../", import.meta.url));
 
 export async function buildRuntime(installRoot = repository, outputRoot?: string): Promise<string> {
@@ -32,6 +33,7 @@ export async function buildRuntime(installRoot = repository, outputRoot?: string
       ],
       { cwd: root, timeout: COMPILER_TIMEOUT, maxBuffer: COMPILER_OUTPUT_BYTES },
     );
+    await fs.chmod(path.join(staging, "src", "server", "main.js"), EXECUTABLE_MODE);
     const nativeAsset = path.join("src", "sidecar", "desktop", "observer-desktop-macos.swift");
     await fs.copyFile(path.join(root, nativeAsset), path.join(staging, nativeAsset));
   });
