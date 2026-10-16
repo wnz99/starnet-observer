@@ -3,14 +3,14 @@ const { test } = require("bun:test");
 
 test("control-remote regression contracts", async () => {
   const assert = require("node:assert/strict");
-  const { makeControl } = require("./control.js");
-  const { createServer } = require("../server.js");
+  const { makeControl } = require("../control/index.ts");
+  const { createServer } = require("../../../server.js");
   const {
     makeRemoteHosts,
     makeFederatedObserver,
     sanitizeTargets,
-  } = require("../src/sidecar/remotes/index.ts");
-  const { nativeProof } = require("../scripts/stream.ts");
+  } = require("../remotes/index.ts");
+  const { nativeProof } = require("../../../scripts/stream.ts");
   // Remote control meets the local bar: a fresh streamed native proof, re-checked on that host over ssh before acting.
   await (async () => {
     const at = new Date("2026-10-14T12:00:00").getTime();

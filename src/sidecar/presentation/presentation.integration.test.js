@@ -3,8 +3,8 @@ const { test } = require("bun:test");
 
 test("presentation regression contracts", async () => {
   const assert = require("node:assert/strict");
-  const { makePresentationObserver } = require("./presentation.js");
-  const { createServer } = require("../server.js");
+  const { makePresentationObserver } = require("../presentation/index.ts");
+  const { createServer } = require("../../../server.js");
   await (async () => {
     let inspected = 0,
       closes = 0;
