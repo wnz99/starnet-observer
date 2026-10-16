@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { selectRemote } from "./relay.js";
-import { WINDOW, MAX_RAW_CHARS, object } from "./types.js";
+import { WINDOW, MAX_RAW_CHARS, busRecord } from "./types.js";
 import type { BusRow } from "./types.js";
 import type { Fingerprint, SnapshotDatabase } from "../sqlite/snapshots.js";
 const WAKE_FAILED = "failed";
@@ -47,7 +47,7 @@ function validRow(row: unknown): row is Record<string, unknown> & {
   sent_at: string;
 } {
   return (
-    object(row) &&
+    busRecord(row) &&
     typeof row.id === "number" &&
     Number.isSafeInteger(row.id) &&
     row.id >= 1 &&
@@ -119,7 +119,7 @@ export function selectInspection(
     .get(MAX_RAW_CHARS + 1, id);
   if (!row) return { reason: "missing-message" };
   if (
-    !object(row) ||
+    !busRecord(row) ||
     typeof row.sender !== "string" ||
     typeof row.recipient !== "string" ||
     typeof row.sent_at !== "string"

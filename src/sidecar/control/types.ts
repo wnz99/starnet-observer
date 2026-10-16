@@ -5,14 +5,14 @@ export interface Settings {
   timeout?: number;
   env?: NodeJS.ProcessEnv;
 }
-export type Execute = (
+export type ControlExecute = (
   command: string,
   args: string[],
   settings: Settings,
 ) => Promise<{ stdout: string; stderr?: string }>;
 type State = ReturnType<typeof makeOverseerState>;
 export interface ControlOptions {
-  execute?: Execute;
+  execute?: ControlExecute;
   platform?: string;
   claudeArgs?: string[];
   now?: () => number;

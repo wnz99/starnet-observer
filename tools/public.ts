@@ -5,7 +5,10 @@ import { readBounded } from "../src/sidecar/themes/files.js";
 const MISSING_FILE = "ENOENT";
 const EMISSION_FAILED = "Browser emission failed";
 const PUBLIC_EXTENSIONS = new Set([".css", ".json", ".png", ".woff2", ".txt"]);
-const CLASSIC_ENTRIES = ["observer-scene", "observer-view", "observer"];
+const BROWSER_ENTRIES = [
+  { name: "prepaint", format: "iife" },
+  { name: "main", format: "esm" },
+] as const;
 function within(root: string, file: string) {
   const relative = path.relative(root, file);
   return !path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(".." + path.sep);
@@ -75,11 +78,11 @@ function resourceCopier(root: string, staging: string) {
 async function emitBrowser(root: string, staging: string) {
   const application = path.join(staging, "app");
   await fs.mkdir(application, { recursive: true });
-  for (const entry of ["prepaint", "legacy-bridge"]) {
+  for (const entry of BROWSER_ENTRIES) {
     const result = await Bun.build({
-      entrypoints: [path.join(root, "src", "browser", `${entry}.ts`)],
+      entrypoints: [path.join(root, "src", "browser", `${entry.name}.ts`)],
       target: "browser",
-      format: "iife",
+      format: entry.format,
       throw: false,
     });
     if (!result.success) throw new AggregateError(result.logs, EMISSION_FAILED);
@@ -87,20 +90,12 @@ async function emitBrowser(root: string, staging: string) {
     if (!output || result.outputs.length !== 1)
       throw new Error("Unexpected browser emission inventory");
     await fs.writeFile(
-      path.join(application, `${entry}.js`),
+      path.join(application, `${entry.name}.js`),
       new Uint8Array(await output.arrayBuffer()),
       {
         flag: "wx",
       },
     );
-  }
-  // Classic lexical bindings remain visible to the next ordered script until Task 7.
-  const transpiler = new Bun.Transpiler({ loader: "js", target: "browser" });
-  for (const entry of CLASSIC_ENTRIES) {
-    const source = await fs.readFile(path.join(root, "frontend", "app", `${entry}.js`), "utf8");
-    await fs.writeFile(path.join(application, `${entry}.js`), transpiler.transformSync(source), {
-      flag: "wx",
-    });
   }
 }
 export async function buildPublic(installRoot: string, outputRoot: string) {

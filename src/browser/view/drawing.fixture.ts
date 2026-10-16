@@ -1,3 +1,4 @@
+import type { OfficeImage } from "../office-art/types.js";
 import type { RecordingResource } from "../sprites/recorder.fixture.js";
 import type { ViewContext, ViewEvent } from "./types.js";
 export type Resource = RecordingResource;
@@ -90,6 +91,8 @@ export class DrawingContext implements ViewContext<Resource> {
   arc: ViewContext<Resource>["arc"] = () => {
     /* No raster in drawing oracle. */
   };
+  // Crew and props use this optional ViewContext capability; Fallow 3.27.0 misses that dispatch.
+  // fallow-ignore-next-line unused-class-member
   roundRect: NonNullable<ViewContext<Resource>["roundRect"]> = () => {
     /* No raster in drawing oracle. */
   };
@@ -117,7 +120,7 @@ export function present<T>(value: T | undefined | null): T {
   if (value === null || value === undefined) throw new Error("Missing expected View fixture value");
   return value;
 }
-export class OfficeImageFixture {
+export class OfficeImageFixture implements OfficeImage, RecordingResource {
   protected _src = "";
   naturalWidth = 0;
   naturalHeight = 0;

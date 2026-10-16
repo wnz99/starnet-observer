@@ -79,9 +79,6 @@ function instanceFor<R extends SpriteResource, B extends R>(view: ViewRuntime<R,
   };
 }
 
-export { browserViewEnvironment } from "./native.js";
-export type { BrowserResource } from "./native.js";
-
 const VIEW_HELPERS = {
   needsAttention,
   idleFilter,

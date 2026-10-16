@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import ts from "typescript";
 import { buildPublic, generatedRoot } from "./public.js";
 import { publicFixture } from "./public.fixture.js";
 import { loadThemePack, validateInstalledPacks } from "../src/sidecar/themes/index.js";
@@ -25,6 +26,20 @@ async function digest(folder: string) {
   }
   return hash.digest("hex");
 }
+function browserSourcePaths() {
+  const config = ts.getParsedCommandLineOfConfigFile(
+    path.resolve(import.meta.dir, "../tsconfig.json"),
+    {},
+    {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic(diagnostic) {
+        throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+      },
+    },
+  );
+  assert.ok(config);
+  return config.options.paths;
+}
 test("public build closes script URLs, includes ignored local packs and preserves selection semantics and source bytes", async () => {
   const fixture = await publicFixture();
   try {
@@ -32,10 +47,7 @@ test("public build closes script URLs, includes ignored local packs and preserve
     const output = await buildPublic(fixture.root, fixture.generated);
     assert.equal(await digest(fixture.frontend), before);
     assert.deepEqual((await fs.readdir(path.join(output, "app"))).sort(), [
-      "legacy-bridge.js",
-      "observer-scene.js",
-      "observer-view.js",
-      "observer.js",
+      "main.js",
       "prepaint.js",
     ]);
     const files = await inventory(output);
@@ -46,22 +58,24 @@ test("public build closes script URLs, includes ignored local packs and preserve
     );
     assert.ok(files.every((file) => !file.includes(`${path.sep}sidecar${path.sep}`)));
     const html = await fs.readFile(path.join(output, "observer.html"), "utf8");
-    const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(
+    const scripts = [...html.matchAll(/<script(?: type="module")? src="([^"]+)"><\/script>/g)].map(
       (match) => match[1],
     );
-    assert.deepEqual(scripts, [
-      "app/prepaint.js",
-      "app/legacy-bridge.js",
-      "app/observer-scene.js",
-      "app/observer-view.js",
-      "app/observer.js",
-    ]);
+    assert.deepEqual(scripts, ["app/prepaint.js", "app/main.js"]);
     assert.ok(html.indexOf("<!--observer-boot-->") < html.indexOf('src="app/prepaint.js"'));
     assert.ok(html.indexOf('src="app/prepaint.js"') < html.indexOf("</head>"));
     assert.ok(html.indexOf('href="css/observer.css"') < html.indexOf("<!--observer-boot-->"));
-    assert.ok(!/<script[^>]+(?:async|defer|type=)/.test(html));
+    assert.ok(!/<script[^>]+(?:async|defer)/.test(html));
+    assert.ok(html.includes('<script type="module" src="app/main.js"></script>'));
+    assert.ok(html.indexOf('src="app/main.js"') > html.indexOf("</head>"));
+    const paths = browserSourcePaths();
     for (const script of scripts) {
       assert.ok(script);
+      const mapped = paths?.["./" + script];
+      assert.deepEqual(mapped, [`./src/browser/${path.basename(script, ".js")}.ts`]);
+      const source = mapped[0];
+      assert.ok(source);
+      assert.ok((await fs.stat(path.resolve(import.meta.dir, "..", source))).isFile());
       assert.ok((await fs.stat(path.join(output, script))).size > 0);
     }
     assert.deepEqual(
@@ -263,10 +277,7 @@ test("public build stages canonical directory-link dependencies outside resource
     }
     assert.equal(await fs.realpath(path.join(output, "shared/sprites/frontend")), output);
     assert.deepEqual((await fs.readdir(path.join(output, "app"))).sort(), [
-      "legacy-bridge.js",
-      "observer-scene.js",
-      "observer-view.js",
-      "observer.js",
+      "main.js",
       "prepaint.js",
     ]);
     const files = await inventory(output);

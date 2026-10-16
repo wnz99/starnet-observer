@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: TypeScript refactor
-status: In progress; Tasks 1–6 accepted; Scene/View integrated; app lifecycle and full quality convergence remain.
-last_updated: "2026-10-16T15:23:06.712226+00:00"
+status: In progress; Tasks 1–7 accepted; packaging, browser acceptance and delivery remain.
+last_updated: "2026-10-16T18:43:14.147667+00:00"
 last_activity: 2026-10-16
-last_activity_desc: Scene/View and lifecycle producers independently approved and integrated; app and original UI test migration run in parallel.
-state_head: a468e15
-stopped_at: Task 7; app mount, roster, original UI oracle transfer and final quality convergence
+last_activity_desc: Task 7 accepted after full static gate, 232 tests and independent integration/amendment review; Task 8 next.
+state_head: 0cc9ad6
+stopped_at: Task 8; clean packaging, external consumer, browser, acceptance probes, CI, records and delivery
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: In progress; Tasks 1–6 accepted; Scene/View integrated; app lifecycle and full quality convergence remain.
-Last activity: 2026-10-16 — Scene/View and Query/Panel/Theme producer packages passed independent review and integrated; full Task 7 acceptance remains pending.
+Status: In progress; Tasks 1–7 accepted; Task 8 pending.
+Last activity: 2026-10-16 — Task 7 full static gate and 232 tests pass; independent review approves final integration and five authorized fixture exceptions.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Current work: Task 7; typed Scene/View and lifecycle producers integrated; isolated app, roster and five-suite UI oracle transfer continue. No PR or merge.
+Current work: Task 7; app, roster, original UI oracles, entries and export cleanup integrated and independently reviewed. Exact five fixture exceptions approved under PLAN revision 6. Final combined gates and acceptance pending. No PR or merge.
 Resume file: [TypeScript handover](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-HANDOVER.md)
-Next action: Complete and independently review the app and original 607 UI oracle transfer, perform the atomic entry switch, then converge the full baseline. User explicitly resumed implementation on 2026-10-16 through PR, required checks/CI and merge. No paid/live runs or optional configuration changes are authorized. User separately authorized needed local headless browser setup; pinned Chromium is ready for synthetic checks.
+Next action: Finish final combined current-root gates and record Task 7 acceptance only after they pass; then execute Task 8 packaging/isolation, browser/assets, helper/MCP and final-record acceptance. Preserved package, integration, clock and approved-exception reviews are indexed in [resume evidence](./quick/261016-0z8-full-typescript-refactor-and-repository-/resume-evidence/README.md). User explicitly resumed implementation on 2026-10-16 through PR, required checks/CI and merge. No paid/live runs or optional configuration changes are authorized. User separately authorized needed local headless browser setup; pinned Chromium is ready for synthetic checks.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Tasks 1–6 accepted; Scene/View integrated; app lifecycle and final acceptance remain | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Tasks 1–6 accepted; all Task 7 packages integrated/reviewed; final gates and acceptance pending; Task 8 pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

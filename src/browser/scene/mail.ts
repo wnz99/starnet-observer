@@ -3,7 +3,7 @@ import { projectKey } from "../model/identity.js";
 import type {
   Scene,
   MailLayout,
-  Message,
+  SceneMessage,
   Host,
   Point,
   PendingSpot,
@@ -60,7 +60,7 @@ function ghostFor(
   if (!link.shadow || !relay.peer) return undefined;
   return scene.workers.find((worker) => worker.id === relay.peer && worker.row.host === host);
 }
-function relayEnd(scene: Scene, message: Message, host: Host) {
+function relayEnd(scene: Scene, message: SceneMessage, host: Host) {
   const relay = message.relay;
   if (!relay) return null;
   const link = relayLinkFor(scene, relay, host);
@@ -110,7 +110,7 @@ function halfway(points: readonly Point[]) {
   }
   return { ...element(points, points.length - 1), z: 0 };
 }
-function messageEndpoints(scene: Scene, layout: MailLayout, message: Message, host: Host) {
+function messageEndpoints(scene: Scene, layout: MailLayout, message: SceneMessage, host: Host) {
   const far = message.relay ? relayEnd(scene, message, host) : null;
   if (!far)
     return {
@@ -134,7 +134,7 @@ export function route(
   ...[scene, layout, message, rows, host = null]: [
     Scene,
     MailLayout,
-    Message,
+    SceneMessage,
     readonly LayoutRow[],
     Host?,
   ]
@@ -170,7 +170,7 @@ function pendingGone(state: string | undefined, far: RelayEnd | null) {
 function pendingEnd(
   scene: Scene,
   layout: MailLayout,
-  message: Message,
+  message: SceneMessage,
   host: Host,
 ): MailEnd | null {
   const far = message.relay?.direction === "out" ? relayEnd(scene, message, host) : null;
@@ -182,7 +182,7 @@ function pendingEnd(
 export function pending(
   scene: Scene,
   layout: MailLayout,
-  messages: readonly Message[],
+  messages: readonly SceneMessage[],
   host: Host = null,
 ) {
   const spots = new Map<string, PendingSpot>();

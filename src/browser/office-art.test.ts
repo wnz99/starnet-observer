@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { create, load } from "./office-art.js";
 import { art, context, images, ready, required } from "./office-art/loading.fixture.js";
 import type { FakeImage } from "./office-art/loading.fixture.js";
-import type { Point } from "./office-art/types.js";
+import type { OfficePoint } from "./office-art/types.js";
 import { canonicalTheme } from "./theme.fixture.js";
 test("native composition keeps foot anchors, clipped repetition and fallback human bounds", async () => {
   const result = ready(await load(art(), { Image: images().Image }));
-  const project = ({ x, y, z = 0 }: Point) => ({ x: 24 * (x - y), y: 12 * (x + y) - 24 * z });
+  const project = ({ x, y, z = 0 }: OfficePoint) => ({ x: 24 * (x - y), y: 12 * (x + y) - 24 * z });
   const { ctx, draws, ops } = context<FakeImage>();
   const colors = canonicalTheme().scene.colors;
   const composition = create({ images: result.images, colors, project, crewHeight: 40 });

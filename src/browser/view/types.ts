@@ -18,7 +18,7 @@ import type {
 } from "../sprites/types.js";
 import type { RuntimeThemeWarning } from "../theme/dom.js";
 export type Colors = ThemeContents["scene"]["colors"];
-export type StatusColors = Pick<Colors, "working" | "blocked" | "idle" | "done" | "unknown">;
+type StatusColors = Pick<Colors, "working" | "blocked" | "idle" | "done" | "unknown">;
 export interface Look {
   colors: Colors;
   status: StatusColors;
@@ -110,7 +110,7 @@ export interface WatchTarget {
   addEventListener(name: string, callback: () => void): void;
   removeEventListener(name: string, callback: () => void): void;
 }
-export interface ViewWindow<R extends SpriteResource> {
+interface ViewWindow<R extends SpriteResource> {
   requestAnimationFrame?(callback: (now: number) => void): number;
   cancelAnimationFrame?(id: number): void;
   readonly devicePixelRatio?: number;

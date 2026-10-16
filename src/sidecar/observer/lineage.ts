@@ -2,28 +2,28 @@ import { grouping } from "../helpers/evidence.js";
 import { sameIdentity, sameProof } from "./ownership.js";
 import { required } from "./required.js";
 import type { State } from "./state.js";
-import type { Row, Lineage, HelperResult } from "./contracts.js";
+import type { ObserverInputRow, Lineage, HelperResult } from "./contracts.js";
 const MAX_ANCESTRY = 64;
 export class Publication {
-  private readonly candidates: Map<string, Row>;
+  private readonly candidates: Map<string, ObserverInputRow>;
   private readonly result: HelperResult;
   readonly accepted: Set<string>;
   constructor(
     private readonly s: State,
     private readonly lineage: Lineage,
-    roots: Row[],
+    roots: ObserverInputRow[],
   ) {
     this.result = lineage.result;
     this.candidates = new Map([
-      ...roots.map((row): [string, Row] => [
+      ...roots.map((row): [string, ObserverInputRow] => [
         row.id,
         { ...row, ...lineage.result.annotations.get(row.id) },
       ]),
-      ...lineage.result.rows.map((row): [string, Row] => [row.id, row]),
+      ...lineage.result.rows.map((row): [string, ObserverInputRow] => [row.id, row]),
     ]);
     this.accepted = new Set([...this.candidates.keys()].filter((id) => this.valid(id)));
   }
-  private validParent(id: string, parent: Row) {
+  private validParent(id: string, parent: ObserverInputRow) {
     return (
       !(parent.identitySource === "footer" && !this.lineage.proofs.has(id)) &&
       sameIdentity(
@@ -43,7 +43,11 @@ export class Publication {
     if (!parent && row.source !== "helper") return false;
     return this.validLinks(row, visited, parent);
   }
-  private validLinks(row: Row, visited: Set<string>, parent: Row | undefined) {
+  private validLinks(
+    row: ObserverInputRow,
+    visited: Set<string>,
+    parent: ObserverInputRow | undefined,
+  ) {
     const ownerId = this.result.groupOwners?.get(row.id);
     if (ownerId && !this.valid(ownerId, new Set(visited))) return false;
     return Object.hasOwn(row, "parentId") ? this.valid(row.parentId, visited) : !!parent;
@@ -55,7 +59,7 @@ export class Publication {
       ? this.currentGrouping(ownerId)
       : grouping(required(this.s.coreRows.find((value) => value.id === id)));
   }
-  roots(rows: Row[]) {
+  roots(rows: ObserverInputRow[]) {
     return rows.map((row) =>
       !this.lineage.failed && this.accepted.has(row.id)
         ? {
@@ -67,7 +71,7 @@ export class Publication {
         : row,
     );
   }
-  children(): Row[] {
+  children(): ObserverInputRow[] {
     return this.result.rows
       .filter((row) => this.accepted.has(row.id))
       .map((row) => ({

@@ -5,18 +5,15 @@
   "entry": [
     "src/server/main.ts",
     "src/sidecar/sqlite/worker.ts",
-    "scripts/*.{js,mjs,ts}",
-    "frontend/app/observer-scene.{js,ts}",
-    "frontend/app/observer-view.{js,ts}",
-    "frontend/app/observer.{js,ts}",
-    "**/*.test.{js,ts}",
+    "scripts/*.ts",
+    "**/*.test.ts",
     "eslint.config.mjs",
     "tools/acceptance.ts",
     "tools/quality/isolate-typescript.mjs",
     "frontend/css/observer.css",
     "tools/build.ts",
     "src/browser/prepaint.ts",
-    "src/browser/legacy-bridge.ts",
+    "src/browser/main.ts",
     "tools/start.ts"
   ],
   "ignorePatterns": [
@@ -25,5 +22,11 @@
     "**/.venv/**",
     "**/.nx/**",
     "**/package-staging/**"
-  ]
+  ],
+  "typeAware": {
+    "enabled": true
+  },
+  "rules": {
+    "private-type-leaks": "off"
+  }
 }

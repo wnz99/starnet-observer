@@ -5,27 +5,31 @@ import {
   SCENE_ART_ROLE_NAMES as ROLE_NAMES,
 } from "../shared/scene-art-roles.js";
 import type { SceneArtRoleName } from "../shared/scene-art-roles.js";
-import type { Composition, OfficeContext, Point, Rect } from "./office-art/types.js";
+import type { Composition, OfficeContext, OfficePoint, OfficeRect } from "./office-art/types.js";
 import { createHuman } from "./office-art/human.js";
 export { load } from "./office-art/loading.js";
 export { ROLE_NAMES };
 /* Fixed composition draws native images with their foot at the projected origin, rounded to whole pixels. */
 const EDGE_CLIP_TOP = -1e6;
 const EDGE_CLIP_HEIGHT = 2e6;
-function origin(project: Composition<unknown>["project"], role: SceneArtRoleName, point: Point) {
+function origin(
+  project: Composition<unknown>["project"],
+  role: SceneArtRoleName,
+  point: OfficePoint,
+) {
   const at = project(point),
     foot = ROLES[role].foot;
   return { x: Math.round(at.x - foot.x), y: Math.round(at.y - foot.y) };
 }
 export function create<I>({ images, colors, project, crewHeight }: Composition<I>) {
-  function draw(ctx: OfficeContext<I>, role: SceneArtRoleName, point: Point) {
+  function draw(ctx: OfficeContext<I>, role: SceneArtRoleName, point: OfficePoint) {
     const image = images[role],
       { width, height } = ROLES[role].source,
       at = origin(project, role, point);
     ctx.drawImage(image, at.x, at.y, width, height);
   }
   // Diamond surface roles (repeat 'tile'): one native tile per whole cell, clipped to the floor rect.
-  function tile(ctx: OfficeContext<I>, role: SceneArtRoleName, rect: Rect, z = 0) {
+  function tile(ctx: OfficeContext<I>, role: SceneArtRoleName, rect: OfficeRect, z = 0) {
     const corners = [
       { x: rect.x, y: rect.y },
       { x: rect.x + rect.w, y: rect.y },
@@ -46,7 +50,7 @@ export function create<I>({ images, colors, project, crewHeight }: Composition<I
   }
   /* Edge roles (repeat 'edge'): one native unit per whole step along the role's orientation ('x' walls stand on a
        constant x and run along y; 'y' walls the reverse), clipped to the rect's projected horizontal span. */
-  function edge(ctx: OfficeContext<I>, role: SceneArtRoleName, rect: Rect, z = 0) {
+  function edge(ctx: OfficeContext<I>, role: SceneArtRoleName, rect: OfficeRect, z = 0) {
     const alongY = ROLES[role].orientation === "x",
       length = alongY ? rect.h : rect.w;
     const [left, right] = [

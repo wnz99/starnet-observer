@@ -1,10 +1,10 @@
 import os from "node:os";
 import { fakeSpawn } from "../remotes/remotes.fixture.js";
 import { emptyState as makeEmptyState } from "./control.fixture.js";
-import type { Execute } from "./types.js";
+import type { ControlExecute } from "./types.js";
 import type { ControlProof } from "../observer/contracts.js";
 import type { HttpControl, HttpObserver } from "../../server/contracts.js";
-import { port, required, status, field } from "../../server/http.fixture.js";
+import { port, requiredHttpValue, status, field } from "../../server/http.fixture.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makeControl } from "../control/index.js";
@@ -42,7 +42,7 @@ test("control-remote regression contracts", async () => {
       "pane close w1:p2": { result: { type: "ok" } },
     };
     const unq = (word: string) => word.replace(/^'(.*)'$/, "$1");
-    const execute: Execute = (command, args, settings) => {
+    const execute: ControlExecute = (command, args, settings) => {
       assert.equal(
         settings.env?.STARNET_TEST_TOKEN,
         undefined,
@@ -51,9 +51,9 @@ test("control-remote regression contracts", async () => {
       calls.push([command, ...args]);
       if (command === "osascript") return Promise.resolve({ stdout: "" });
       assert.equal(command, "ssh", "a remote action never runs local herdr");
-      if (required(args.at(-1)) === 'printf %s "$HOME"')
+      if (requiredHttpValue(args.at(-1)) === 'printf %s "$HOME"')
         return Promise.resolve({ stdout: "/home/nick" });
-      const words = required(args.at(-1)).split(" ").slice(2).map(unq);
+      const words = requiredHttpValue(args.at(-1)).split(" ").slice(2).map(unq);
       if (words[0] === "pane" && words[1] === "wait-output")
         return Promise.resolve({ stdout: "{}" });
       const key = words.slice(0, 3).join(" "),
@@ -123,12 +123,12 @@ test("control-remote regression contracts", async () => {
       assert.deepEqual(
         calls.map((call) =>
           call[0] === "ssh"
-            ? required(call.at(-1)).split(" ").slice(2, 4).map(unq).join(" ")
+            ? requiredHttpValue(call.at(-1)).split(" ").slice(2, 4).map(unq).join(" ")
             : call[0],
         ),
         ["agent list", "agent get", "pane get", "osascript"],
       );
-      assert.deepEqual(required(calls[0]).slice(0, 10), [
+      assert.deepEqual(requiredHttpValue(calls[0]).slice(0, 10), [
         "ssh",
         "-o",
         "BatchMode=yes",
@@ -141,7 +141,7 @@ test("control-remote regression contracts", async () => {
         "nick@34.153.167.160",
       ]);
       assert.equal(
-        required(calls.at(-1))[2],
+        requiredHttpValue(calls.at(-1))[2],
         `tell application "Terminal"\nlaunch\ndo script "ssh -t nick@34.153.167.160 'PATH=$HOME/.local/bin:$PATH herdr agent attach w1:p2 --takeover'"\nactivate\nend tell`,
       );
 
@@ -150,7 +150,7 @@ test("control-remote regression contracts", async () => {
         calls.filter(
           (call) =>
             call[0] === "osascript" ||
-            (call[0] === "ssh" && /'(close|create|start)'/.test(required(call.at(-1)))),
+            (call[0] === "ssh" && /'(close|create|start)'/.test(requiredHttpValue(call.at(-1)))),
         );
       for (const patch of [
         { terminal_id: "reused" },
@@ -192,7 +192,7 @@ test("control-remote regression contracts", async () => {
       assert.ok(!calls.some((call) => call[0] === "osascript"), "remote spawn opens no Terminal");
       assert.ok(
         calls.some((call) =>
-          required(call.at(-1)).endsWith(
+          requiredHttpValue(call.at(-1)).endsWith(
             `'agent' 'start' 'proj-120000' '--kind' 'claude' '--pane' 'w1:p4' '--timeout' '60000' '--' '--dangerously-skip-permissions'`,
           ),
         ),
@@ -208,7 +208,7 @@ test("control-remote regression contracts", async () => {
       });
       assert.ok(
         calls.some((call) =>
-          required(call.at(-1)).endsWith(
+          requiredHttpValue(call.at(-1)).endsWith(
             `'tab' 'create' '--workspace' 'w1' '--cwd' '/home/nick/proj' '--label' 'proj-120000' '--no-focus'`,
           ),
         ),
@@ -218,7 +218,7 @@ test("control-remote regression contracts", async () => {
       assert.equal(home.folder, "/home/nick");
       assert.equal(home.paneId, "herdr-dev-2/w2:p1");
       assert.ok(
-        !calls.some((call) => required(call.at(-1)) === 'printf %s "$HOME"'),
+        !calls.some((call) => requiredHttpValue(call.at(-1)) === 'printf %s "$HOME"'),
         "the remote home is looked up once and cached",
       );
       assert.ok(!calls.some((call) => call[0] === "osascript"), "host spawn opens no Terminal");
@@ -229,7 +229,11 @@ test("control-remote regression contracts", async () => {
         paneId: "herdr-dev-2/w1:p2",
         name: "beta",
       });
-      assert.ok(required(required(calls.at(-1)).at(-1)).endsWith(`herdr 'pane' 'close' 'w1:p2'`));
+      assert.ok(
+        requiredHttpValue(requiredHttpValue(calls.at(-1)).at(-1)).endsWith(
+          `herdr 'pane' 'close' 'w1:p2'`,
+        ),
+      );
       // Without remotes every namespaced id and host spawn is refused before anything runs.
       const plain = makeControl({
         execute,
@@ -272,7 +276,7 @@ test("control-remote regression contracts", async () => {
     assert.equal(localSpawn.paneId, "w3:p1");
     assert.equal(localSpawn.host, "local");
     assert.equal(localSpawn.folder, localHome);
-    const create = required(
+    const create = requiredHttpValue(
       localCalls.find(([, args]) => args[0] === "workspace" && args[1] === "create"),
     )[1];
     assert.equal(create[create.indexOf("--cwd") + 1], localHome);
@@ -317,7 +321,7 @@ test("control-remote regression contracts", async () => {
       },
     ];
     assert.equal(
-      field(required(sanitizeTargets([wire], rows).get("w1:p2")).agent_session, "value"),
+      field(requiredHttpValue(sanitizeTargets([wire], rows).get("w1:p2")).agent_session, "value"),
       "0123abcd-0000-4000-8000-000000000001",
     );
     assert.equal(
@@ -344,7 +348,7 @@ test("control-remote regression contracts", async () => {
       "an unprovable native session yields no proof",
     );
     assert.equal(
-      required(sanitizeTargets([{ ...wire, cwd: "relative" }], rows).get("w1:p2")).cwd,
+      requiredHttpValue(sanitizeTargets([{ ...wire, cwd: "relative" }], rows).get("w1:p2")).cwd,
       null,
     );
 
@@ -366,7 +370,7 @@ test("control-remote regression contracts", async () => {
       status: "idle",
       inventoryHealth: "available",
     };
-    required(fake.children[0]).stdout.emit(
+    requiredHttpValue(fake.children[0]).stdout.emit(
       "data",
       JSON.stringify({ health: "available", sessions: [row], targets: [wire] }) + "\n",
     );
@@ -379,10 +383,13 @@ test("control-remote regression contracts", async () => {
     const hub = makeFederatedObserver(local, hosts, () => clock);
     assert.deepEqual(hub.controlTarget("w1:p1"), { local: true }, "plain ids stay local");
     assert.equal(
-      field(required(hub.controlTarget("herdr-dev-2/w1:p2")), "endpoint"),
+      field(requiredHttpValue(hub.controlTarget("herdr-dev-2/w1:p2")), "endpoint"),
       "remote:herdr-dev-2",
     );
-    assert.equal(field(required(hub.controlTarget("herdr-dev-2/w1:p2")), "observedAt"), at);
+    assert.equal(
+      field(requiredHttpValue(hub.controlTarget("herdr-dev-2/w1:p2")), "observedAt"),
+      at,
+    );
     assert.equal(hub.controlTarget("herdr-dev-1/w1:p2"), null);
     clock = at + 6001;
     assert.equal(hub.controlTarget("herdr-dev-2/w1:p2"), null, "a quiet stream proves nothing");

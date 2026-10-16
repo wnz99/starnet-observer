@@ -1,6 +1,6 @@
 import { element } from "../model/types.js";
 import { pathTo, safeSegment, direction } from "./navigation.js";
-import { hash } from "../model/identity.js";
+import { identityHash } from "../model/identity.js";
 import { contains } from "./geometry.js";
 import { atDesk, closed, isStale } from "./formation.js";
 import { historicalPath } from "./history.js";
@@ -205,7 +205,7 @@ export class ActorState implements Actor {
     this.rest(now);
   }
   private rest(now: number) {
-    this.due = now + MOTION.rest + (hash(this.worker.id) % MOTION.restJitter);
+    this.due = now + MOTION.rest + (identityHash(this.worker.id) % MOTION.restJitter);
   }
   private roam(graph: Graph, now: number) {
     if (this.path.length > 0 || now < this.due || graph.cells.size === 0) return;
@@ -215,7 +215,7 @@ export class ActorState implements Actor {
     const cells = own.length > 0 ? own : all;
     const target = element(
       cells,
-      (hash(this.worker.id) + ++this.trip * MOTION.tripStride) % cells.length,
+      (identityHash(this.worker.id) + ++this.trip * MOTION.tripStride) % cells.length,
     );
     this.path = pathTo(graph, this.point, target, this.worker);
     this.targetKey = null;

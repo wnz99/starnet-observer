@@ -1,9 +1,9 @@
 import type { State } from "./state.js";
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import type { FooterProof } from "../identity/types.js";
 import { currentOwner } from "./ownership.js";
 const MAX_ANCESTRY = 64;
-function ancestry(s: State, row: Row, roster: Row[]) {
+function ancestry(s: State, row: ObserverInputRow, roster: ObserverInputRow[]) {
   // A helper's content is owned by its full live ancestry, including a footer-bound
   // root. Keep these private proofs outside public inventory and projection rows.
   const targets = [row],
@@ -30,7 +30,7 @@ function ancestry(s: State, row: Row, roster: Row[]) {
     return null;
   return targets;
 }
-export function inspectionProof(s: State, row: Row, roster: Row[]) {
+export function inspectionProof(s: State, row: ObserverInputRow, roster: ObserverInputRow[]) {
   const targets = ancestry(s, row, roster);
   if (!targets) return null;
   const captured = new Map(targets.map((target) => [target.id, s.identityProofs.get(target.id)]));

@@ -5,7 +5,7 @@ import { stationChildEnv } from "../child-env.js";
 import { unassigned } from "./identity.js";
 import type {
   CacheEntry,
-  Execute,
+  ProjectExecute,
   ExecuteSettings,
   Found,
   GitIdentity,
@@ -30,7 +30,7 @@ export function gitSettings(): ExecuteSettings {
 export class ProjectDiscovery {
   private readonly cache = new Map<unknown, CacheEntry>();
   constructor(
-    private readonly execute: Execute,
+    private readonly execute: ProjectExecute,
     private readonly now: () => number,
   ) {}
   async gitIdentity(folder: string): Promise<GitIdentity> {

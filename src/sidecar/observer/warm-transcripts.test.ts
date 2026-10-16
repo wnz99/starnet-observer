@@ -1,4 +1,4 @@
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import { settled } from "./testing.fixture.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -68,7 +68,7 @@ async function observerWarmReuse(temp: string) {
       prepareChildren: () =>
         settled(() => ({
           rows: [],
-          annotations: new Map<string, Partial<Row>>(),
+          annotations: new Map<string, Partial<ObserverInputRow>>(),
           overflow: new Map<string, number>(),
           commitBindings() {},
         })),

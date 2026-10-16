@@ -5,12 +5,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalTheme } from "../theme.fixture.js";
 const root = fileURLToPath(new URL("../../../frontend/", import.meta.url));
-function typedSources(domain: "model" | "mail") {
+function typedSources(domain: "model" | "mail" | "scene" | "view") {
   const directory = fileURLToPath(new URL(`../${domain}/`, import.meta.url));
+  const entry = path.join(directory, "..", `${domain}.ts`);
   return [
-    path.join(directory, "..", `${domain}.ts`),
+    ...(fs.existsSync(entry) ? [entry] : []),
     ...fs
-      .readdirSync(directory)
+      .readdirSync(directory, { recursive: true, encoding: "utf8" })
       .filter((name) => name.endsWith(".ts") && !/\.(test|fixture)\.ts$/.test(name))
       .map((name) => path.join(directory, name)),
   ];
@@ -48,7 +49,10 @@ test("authored palette and CSS resource inventory remain complete", () => {
       : value.replace(/\s+/g, "").replace(/,0\./g, ",.");
   for (const [filename, inventory] of [
     ["css/observer.css", defaults.ui.colors],
-    ["app/observer-view.js", defaults.scene.colors],
+    ...typedSources("view").map((file): readonly [string, Readonly<Record<string, string>>] => [
+      file,
+      defaults.scene.colors,
+    ]),
     ...typedSources("model").map((file): readonly [string, Readonly<Record<string, string>>] => [
       file,
       defaults.scene.colors,
@@ -57,7 +61,10 @@ test("authored palette and CSS resource inventory remain complete", () => {
       file,
       defaults.scene.colors,
     ]),
-    ["app/observer-scene.js", defaults.scene.colors],
+    ...typedSources("scene").map((file): readonly [string, Readonly<Record<string, string>>] => [
+      file,
+      defaults.scene.colors,
+    ]),
   ] as const) {
     const literals =
       fs

@@ -13,6 +13,8 @@ export class FixtureNode implements InspectorNode {
   scrollTop = 0;
   scrollHeight = 1000;
   clientHeight = 200;
+  // Inspector builders assign this optional property through InspectorNode; Fallow 3.27.0 misses it.
+  // fallow-ignore-next-line unused-class-member
   type = "";
   disabled = false;
   open = false;

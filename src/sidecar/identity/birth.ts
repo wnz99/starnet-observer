@@ -2,13 +2,13 @@ const BIRTH_BUFFER = 1024;
 import path from "node:path";
 import { executeFile } from "./execute.js";
 import { object, TIMEOUT } from "./types.js";
-import type { Execute, ProcessBirth } from "./types.js";
+import type { IdentityExecute, ProcessBirth } from "./types.js";
 // Read only one requested PID; never enumerate processes or retain command lines.
 export function makeProcessBirthReader({
   execute = executeFile,
   endpoint,
 }: {
-  execute?: Execute | undefined;
+  execute?: IdentityExecute | undefined;
   endpoint: string;
 }) {
   const localMac =

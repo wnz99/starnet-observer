@@ -1,6 +1,6 @@
 const EXPECTED_FALSE = false;
 import type { PresentationInput } from "./types.js";
-import { port, required, gate, field } from "../../server/http.fixture.js";
+import { port, requiredHttpValue, gate, field } from "../../server/http.fixture.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makePresentationObserver } from "../presentation/index.js";
@@ -122,36 +122,42 @@ test("presentation regression contracts", async () => {
       "masking never mutates live identities or source snapshots",
     );
     assert.notEqual(
-      required(first.sessions[0]).worktree,
-      required(first.sessions[1]).worktree,
+      requiredHttpValue(first.sessions[0]).worktree,
+      requiredHttpValue(first.sessions[1]).worktree,
       "equal real names alias by checkout identity",
     );
     assert.notEqual(
-      required(first.sessions[0]).folder,
-      required(first.sessions[1]).folder,
+      requiredHttpValue(first.sessions[0]).folder,
+      requiredHttpValue(first.sessions[1]).folder,
       "equal folder names alias by checkout+folder",
     );
-    assert.equal(required(first.sessions[1]).checkoutId, parent.checkoutId);
-    assert.equal(required(first.sessions[1]).checkoutKind, "worktree");
-    assert.equal(required(first.sessions[1]).paneId, "w1:p2");
-    assert.equal(required(first.sessions[1]).role, "overseer");
+    assert.equal(requiredHttpValue(first.sessions[1]).checkoutId, parent.checkoutId);
+    assert.equal(requiredHttpValue(first.sessions[1]).checkoutKind, "worktree");
+    assert.equal(requiredHttpValue(first.sessions[1]).paneId, "w1:p2");
+    assert.equal(requiredHttpValue(first.sessions[1]).role, "overseer");
     assert.deepEqual(first.aggregate, inventory.aggregate);
     assert.deepEqual(
       first.sessions.map((row) => [row.id, row.parentId, row.status, row.observedAt]),
       inventory.sessions.map((row) => [row.id, row.parentId, row.status, row.observedAt]),
     );
-    assert.equal(required(first.sessions[1]).project, "Product");
-    assert.equal(required(first.sessions[1]).repo, "helio-web");
-    assert.equal(required(first.sessions[0]).title, "Helper");
-    assert.equal(required(required(required(first.sessions[0]).tool).last).name, "Tool");
-    assert.equal(required(required(required(first.sessions[1]).tool).last).name, "exec_command");
+    assert.equal(requiredHttpValue(first.sessions[1]).project, "Product");
+    assert.equal(requiredHttpValue(first.sessions[1]).repo, "helio-web");
+    assert.equal(requiredHttpValue(first.sessions[0]).title, "Helper");
     assert.equal(
-      required(required(first.sessions[1]).tool).observedAt,
+      requiredHttpValue(requiredHttpValue(requiredHttpValue(first.sessions[0]).tool).last).name,
+      "Tool",
+    );
+    assert.equal(
+      requiredHttpValue(requiredHttpValue(requiredHttpValue(first.sessions[1]).tool).last).name,
+      "exec_command",
+    );
+    assert.equal(
+      requiredHttpValue(requiredHttpValue(first.sessions[1]).tool).observedAt,
       1000,
       "forward original tool source time independently of inventory time",
     );
     assert.equal(
-      Object.hasOwn(required(first.sessions[0]).tool, "observedAt"),
+      Object.hasOwn(requiredHttpValue(first.sessions[0]).tool, "observedAt"),
       EXPECTED_FALSE,
       "legacy input keeps its missing tool timestamp",
     );
@@ -163,7 +169,7 @@ test("presentation regression contracts", async () => {
             sessions: [{ ...parent, tool: { ...parent.tool, observedAt } }],
           }),
       }).get();
-      const tool = required(required(projected.sessions[0]).tool);
+      const tool = requiredHttpValue(requiredHttpValue(projected.sessions[0]).tool);
       assert.equal(
         Object.hasOwn(tool, "observedAt"),
         observedAt === 0,
@@ -176,7 +182,7 @@ test("presentation regression contracts", async () => {
         "malformed timestamps cannot expose private strings or objects",
       );
     }
-    assert.equal(required(first.sessions[1]).inspectionIdentity, null);
+    assert.equal(requiredHttpValue(first.sessions[1]).inspectionIdentity, null);
     assert.deepEqual(
       first.sessions.map((row) => row.arrangement),
       [
@@ -190,7 +196,7 @@ test("presentation regression contracts", async () => {
       [null, 900],
       "idle age keeps a numeric last-activity time and drops anything else",
     );
-    assert.deepEqual(required(first.bus).messages[0], {
+    assert.deepEqual(requiredHttpValue(first.bus).messages[0], {
       id: 1,
       from: parent.id,
       to: helper.id,
@@ -216,8 +222,8 @@ test("presentation regression contracts", async () => {
         byId.get(row.id),
         "new earlier IDs cannot rename existing rooms or repos",
       );
-    assert.equal(required(grown.sessions[0]).project, "Platform");
-    assert.equal(required(grown.sessions[0]).repo, "helio-auth");
+    assert.equal(requiredHttpValue(grown.sessions[0]).project, "Platform");
+    assert.equal(requiredHttpValue(grown.sessions[0]).repo, "helio-auth");
     const custom = makePresentationObserver({ get: () => Promise.resolve(inventory) }, () => 1000, {
       company: "Orbit Works",
       repoPrefix: "orbit",
@@ -225,10 +231,10 @@ test("presentation regression contracts", async () => {
     });
     const labeled = await custom.get();
     assert.equal(labeled.presentation.company, "Orbit Works");
-    assert.equal(required(labeled.sessions[0]).project, "Studio 2");
-    assert.equal(required(labeled.sessions[0]).repo, "orbit-studio-2-2");
+    assert.equal(requiredHttpValue(labeled.sessions[0]).project, "Studio 2");
+    assert.equal(requiredHttpValue(labeled.sessions[0]).repo, "orbit-studio-2-2");
     assert.equal(
-      required(labeled.sessions[1]).project,
+      requiredHttpValue(labeled.sessions[1]).project,
       "Studio 3",
       "overflow room cannot reuse a configured room name",
     );
@@ -240,13 +246,17 @@ test("presentation regression contracts", async () => {
     inventory = {
       ...inventory,
       sessions: [
-        { ...required(inventory.sessions[0]), id: "obs_" + "d".repeat(24), repoId: "repo_extra" },
+        {
+          ...requiredHttpValue(inventory.sessions[0]),
+          id: "obs_" + "d".repeat(24),
+          repoId: "repo_extra",
+        },
         ...inventory.sessions,
       ],
     };
     const expanded = await custom.get();
     assert.equal(
-      required(expanded.sessions[0]).repo,
+      requiredHttpValue(expanded.sessions[0]).repo,
       "orbit-studio-2-3",
       "generated repo aliases cannot reuse reserved configured names",
     );
@@ -307,7 +317,7 @@ test("presentation regression contracts", async () => {
             sessions: [
               ...inventory.sessions.map((r) => ({ ...r, host: null })),
               {
-                ...required(inventory.sessions[0]),
+                ...requiredHttpValue(inventory.sessions[0]),
                 id: "obs_" + "f".repeat(24),
                 host: "herdr-dev-2",
               },
@@ -380,15 +390,15 @@ test("presentation regression contracts", async () => {
     );
     const masked = await remote.get();
     assert.equal(JSON.stringify(masked).includes("herdr-dev-2"), EXPECTED_FALSE);
-    assert.equal(required(masked.sessions.at(-1)).host, "Ship 1");
-    assert.equal(required(masked.sessions[0]).host, null);
+    assert.equal(requiredHttpValue(masked.sessions.at(-1)).host, "Ship 1");
+    assert.equal(requiredHttpValue(masked.sessions[0]).host, null);
     assert.deepEqual(
-      required(masked.sources.hosts)["Ship 1"],
+      requiredHttpValue(masked.sources.hosts)["Ship 1"],
       { health: "stale", observedAt: 1, agents: 1 },
       "host reasons are not shown in presentation",
     );
     assert.deepEqual(
-      required(required(masked.hostBus)["Ship 1"]).messages[0],
+      requiredHttpValue(requiredHttpValue(masked.hostBus)["Ship 1"]).messages[0],
       {
         id: 5,
         key: "5@Ship 1",
@@ -409,7 +419,7 @@ test("presentation regression contracts", async () => {
       "remote mail is masked like local mail: ship name, no identity, fictional relay names",
     );
     assert.deepEqual(
-      required(required(masked.hostBus)["Ship 1"]).remote,
+      requiredHttpValue(requiredHttpValue(masked.hostBus)["Ship 1"]).remote,
       {
         relay: "Relay 1",
         machine: "Machine 2",

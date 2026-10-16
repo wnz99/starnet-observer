@@ -56,11 +56,6 @@ export async function publicFixture() {
   const frontend = path.join(root, "frontend"),
     assets = path.join(frontend, "assets");
   await fs.mkdir(path.join(frontend, "app"), { recursive: true });
-  for (const entry of ["observer-scene", "observer-view", "observer"])
-    await fs.copyFile(
-      path.join(REPOSITORY, "frontend", "app", `${entry}.js`),
-      path.join(frontend, "app", `${entry}.js`),
-    );
   await fs.copyFile(
     path.join(REPOSITORY, "frontend", "observer.html"),
     path.join(frontend, "observer.html"),

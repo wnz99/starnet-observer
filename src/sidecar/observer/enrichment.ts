@@ -1,5 +1,5 @@
 import type { State } from "./state.js";
-import type { Sweep, Tool, Row } from "./contracts.js";
+import type { Sweep, Tool, ObserverInputRow } from "./contracts.js";
 import { currentOwner, sameIdentity, sameProof } from "./ownership.js";
 import { required } from "./required.js";
 const SUMMARY_CONCURRENCY = 4;
@@ -26,7 +26,7 @@ export class Enrichment {
           : tool,
     };
   }
-  async readSummary(target: Sweep, row: Row, results: Summaries) {
+  async readSummary(target: Sweep, row: ObserverInputRow, results: Summaries) {
     const result = required(results.get(row.id)),
       owners = target.owners.get(row.id);
     if (row.inspectionIdentity && !currentOwner(this.state, owners)) {

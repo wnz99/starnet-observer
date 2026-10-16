@@ -1,5 +1,5 @@
 import { required } from "../model/types.js";
-import { hash } from "../model/identity.js";
+import { identityHash } from "../model/identity.js";
 import { graphFor } from "./navigation.js";
 import { ActorState } from "./actor.js";
 import { verified, canFollow, FormationPlanner } from "./formation.js";
@@ -55,7 +55,7 @@ class Movement {
       actor.worker.platformKey !== worker.platformKey ||
       distance(actor.worker.chair, worker.chair) > MOVED_EPSILON;
     if (!actor || moved) {
-      actor = new ActorState(worker, now, hash(worker.id));
+      actor = new ActorState(worker, now, identityHash(worker.id));
       this.actors.set(worker.id, actor);
     }
     return actor;

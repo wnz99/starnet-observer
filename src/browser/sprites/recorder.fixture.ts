@@ -176,6 +176,8 @@ export class RecordingContext implements SpriteContext<RecordingResource> {
     this.record("createLinearGradient", ...args);
     return new Gradient();
   }
+  // Sprite renderers call this optional SpriteContext capability; Fallow 3.27.0 misses that dispatch.
+  // fallow-ignore-next-line unused-class-member
   isContextLost() {
     return this.lost;
   }

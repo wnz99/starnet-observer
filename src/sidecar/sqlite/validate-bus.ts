@@ -1,4 +1,4 @@
-import { object, MESSAGE_IDENTITY } from "../bus/types.js";
+import { busRecord, MESSAGE_IDENTITY } from "../bus/types.js";
 import type { BusState, BusRow, Relay, RemoteView } from "../bus/types.js";
 const WAKE_FAILED = "failed";
 const MAX_FIELD_CHARS = 65536;
@@ -31,7 +31,7 @@ function relayState(value: unknown) {
 }
 function relay(value: unknown): value is Relay {
   return (
-    object(value) &&
+    busRecord(value) &&
     (value.direction === "in" || value.direction === "out") &&
     string(value.machine) &&
     string(value.repo) &&
@@ -59,7 +59,7 @@ function messageId(value: unknown) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 function row(value: unknown): value is BusRow {
-  if (!object(value) || !messageId(value.id)) return false;
+  if (!busRecord(value) || !messageId(value.id)) return false;
   if (!identity(value.identity)) return false;
   return (
     string(value.sender) &&
@@ -75,7 +75,7 @@ function strings(value: unknown, max: number) {
 }
 function agent(value: unknown) {
   return (
-    object(value) &&
+    busRecord(value) &&
     string(value.id) &&
     provider(value.provider) &&
     string(value.repo) &&
@@ -83,7 +83,7 @@ function agent(value: unknown) {
   );
 }
 function peer(value: unknown) {
-  if (!object(value) || !string(value.machine) || !strings(value.repos, MAX_REPOS)) return false;
+  if (!busRecord(value) || !string(value.machine) || !strings(value.repos, MAX_REPOS)) return false;
   return (
     typeof value.agents === "number" &&
     Number.isSafeInteger(value.agents) &&
@@ -95,11 +95,11 @@ function peer(value: unknown) {
   );
 }
 function publication(value: unknown) {
-  return object(value) && string(value.address) && string(value.repo);
+  return busRecord(value) && string(value.address) && string(value.repo);
 }
 function remote(value: unknown): value is RemoteView {
   if (
-    !object(value) ||
+    !busRecord(value) ||
     !string(value.relay) ||
     !string(value.machine) ||
     !number(value.lastActivityAt)
@@ -123,7 +123,7 @@ function rows(value: unknown, window: number) {
   return Array.isArray(value) && value.length <= window && value.every(row);
 }
 export function validBusState(value: unknown, window = MAX_WINDOW): value is BusState {
-  if (!object(value) || !rows(value.rows, window) || !health(value.health)) return false;
+  if (!busRecord(value) || !rows(value.rows, window) || !health(value.health)) return false;
   return (
     number(value.observedAt) &&
     (value.reason === null || string(value.reason)) &&

@@ -1,4 +1,4 @@
-import type { OfficeColors, OfficeContext, Point, HumanOptions } from "./types.js";
+import type { OfficeColors, OfficeContext, OfficePoint, HumanOptions } from "./types.js";
 const HUMAN_WIDTH = 16;
 const HEAD_RADIUS = 4.5;
 const STANDING_HIP = 0.46;
@@ -19,7 +19,7 @@ const TORSO_HIP = 0.42;
 const TORSO_SHOULDER = 0.36;
 const FULL_TURN = 2 * Math.PI;
 interface Geometry {
-  foot: Point;
+  foot: OfficePoint;
   h: number;
   w: number;
   head: number;
@@ -98,7 +98,7 @@ class HumanPainter<I> {
 export function createHuman<I>(colors: OfficeColors, crewHeight: number) {
   return function human(
     context: OfficeContext<I>,
-    foot: Point,
+    foot: OfficePoint,
     {
       size = 1,
       sitting = false,

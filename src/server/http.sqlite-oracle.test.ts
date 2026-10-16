@@ -1,6 +1,6 @@
 const EXPECTED_TRUE = true,
   EXPECTED_FALSE = false;
-import { port, required, gate, field } from "./http.fixture.js";
+import { port, requiredHttpValue, gate, field } from "./http.fixture.js";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -107,10 +107,10 @@ export async function sqliteContracts({
         assert.equal(first.health, "available");
         clock = 2000;
         assert.deepEqual(await client.readBus(), first, "unchanged rows retain observation time");
-        const inspected = await client.inspectMessage(1, required(first.rows[0]).identity);
+        const inspected = await client.inspectMessage(1, requiredHttpValue(first.rows[0]).identity);
         assert.equal(inspected.health, "available");
         assert(
-          !required(inspected.text).includes("ordinary"),
+          !requiredHttpValue(inspected.text).includes("ordinary"),
           "redact full known value before display clipping",
         );
         assert.equal(inspected.truncated, EXPECTED_TRUE);
@@ -118,7 +118,7 @@ export async function sqliteContracts({
           "http://127.0.0.1:" +
             String(port(nativeServer)) +
             "/api/observer/messages/1/inspect?identity=" +
-            required(required(first.rows[0]).identity),
+            requiredHttpValue(requiredHttpValue(first.rows[0]).identity),
           { headers: { "x-observer-token": "native-test" } },
         ).then((response) => response.json());
         assert.deepEqual(
@@ -144,7 +144,7 @@ export async function sqliteContracts({
         fs.copyFileSync(file, replacement);
         fs.renameSync(replacement, file);
         assert.equal(
-          (await client.inspectMessage(1, required(first.rows[0]).identity)).reason,
+          (await client.inspectMessage(1, requiredHttpValue(first.rows[0]).identity)).reason,
           "identity-mismatch",
         );
         fs.writeFileSync(file, "broken");

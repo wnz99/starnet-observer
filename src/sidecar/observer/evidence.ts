@@ -1,4 +1,4 @@
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 export const COUNTERS = [
   "inputTokens",
   "outputTokens",
@@ -10,7 +10,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 export function freshObservation(at: unknown, now: number): at is number {
   return typeof at === "number" && Number.isFinite(at) && now - at <= 6000;
 }
-export const usageObservation = (row: Row) =>
+export const usageObservation = (row: ObserverInputRow) =>
   row.usage?.observedAt ?? (row.source === "helper" ? row.observedAt : null);
 export function status(value: unknown) {
   switch (value) {
@@ -47,7 +47,7 @@ export function lastActivity(
   ].filter((time): time is number => typeof time === "number" && Number.isFinite(time));
   return times.length > 0 ? Math.min(now, Math.max(...times)) : null;
 }
-function helperIdentity(row: Row) {
+function helperIdentity(row: ObserverInputRow) {
   return (
     row.provider === "claude" &&
     row.source === "helper" &&
@@ -55,7 +55,7 @@ function helperIdentity(row: Row) {
     /^helper:obs_[a-f0-9]{24}$/.test(row.inspectionIdentity || "")
   );
 }
-export function identity(row: Row) {
+export function identity(row: ObserverInputRow) {
   const helper = helperIdentity(row);
   const verified =
     helper ||
@@ -67,13 +67,13 @@ export function identity(row: Row) {
       : "presence:" + row.id;
   return { verified, key: JSON.stringify([row.host || null, value]) };
 }
-export const fresh = (row: Row, now: number) =>
+export const fresh = (row: ObserverInputRow, now: number) =>
   row.inventoryHealth === "available" && freshObservation(row.observedAt, now);
-export const freshUsage = (row: Row, now: number) =>
+export const freshUsage = (row: ObserverInputRow, now: number) =>
   fresh(row, now) && freshObservation(usageObservation(row), now);
-const rank = (row: Row, now: number) =>
+const rank = (row: ObserverInputRow, now: number) =>
   [fresh(row, now) ? 1 : 0, row.observedAt ?? -1, row.source === "herdr" ? 1 : 0] as const;
-export function compare(a: Row, b: Row, now: number) {
+export function compare(a: ObserverInputRow, b: ObserverInputRow, now: number) {
   const ar = rank(a, now),
     br = rank(b, now);
   return (
@@ -84,8 +84,8 @@ export function compare(a: Row, b: Row, now: number) {
     a.id.localeCompare(b.id)
   );
 }
-export function conflicting(rows: Row[], row: Row, now: number) {
-  const signature = (value: Row) =>
+export function conflicting(rows: ObserverInputRow[], row: ObserverInputRow, now: number) {
+  const signature = (value: ObserverInputRow) =>
     JSON.stringify(COUNTERS.map((key) => value.usage?.[key] || null));
   return rows
     .filter((value) => JSON.stringify(rank(value, now)) === JSON.stringify(rank(row, now)))

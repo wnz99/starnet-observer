@@ -1,5 +1,5 @@
 import type { ObserverSnapshot } from "../../shared/observer.js";
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import { COUNTERS, freshUsage, usageObservation } from "./evidence.js";
 import type { CounterKey } from "./evidence.js";
 const emptyCoverage = () => ({
@@ -28,7 +28,7 @@ export class Counters {
     if (!Number.isSafeInteger(sum)) this.overflow.add(key);
     this.totals[key] = this.overflow.has(key) ? null : sum;
   }
-  private add(row: Row, key: CounterKey, stale: boolean) {
+  private add(row: ObserverInputRow, key: CounterKey, stale: boolean) {
     const counter = this.coverage.counters[key];
     counter.eligible++;
     if (stale) {
@@ -50,7 +50,7 @@ export class Counters {
     this.accumulate(key, item.value, usageObservation(row));
     return item.state;
   }
-  contribute(row: Row, stale: boolean, now: number) {
+  contribute(row: ObserverInputRow, stale: boolean, now: number) {
     this.coverage.eligible++;
     const usageStale =
       stale || (row.usage !== null && row.usage !== undefined && !freshUsage(row, now));

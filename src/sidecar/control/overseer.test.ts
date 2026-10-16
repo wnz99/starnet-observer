@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { makeControl } from "./index.js";
-import type { ControlOptions, Execute } from "./types.js";
+import type { ControlOptions, ControlExecute } from "./types.js";
 import { object } from "../overseer-state/identity.js";
 
 async function uncertainOverseer() {
@@ -19,7 +19,7 @@ async function uncertainOverseer() {
     terminal_id: "term",
     agent: "claude",
   };
-  const execute: Execute = (command, args, settings) =>
+  const execute: ControlExecute = (command, args, settings) =>
     Promise.resolve().then(() => {
       calls.push([command, ...args]);
       assert.equal(settings.env?.HERDR_SOCKET_PATH, endpoint);

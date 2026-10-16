@@ -4,7 +4,7 @@ import { redactText } from "../inspector/fields.js";
 import { status } from "./evidence.js";
 import { required } from "./required.js";
 import type { State } from "./state.js";
-import type { Pane, Row } from "./contracts.js";
+import type { Pane, ObserverInputRow } from "./contracts.js";
 import type { InjectedIdentity } from "./contracts.js";
 const TITLE_LIMIT = 160;
 const ID_DIGEST_LENGTH = 24;
@@ -99,7 +99,7 @@ export class InventoryReader {
     const projects = this.state.projects.resolveMany
       ? await this.state.projects.resolveMany(cwds)
       : [];
-    const rows: Row[] = [],
+    const rows: ObserverInputRow[] = [],
       proofs = new Map<string, NonNullable<InjectedIdentity["proof"]>>();
     for (const [index, pane] of panes.entries()) {
       const id =

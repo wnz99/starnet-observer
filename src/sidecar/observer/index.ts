@@ -10,10 +10,10 @@ import { makeOverseerState, resolveEndpoint } from "../overseer-state/index.js";
 import { makeIdentityResolver } from "../identity/index.js";
 import { State } from "./state.js";
 import { inspect } from "./inspection.js";
-import type { ObserverOptions, Execute, Transcripts } from "./contracts.js";
+import type { ObserverOptions, ObserverExecute, Transcripts } from "./contracts.js";
 export { aggregateRows, lastActivity } from "./aggregation.js";
 const childProcess = guardChildProcess({ execFile });
-const executeDefault: Execute = (command, args, settings) =>
+const executeDefault: ObserverExecute = (command, args, settings) =>
   new Promise((resolve, reject: (reason: unknown) => void) => {
     childProcess.execFile(command, args, settings, (error, stdout) => {
       if (error) reject(error instanceof Error ? error : new Error(error.message));
@@ -44,7 +44,11 @@ function defaultHelpers(
     readEdges: () => required(sqlite).readHelperEdges(),
   });
 }
-function identityDependencies(options: ObserverOptions, execute: Execute, now: () => number) {
+function identityDependencies(
+  options: ObserverOptions,
+  execute: ObserverExecute,
+  now: () => number,
+) {
   const endpoint = resolveEndpoint(options);
   const overseerState = options.overseerState || makeOverseerState({ endpoint });
   if (overseerState.endpoint !== undefined && overseerState.endpoint !== endpoint)

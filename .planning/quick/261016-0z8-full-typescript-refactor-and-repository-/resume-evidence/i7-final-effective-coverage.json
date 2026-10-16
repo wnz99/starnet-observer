@@ -1,0 +1,4574 @@
+{
+  "method": "TypeScript readConfigFile/parseJsonConfigFileContent (no program/typecheck); ESLint calculateConfigForFile (no lint); git tracked+untracked nonignored existing authored files",
+  "root": "/home/david/Projects/starnet-observer-resume",
+  "head": "0cc9ad6d87fd5805d251fe75b174b57b9c73c535",
+  "projects": [
+    {
+      "name": "tsconfig.json",
+      "count": 452,
+      "errors": []
+    },
+    {
+      "name": "tsconfig.runtime.json",
+      "count": 161,
+      "errors": []
+    },
+    {
+      "name": "tsconfig.browser.json",
+      "count": 175,
+      "errors": []
+    },
+    {
+      "name": "tsconfig.tools.json",
+      "count": 67,
+      "errors": []
+    },
+    {
+      "name": "tsconfig.browser-tests.json",
+      "count": 55,
+      "errors": []
+    }
+  ],
+  "entries": [
+    {
+      "path": "eslint.config.mjs",
+      "compiler_projects": [],
+      "eslint_visible": true,
+      "eslint_typechecked": false,
+      "eslint_rules": 126
+    },
+    {
+      "path": "scripts/stream.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "scripts/stream.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "scripts/validate-theme-packs.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "scripts/validate-theme-packs.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/admission.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/admission.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/auth-reload.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/auth-reload.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/control-ui-hosts.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/control-ui.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/controls.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/couriers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/data.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/deadline.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/dom.fixture.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/dom.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/dom.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/environment.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/floor.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/format.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/format.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/header.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/hosts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/ledger.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/lifecycle.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mail-text.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-control-json.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-core.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-lifecycle.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-panels.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-spawn.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-sprites.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount-view.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/mount.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/native.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/navigation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/observer-arrange-ui.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/observer-prefs-ui.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/observer-ui.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/overlays.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/panel-adapter.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/panel-descriptions.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/panel-stack.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/preferences.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/render.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster-ports.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/checkouts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/grouping.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/project.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/repositories.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/roster.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/roster.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/row-view.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/roster/row.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/state.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/totals.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/ui-test.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/app/ui.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/bootstrap.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/bootstrap.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/composition.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/data-shim.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/data-shim.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/harness.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/harness.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/dom.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/dom.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/format.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/mail-panel.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/mail-validation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/native.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/panel.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/roster.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/rows.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/validation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/inspector/view.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail-inspector.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail-inspector.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail/frame.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail/geometry.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/mail/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/main.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model.scene.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model/description.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model/hues.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model/layout.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/model/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art/human.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art/loading.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art/loading.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art/loading.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/office-art/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/prepaint.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/prepaint.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/prepaint.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/queryspine.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/queryspine.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/queryspine/request.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/queryspine/state.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/queryspine/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/actor.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/build.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/camera.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/crew-topology.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/formation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/geometry.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/highways.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/history.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/hulls.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/mail.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/motion-types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/movement.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/navigation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/observatory.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/relay.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/relay.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/revision.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/room-workers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/rooms.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/site.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/scene/values.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/animation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/assets.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/assets.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/destination.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/drawing.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/facing.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/geometry.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/light-painter.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/lighting.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/load-plan.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/load-plan.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/loading.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/native.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/paint.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/placement.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/pose.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/recorder.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/renderer.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/runtime.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/shadow.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/sprites/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/assets.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/assets.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/configuration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/dom.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/dom.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/lifecycle.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/native.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/native.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/native.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/root.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/status.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/style.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/style.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/theme/validation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/attention.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/aura.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/cache.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/callbacks.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/camera-control.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/crew.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/drawing.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/effects.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/environment.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/frame-overlays.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/frame-paint.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/furnishing-layout.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/furnishing.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/furnishings.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/furniture-effects.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/furniture-lighting.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/geometry-painter.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/helpers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/host-labels.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/hosts.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/hub-effects.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser-tests.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/interaction.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/label-types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/lifecycle.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/look.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/mail.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/native.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/office-floor.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/office-furnishing.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/office.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/painters.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/plates.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/platform-effects.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/platform-labels.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/pointer-gestures.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/primitives.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/props.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/resources.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/runtime.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/sky-random.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/space.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/stars-paint.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/state-types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/static.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/station-items.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/station-labels.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/stations.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/surfaces.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/values.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/browser/view/worker-labels.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/api.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/bootstrap.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/control-body.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/control-result.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/control.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.security.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.sqlite-oracle.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.sqlite.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/http.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/lifecycle.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/main.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/main.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/runtime-paths.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/runtime-paths.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/security.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/static.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/server/status.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/bootstrap.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/inspection.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/observer.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/observer.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/scene-art-roles.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/scene-art-roles.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/theme-keys.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/shared/theme.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json",
+        "tsconfig.browser.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/common.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/discovery.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/model.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/placement.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/room-file.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/rooms.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/arrangement/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/inspection.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/public.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/relay.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/relay.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/selection.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/sqlite.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/bus/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/child-env.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/child-env.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config/cli.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config/defaults.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config/read.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/config/validation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/constants.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/control-remote.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/control.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/control.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/overseer.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/overseer.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/proof.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/spawn.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/spawn.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/start.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/terminal.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/transport.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/transport.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/control/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/cache.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/cache.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/inspection.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/desktop/inventory.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/failopen.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/failopen.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/claims.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/edges.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/evidence.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/graph.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/helpers/traversal.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/birth.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/capture-rpc.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/capture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/configuration.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/evidence.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/execute.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/refresh.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/revalidation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/rpc.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/identity/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/claude-helpers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/codex-helpers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/conversation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/fields.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/helper-state.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/metadata.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/tool-kind.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/inspector/values.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/iterable.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/aggregation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/counters.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/enrichment.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/evidence.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/identity-process.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/inspection-proof.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/inspection.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/inspector.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/inventory.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/lifecycle.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/lineage.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/ownership.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/publication.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/queryspine.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/refresh.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/required.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/snapshot.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/state.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/testing.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/warm-transcripts.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/observer/warmup.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/overseer-state/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/overseer-state/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/overseer-state/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/overseer-state/lifecycle.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/overseer-state/records.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/aliases.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/mail.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/presentation.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/rows.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/presentation/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/association.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/discovery.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/projects/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/redaction.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/redaction.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/bus.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/command.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/control.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/federation.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/federation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/fields.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/framing.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/host.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/hosts.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/hosts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/limits.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/relay.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/remotes.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/rows.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/scene.integration.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/snapshot.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/targets.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/targets.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/timers.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/remotes/types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/client-types.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/client.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/client.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/protocol.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/protocol.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/snapshots.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/validate-bus.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/sqlite/worker.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/files.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/limits.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/resolve.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/resources.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/schema.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/validation-colors.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/validation-crew.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/validation-scene.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/validation-ui.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/themes/validation.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/binding.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/children.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/claims.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/contracts.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/discovery.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/identity.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/index.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/reader.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/resources.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/spawn-index.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/testing.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/tools.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "src/sidecar/transcripts/windows.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.runtime.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/acceptance.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/acceptance.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/build.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/build.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/public.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/public.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/public.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/quality/boolean-assertions.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/quality/hooks.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/quality/isolate-typescript.mjs",
+      "compiler_projects": [],
+      "eslint_visible": true,
+      "eslint_typechecked": false,
+      "eslint_rules": 126
+    },
+    {
+      "path": "tools/staging.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/start.fixture.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/start.test.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    },
+    {
+      "path": "tools/start.ts",
+      "compiler_projects": [
+        "tsconfig.json",
+        "tsconfig.tools.json"
+      ],
+      "eslint_visible": true,
+      "eslint_typechecked": true,
+      "eslint_rules": 169
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-export function required<T>(value: T | null | undefined): T {
+export function requiredHttpValue<T>(value: T | null | undefined): T {
   assert(value !== undefined && value !== null, "required fixture value");
   return value;
 }

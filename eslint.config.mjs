@@ -42,10 +42,33 @@ function assertionExpectedOperand(sourceCode, node) {
   return false;
 }
 const booleanFlags = cleanCode.rules["no-boolean-flag-arguments"];
+const commentedCode = cleanCode.rules["no-commented-out-code"];
 const assertionAwareCleanCode = {
   ...cleanCode,
   rules: {
     ...cleanCode.rules,
+    "no-commented-out-code": {
+      ...commentedCode,
+      create(context) {
+        const scoped = {
+          ...context,
+          report(descriptor) {
+            const comment = context.sourceCode
+              .getAllComments()
+              .find(
+                (candidate) =>
+                  candidate.loc.start.line === descriptor.loc.start.line &&
+                  candidate.loc.start.column === descriptor.loc.start.column,
+              );
+            // This native tool directive is metadata despite its hyphenated rule name.
+            if (comment?.value.trim() === "fallow-ignore-next-line unused-class-member") return;
+            context.report(descriptor);
+          },
+        };
+        Object.setPrototypeOf(scoped, context);
+        return commentedCode.create(scoped);
+      },
+    },
     "no-boolean-flag-arguments": {
       ...booleanFlags,
       create(context) {

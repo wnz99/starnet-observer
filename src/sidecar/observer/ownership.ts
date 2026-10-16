@@ -1,4 +1,4 @@
-import type { Row, Owners, Owner } from "./contracts.js";
+import type { ObserverInputRow, Owners, Owner } from "./contracts.js";
 import type { FooterProof } from "../identity/types.js";
 import type { State } from "./state.js";
 
@@ -10,7 +10,7 @@ function sameBirth(a: FooterProof["birth"], b: FooterProof["birth"]) {
     a.startMicroseconds === b.startMicroseconds
   );
 }
-function invalidOwner(row: Row, proofs: Map<string, FooterProof>) {
+function invalidOwner(row: ObserverInputRow, proofs: Map<string, FooterProof>) {
   return (
     row.inventoryHealth !== "available" ||
     !row.inspectionIdentity ||
@@ -27,7 +27,10 @@ export function sameProof(a: FooterProof | null | undefined, b: FooterProof | nu
   );
 }
 
-export function sameIdentity(a: Row | null | undefined, b: Row | null | undefined) {
+export function sameIdentity(
+  a: ObserverInputRow | null | undefined,
+  b: ObserverInputRow | null | undefined,
+) {
   return (
     !!a &&
     !!b &&
@@ -44,7 +47,7 @@ export function sameIdentity(a: Row | null | undefined, b: Row | null | undefine
 
 export function capture(
   s: State,
-  row: Row | undefined,
+  row: ObserverInputRow | undefined,
   roster = s.lastGood,
   proofs = s.identityProofs,
 ) {

@@ -1,5 +1,5 @@
 import { element, required } from "./types.js";
-import { hash } from "./identity.js";
+import { identityHash } from "./identity.js";
 import type { Unit } from "./types.js";
 const ROOMS_PER_PAGE = 8;
 const ownerOf = (key: string) => key.slice(0, key.lastIndexOf(":"));
@@ -9,7 +9,7 @@ export class Hues {
   private hues = new Map<string, number>();
   constructor(private readonly palette: readonly (readonly [string, string])[]) {}
   colorFor(project: string) {
-    return this.color(this.hues.get(project) ?? hash(project) % this.palette.length);
+    return this.color(this.hues.get(project) ?? identityHash(project) % this.palette.length);
   }
   color(index: number) {
     const [floor, accent] = element(this.palette, index);
@@ -61,7 +61,7 @@ export class Hues {
     }
     const previous = this.hues.get(project);
     if (previous !== undefined && !shared.has(previous)) return previous;
-    const start = hash(project) % this.palette.length;
+    const start = identityHash(project) % this.palette.length;
     const candidates = this.palette.map((_, index) => (start + index) % this.palette.length);
     return (
       candidates.find((index) => !anywhere.has(index)) ??

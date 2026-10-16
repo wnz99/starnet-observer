@@ -1,4 +1,4 @@
-import { object } from "../bus/types.js";
+import { busRecord } from "../bus/types.js";
 import { identity } from "./evidence.js";
 import type { Candidate, HelperRow, Root, ChildBinding, HelperTranscripts } from "./contracts.js";
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -38,7 +38,7 @@ export class HelperGraph {
   }
   edges(edges: unknown[]) {
     for (const edge of edges) {
-      if (!object(edge)) continue;
+      if (!busRecord(edge)) continue;
       const parent = edge.parent_thread_id,
         child = edge.child_thread_id;
       if (typeof parent !== "string" || typeof child !== "string") continue;

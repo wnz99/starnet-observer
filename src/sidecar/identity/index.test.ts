@@ -12,7 +12,7 @@ import net from "node:net";
 import { spawn } from "node:child_process";
 import { makeFooterConfigurationReader, makeIdentityRpc } from "./index.js";
 import { object, result } from "./types.js";
-import type { Execute } from "./types.js";
+import type { IdentityExecute } from "./types.js";
 import { makeIdentityResolver } from "./index.js";
 import type { FooterMode, IdentityRpc, RefreshState } from "./types.js";
 import { test } from "bun:test";
@@ -434,7 +434,7 @@ test("observer-identity regression contracts", async () => {
         },
       });
     };
-    const createResolver = (execute?: Execute) =>
+    const createResolver = (execute?: IdentityExecute) =>
       makeIdentityResolver({
         now: () => 1000,
         endpoint: "/isolated/native.sock",

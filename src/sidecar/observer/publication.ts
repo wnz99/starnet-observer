@@ -1,5 +1,5 @@
 import type { State } from "./state.js";
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import { currentOwner } from "./ownership.js";
 import { Publication } from "./lineage.js";
 export class Publisher {
@@ -23,7 +23,7 @@ export class Publisher {
       const previous = this.state.sourceRows("herdr").find((value) => value.id === row.id);
       return { ...row, tool: previous?.tool || row.tool, usage: previous?.usage || null };
     });
-    let children: Row[] =
+    let children: ObserverInputRow[] =
       this.state.herdrSource.health === "available"
         ? []
         : this.state

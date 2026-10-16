@@ -1,0 +1,91 @@
+{
+  "source_directory": "/tmp/starnet-ts-resume",
+  "purpose": "Immutable Task 7 review and verification evidence; Task 8 remains separate.",
+  "files": [
+    {
+      "path": "i7-app-full-review-r1.md",
+      "bytes": 17761,
+      "sha256": "d33092f1f752410c6185458a54bda30dc414a02c9a34553b94a50ce6e8b304e0"
+    },
+    {
+      "path": "i7-approved-exception-review-r1.md",
+      "bytes": 8205,
+      "sha256": "d4c362dcff4692b0ecee3635a6622d60ce149c2eeabf3328cde04bdb2c59b53d"
+    },
+    {
+      "path": "i7-approved-final-fallow.log",
+      "bytes": 484,
+      "sha256": "365a869cd36519be627bb21027fd9799a87a683d2c62de121dc4fe93e2897102"
+    },
+    {
+      "path": "i7-approved-final-tests.log",
+      "bytes": 40437,
+      "sha256": "4b79921757a4d9477c71a2f8ca09036693d6b90abcd7189e915de132d0de4bf2"
+    },
+    {
+      "path": "i7-directive-classifier-review-r1.md",
+      "bytes": 4499,
+      "sha256": "473258ab43ab4edc9076f20b1478bf968779003b1f0ac57be5cae6cee03bf1ee"
+    },
+    {
+      "path": "i7-directive-classifier-tests.log",
+      "bytes": 450,
+      "sha256": "70d4add21bd11f0d15a1ed7d7059fd24168d057e8addfe1232ae099cb0f16d18"
+    },
+    {
+      "path": "i7-entry-review-r1.md",
+      "bytes": 12030,
+      "sha256": "70ed015b01374cfcb4e07b3b0dd000235eb256d1208f9426ac040611c9352ad5"
+    },
+    {
+      "path": "i7-exact-exceptions-proposal.md",
+      "bytes": 5791,
+      "sha256": "6bf63ce82da4410baf7ad24a9f2c183137dd76bd0c376126d020d738999362f9"
+    },
+    {
+      "path": "i7-export-review-r1.md",
+      "bytes": 17853,
+      "sha256": "fd0a84174e00dc8b07519fb1686044cf1ac1520bcb34e9e8b0ea91be6d5dbd20"
+    },
+    {
+      "path": "i7-final-complete-static-r2.log",
+      "bytes": 1707,
+      "sha256": "d7a4f695cf1f3f67c8e793d1598c8a5ecf6ce5b69677469b710777c5f89595e2"
+    },
+    {
+      "path": "i7-final-effective-coverage.json",
+      "bytes": 112986,
+      "sha256": "c1bf25388f165dc76a2bda28c926ada86aa099d10d83583126de1e572f9ea2f7"
+    },
+    {
+      "path": "i7-final-integration-review-r1.md",
+      "bytes": 19088,
+      "sha256": "5c104d749274806c8b24f4cf54c6aa09eb86e6d5825af8ea8b1d01f1c4c06533"
+    },
+    {
+      "path": "i7-final-official-tests.log",
+      "bytes": 40338,
+      "sha256": "fe9d4e0673d99cfb31c265ce61fde99a7f6df2c8da9de0723e6b27c4015cc3a1"
+    },
+    {
+      "path": "i7-original-78-final-disposition.json",
+      "bytes": 98130,
+      "sha256": "94e4ebb450e16050f4a59389d292fb8461d82ac3df89018e9c272a1b8ca32350"
+    },
+    {
+      "path": "i7-original-78-final-disposition.md",
+      "bytes": 14214,
+      "sha256": "d16f657442e03ddfac0dcdadd17d63bbb8247bb477f424094e5302276cabfaf8"
+    },
+    {
+      "path": "i7-ui-clock-review-r1.md",
+      "bytes": 6239,
+      "sha256": "2e0576f68b76b823408f8420bf1e9ff70630aafb924f4d3e6d13242fab677a36"
+    },
+    {
+      "path": "i7-ui-oracle-review-r1.md",
+      "bytes": 17009,
+      "sha256": "30ddd880ebd0658fb7f2d57be0dd402f0a6520accbd43ad19244471922b98715"
+    }
+  ]
+}

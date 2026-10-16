@@ -1,4 +1,4 @@
-import type { Row, Sweep } from "./contracts.js";
+import type { ObserverInputRow, Sweep } from "./contracts.js";
 import type { State } from "./state.js";
 import { capture } from "./ownership.js";
 import { currentOwner } from "./ownership.js";
@@ -6,7 +6,7 @@ import { inspect, expectedInspectionIdentity, PREPARE_INSPECTION } from "./inspe
 const WARMUP_LIMIT = 32;
 const WARMUP_CONCURRENCY = 2;
 const WARMUP_CACHE_AGE = 60000;
-function eligible(row: Row) {
+function eligible(row: ObserverInputRow) {
   return (
     row.source !== "desktop" &&
     !!row.inspectionIdentity &&
@@ -28,7 +28,7 @@ export class Warmup {
     }
     this.pumpWarmup();
   }
-  private scheduleRow(row: Row, warmed: Set<string>) {
+  private scheduleRow(row: ObserverInputRow, warmed: Set<string>) {
     const owners = capture(this.state, row);
     if (!owners) return;
     const key = JSON.stringify(

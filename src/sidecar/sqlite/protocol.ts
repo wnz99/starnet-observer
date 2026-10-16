@@ -1,5 +1,5 @@
 import type { BusState, RawInspection } from "../bus/types.js";
-import { MESSAGE_IDENTITY, MAX_RAW_CHARS, WINDOW, object } from "../bus/types.js";
+import { MESSAGE_IDENTITY, MAX_RAW_CHARS, WINDOW, busRecord } from "../bus/types.js";
 import type { HelperEdges } from "../helpers/edges.js";
 import { MAX_EDGES } from "../helpers/edges.js";
 import { validBusState } from "./validate-bus.js";
@@ -44,7 +44,7 @@ function path(value: unknown): value is string {
 }
 export function validWorkerPaths(value: unknown): value is WorkerPaths {
   return (
-    object(value) &&
+    busRecord(value) &&
     keys(value, ["busFile", "helperFile", "tempRoot"]) &&
     path(value.busFile) &&
     path(value.helperFile) &&
@@ -52,11 +52,11 @@ export function validWorkerPaths(value: unknown): value is WorkerPaths {
   );
 }
 export function closing(value: unknown) {
-  return object(value) && value.op === "close" && keys(value, ["op"]);
+  return busRecord(value) && value.op === "close" && keys(value, ["op"]);
 }
 function correlation(value: unknown): value is Record<string, unknown> & Correlation {
   return (
-    object(value) &&
+    busRecord(value) &&
     typeof value.request === "number" &&
     Number.isSafeInteger(value.request) &&
     value.request > 0 &&
@@ -85,7 +85,7 @@ export function validRequest(value: unknown): value is WorkerRequest {
 }
 export function validReply(value: unknown): value is { request: number; result: unknown } {
   return (
-    object(value) &&
+    busRecord(value) &&
     keys(value, ["request", "result"]) &&
     typeof value.request === "number" &&
     Number.isSafeInteger(value.request) &&
@@ -107,7 +107,7 @@ function rawBody(value: Record<string, unknown>) {
 }
 export function validRawInspection(value: unknown): value is RawInspection {
   if (
-    !object(value) ||
+    !busRecord(value) ||
     !keys(value, ["id", "identity", "body", "reason"]) ||
     typeof value.id !== "number" ||
     !Number.isSafeInteger(value.id)
@@ -137,7 +137,7 @@ function edgeField(value: unknown) {
 }
 function edge(value: unknown) {
   return (
-    object(value) &&
+    busRecord(value) &&
     keys(value, ["parent_thread_id", "child_thread_id", "status"]) &&
     edgeField(value.parent_thread_id) &&
     edgeField(value.child_thread_id) &&
@@ -146,7 +146,7 @@ function edge(value: unknown) {
 }
 export function validHelperEdges(value: unknown): value is HelperEdges {
   if (
-    !object(value) ||
+    !busRecord(value) ||
     !keys(value, ["rows", "reason", "fingerprint"]) ||
     !reason(value.reason) ||
     !fingerprint(value.fingerprint)

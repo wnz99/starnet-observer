@@ -25,7 +25,7 @@ export interface BusState {
   health: "available" | "unavailable" | "unknown";
   reason: string | null;
 }
-export type Pane = Pick<ObserverRow, "id" | "provider" | "sessionId">;
+export type BusPane = Pick<ObserverRow, "id" | "provider" | "sessionId">;
 export interface RawInspection {
   id: number;
   reason?: string;
@@ -37,6 +37,6 @@ export const MAX_TEXT_CHARS = 32768;
 export const MAX_RAW_CHARS = 65536;
 export const MESSAGE_IDENTITY = /^mail_[a-f0-9]{64}$/;
 export const ADDRESS = /^(claude|codex):[A-Za-z0-9._-]{1,200}$/;
-export function object(value: unknown): value is Record<string, unknown> {
+export function busRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

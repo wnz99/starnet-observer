@@ -2,7 +2,7 @@ interface ExecuteSettings {
   timeout: number;
   maxBuffer: number;
 }
-export type Execute = (
+export type IdentityExecute = (
   command: string,
   args: string[],
   settings: ExecuteSettings,
@@ -37,7 +37,7 @@ export interface IdentityOptions {
   now?: () => number;
   endpoint?: string;
   rpc?: IdentityRpc;
-  execute?: Execute | undefined;
+  execute?: IdentityExecute | undefined;
   readConfiguration?: (() => Promise<FooterMode>) | undefined;
   readProcessBirth?: ((pid: number) => Promise<unknown>) | undefined;
 }

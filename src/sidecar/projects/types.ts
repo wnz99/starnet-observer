@@ -5,7 +5,7 @@ export interface ExecuteSettings {
   maxBuffer: number;
   env: NodeJS.ProcessEnv;
 }
-export type Execute = (
+export type ProjectExecute = (
   command: string,
   args: string[],
   settings: ExecuteSettings,
@@ -26,7 +26,7 @@ export type ProjectResolution = Pick<
   | "arrangement"
 >;
 export interface ProjectOptions {
-  execute: Execute;
+  execute: ProjectExecute;
   now: () => number;
   home?: string;
   arrange?: { home?: string; roomsFile?: string; warn?: (message: string) => void } | null;

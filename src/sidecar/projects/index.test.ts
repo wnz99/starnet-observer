@@ -6,7 +6,7 @@ function at<T>(items: readonly T[], index: number): T {
   return value;
 }
 import { makeProjectResolver } from "./index.js";
-import type { Execute } from "./types.js";
+import type { ProjectExecute } from "./types.js";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -110,7 +110,7 @@ test("observer-projects regression contracts", async () => {
       );
       const pressured = makeProjectResolver({
         now: () => 1000,
-        execute: async (...args: Parameters<Execute>) => {
+        execute: async (...args: Parameters<ProjectExecute>) => {
           if (args[1][1] === (await fs.realpath(temp)))
             throw new Error("Fixture folder is not a checkout");
           return execFile(...args);
@@ -128,7 +128,7 @@ test("observer-projects regression contracts", async () => {
       const gates: (() => void)[] = [];
       const bounded = makeProjectResolver({
         now: () => 1000,
-        execute: async (...args: Parameters<Execute>) => {
+        execute: async (...args: Parameters<ProjectExecute>) => {
           calls++;
           maximum = Math.max(maximum, ++active);
           await new Promise<void>((resolve) => gates.push(resolve));
@@ -208,7 +208,7 @@ test("observer-projects regression contracts", async () => {
         clock = 1000;
       const resolver = makeProjectResolver({
         now: () => clock,
-        execute: async (...args: Parameters<Execute>) => {
+        execute: async (...args: Parameters<ProjectExecute>) => {
           executions++;
           return execFile(...args);
         },

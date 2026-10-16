@@ -27,7 +27,7 @@ const fitZoom = (bounds: Bounds, v: Viewport) =>
   );
 const clampZoom = (zoom: number, bounds: Bounds, v: Viewport) =>
   Math.max(Math.min(CAMERA.minimumZoom, fitZoom(bounds, v)), Math.min(CAMERA.maximumZoom, zoom));
-export function constrain(camera: Camera, bounds: Bounds, viewport: Viewport) {
+function constrain(camera: Camera, bounds: Bounds, viewport: Viewport) {
   const v = viewportOf(viewport),
     zoom = clampZoom(camera.zoom, bounds, v),
     result = { zoom, tx: camera.tx, ty: camera.ty };

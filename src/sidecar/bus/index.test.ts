@@ -1,4 +1,4 @@
-import type { Pane } from "./types.js";
+import type { BusPane } from "./types.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 import { must, SnapshotFixture } from "./sqlite.fixture.js";
 import { test } from "bun:test";
@@ -27,7 +27,7 @@ test("observer-bus regression contracts", () => {
 CREATE TABLE messages (id INTEGER PRIMARY KEY, sender TEXT NOT NULL REFERENCES agents(address), recipient TEXT NOT NULL REFERENCES agents(address),
   body TEXT NOT NULL, sender_cwd TEXT, recipient_cwd TEXT, sender_scope TEXT, recipient_scope TEXT,
   sent_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), acknowledged_at TEXT, wake_status TEXT, wake_via TEXT, wake_reason TEXT, wake_checked_at TEXT);`;
-  const sessions: Pane[] = [
+  const sessions: BusPane[] = [
     { id: "obs_a", provider: "codex", sessionId: S1 },
     { id: "obs_b", provider: "claude", sessionId: S2 },
     { id: "obs_c", provider: "claude", sessionId: S2 },

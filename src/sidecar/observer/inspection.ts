@@ -1,5 +1,5 @@
 import type { State } from "./state.js";
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import type { SessionInspection } from "../../shared/inspection.js";
 import { unavailable } from "../inspector/fields.js";
 import { inspectionProof } from "./inspection-proof.js";
@@ -16,12 +16,12 @@ function invalidExpected(value: unknown) {
       !EXPECTED_IDENTITY.test(value))
   );
 }
-function reason(row: Row | undefined) {
+function reason(row: ObserverInputRow | undefined) {
   if (!row) return "unknown-session";
   if (row.inventoryHealth !== "available") return "inventory-unavailable";
   return row.inspectionIdentity ? null : "identity-unavailable";
 }
-async function read(s: State, row: Row) {
+async function read(s: State, row: ObserverInputRow) {
   if (row.source === "desktop")
     return {
       kind: "desktop" as const,
@@ -32,7 +32,7 @@ async function read(s: State, row: Row) {
     : required(s.transcripts.inspect).call(s.transcripts, row.id, row.provider, row.sessionId));
   return { kind: "transcript" as const, data };
 }
-function current(s: State, row: Row) {
+function current(s: State, row: ObserverInputRow) {
   const source = row.source,
     live = source ? s.rowsBySource[source].find((value) => value.id === row.id) : undefined;
   return {
@@ -46,7 +46,7 @@ function current(s: State, row: Row) {
       Object.hasOwn(live, "parentId") === Object.hasOwn(row, "parentId"),
   };
 }
-function changedReason(live: Row | undefined, expected: unknown) {
+function changedReason(live: ObserverInputRow | undefined, expected: unknown) {
   return live?.inventoryHealth === "unavailable"
     ? "inventory-unavailable"
     : expected === undefined
@@ -103,17 +103,17 @@ function inspectionInventory(s: State, preparing: boolean) {
   if (!preparing) return s.snapshot.get();
   return s.pending || Promise.resolve(s.snapshot.snapshot());
 }
-export function expectedInspectionIdentity(row: Row) {
+export function expectedInspectionIdentity(row: ObserverInputRow) {
   return `${String(row.inspectionIdentity)}${row.source === "helper" || Object.hasOwn(row, "parentId") ? `|${String(row.parentId)}` : ""}`;
 }
 async function inspectOwned(
   s: State,
-  row: Row,
+  row: ObserverInputRow,
   request: {
     id: string;
     expectedIdentity: unknown;
     inspectionIdentity: string;
-    roster: Row[];
+    roster: ObserverInputRow[];
   },
 ) {
   const { id, expectedIdentity, inspectionIdentity, roster } = request;

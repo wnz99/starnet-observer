@@ -9,12 +9,12 @@ export interface OfficeImage {
   onload: ((event: Event) => unknown) | null;
   onerror: ((event: Event) => unknown) | null;
 }
-export interface Point {
+export interface OfficePoint {
   readonly x: number;
   readonly y: number;
   readonly z?: number;
 }
-export interface Rect {
+export interface OfficeRect {
   readonly x: number;
   readonly y: number;
   readonly w: number;
@@ -51,7 +51,7 @@ export interface HumanOptions {
 export interface Composition<I> {
   readonly images: Readonly<Record<SceneArtRoleName, I>>;
   readonly colors: OfficeColors;
-  readonly project: (point: Point) => { x: number; y: number };
+  readonly project: (point: OfficePoint) => { x: number; y: number };
   readonly crewHeight: number;
 }
 export type LoadResult<I> =

@@ -1,9 +1,9 @@
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import { identity, compare, fresh, conflicting, status } from "./evidence.js";
 import { Counters } from "./counters.js";
 export { lastActivity } from "./evidence.js";
-function grouped(rows: Row[]) {
-  const groups = new Map<string, { verified: boolean; rows: Row[] }>();
+function grouped(rows: ObserverInputRow[]) {
+  const groups = new Map<string, { verified: boolean; rows: ObserverInputRow[] }>();
   for (const row of rows) {
     const proof = identity(row),
       group = groups.get(proof.key);
@@ -12,7 +12,7 @@ function grouped(rows: Row[]) {
   }
   return groups.values();
 }
-export function aggregateRows(rows: Row[], now: number) {
+export function aggregateRows(rows: ObserverInputRow[], now: number) {
   const agents = {
     observed: 0,
     verifiedSessions: 0,

@@ -12,7 +12,7 @@ import {
   checkoutSuffix,
   sectionKey,
   helperStations,
-  hash,
+  identityHash,
 } from "./model/identity.js";
 import { activity, age, idleAge, taskTitle, hoverLabel } from "./model/description.js";
 const FLOORS = [
@@ -51,7 +51,7 @@ export function createModel(defaults: ThemeContents) {
     checkoutSuffix,
     sectionKey,
     helperStations,
-    hash,
+    hash: identityHash,
     palette,
     activity,
     age,

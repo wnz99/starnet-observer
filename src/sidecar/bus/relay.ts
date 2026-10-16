@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { ADDRESS, object } from "./types.js";
+import { ADDRESS, busRecord } from "./types.js";
 import type { BusRow, RemoteView, Relay } from "./types.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 
@@ -75,10 +75,10 @@ export function relayBinding(connection: unknown) {
   }
 }
 function payload(value: unknown) {
-  if (!object(value) || typeof value.payload !== "string") return null;
+  if (!busRecord(value) || typeof value.payload !== "string") return null;
   try {
     const parsed: unknown = JSON.parse(value.payload);
-    return object(parsed) ? parsed : null;
+    return busRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -124,7 +124,7 @@ class RemoteSelection {
             "')",
         )
         .all()
-        .flatMap((row) => (object(row) ? [row.name] : [])),
+        .flatMap((row) => (busRecord(row) ? [row.name] : [])),
     );
   }
   private changesAt(value: number) {
@@ -147,12 +147,12 @@ class RemoteSelection {
       for (const row of this.database
         .query("SELECT local_id, state FROM remote_outbox WHERE local_id >= ?")
         .all(oldest))
-        if (object(row)) outbox.set(row.local_id, row.state);
+        if (busRecord(row)) outbox.set(row.local_id, row.state);
     if (this.present.has("remote_imports"))
       for (const row of this.database
         .query("SELECT local_id FROM remote_imports WHERE local_id >= ?")
         .all(oldest))
-        if (object(row)) imports.add(row.local_id);
+        if (busRecord(row)) imports.add(row.local_id);
     return { outbox, imports };
   }
   private messages() {
@@ -226,7 +226,7 @@ class RemoteSelection {
       .query("SELECT address, payload FROM remote_publications LIMIT " + String(MAX_PEERS))
       .all()) {
       const value = payload(raw);
-      if (!object(raw) || !value || !this.validPublication(raw, value)) continue;
+      if (!busRecord(raw) || !value || !this.validPublication(raw, value)) continue;
       const last = typeof value.last_seen === "string" ? Date.parse(value.last_seen) : NaN;
       if (Number.isFinite(last) && this.at - last < PEER_IDLE_MS) {
         this.changesAt(last + PEER_IDLE_MS);
@@ -251,7 +251,7 @@ class RemoteSelection {
   select() {
     if (!this.present.has("remote_binding")) return null;
     const row = this.database.query("SELECT connection FROM remote_binding WHERE id = 1").all()[0];
-    const binding = relayBinding(object(row) ? row.connection : null);
+    const binding = relayBinding(busRecord(row) ? row.connection : null);
     if (!binding) return null;
     this.messages();
     this.roster(binding.machine);

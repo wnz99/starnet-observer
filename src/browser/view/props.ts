@@ -1,5 +1,5 @@
 import { project as P } from "../scene/index.js";
-import type { Observatory, Point, PropExtent } from "../scene/types.js";
+import type { Observatory, PropExtent } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { GeometryPainter } from "./geometry-painter.js";
 import { CREW_HEIGHT } from "./primitives.js";
@@ -72,13 +72,6 @@ export class Props<R extends SpriteResource> {
   ) {
     this.geometry = new GeometryPainter(context);
   }
-  glow = (point: Point, radius: number, color: string, alpha: number) => {
-    this.geometry.glow(point, radius, {
-      color: color,
-      alpha: alpha,
-      transparent: this.look.colors["glow-transparent"],
-    });
-  };
   // Observatory props share the depth stream so passing crew occlude them correctly.
   paintObservatoryScreen = (screen: PropExtent, now: number, animate: boolean) => {
     const r = screen.rect,

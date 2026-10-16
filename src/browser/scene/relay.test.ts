@@ -1,7 +1,15 @@
 import { present } from "./values.fixture.js";
 import assert from "node:assert/strict";
 import type { LayoutRow } from "../model/types.js";
-import type { Point, Rect, RelayNetwork, RelayShadow, Host, Message, RelayBus } from "./types.js";
+import type {
+  Point,
+  Rect,
+  RelayNetwork,
+  RelayShadow,
+  Host,
+  SceneMessage,
+  RelayBus,
+} from "./types.js";
 import { createModel } from "../model.js";
 import { canonicalTheme } from "../theme.fixture.js";
 import { test } from "bun:test";
@@ -254,7 +262,7 @@ test("observer-relay-scene regression contracts", () => {
       colorFor: () => ({ accent: "#fff" }),
     };
     const target = present(crew[0]).id,
-      sent = (state: NonNullable<Message["relay"]>["state"]): Message => ({
+      sent = (state: NonNullable<SceneMessage["relay"]>["state"]): SceneMessage => ({
         from: "obs_a",
         to: "external",
         acknowledgedAt: null,
@@ -338,7 +346,7 @@ test("observer-relay-scene regression contracts", () => {
     );
 
     // Pending: where llm-bus last proved it is.
-    const at = (state: NonNullable<Message["relay"]>["state"]) =>
+    const at = (state: NonNullable<SceneMessage["relay"]>["state"]) =>
       Scene.pending(scene, fake, [sent(state)]);
     assert.ok(
       inside(present(at("queued_local")[0]).point, scene.mail.rect),
@@ -369,7 +377,7 @@ test("observer-relay-scene regression contracts", () => {
   {
     const layout = Model.createLayout(),
       empty = Scene.build([], 0);
-    const message: Message = {
+    const message: SceneMessage = {
       from: "external",
       to: "external",
       acknowledgedAt: null,

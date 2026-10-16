@@ -1,7 +1,7 @@
 const EXPECTED_FALSE = false;
 import vm from "node:vm";
 
-import { port, required, value, field } from "./http.fixture.js";
+import { port, requiredHttpValue, value, field } from "./http.fixture.js";
 import { resolveRuntimePaths } from "./runtime-paths.js";
 const { installRoot } = resolveRuntimePaths();
 import { test } from "bun:test";
@@ -55,7 +55,7 @@ test("server regression contracts", async () => {
           res.on("data", (chunk: Buffer) => chunks.push(chunk));
           res.on("end", () => {
             resolve({
-              status: required(res.statusCode),
+              status: requiredHttpValue(res.statusCode),
               headers: res.headers,
               body: Buffer.concat(chunks),
             });
@@ -77,25 +77,25 @@ test("server regression contracts", async () => {
       const first = await request(fixtureUrl + "/mutable.json");
       assert.equal(first.status, 200);
       assert.equal(first.headers["cache-control"], "private, no-cache");
-      assert.match(required(first.headers.etag), /^"[a-f0-9]+"$/);
+      assert.match(requiredHttpValue(first.headers.etag), /^"[a-f0-9]+"$/);
       assert.equal(first.body.toString(), '{"revision":1}');
       assert.ok(!first.body.includes("fixture-token"));
-      const conditional = { "If-None-Match": required(first.headers.etag) };
+      const conditional = { "If-None-Match": requiredHttpValue(first.headers.etag) };
       const cached = await request(fixtureUrl + "/mutable.json", conditional);
       assert.equal(cached.status, 304);
-      assert.equal(cached.headers.etag, required(first.headers.etag));
+      assert.equal(cached.headers.etag, requiredHttpValue(first.headers.etag));
       assert.equal(cached.headers["cache-control"], "private, no-cache");
       assert.equal(cached.body.length, 0);
       // Equal-length replacements must invalidate even when the filename stays stable.
       await fs.writeFile(asset, '{"revision":2}');
       const replaced = await request(fixtureUrl + "/mutable.json", conditional);
       assert.equal(replaced.status, 200);
-      assert.notEqual(replaced.headers.etag, required(first.headers.etag));
+      assert.notEqual(replaced.headers.etag, requiredHttpValue(first.headers.etag));
       assert.equal(replaced.body.toString(), '{"revision":2}');
       assert.equal(
         (
           await request(fixtureUrl + "/mutable.json", {
-            "If-None-Match": '"unrelated", W/' + required(replaced.headers.etag),
+            "If-None-Match": '"unrelated", W/' + requiredHttpValue(replaced.headers.etag),
           })
         ).status,
         304,
@@ -110,17 +110,17 @@ test("server regression contracts", async () => {
       assert.equal(firstFont.status, 200);
       assert.equal(firstFont.headers["content-type"], "font/woff2");
       assert.equal(firstFont.headers["cache-control"], "private, no-cache");
-      assert.match(required(firstFont.headers.etag), /^"[a-f0-9]+"$/);
-      const fontConditional = { "If-None-Match": required(firstFont.headers.etag) };
+      assert.match(requiredHttpValue(firstFont.headers.etag), /^"[a-f0-9]+"$/);
+      const fontConditional = { "If-None-Match": requiredHttpValue(firstFont.headers.etag) };
       const cachedFont = await request(fixtureUrl + "/mutable.woff2", fontConditional);
       assert.equal(cachedFont.status, 304);
       assert.equal(cachedFont.body.length, 0);
-      assert.equal(cachedFont.headers.etag, required(firstFont.headers.etag));
+      assert.equal(cachedFont.headers.etag, requiredHttpValue(firstFont.headers.etag));
       assert.equal(cachedFont.headers["cache-control"], "private, no-cache");
       await fs.writeFile(fontAsset, Buffer.from("wOF2-other"));
       const replacedFont = await request(fixtureUrl + "/mutable.woff2", fontConditional);
       assert.equal(replacedFont.status, 200);
-      assert.notEqual(replacedFont.headers.etag, required(firstFont.headers.etag));
+      assert.notEqual(replacedFont.headers.etag, requiredHttpValue(firstFont.headers.etag));
       assert.equal(replacedFont.body.toString(), "wOF2-other");
       assert.equal(replacedFont.headers["content-type"], "font/woff2");
       await fs.writeFile(
@@ -146,8 +146,8 @@ test("server regression contracts", async () => {
           noStore(response);
           if (route === "/" || route === "/observer.html" || route.endsWith("/observer-alias.js")) {
             assert.match(response.body.toString(), /window\.__OBSERVER_TOKEN__="fixture-token"/);
-            const nonce = required(
-              String(required(response.headers["content-security-policy"])).match(
+            const nonce = requiredHttpValue(
+              String(requiredHttpValue(response.headers["content-security-policy"])).match(
                 /'nonce-([^']+)'/,
               )?.[1],
             );
@@ -185,7 +185,7 @@ test("server regression contracts", async () => {
       const html = await page.text();
       assert.match(html, /window\.__OBSERVER_TOKEN__="fixture-token"/);
       assert.match(html, /window\.__OBSERVER_THEME__=/);
-      const boot = required(html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1]);
+      const boot = requiredHttpValue(html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1]);
       const sandbox = { window: {} };
       vm.runInNewContext(boot, sandbox);
       const window = sandbox.window;
@@ -207,7 +207,7 @@ test("server regression contracts", async () => {
         "/assets/sprites/approved_android/rot_south.png",
       );
       assert.ok(
-        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/legacy-bridge.js"),
+        html.indexOf("window.__OBSERVER_THEME_PACK__=") < html.indexOf("app/main.js"),
         "startup snapshot precedes consumers",
       );
       assert.ok(
@@ -220,20 +220,23 @@ test("server regression contracts", async () => {
         () => createServer({ observer, theme: { pack: "uninstalled-test-pack" } }),
         /Unknown or uninstalled/,
       );
-      assert.match(required(page.headers.get("content-security-policy")), /frame-ancestors 'none'/);
+      assert.match(
+        requiredHttpValue(page.headers.get("content-security-policy")),
+        /frame-ancestors 'none'/,
+      );
       // Every script referenced by the shipped page must exist and be executable JavaScript.
       await checkPageScripts();
       async function checkPageScripts() {
         for (const match of html.matchAll(/src="([^"]+\.js)"/g)) {
-          const response = await get("/" + required(match[1]));
+          const response = await get("/" + requiredHttpValue(match[1]));
           assert.equal(response.status, 200, match[1]);
-          assert.match(required(response.headers.get("content-type")), /javascript/);
+          assert.match(requiredHttpValue(response.headers.get("content-type")), /javascript/);
           new vm.Script(await response.text());
         }
         for (const match of html.matchAll(/href="([^"]+\.css)"/g)) {
-          const response = await get("/" + required(match[1]));
+          const response = await get("/" + requiredHttpValue(match[1]));
           assert.equal(response.status, 200, match[1]);
-          assert.match(required(response.headers.get("content-type")), /text\/css/);
+          assert.match(requiredHttpValue(response.headers.get("content-type")), /text\/css/);
           assert((await response.text()).length > 0);
         }
       }
@@ -246,7 +249,7 @@ test("server regression contracts", async () => {
       await new Promise((resolve, reject) => {
         http
           .get(base, { headers: { Host: "attacker.invalid" } }, (res) => {
-            assert.equal(required(res.statusCode), 403);
+            assert.equal(requiredHttpValue(res.statusCode), 403);
             res.resume();
             res.on("end", resolve);
           })

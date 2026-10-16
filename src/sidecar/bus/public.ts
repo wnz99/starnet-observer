@@ -1,7 +1,7 @@
 import { ADDRESS, WINDOW } from "./types.js";
-import type { BusState, Pane } from "./types.js";
+import type { BusState, BusPane } from "./types.js";
 // Exact identity join: one pane with this provider:session gets its observer id; two or more stay ambiguous.
-export function publicBus(state: BusState, sessions: Pane[]) {
+export function publicBus(state: BusState, sessions: BusPane[]) {
   const panes = new Map<string, string>();
   for (const row of sessions) {
     if (!row.sessionId) continue;

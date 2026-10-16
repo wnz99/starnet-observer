@@ -1,9 +1,9 @@
 import { busFixture } from "../observer/testing.fixture.js";
 const EXPECTED_FALSE = false;
 import { emptyState as makeEmptyState } from "./control.fixture.js";
-import type { Execute, ControlOptions } from "./types.js";
+import type { ControlExecute, ControlOptions } from "./types.js";
 import type { HttpControl } from "../../server/contracts.js";
-import { port, required, gate, status, field } from "../../server/http.fixture.js";
+import { port, requiredHttpValue, gate, status, field } from "../../server/http.fixture.js";
 import { test, afterEach } from "bun:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -48,7 +48,7 @@ test("control regression contracts", async () => {
       "agent list": { result: { agents: [native] } },
       "pane close w1:p2": { result: { type: "ok" } },
     };
-    const execute: Execute = (command, args, settings) => {
+    const execute: ControlExecute = (command, args, settings) => {
       assert.equal(typeof settings.env?.HERDR_SOCKET_PATH, "string");
       assert.equal(settings.env?.STARNET_TEST_TOKEN, undefined);
       calls.push([command, ...args]);
@@ -81,10 +81,10 @@ test("control regression contracts", async () => {
       paneId: "w1:p2",
       name: "alpha",
     });
-    assert.deepEqual(required(calls[0]), ["herdr", "agent", "list"]);
-    assert.equal(required(calls.at(-1))[0], "osascript");
+    assert.deepEqual(requiredHttpValue(calls[0]), ["herdr", "agent", "list"]);
+    assert.equal(requiredHttpValue(calls.at(-1))[0], "osascript");
     assert.match(
-      required(required(calls.at(-1))[2]),
+      requiredHttpValue(requiredHttpValue(calls.at(-1))[2]),
       /HERDR_SOCKET_PATH=.*herdr agent attach w1:p2 --takeover/,
     );
     await assert.rejects(control.close("w1:p9"), /target-unavailable/);
@@ -115,7 +115,9 @@ test("control regression contracts", async () => {
       !calls.some((call) => call[0] === "osascript"),
       "spawn never opens a Terminal; only attach does",
     );
-    const start = required(calls.find((call) => call[1] === "agent" && call[2] === "start"));
+    const start = requiredHttpValue(
+      calls.find((call) => call[1] === "agent" && call[2] === "start"),
+    );
     assert.deepEqual(start.slice(3), [
       "proj-120000",
       "--kind",
@@ -127,7 +129,7 @@ test("control regression contracts", async () => {
       "--",
       "--dangerously-skip-permissions",
     ]);
-    assert.deepEqual(required(calls[3]).slice(3), [
+    assert.deepEqual(requiredHttpValue(calls[3]).slice(3), [
       "--workspace",
       "w1",
       "--cwd",
@@ -162,7 +164,8 @@ test("control regression contracts", async () => {
     const mutations = () =>
       calls.filter(
         (call) =>
-          call[0] === "osascript" || ["close", "create", "start"].includes(required(call[2])),
+          call[0] === "osascript" ||
+          ["close", "create", "start"].includes(requiredHttpValue(call[2])),
       );
     await rejectReusedTargets();
     async function rejectReusedTargets() {
@@ -636,7 +639,7 @@ test("control regression contracts", async () => {
     let clock = 1000,
       live = native,
       fail = false;
-    const execute: Execute = (command, args, settings) => {
+    const execute: ControlExecute = (command, args, settings) => {
       assert.equal(settings.env?.HERDR_SOCKET_PATH, endpoint);
       calls.push([command, ...args]);
       if (command === "osascript") return Promise.resolve({ stdout: "" });
@@ -682,7 +685,8 @@ test("control regression contracts", async () => {
     const mutations = () =>
       calls.filter(
         (call) =>
-          call[0] === "osascript" || ["close", "create", "start"].includes(required(call[2])),
+          call[0] === "osascript" ||
+          ["close", "create", "start"].includes(requiredHttpValue(call[2])),
       ).length;
     try {
       assert.equal(observer.controlTarget("pane"), null, "unobserved pane has no action proof");
@@ -693,14 +697,14 @@ test("control regression contracts", async () => {
         EXPECTED_FALSE,
         "private proof is absent from public rows",
       );
-      const proof = required(observer.controlTarget("pane"));
+      const proof = requiredHttpValue(observer.controlTarget("pane"));
       proof.terminal_id = "tampered";
       assert.equal(
-        required(observer.controlTarget("pane")).terminal_id,
+        requiredHttpValue(observer.controlTarget("pane")).terminal_id,
         "terminal",
         "callers cannot change retained native proof",
       );
-      await control.attach(required(inventory.sessions[0]).paneId);
+      await control.attach(requiredHttpValue(inventory.sessions[0]).paneId);
       assert.equal(mutations(), 1);
       live = {
         ...native,

@@ -5,12 +5,12 @@ import nativeChildProcess from "node:child_process";
 import { guardChildProcess, stationChildEnv } from "../child-env.js";
 import { object } from "../overseer-state/identity.js";
 import { TARGET, SSH_OPTIONS, REMOTE_PATH, quote, badRequest } from "./constants.js";
-import type { ControlOptions, Execute, Settings, Host } from "./types.js";
+import type { ControlOptions, ControlExecute, Settings, Host } from "./types.js";
 const childProcess = guardChildProcess(nativeChildProcess);
 const DEFAULT_TIMEOUT = WAIT_TIMEOUT;
 const MAX_BUFFER = 2 * 1024 * 1024;
 const HOME_TIMEOUT = 15000;
-const executeDefault: Execute = (command, args, settings) =>
+const executeDefault: ControlExecute = (command, args, settings) =>
   new Promise((resolve, reject) => {
     childProcess.execFile(
       command,
@@ -44,7 +44,7 @@ function parseReply(stdout: string, args: string[]) {
   }
   return object(parsed) && object(parsed.result) ? parsed.result : {};
 }
-function makeRegistry(options: ControlOptions, execute: Execute) {
+function makeRegistry(options: ControlOptions, execute: ControlExecute) {
   const remotes = new Map(
     (Array.isArray(options.remotes) ? options.remotes : []).map((remote) => [remote.id, remote]),
   );

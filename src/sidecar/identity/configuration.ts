@@ -7,7 +7,7 @@ import os from "node:os";
 import { note as failNote } from "../failopen.js";
 import { executeFile } from "./execute.js";
 import { TIMEOUT, code } from "./types.js";
-import type { Execute, FooterMode } from "./types.js";
+import type { IdentityExecute, FooterMode } from "./types.js";
 function isMode(value: string): value is FooterMode {
   return ["configured", "unconfigured", "unavailable"].includes(value);
 }
@@ -17,7 +17,7 @@ function missingConfiguration(error: unknown, cached: unknown, key: string | nul
 // Parse actual TOML meaning with an optional stdlib reader, never a regexp over host settings.
 // A changed file invalidates the cache; unsupported Python/tomllib fails closed.
 export function makeFooterConfigurationReader(
-  options: { file?: string; execute?: Execute | undefined } = {},
+  options: { file?: string; execute?: IdentityExecute | undefined } = {},
 ) {
   const file =
     options.file ||

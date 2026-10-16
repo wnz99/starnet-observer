@@ -13,5 +13,5 @@ export {
   fromScreen,
   hitTest,
 } from "./camera.js";
-export { mailOf, endpoint, route, pending } from "./mail.js";
+export { endpoint, route, pending } from "./mail.js";
 export { createMovement } from "./movement.js";

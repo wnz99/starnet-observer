@@ -1,8 +1,8 @@
-import type { Row } from "./contracts.js";
+import type { ObserverInputRow } from "./contracts.js";
 import { settled } from "./testing.fixture.js";
 import { spawn } from "node:child_process";
 import { makeIdentityResolver } from "../identity/index.js";
-import type { Execute, IdentityRpc } from "../identity/types.js";
+import type { IdentityExecute, IdentityRpc } from "../identity/types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makeObserver } from "./index.js";
@@ -62,7 +62,7 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         };
       });
     };
-    const createResolver = (execute?: Execute) =>
+    const createResolver = (execute?: IdentityExecute) =>
       makeIdentityResolver({
         now: () => 1000,
         endpoint: "/isolated/native.sock",
@@ -85,7 +85,7 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         children: () =>
           settled(() => ({
             rows: [],
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
           })),
       },

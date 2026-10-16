@@ -66,7 +66,7 @@ export const helperStations = HELPER_ROWS.flatMap((y) =>
 );
 export const isHelper = (row: DisplayRow) =>
   row.source === "helper" || Object.hasOwn(row, "parentId");
-export const hash = (key: string) => {
+export const identityHash = (key: string) => {
   let value = 0;
   for (const character of key) value = (value * 31 + character.charCodeAt(0)) >>> 0;
   return value;

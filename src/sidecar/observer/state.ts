@@ -10,7 +10,7 @@ import type { FooterProof } from "../identity/types.js";
 import type { BusState } from "../bus/types.js";
 import type { makeSqliteClient } from "../sqlite/client.js";
 import type {
-  Row,
+  ObserverInputRow,
   Tool,
   Owners,
   Sweep,
@@ -18,12 +18,12 @@ import type {
   WarmTarget,
   Inventory,
   ObserverOptions,
-  Execute,
+  ObserverExecute,
   Projects,
   Transcripts,
   Helpers,
   Desktop,
-  Bus,
+  ObserverBus,
   Identities,
   OverseerState,
   ControlProof,
@@ -39,8 +39,8 @@ export class State {
 
   identityProofs = new Map<string, FooterProof>();
   controlTargets = new Map<string, ControlProof>();
-  lastGood: Row[] = [];
-  coreRows: Row[] = [];
+  lastGood: ObserverInputRow[] = [];
+  coreRows: ObserverInputRow[] = [];
   refreshStartedAt: number | null = null;
   pending: Promise<Inventory> | null = null;
   mail: BusState | null = null;
@@ -58,7 +58,7 @@ export class State {
     herdr: { health: "unavailable", observedAt: null, reason: "not-observed" },
     desktop: { health: "unavailable", observedAt: null, reason: "not-observed" },
   };
-  rowsBySource: Record<"herdr" | "desktop" | "helper", Row[]> = {
+  rowsBySource: Record<"herdr" | "desktop" | "helper", ObserverInputRow[]> = {
     herdr: [],
     desktop: [],
     helper: [],
@@ -68,12 +68,12 @@ export class State {
     readonly dependencies: {
       options: ObserverOptions;
       now: () => number;
-      execute: Execute;
+      execute: ObserverExecute;
       projects: Projects;
       transcripts: Transcripts;
       sqlite: ReturnType<typeof makeSqliteClient> | null;
       helpers: Helpers;
-      bus: Bus;
+      bus: ObserverBus;
       desktop: Desktop;
       endpoint: string;
       overseerState: OverseerState;

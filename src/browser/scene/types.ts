@@ -232,7 +232,7 @@ export type MessageRelay = Omit<
   Partial<NonNullable<PublicBus["messages"][number]["relay"]>>,
   "state" | "direction"
 > & { machine: string; state: string; direction: string };
-export type Message = Partial<
+export type SceneMessage = Partial<
   Pick<PublicBus["messages"][number], "from" | "to" | "acknowledgedAt" | "wake">
 > & { relay?: MessageRelay };
 export interface PendingSpot {

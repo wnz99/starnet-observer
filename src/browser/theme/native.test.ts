@@ -7,23 +7,7 @@ import { canonicalTheme } from "../theme.fixture.js";
 import { ThemeFixtureDocument } from "./dom.fixture.js";
 import type { ThemeDocument } from "./dom.js";
 import { record } from "./validation.js";
-class FontFaceFixture {
-  readonly weight: string;
-  constructor(
-    readonly family: string,
-    readonly source: string,
-    readonly descriptors: {
-      display: "swap";
-      weight: string;
-      style: "normal";
-    },
-  ) {
-    this.weight = descriptors.weight;
-  }
-  load() {
-    return Promise.resolve(this);
-  }
-}
+import { FontFaceFixture } from "./native.fixture.js";
 
 test("head and main adapters share exact native font resources without an application global", async () => {
   const fonts = new Set<FontFaceFixture>();

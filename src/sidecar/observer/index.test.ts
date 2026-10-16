@@ -31,7 +31,7 @@ import { makeDesktopObserver } from "../desktop/index.js";
 import { makeTranscriptObserver } from "../transcripts/index.js";
 import { makeIdentityResolver } from "../identity/index.js";
 import { makeOverseerState } from "../overseer-state/index.js";
-import type { ObserverOptions, Inventory, Row } from "./contracts.js";
+import type { ObserverOptions, Inventory, ObserverInputRow } from "./contracts.js";
 
 test("observer regression contracts", async () => {
   // Inventory fixtures never consult a developer's real private overseer record.
@@ -165,7 +165,7 @@ test("observer regression contracts", async () => {
       ],
       fail = false;
     let release: (() => void) | true | null | undefined;
-    const reads: [string, Row["provider"], string | null | undefined][] = [];
+    const reads: [string, ObserverInputRow["provider"], string | null | undefined][] = [];
     let inspectRelease: (() => void) | true | null | undefined = null;
     // A fixture bus reader: the real user bus is never opened by this test.
     let busReads = 0,
@@ -410,7 +410,7 @@ test("observer regression contracts", async () => {
           children: () =>
             settled(() => ({
               rows: [],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             })),
         },
@@ -486,7 +486,7 @@ test("observer regression contracts", async () => {
       claudeCandidates: () => settled(() => []),
       read: async (
         _id: string,
-        _provider: Row["provider"],
+        _provider: ObserverInputRow["provider"],
         sessionId: string | null | undefined,
       ) => {
         if (cleaning) return { available: false };
@@ -606,7 +606,7 @@ test("observer regression contracts", async () => {
     let clock = 1000,
       fail = false,
       desktopFail = false,
-      rows: Row[] = [
+      rows: ObserverInputRow[] = [
         {
           provider: "claude",
           id: "obs_" + "a".repeat(24),
@@ -833,7 +833,11 @@ test("observer regression contracts", async () => {
       read: () => settled(() => ({ available: true })),
       retain() {},
       claudeCandidates: () => settled(() => []),
-      bindChild: (provider: Row["provider"], sessionId: string, parentSessionId: string) =>
+      bindChild: (
+        provider: ObserverInputRow["provider"],
+        sessionId: string,
+        parentSessionId: string,
+      ) =>
         settled(() => ({
           provider,
           sessionId,
@@ -1168,7 +1172,7 @@ test("observer regression contracts", async () => {
                 inventoryHealth: "available",
               },
             ],
-            annotations: new Map<string, Partial<Row>>([
+            annotations: new Map<string, Partial<ObserverInputRow>>([
               [must(parents[2]).id, { parentId: must(parents[parentIndex]).id }],
             ]),
             overflow: new Map<string, number>(),
@@ -1385,7 +1389,7 @@ test("observer regression contracts", async () => {
                 inspectionIdentity: helperIdentity,
               },
             ],
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
           })),
         inspect: async () => {
@@ -1621,7 +1625,7 @@ test("observer regression contracts", async () => {
                   inspectionIdentity: "helper:" + helperId,
                 },
               ],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             })),
           inspect: inspectBody,
@@ -2024,7 +2028,7 @@ test("observer regression contracts", async () => {
       helpers: {
         children: (parents) =>
           settled(() => ({
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
             rows: [
               {
@@ -2141,7 +2145,7 @@ test("observer regression contracts", async () => {
         children: () =>
           settled(() => ({
             rows: [],
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
           })),
       },
@@ -2221,7 +2225,7 @@ test("observer regression contracts", async () => {
         helpers: {
           prepareChildren: (parents) =>
             settled(() => ({
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
               rows: [
                 {
@@ -2455,7 +2459,7 @@ test("observer regression contracts", async () => {
             events.push(`helpers:${String(parents.length)}`);
             return {
               rows: [],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             };
           });
@@ -2548,7 +2552,7 @@ test("observer regression contracts", async () => {
             return settled(() => {
               return {
                 rows: [],
-                annotations: new Map<string, Partial<Row>>(),
+                annotations: new Map<string, Partial<ObserverInputRow>>(),
                 overflow: new Map<string, number>(),
               };
             });
@@ -2624,7 +2628,7 @@ test("observer regression contracts", async () => {
           await helperGate.promise;
           return {
             rows: [],
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
             commitBindings() {},
           };
@@ -2726,7 +2730,7 @@ test("observer regression contracts", async () => {
         prepareChildren: () =>
           settled(() => ({
             rows: [],
-            annotations: new Map<string, Partial<Row>>(),
+            annotations: new Map<string, Partial<ObserverInputRow>>(),
             overflow: new Map<string, number>(),
             commitBindings() {},
           })),
@@ -2814,7 +2818,7 @@ test("observer regression contracts", async () => {
         return inspection({ available: true });
       }
       bindChild(
-        provider: Row["provider"],
+        provider: ObserverInputRow["provider"],
         sessionId: string,
         parentSessionId: string,
       ): ChildBinding {
@@ -2943,7 +2947,7 @@ test("observer regression contracts", async () => {
                   tool: { available: true },
                 },
               ],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             })),
         },
@@ -2997,7 +3001,7 @@ test("observer regression contracts", async () => {
               await helper.promise;
               return {
                 rows: [],
-                annotations: new Map<string, Partial<Row>>(),
+                annotations: new Map<string, Partial<ObserverInputRow>>(),
                 overflow: new Map<string, number>(),
                 commitBindings() {},
               };
@@ -3172,7 +3176,7 @@ test("observer regression contracts", async () => {
             const sweep = ++sweeps;
             await helper.promise;
             // Later changed-owner sweeps supply their own empty result; old work must not leak through.
-            const rows: Row[] =
+            const rows: ObserverInputRow[] =
               sweep === 1 || change === "unchanged"
                 ? [
                     {
@@ -3201,7 +3205,7 @@ test("observer regression contracts", async () => {
                 : [];
             return {
               rows,
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
               commitBindings(ids) {
                 bindings.clear();
@@ -3473,7 +3477,7 @@ test("observer regression contracts", async () => {
                   observedAt: 900,
                 },
               ],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
               commitBindings() {},
             })),
@@ -3559,7 +3563,7 @@ test("observer regression contracts", async () => {
             await helpers.promise;
             return {
               rows: [],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
               commitBindings() {
                 assert.fail("closed observer committed helper bindings");
@@ -3758,7 +3762,7 @@ test("observer regression contracts", async () => {
                         observedAt: 777,
                       },
                     ],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
               commitBindings(ids) {
                 bindings.clear();
@@ -3864,7 +3868,7 @@ test("observer regression contracts", async () => {
                   ...oldGrouping,
                 },
               ],
-              annotations: new Map<string, Partial<Row>>([
+              annotations: new Map<string, Partial<ObserverInputRow>>([
                 [must(parents[1]).id, { parentId: must(parents[0]).id, ...oldGrouping }],
                 [must(parents[2]).id, oldGrouping],
               ]),
@@ -3922,7 +3926,7 @@ test("observer regression contracts", async () => {
             await helper.promise;
             return {
               rows: [],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             };
           },
@@ -3997,7 +4001,7 @@ test("observer regression contracts", async () => {
           children: () =>
             settled(() => ({
               rows: [],
-              annotations: new Map<string, Partial<Row>>(),
+              annotations: new Map<string, Partial<ObserverInputRow>>(),
               overflow: new Map<string, number>(),
             })),
         },
@@ -4058,7 +4062,7 @@ test("observer regression contracts", async () => {
         cacheWriteTokens: { value: 0, state: "available" },
         observedAt: 1000,
       });
-    const local: Row = {
+    const local: ObserverInputRow = {
       id: "local-pane",
       provider: "codex",
       source: "herdr",
@@ -4069,7 +4073,7 @@ test("observer regression contracts", async () => {
       status: "working",
       usage: usage(10),
     };
-    const remote: Row = {
+    const remote: ObserverInputRow = {
       ...local,
       id: "remote-pane",
       host: "vm",

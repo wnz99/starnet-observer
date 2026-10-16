@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fixtureFile } from "./start.fixture.js";
-import { required } from "../src/server/http.fixture.js";
+import { requiredHttpValue } from "../src/server/http.fixture.js";
 async function waitFile(file: string) {
   const deadline = Date.now() + 3000;
   for (;;) {
@@ -92,7 +92,7 @@ test("parent and terminal-group signals reach child once and await asynchronous 
       const run = await fixture({ STARNET_FIXTURE_WAIT: "1" });
       try {
         await waitFile(path.join(run.root, "started"));
-        process.kill((group ? -1 : 1) * required(run.child.pid), signal);
+        process.kill((group ? -1 : 1) * requiredHttpValue(run.child.pid), signal);
         assert.equal(
           await run.exited,
           0,
