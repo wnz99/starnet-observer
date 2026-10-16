@@ -1,15 +1,17 @@
-"use strict";
-const { test } = require("bun:test");
+import { present } from "./values.fixture.js";
+import assert from "node:assert/strict";
+import type { LayoutRow } from "../model/types.js";
+import type { Point, Rect, RelayNetwork, RelayShadow, Host, Message, RelayBus } from "./types.js";
+import { createModel } from "../model.js";
+import { canonicalTheme } from "../theme.fixture.js";
+import { test } from "bun:test";
+import * as Scene from "./index.js";
 
-test("observer-relay-scene regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const Model = require("../../src/browser/model.ts").createModel(
-    require("../assets/themes/starnet/theme.json"),
-  );
-  const Scene = require("./observer-scene.js");
+test("observer-relay-scene regression contracts", () => {
+  const Model = createModel(canonicalTheme());
 
   const NOW = 10 * 3600000;
-  const row = (id, extra = {}) => ({
+  const row = (id: string, extra: Partial<LayoutRow> = {}): LayoutRow => ({
     id,
     project: "P",
     projectId: "p" + (extra.host || ""),
@@ -20,20 +22,27 @@ test("observer-relay-scene regression contracts", async () => {
     status: "idle",
     ...extra,
   });
-  const agent = (c, repo = "llm-bus", provider = "codex") => ({
+  const agent = (c: string, repo = "llm-bus", provider: "codex" | "claude" = "codex") => ({
     id: "peer_" + c.repeat(24),
     provider,
     repo,
     lastSeen: NOW - 120000,
   });
-  const remote = (machine, extra = {}) => ({
+  const remote = (
+    machine: string,
+    extra: Partial<NonNullable<RelayBus["remote"]>> = {},
+  ): NonNullable<RelayBus["remote"]> => ({
     relay: "relay.example.dev",
     machine,
     lastActivityAt: NOW - 60000,
     peers: [],
     ...extra,
   });
-  const peer = (machine, list, extra = {}) => ({
+  const peer = (
+    machine: string,
+    list: NonNullable<RelayBus["remote"]>["peers"][number]["list"],
+    extra: Partial<Omit<RelayShadow, "host">> = {},
+  ) => ({
     machine,
     repos: [...new Set(list.map((value) => value.repo))],
     agents: list.length,
@@ -41,12 +50,12 @@ test("observer-relay-scene regression contracts", async () => {
     list,
     ...extra,
   });
-  const inside = (point, rect) =>
+  const inside = (point: Point, rect: Rect) =>
     point.x >= rect.x &&
     point.x <= rect.x + rect.w &&
     point.y >= rect.y &&
     point.y <= rect.y + rect.h;
-  const shadowHost = (net, shadow, member) => ({
+  const shadowHost = (net: RelayNetwork, shadow: RelayShadow, member: Host) => ({
     id: shadow.host,
     shadow: true,
     health: "shadow",
@@ -98,7 +107,7 @@ test("observer-relay-scene regression contracts", async () => {
     );
     const main = nets[1];
     assert.deepEqual(
-      main.members.map((member) => [member.host, member.machine, member.state]),
+      present(main).members.map((member) => [member.host, member.machine, member.state]),
       [
         [null, "mac", "quiet"],
         ["vm", "vm-1", "active"],
@@ -106,7 +115,7 @@ test("observer-relay-scene regression contracts", async () => {
       "this machine first; active only with relay activity in the last 15 minutes",
     );
     assert.deepEqual(
-      main.shadows.map((shadow) => [
+      present(main).shadows.map((shadow) => [
         shadow.host,
         shadow.machine,
         shadow.agents,
@@ -116,15 +125,19 @@ test("observer-relay-scene regression contracts", async () => {
       "rosters merged across members, sorted by repo; observed machines are never shadows",
     );
     assert.deepEqual(
-      nets[0].members.map((member) => member.state),
+      present(nets[0]).members.map((member) => member.state),
       ["unknown"],
       "an unreadable bus never claims a live relay",
     );
     assert.equal(
-      Scene.relayNetworks(
-        [[null, { health: "available", remote: remote("mac", { lastActivityAt: null }) }]],
-        NOW,
-      )[0].members[0].state,
+      present(
+        present(
+          Scene.relayNetworks(
+            [[null, { health: "available", remote: remote("mac", { lastActivityAt: null }) }]],
+            NOW,
+          )[0],
+        ).members[0],
+      ).state,
       "quiet",
       "no activity seen is quiet, not live",
     );
@@ -174,16 +187,16 @@ test("observer-relay-scene regression contracts", async () => {
     const plain = Scene.build(plainLayout.onPage(0), 0);
     const scene = Scene.build(layout.onPage(0), 0, {
       relays: nets,
-      hosts: [shadowHost(nets[0], nets[0].shadows[0], null)],
+      hosts: [shadowHost(present(nets[0]), present(present(nets[0]).shadows[0]), null)],
     });
-    const flagship = scene.ships.find((ship) => ship.local),
-      shadow = scene.ships.find((ship) => ship.shadow);
+    const flagship = present(scene.ships).find((ship) => ship.local),
+      shadow = present(scene.ships).find((ship) => ship.shadow);
     assert.equal(plain.relays, undefined, "no relay without a bus that reports one");
     assert.ok(
-      shadow.rect.x > flagship.rect.x + flagship.rect.w,
+      present(shadow).rect.x > present(flagship).rect.x + present(flagship).rect.w,
       "the shadow ship docks east of the flagship",
     );
-    assert.equal(scene.links.length, 0, "a shadow ship has no ssh observation link");
+    assert.equal(present(scene.links).length, 0, "a shadow ship has no ssh observation link");
     const crew = scene.workers.filter((worker) => worker.row.shadow);
     assert.deepEqual(
       crew.map((worker) => worker.id).sort(),
@@ -191,48 +204,57 @@ test("observer-relay-scene regression contracts", async () => {
       "every listed agent has a desk",
     );
     for (const worker of crew)
-      assert.ok(inside(worker.chair, shadow.rect), "ghost crew sit on their own ship");
+      assert.ok(inside(worker.chair, present(shadow).rect), "ghost crew sit on their own ship");
     for (const worker of crew)
       assert.deepEqual(
-        worker.route.at(-1),
-        shadow.mail.hub,
+        present(worker.route).at(-1),
+        present(present(shadow).mail).hub,
         "ghost crew walk to their own mailroom",
       );
     const local = scene.workers.find((worker) => worker.id === "obs_a"),
       alone = plain.workers.find((worker) => worker.id === "obs_a");
-    assert.deepEqual(local.route, alone.route, "observed crew routes are unchanged");
     assert.deepEqual(
-      scene.relays[0].links.map((link) => [link.from, link.to, link.shadow, link.verified]),
+      present(local).route,
+      present(alone).route,
+      "observed crew routes are unchanged",
+    );
+    assert.deepEqual(
+      present(present(scene.relays)[0]).links.map((link) => [
+        link.from,
+        link.to,
+        link.shadow,
+        link.verified,
+      ]),
       [[null, "relay:whitenoise", true, false]],
       "one highway, mailroom to mailroom, unverified until mail crosses",
     );
-    const link = scene.relays[0].links[0];
+    const link = present(present(scene.relays)[0]).links[0];
     assert.deepEqual(
-      [link.path[0], link.path.at(-1)],
-      [scene.mail.hub, shadow.mail.hub],
+      [present(link).path[0], present(link).path.at(-1)],
+      [scene.mail.hub, present(present(shadow).mail).hub],
       "it runs from this mailroom to the shadow mailroom",
     );
-    const overlap = (a, b) =>
+    const overlap = (a: Rect, b: Rect) =>
       a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
     const highway = scene.walkways.filter((walkway) => walkway.kind === "relay-highway");
     for (const segment of highway)
       for (const solid of [...scene.platforms.map((p) => p.rect), scene.observatory.rect])
         assert.ok(!overlap(segment.rect, solid), "around every floor and the observatory");
-    for (let index = 1; index < link.path.length; index++)
+    for (let index = 1; index < present(link).path.length; index++)
       assert.ok(
-        link.path[index].x === link.path[index - 1].x ||
-          link.path[index].y === link.path[index - 1].y,
+        present(present(link).path[index]).x === present(present(link).path[index - 1]).x ||
+          present(present(link).path[index]).y === present(present(link).path[index - 1]).y,
         "axis-aligned like every walkway",
       );
 
     // Couriers: desk → this mailroom → across the relay link → the far mailroom → the far agent's desk, and back.
     const fake = {
-      seatFor: (id) => (scene.workers.some((w) => w.id === id) ? 0 : undefined),
+      seatFor: (id: string) => (scene.workers.some((w) => w.id === id) ? 0 : undefined),
       pageFor: () => 0,
       colorFor: () => ({ accent: "#fff" }),
     };
-    const target = crew[0].id,
-      sent = (state) => ({
+    const target = present(crew[0]).id,
+      sent = (state: NonNullable<Message["relay"]>["state"]): Message => ({
         from: "obs_a",
         to: "external",
         acknowledgedAt: null,
@@ -243,15 +265,23 @@ test("observer-relay-scene regression contracts", async () => {
     assert.equal(out.key, "obs_a>" + target);
     assert.deepEqual(out.to.at(-1), scene.mail.hub, "the outbound leg starts at this hub");
     assert.ok(
-      out.to.some((point) => point.x === shadow.mail.hub.x && point.y === shadow.mail.hub.y),
+      out.to.some(
+        (point) =>
+          point.x === present(present(shadow).mail).hub.x &&
+          point.y === present(present(shadow).mail).hub.y,
+      ),
       "passes through the far hub",
     );
-    for (const point of link.path.slice(1, -1))
+    for (const point of present(link).path.slice(1, -1))
       assert.ok(
         out.to.some((value) => value.x === point.x && value.y === point.y),
         "and follows the highway",
       );
-    assert.deepEqual(out.to[0], crew[0].route[0], "and ends at the far agent's chair");
+    assert.deepEqual(
+      out.to[0],
+      present(present(crew[0]).route)[0],
+      "and ends at the far agent's chair",
+    );
     assert.deepEqual(out.from.at(-1), scene.mail.hub);
     const inbound = Scene.route(
       scene,
@@ -270,20 +300,20 @@ test("observer-relay-scene regression contracts", async () => {
       [],
     );
     assert.equal(inbound.key, target + ">obs_a");
-    assert.deepEqual(inbound.from[0], crew[0].route[0]);
+    assert.deepEqual(inbound.from[0], present(present(crew[0]).route)[0]);
     const unknown = Scene.route(
       scene,
       fake,
       {
         ...sent("accepted_remote"),
-        relay: { ...sent("accepted_remote").relay, peer: "peer_" + "f".repeat(24) },
+        relay: { ...present(sent("accepted_remote").relay), peer: "peer_" + "f".repeat(24) },
       },
       [],
     );
     assert.deepEqual(
       [unknown.to[0], unknown.to.at(-1)],
       [
-        { ...shadow.mail.hub, z: 0 },
+        { ...present(present(shadow).mail).hub, z: 0 },
         { ...scene.mail.hub, z: 0 },
       ],
       "an agent the roster no longer lists: that machine's mailroom, along the highway",
@@ -297,7 +327,10 @@ test("observer-relay-scene regression contracts", async () => {
       Scene.route(
         scene,
         fake,
-        { ...sent("queued_local"), relay: { ...sent("queued_local").relay, machine: "elsewhere" } },
+        {
+          ...sent("queued_local"),
+          relay: { ...present(sent("queued_local").relay), machine: "elsewhere" },
+        },
         [],
       ).key,
       "obs_a>chute",
@@ -305,25 +338,29 @@ test("observer-relay-scene regression contracts", async () => {
     );
 
     // Pending: where llm-bus last proved it is.
-    const at = (state) => Scene.pending(scene, fake, [sent(state)]);
+    const at = (state: NonNullable<Message["relay"]>["state"]) =>
+      Scene.pending(scene, fake, [sent(state)]);
     assert.ok(
-      inside(at("queued_local")[0].point, scene.mail.rect),
+      inside(present(at("queued_local")[0]).point, scene.mail.rect),
       "queued: still in this mailroom",
     );
-    const mid = at("accepted_remote")[0].point;
+    const mid = present(at("accepted_remote")[0]).point;
     assert.ok(
       highway.some((segment) => inside(mid, segment.rect)),
       "held by the relay: on the highway",
     );
     assert.deepEqual(
-      [at("delivered_local")[0].point.x, at("delivered_local")[0].point.y],
-      [crew[0].route[0].x, crew[0].route[0].y],
+      [present(at("delivered_local")[0]).point.x, present(at("delivered_local")[0]).point.y],
+      [
+        present(present(present(crew[0]).route)[0]).x,
+        present(present(present(crew[0]).route)[0]).y,
+      ],
       "delivered: at the far agent's desk",
     );
     assert.deepEqual(at("expired"), [], "expired is not pending anywhere");
-    assert.equal(
-      at("accepted_remote")[0].mark,
-      true,
+    assert.deepEqual(
+      { mark: present(at("accepted_remote")[0]).mark },
+      { mark: true },
       "relay sends never wake locally: marked like any unsupported wake",
     );
   }
@@ -332,7 +369,7 @@ test("observer-relay-scene regression contracts", async () => {
   {
     const layout = Model.createLayout(),
       empty = Scene.build([], 0);
-    const message = {
+    const message: Message = {
       from: "external",
       to: "external",
       acknowledgedAt: null,
@@ -345,14 +382,17 @@ test("observer-relay-scene regression contracts", async () => {
     );
     assert.equal(
       Scene.pending(empty, layout, [
-        { ...message, relay: { ...message.relay, state: "queued_local" } },
+        { ...message, relay: { ...present(message.relay), state: "queued_local" } },
       ]).length,
       1,
       "unexpired mail still uses the existing chute fallback when the peer is absent",
     );
     assert.equal(
       Scene.pending(empty, layout, [
-        { ...message, relay: { ...message.relay, direction: "in", state: "delivered_local" } },
+        {
+          ...message,
+          relay: { ...present(message.relay), direction: "in", state: "delivered_local" },
+        },
       ]).length,
       1,
       "incoming delivery remains pending locally until acknowledgement",
@@ -365,7 +405,9 @@ test("observer-relay-scene regression contracts", async () => {
           {
             health: "available",
             remote: remote("mac", {
-              peers: Array.from({ length: 7 }, (_, i) => peer("peer-" + i, [agent(String(i))])),
+              peers: Array.from({ length: 7 }, (_, i) =>
+                peer("peer-" + String(i), [agent(String(i))]),
+              ),
             }),
           },
         ],
@@ -373,20 +415,20 @@ test("observer-relay-scene regression contracts", async () => {
       NOW,
     );
     const omitted = "peer-6";
-    assert.equal(nets[0].shadows.length, 6);
-    assert.equal(
-      nets[0].shadows.some((shadow) => shadow.machine === omitted),
-      false,
+    assert.equal(present(nets[0]).shadows.length, 6);
+    assert.deepEqual(
+      { omitted: present(nets[0]).shadows.some((shadow) => shadow.machine === omitted) },
+      { omitted: false },
       "fixture peer is excluded by the render cap",
     );
     layout.reconcile(Scene.shadowRows(nets));
     const capped = Scene.build(layout.onPage(0), 0, {
       relays: nets,
-      hosts: nets[0].shadows.map((shadow) => shadowHost(nets[0], shadow, null)),
+      hosts: present(nets[0]).shadows.map((shadow) => shadowHost(present(nets[0]), shadow, null)),
     });
     assert.deepEqual(
       Scene.pending(capped, layout, [
-        { ...message, relay: { ...message.relay, machine: omitted } },
+        { ...message, relay: { ...present(message.relay), machine: omitted } },
       ]),
       [],
       "expired mail to a real but capped peer cannot reappear at the outside chute",
@@ -414,19 +456,20 @@ test("observer-relay-scene regression contracts", async () => {
         hosts: [{ id: "vm", health: "available", agents: 1 }],
         relays: nets,
       }),
-      vmShip = scene.ships.find((ship) => ship.id === "vm");
-    assert.deepEqual(nets[0].shadows, [], "both machines are observed: no shadows");
+      vmShip = present(scene.ships).find((ship) => ship.id === "vm");
+    assert.deepEqual(present(nets[0]).shadows, [], "both machines are observed: no shadows");
     assert.deepEqual(
-      scene.relays[0].links.map((link) => [link.from, link.to, link.shadow]),
+      present(present(scene.relays)[0]).links.map((link) => [link.from, link.to, link.shadow]),
       [[null, "vm", false]],
     );
     const column = scene.walkways.filter((walkway) => walkway.kind === "relay-highway");
     assert.ok(
-      column.length === 1 && column[0].rect.x + column[0].rect.w / 2 === scene.mail.hub.x,
+      column.length === 1 &&
+        present(column[0]).rect.x + present(column[0]).rect.w / 2 === scene.mail.hub.x,
       "member to member: straight down the centre line between the banks",
     );
     const fake = {
-      seatFor: (id) => (["obs_l", "obs_v"].includes(id) ? 0 : undefined),
+      seatFor: (id: string) => (["obs_l", "obs_v"].includes(id) ? 0 : undefined),
       pageFor: () => 0,
       colorFor: () => ({ accent: "#fff" }),
     };
@@ -445,11 +488,11 @@ test("observer-relay-scene regression contracts", async () => {
       [vmOut.to[0], vmOut.to.at(-1)],
       [
         { ...scene.mail.hub, z: 0 },
-        { ...vmShip.mail.hub, z: 0 },
+        { ...present(present(vmShip).mail).hub, z: 0 },
       ],
       "the vm half runs from the vm mailroom to this machine's",
     );
-    assert.deepEqual(vmOut.from.at(-1), vmShip.mail.hub);
+    assert.deepEqual(vmOut.from.at(-1), present(present(vmShip).mail).hub);
     assert.deepEqual(
       Scene.pending(
         scene,
@@ -470,9 +513,12 @@ test("observer-relay-scene regression contracts", async () => {
   // Evidence: a highway is verified once mail demonstrably crossed with that machine (received from, or delivered to).
   {
     const base = remote("mac", { peers: [peer("whitenoise", [agent("a")])] });
-    const crossed = (messages) =>
-      Scene.relayNetworks([[null, { health: "available", messages, remote: base }]], NOW)[0]
-        .members[0].crossed;
+    const crossed = (messages: NonNullable<RelayBus["messages"]>) =>
+      present(
+        present(
+          Scene.relayNetworks([[null, { health: "available", messages, remote: base }]], NOW)[0],
+        ).members[0],
+      ).crossed;
     assert.deepEqual(crossed([]), []);
     assert.deepEqual(
       crossed([{ relay: { direction: "out", machine: "whitenoise", state: "accepted_remote" } }]),

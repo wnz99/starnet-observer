@@ -1,20 +1,23 @@
+import { present } from "./scene/values.fixture.js";
+import { element } from "./model/types.js";
+import type { LayoutRow } from "./model/types.js";
+import type { Layout } from "./model/layout.js";
 import assert from "node:assert/strict";
 import { test } from "bun:test";
 import { createModel } from "./model.js";
 import { canonicalTheme } from "./theme.fixture.js";
-import Scene from "../../frontend/app/observer-scene.js";
-// Task 7-V ports this real classic Scene handoff to TypeScript, then removes this file.
+import * as Scene from "./scene/index.js";
 const Model = createModel(canonicalTheme());
 test("original model allocation, lineage, checkout and theme geometry with real Scene", () => {
-  const worker = (repo, index, project = "Mama") => ({
-    id: repo + "_" + index,
+  const worker = (repo: string, index: number, project = "Mama") => ({
+    id: repo + "_" + String(index),
     project,
     projectId: "prj_" + project,
     projectKind: "group",
     repo,
     repoId: "repo_" + repo,
   });
-  const desksOf = (layout) =>
+  const desksOf = (layout: Layout) =>
     new Map(
       Array.from(
         { length: layout.pages() },
@@ -23,12 +26,16 @@ test("original model allocation, lineage, checkout and theme geometry with real 
         .flat()
         .map((worker) => [worker.id, JSON.stringify(worker.chair)]),
     );
-  const sameDesks = (before, after, label) => {
+  const sameDesks = (
+    before: ReadonlyMap<string, string>,
+    after: ReadonlyMap<string, string>,
+    label: string,
+  ) => {
     for (const [id, tile] of before)
       if (after.has(id)) assert.equal(after.get(id), tile, label + ": " + id + " kept its desk");
   };
 
-  {
+  function verifyStableAllocations() {
     // Allocation stays stable across growth, repository changes, removal, refill and trailing-block trimming.
     const layout = Model.createLayout();
     let rows = Array.from({ length: 8 }, (_, index) => worker("ma-ai", index));
@@ -46,7 +53,7 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     layout.reconcile(rows);
     sameDesks(eight, desksOf(layout), "adding repository");
     assert.deepEqual(
-      [0, 1, 2].map((index) => layout.seatFor("ma-web-app_" + index)),
+      [0, 1, 2].map((index) => layout.seatFor("ma-web-app_" + String(index))),
       [16, 17, 18],
     );
     const twelve = desksOf(layout);
@@ -77,13 +84,14 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     rows = rows.filter((row) => !/^ma-web-app_[0-7]$/.test(row.id));
     layout.reconcile(rows);
     sameDesks(afterMove, desksOf(layout), "trim");
-    assert.equal(layout.onPage(0)[0].blocks.length, 1, "trailing empty blocks removed");
+    assert.equal(element(layout.onPage(0), 0).blocks.length, 1, "trailing empty blocks removed");
   }
-  {
+  verifyStableAllocations();
+  function verifySameHueAnnex() {
     // The 25th worker opens a same-hue annex without moving existing seats.
     const layout = Model.createLayout();
     const rows = Array.from({ length: 25 }, (_, index) => ({
-      id: "solo_" + index,
+      id: "solo_" + String(index),
       project: "Solo",
       projectId: "prj_solo",
     }));
@@ -91,17 +99,20 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     const before = desksOf(layout);
     layout.reconcile(rows);
     sameDesks(before, desksOf(layout), "annex");
-    const [main, annex] = layout.onPage(0);
+    const main = element(layout.onPage(0), 0),
+      annex = element(layout.onPage(0), 1);
     assert.deepEqual([main.annex, annex.annex, annex.floor], [0, 1, main.floor]);
     assert.equal(layout.seatFor("solo_24"), 24);
   }
-  {
-    // Hues: unique per deck even for colliding hashes, kept while live, freed hues reused, swatches use the layout hue.
-    const project = (name) => ({ id: "w_" + name, project: name, projectId: name });
+  verifySameHueAnnex();
+  function verifyHueAllocation() {
+    // Hues: unique per deck despite hash collisions, kept as long as live, freed hues reused, swatches use the layout hue.
+    const project = (name: string) => ({ id: "w_" + name, project: name, projectId: name });
     const target = Model.hash("alpha") % Model.palette.length,
       twins = ["alpha"];
     for (let index = 0; twins.length < 3; index++)
-      if (Model.hash("twin" + index) % Model.palette.length === target) twins.push("twin" + index);
+      if (Model.hash("twin" + String(index)) % Model.palette.length === target)
+        twins.push("twin" + String(index));
     const layout = Model.createLayout();
     layout.reconcile(twins.map(project));
     assert.equal(
@@ -109,7 +120,7 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       3,
       "colliding hashes still get distinct hues",
     );
-    const ten = Array.from({ length: 10 }, (_, index) => project("p" + index));
+    const ten = Array.from({ length: 10 }, (_, index) => project("p" + String(index)));
     layout.reconcile(ten);
     const hues = new Map(ten.map((row) => [row.projectId, layout.colorFor(row.projectId).floor]));
     assert.equal(new Set(hues.values()).size, 10);
@@ -122,10 +133,10 @@ test("original model allocation, lineage, checkout and theme geometry with real 
         assert.equal(
           layout.colorFor(row.projectId).floor,
           hues.get(row.projectId),
-          "hue kept while live",
+          "hue kept as long as live",
         );
     assert.equal(layout.colorFor("fresh").floor, hues.get("p3"), "the freed hue is reused");
-    const many = Array.from({ length: 40 }, (_, index) => project("many" + index));
+    const many = Array.from({ length: 40 }, (_, index) => project("many" + String(index)));
     layout.reconcile(many);
     assert.equal(layout.pages(), 5);
     for (let page = 0; page < layout.pages(); page++) {
@@ -133,26 +144,29 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       assert.equal(
         new Set(rooms.map((room) => room.floor)).size,
         rooms.length,
-        "distinct hues on deck " + (page + 1),
+        "distinct hues on deck " + String(page + 1),
       );
     }
     assert.equal(layout.pageFor("w_many39"), 4);
   }
+  verifyHueAllocation();
 
-  {
+  function verifyHueConflictAnnex() {
     // Eleven projects fill deck 1 and three rooms of deck 2; a deck-1 project whose hue is already on deck 2 then
     // grows past 24 seats. Its annex takes the next deck instead, so no surviving project is recoloured.
     const layout = Model.createLayout(),
-      names = Array.from({ length: 11 }, (_, index) => "hue" + index);
+      names = Array.from({ length: 11 }, (_, index) => "hue" + String(index));
     let rows = names.map((name) => ({ id: name + "_0", project: name, projectId: name }));
     layout.reconcile(rows);
     const before = new Map(names.map((name) => [name, layout.colorFor(name).floor]));
     const deckTwo = new Set(layout.onPage(1).map((room) => room.floor));
-    const grower = layout.onPage(0).find((room) => deckTwo.has(room.floor)).projectId;
+    const growerRoom = layout.onPage(0).find((room) => deckTwo.has(room.floor));
+    assert(growerRoom);
+    const grower = growerRoom.projectId;
     rows = [
       ...rows,
       ...Array.from({ length: 24 }, (_, index) => ({
-        id: grower + "_" + (index + 1),
+        id: grower + "_" + String(index + 1),
         project: grower,
         projectId: grower,
       })),
@@ -165,7 +179,7 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       assert.equal(
         new Set(rooms.map((room) => room.floor)).size,
         new Set(rooms.map((room) => room.projectId)).size,
-        "distinct hues on deck " + (page + 1),
+        "distinct hues on deck " + String(page + 1),
       );
     }
     assert.equal(
@@ -174,12 +188,16 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       "the annex skips the deck that already shows its hue",
     );
     assert.equal(
-      layout.onPage(2).find((room) => room.projectId === grower).floor,
+      element(
+        layout.onPage(2).filter((room) => room.projectId === grower),
+        0,
+      ).floor,
       before.get(grower),
     );
     assert.equal(layout.pageFor(grower + "_23"), 0, "existing seats stay in the main room");
   }
-  {
+  verifyHueConflictAnnex();
+  function verifyLineageAndProjectMoves() {
     const layout = Model.createLayout(),
       root = worker("child-repo", 0, "Parent folder");
     const sibling = worker("sibling-repo", 0, "Parent folder");
@@ -199,12 +217,12 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     layout.reconcile([root, sibling, desktop, parent]);
     assert.equal(layout.onPage(0).length, 2, "direct parent shares canonical project room");
     const helpers = Array.from({ length: 10 }, (_, i) => ({
-      id: "helper" + i,
+      id: "helper" + String(i),
       source: "helper",
       parentId: root.id,
       projectId: "wrong",
       repoId: "wrong",
-      status: "unknown",
+      status: "unknown" as const,
     }));
     const rootsBefore = desksOf(layout);
     layout.reconcile([...helpers, root, sibling, desktop, parent]);
@@ -213,7 +231,10 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     assert.equal(helperRows.length, 10, "overflow remains available to the list");
     assert.equal(rooms.length, 2, "helpers never create rooms");
     assert.equal(
-      rooms.find((r) => r.projectId === root.projectId).blocks.length,
+      element(
+        rooms.filter((r) => r.projectId === root.projectId),
+        0,
+      ).blocks.length,
       3,
       "helpers never create blocks",
     );
@@ -239,7 +260,7 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     );
     layout.reconcile([
       root,
-      { ...helpers[0], parentId: "missing" },
+      { ...element(helpers, 0), parentId: "missing" },
       { id: "missing-parent", source: "helper" },
       { id: "cycle-a", source: "helper", parentId: "cycle-b" },
       { id: "cycle-b", parentId: "cycle-a" },
@@ -252,10 +273,10 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       [root.id],
       "orphan/cyclic/malformed helpers rejected",
     );
-    const child = { ...helpers[0], parentId: root.id },
-      grandchild = { ...helpers[1], parentId: child.id };
+    const child = { ...element(helpers, 0), parentId: root.id },
+      grandchild = { ...element(helpers, 1), parentId: child.id };
     layout.reconcile([grandchild, child, root]);
-    const chain = layout.onPage(0)[0].rows.filter((v) => v.kind === "helper");
+    const chain = element(layout.onPage(0), 0).rows.filter((v) => v.kind === "helper");
     assert(chain.every((v) => v.rootId === root.id && v.block === 0));
     assert.equal(layout.pageFor(grandchild.id), layout.pageFor(root.id));
     const unrelated = worker("elsewhere", 0, "Other");
@@ -277,18 +298,21 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       "project identity move preserves unrelated seats",
     );
     assert.equal(
-      layout
-        .onPage(0)
-        .find((r) => r.projectId === "moved-project")
-        .rows.filter((v) => v.kind === "helper").length,
+      present(
+        layout
+          .onPage(0)
+          .filter((r) => r.projectId === "moved-project")
+          .at(0),
+      ).rows.filter((v) => v.kind === "helper").length,
       2,
     );
     layout.reconcile([child, grandchild]);
     assert.equal(layout.onPage(0).length, 0, "helper-only snapshot cannot keep a room");
   }
-  {
+  verifyLineageAndProjectMoves();
+  function verifyCheckoutSections() {
     const layout = Model.createLayout();
-    const rows = ["main", "left", "right"].map((checkoutId, index) => ({
+    const rows: LayoutRow[] = ["main", "left", "right"].map((checkoutId, index) => ({
       ...worker("shared", index),
       checkoutId,
       checkoutKind: index ? "worktree" : "main",
@@ -313,9 +337,9 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       sections.map((s) => s.checkoutId),
       ["main", "left", "right", null],
     );
-    assert(sections[0].label.includes("Main checkout"));
-    assert(sections[1].label.includes("Worktree same name"));
-    assert(sections[3].label.includes("Checkout unavailable"));
+    assert(element(sections, 0).label.includes("Main checkout"));
+    assert(element(sections, 1).label.includes("Worktree same name"));
+    assert(element(sections, 3).label.includes("Checkout unavailable"));
     assert(sections.every((s) => s.folder === "src"));
     const before = desksOf(layout);
     layout.reconcile(rows.slice().reverse());
@@ -331,16 +355,16 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       afterScene.revision,
       "label topology invalidates sign cache",
     );
-    assert.equal(afterScene.platforms[0].sections[0].checkoutKind, "main");
-    assert.equal(afterScene.platforms[0].sections[0].repoLabel, "renamed");
+    assert.equal(element(element(afterScene.platforms, 0).sections, 0).checkoutKind, "main");
+    assert.equal(element(element(afterScene.platforms, 0).sections, 0).repoLabel, "renamed");
     sameDesks(before, desksOf(layout), "label-only update");
     const movedRows = renamed.map((row) =>
-      row.id === rows[0].id
-        ? { ...row, checkoutId: "left", checkoutKind: "worktree", worktree: "same name" }
+      row.id === element(rows, 0).id
+        ? { ...row, checkoutId: "left", checkoutKind: "worktree" as const, worktree: "same name" }
         : row,
     );
     assert(
-      layout.reconcile(movedRows).moved.includes(rows[0].id),
+      layout.reconcile(movedRows).moved.includes(element(rows, 0).id),
       "checkout change moves only affected row section",
     );
     assert.notEqual(
@@ -348,8 +372,9 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       Model.sectionKey({ repoId: "a", checkoutId: "b#c", folder: "d" }),
     );
   }
+  verifyCheckoutSections();
   // Theme project accents recolour the ten slots only: same rooms, slots, floor names and desks as the default palette.
-  {
+  function verifyThemeGeometryParity() {
     const defaults = canonicalTheme().scene.projectAccents;
     assert.deepEqual(
       Model.palette.map(([, accent]) => accent),
@@ -373,10 +398,10 @@ test("original model allocation, lineage, checkout and theme geometry with real 
     );
     const custom = Array.from(
       { length: 10 },
-      (_, index) => "#a0" + String(index).padStart(2, "0") + "0" + index,
+      (_, index) => "#a0" + String(index).padStart(2, "0") + "0" + String(index),
     );
     const rows = Array.from({ length: 30 }, (_, index) =>
-      worker("repo" + (index % 5), index, "P" + (index % 12)),
+      worker("repo" + String(index % 5), index, "P" + String(index % 12)),
     );
     const plain = Model.createLayout(),
       themed = Model.createLayout({ projectAccents: custom });
@@ -403,8 +428,12 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       );
       for (const room of after) {
         const slot = Model.palette.findIndex(([floor]) => floor === room.floor);
-        assert.equal(room.accent, custom[slot], room.floor + " shows its themed slot colour");
-        assert.notEqual(room.accent, defaults[slot]);
+        assert.equal(
+          room.accent,
+          element(custom, slot),
+          room.floor + " shows its themed slot colour",
+        );
+        assert.notEqual(room.accent, element(defaults, slot));
       }
       assert.deepEqual(
         JSON.stringify(Scene.build(after, page).workers.map((w) => [w.id, w.chair, w.desk])),
@@ -420,4 +449,5 @@ test("original model allocation, lineage, checkout and theme geometry with real 
       );
     }
   }
+  verifyThemeGeometryParity();
 });
