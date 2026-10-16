@@ -70,7 +70,7 @@
     "tools/quality/isolate-typescript.mjs": "0b5ec1ba27e97205e9cc37b8f39481d08b9b119bb0367d519a446ecf77a940ed",
     "tools/quality/lint-classification.test.ts": "2bb58aa3c6461c4ce16e1fe3d1966404e0a257686458ed3dc8c5b248b8a0b8cb",
     "tools/quality/setup.sh": "f04b4ea14aac65c750e46952b634c48f01049499ea0a2e1f05516026afbf5009",
-    "tools/record-contract.test.ts": "1abe1e2c8337a6ab2c787b2d35e7d66ca8a8ca2990338b22dfe5293efd11dc83",
+    "tools/record-contract.test.ts": "be4f4f7d2a56376650f936e26052b0a3d025b21be3a21ced2e560d7ab10c9358",
     "tools/record-contract.ts": "a90440f304b0d6d1b02b5d666519c2fdaf7734c35e9b25ceee642e01e8d74f7d",
     "tools/records.ts": "fcbdeb99b10a1175abbf207050f1d5b06bfea65b48bfc9cf2dd3f5aa37a1362c",
     "tools/runtime-build.ts": "ecf0200ace4efb9b7aaef51ee547b0ced1a1c61dfe6ac1cf59295a44fccc1939",

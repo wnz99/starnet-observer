@@ -71,7 +71,7 @@ test("inventory rejects unknown structure and contradictory runtime or harness p
 });
 
 test("skill provenance refuses traversal and root or ancestor aliases before enumeration", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "observer-skills-"));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "observer-skills-")));
   try {
     const shared = path.join(root, "skills");
     await fs.mkdir(shared);
