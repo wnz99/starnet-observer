@@ -4,10 +4,15 @@ interface HelperItem<N> {
   readonly root: N;
   readonly button: N;
   helper: HelperDescription;
+  release(): void;
 }
 export class RosterView<N extends InspectorNode> {
   private readonly helpers = new Map<string, HelperItem<N>>();
   constructor(private readonly options: ViewOptions<N>) {}
+  dispose() {
+    for (const item of this.helpers.values()) item.release();
+    this.helpers.clear();
+  }
   private make(tag: string, className: string, text?: string) {
     const node = this.options.document.createElement(tag);
     node.className = className;
@@ -33,11 +38,21 @@ export class RosterView<N extends InspectorNode> {
     button.type = "button";
     button.setAttribute("aria-haspopup", "dialog");
     this.options.document.attach(root, button);
-    const item = { root, button, helper };
-    button.addEventListener("click", () => {
-      if (item.helper.eligible)
+    let active = true;
+    const listener = () => {
+      if (active && item.helper.eligible && item.helper.identity !== null)
         this.options.inspectHelper?.(item.helper.id, item.helper.identity, button);
-    });
+    };
+    const item = {
+      root,
+      button,
+      helper,
+      release() {
+        active = false;
+        button.removeEventListener("click", listener);
+      },
+    };
+    button.addEventListener("click", listener);
     return item;
   }
   private helperList(helpers: readonly HelperDescription[]) {
@@ -48,6 +63,7 @@ export class RosterView<N extends InspectorNode> {
     const present = new Set(helpers.map((helper) => helper.id));
     for (const [key, item] of this.helpers)
       if (!present.has(key)) {
+        item.release();
         item.root.remove();
         this.helpers.delete(key);
       }
@@ -57,8 +73,7 @@ export class RosterView<N extends InspectorNode> {
       item.helper = helper;
       const label = [
         helper.name,
-        (helper.stale ? "last observed " : "") +
-          (helper.status === "blocked" ? "waiting" : helper.status),
+        `${helper.stale ? "last observed " : ""}${helper.status === "blocked" ? "waiting" : String(helper.status)}`,
         helper.task,
         helper.lifecycle,
         helper.title,
@@ -83,7 +98,7 @@ export class RosterView<N extends InspectorNode> {
     const status = this.options.get("inspector-status");
     status.className = "status " + (row?.status ?? "unknown");
     status.textContent = row
-      ? (row.stale ? "was " : "") + (row.status === "blocked" ? "waiting" : row.status)
+      ? `${row.stale ? "was " : ""}${row.status === "blocked" ? "waiting" : String(row.status)}`
       : "";
   }
   private visibleHelpers(row: RosterDescription | null, expected: string | null) {

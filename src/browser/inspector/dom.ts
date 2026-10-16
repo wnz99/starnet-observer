@@ -15,6 +15,7 @@ export interface InspectorNode {
   open?: boolean;
   setAttribute(name: string, value: string): void;
   addEventListener(name: string, listener: () => void): void;
+  removeEventListener(name: string, listener: () => void): void;
   remove(): void;
   focus(): void;
 }

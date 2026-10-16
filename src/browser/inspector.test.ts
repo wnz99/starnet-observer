@@ -4,6 +4,7 @@ import * as Inspector from "./inspector.js";
 import { createQuerySpine } from "./queryspine.js";
 import type { FixtureNode } from "./inspector/dom.fixture.js";
 import { fixtureDocument, focusCalls } from "./inspector/dom.fixture.js";
+import type { HelperDescription } from "./inspector/types.js";
 import type { QuerySpec, QuerySnapshot } from "./queryspine/types.js";
 function requiredValue<T>(value: T | null | undefined): T {
   assert.ok(value !== null && value !== undefined);
@@ -872,4 +873,179 @@ test("original real-query cover transcript identity and window re-read", async (
   await flush();
   assert.equal(own("inspector-log").child(0).child(1).textContent, "newer window text");
   view.close();
+});
+
+test("terminal inspector disposal releases only its panel and rejects retained callbacks", () => {
+  const panels = [1, 2].map((number) => Inspector.buildPanel(fixtureDocument, number));
+  let reads = 0,
+    stops = 0,
+    descriptions = 0,
+    selections = 0,
+    closes = 0,
+    gets = 0;
+  const listeners: ((snapshot: QuerySnapshot) => void)[] = [];
+  let helpers: HelperDescription[] = [
+    { id: "helper", identity: "helper-session", eligible: true, name: "Helper", stale: false },
+  ];
+  const inspectors = panels.map((panel) =>
+    Inspector.createInspector({
+      get(part) {
+        gets++;
+        return panel.get(part);
+      },
+      document: fixtureDocument,
+      QuerySpine: {
+        define() {
+          reads++;
+        },
+        subscribe(_key, listener) {
+          listeners.push(listener);
+          return () => {
+            stops++;
+            listener(querySnapshot({ error: { name: "Error", message: "reentrant unsubscribe" } }));
+          };
+        },
+      },
+      describe() {
+        descriptions++;
+        return {
+          name: "Parent",
+          identity: "session",
+          inventory: "available",
+          stale: false,
+          title: "",
+          meta: [],
+          helpers,
+        };
+      },
+      inspectHelper() {
+        selections++;
+      },
+      requestClose() {
+        closes++;
+      },
+    }),
+  );
+  const first = requiredValue(inspectors[0]),
+    second = requiredValue(inspectors[1]);
+  const panel = requiredValue(panels[0]);
+  first.open("parent", "session");
+  second.open("other", "session");
+  const helper = panel.get("inspector-helpers-list").child(0).child(0);
+  const helperClick = required(helper.handlers, "click");
+  helpers = [];
+  first.roster();
+  assert.equal(helper.handlers.size, 0, "eviction releases helper listener immediately");
+  helperClick();
+  assert.equal(selections, 0, "retained evicted helper callback cannot select");
+  const callbacks = [
+    "inspector-close",
+    "inspector-follow",
+    "inspector-pause",
+    "inspector-jump",
+    "inspector-log",
+  ].map((part) => {
+    const node = panel.get(part);
+    return required(node.handlers, part === "inspector-log" ? "scroll" : "click");
+  });
+  helpers = [{ id: "nullable", identity: null, eligible: true, name: "Unknown", stale: false }];
+  first.roster();
+  const activeHelper = panel.get("inspector-helpers-list").child(0).child(0);
+  const activeClick = required(activeHelper.handlers, "click");
+  activeClick();
+  assert.equal(selections, 0, "nullable identity never invokes helper inspection");
+  helpers = [{ id: "nullable", identity: "known", eligible: true, name: "Known", stale: false }];
+  first.roster();
+  first.dispose();
+  first.dispose();
+  activeClick();
+  assert.equal(activeHelper.handlers.size, 0);
+  assert.equal(selections, 0, "retained current helper callback cannot select after disposal");
+  const before = { reads, stops, descriptions, selections, closes, gets };
+  const text = textOf(panel.root),
+    focus = focusCalls.length;
+  for (const callback of callbacks) callback();
+  for (const listener of listeners.slice(0, 1))
+    listener(querySnapshot({ error: { name: "Error", message: "late" } }));
+  first.open("parent", "session");
+  first.close();
+  first.cover();
+  first.reveal();
+  first.suspend();
+  first.resume();
+  first.roster();
+  first.focusTarget();
+  assert.deepEqual({ reads, stops, descriptions, selections, closes, gets }, before);
+  assert.equal(textOf(panel.root), text);
+  assert.equal(focusCalls.length, focus);
+  expect(first.isOpen()).toBeFalse();
+  assert.equal(first.current(), null);
+  for (const part of [
+    "inspector-close",
+    "inspector-follow",
+    "inspector-pause",
+    "inspector-jump",
+    "inspector-log",
+  ])
+    assert.equal(panel.get(part).handlers.size, 0);
+  requiredValue(panels[1]).get("inspector-close").click();
+  assert.equal(closes, 1, "other panel retains its listener");
+  expect(second.isOpen()).toBeTrue();
+  second.dispose();
+  assert.equal(stops, 2);
+});
+
+test("disposing one real-query inspector preserves another subscriber and pending read", async () => {
+  const reads: ReadCall[] = [];
+  let timers = 0,
+    stops = 0;
+  const query = createQuerySpine({
+    interval() {
+      timers++;
+      return () => {
+        stops++;
+      };
+    },
+    getJson: (path) =>
+      new Promise((resolve, reject) => {
+        reads.push({ path, resolve, reject });
+      }),
+  });
+  const panels = [1, 2].map((number) => Inspector.buildPanel(fixtureDocument, number));
+  const inspectors = panels.map((panel) =>
+    Inspector.createInspector({
+      get: panel.get,
+      document: fixtureDocument,
+      QuerySpine: query,
+      describe: () => ({
+        name: "Shared",
+        identity: "session",
+        inventory: "available",
+        stale: false,
+        title: "",
+        meta: [],
+      }),
+    }),
+  );
+  const first = at(inspectors, 0),
+    second = at(inspectors, 1);
+  first.open("shared", "session");
+  second.open("shared", "session");
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(reads.length, 1, "both panels share the actual pending resource");
+  assert.equal(timers, 1);
+  first.dispose();
+  const before = textOf(at(panels, 0).root);
+  assert.equal(stops, 0, "remaining subscriber keeps polling");
+  at(reads, 0).resolve({
+    id: "shared",
+    inspectionIdentity: "session",
+    health: "available",
+    turns: [{ id: "turn", role: "user", text: "shared answer" }],
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(textOf(at(panels, 0).root), before, "disposed panel ignores pending settlement");
+  assert.match(textOf(at(panels, 1).get("inspector-log")), /shared answer/);
+  second.dispose();
+  assert.equal(stops, 1, "last subscriber releases the timer");
 });

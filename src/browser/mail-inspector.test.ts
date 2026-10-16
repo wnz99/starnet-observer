@@ -351,3 +351,79 @@ test("original mail inspector validation, identity, read and visibility lifecycl
   assert.equal(el("mail-inspector-meta").textContent, "No longer in the recent bus window.");
   mail.close();
 });
+
+test("terminal mail disposal aborts one panel and rejects queued reads and retained close", async () => {
+  const identity = "mail_" + "7".repeat(64);
+  const panels = [1, 2, 3].map((number) => Mail.buildPanel(fixtureDocument, number));
+  const reads: ReadCall[] = [];
+  let descriptions = 0,
+    closes = 0,
+    gets = 0;
+  const inspectors = panels.map((panel) =>
+    Mail.createMailInspector({
+      get(part) {
+        gets++;
+        return panel.get(part);
+      },
+      fetchJson: (path, options) =>
+        new Promise((resolve, reject) => {
+          reads.push({ path, options, resolve, reject });
+        }),
+      describe() {
+        descriptions++;
+        return { text: "Message", identity: undefined, eligible: false };
+      },
+      requestClose() {
+        closes++;
+      },
+    }),
+  );
+  const first = at(inspectors, 0),
+    second = at(inspectors, 1),
+    queued = at(inspectors, 2);
+  first.open(7, identity);
+  second.open(8, identity);
+  queued.open(9, identity);
+  queued.dispose();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(reads.length, 2, "dispose before deferred fetch prevents acquisition");
+  const panel = at(panels, 0),
+    callback = required(panel.get("mail-inspector-close").handlers, "click");
+  at(reads, 0).options.signal.addEventListener("abort", () => {
+    first.dispose();
+    at(reads, 0).resolve({ id: 7, identity, health: "available", text: "reentrant settlement" });
+  });
+  first.dispose();
+  first.dispose();
+  expect(at(reads, 0).options.signal.aborted).toBeTrue();
+  expect(at(reads, 1).options.signal.aborted).toBeFalse();
+  const text = panel.get("mail-inspector-body").textContent,
+    count = descriptions,
+    getCount = gets,
+    focus = focusCalls.length;
+  callback();
+  first.open(7, identity);
+  first.close();
+  first.roster();
+  first.cover();
+  first.suspend();
+  first.reveal();
+  first.resume();
+  first.focusTarget();
+  at(reads, 0).resolve({ id: 7, identity, health: "available", text: "late private body" });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(panel.get("mail-inspector-body").textContent, text);
+  assert.equal(descriptions, count);
+  assert.equal(gets, getCount);
+  assert.equal(closes, 0);
+  assert.equal(reads.length, 2);
+  assert.equal(focusCalls.length, focus);
+  assert.equal(first.current(), null);
+  expect(first.isOpen()).toBeFalse();
+  assert.equal(panel.get("mail-inspector-close").handlers.size, 0);
+  at(panels, 1).get("mail-inspector-close").click();
+  assert.equal(closes, 1);
+  second.dispose();
+  at(reads, 1).reject(new Error("late failure"));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+});

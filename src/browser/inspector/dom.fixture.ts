@@ -25,6 +25,9 @@ export class FixtureNode implements InspectorNode {
   addEventListener(name: string, listener: () => void) {
     this.handlers.set(name, listener);
   }
+  removeEventListener(name: string, listener: () => void) {
+    if (this.handlers.get(name) === listener) this.handlers.delete(name);
+  }
   focus() {
     focusCalls.push(this);
   }

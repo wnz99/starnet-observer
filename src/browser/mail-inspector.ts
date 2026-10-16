@@ -6,7 +6,7 @@ export { buildMailPanel as buildPanel } from "./inspector/mail-panel.js";
 export { REASONS, valid, validId, validIdentity } from "./inspector/mail-validation.js";
 interface LedgerRow {
   readonly text: string;
-  readonly identity: string | null;
+  readonly identity: string | null | undefined;
   readonly eligible: boolean;
 }
 interface Options<N extends InspectorNode> {
@@ -25,6 +25,10 @@ function textCap(data: MessageDisplay) {
 const MAX_TEXT_CHARS = 32768;
 const READ_TIMEOUT_MS = 10000;
 class MailInspector<N extends InspectorNode> {
+  private disposed = false;
+  private readonly closeButton: N;
+  private readonly title: N;
+  private readonly closeListener: () => void;
   private id: number | null = null;
   private expected: string | null = null;
   private request = 0;
@@ -32,14 +36,30 @@ class MailInspector<N extends InspectorNode> {
   private withdrawn = false;
   private reading = false;
   constructor(private readonly options: Options<N>) {
-    options.get("mail-inspector-close").addEventListener("click", () => {
+    this.closeButton = options.get("mail-inspector-close");
+    this.title = options.get("mail-inspector-title");
+    this.closeListener = () => {
+      if (this.isDisposed()) return;
       (
         options.requestClose ??
         (() => {
           this.close();
         })
       )();
-    });
+    };
+    this.closeButton.addEventListener("click", this.closeListener);
+  }
+  dispose() {
+    if (this.isDisposed()) return;
+    this.disposed = true;
+    this.id = null;
+    this.expected = null;
+    this.cancel();
+    this.closeButton.removeEventListener("click", this.closeListener);
+  }
+  // Read again after collaborator calls, which may dispose this panel synchronously.
+  private isDisposed() {
+    return this.disposed;
   }
   private health(message: string, state: string) {
     this.options.get("mail-inspector-health").textContent = message;
@@ -48,8 +68,10 @@ class MailInspector<N extends InspectorNode> {
   private header() {
     if (this.id === null) return;
     this.options.get("mail-inspector-title").textContent = `Message #${String(this.id)}`;
-    this.options.get("mail-inspector-meta").textContent =
-      this.options.describe(this.id)?.text || "No longer in the recent bus window.";
+    const row = this.options.describe(this.id);
+    if (!this.isDisposed())
+      this.options.get("mail-inspector-meta").textContent =
+        row?.text || "No longer in the recent bus window.";
   }
   private clear() {
     const body = this.options.get("mail-inspector-body");
@@ -87,9 +109,10 @@ class MailInspector<N extends InspectorNode> {
   }
   private cancel() {
     this.request++;
-    this.abort?.();
+    const abort = this.abort;
     this.abort = null;
     this.reading = false;
+    abort?.();
   }
   private received(data: unknown, target: number) {
     if (!valid(data, target)) {
@@ -109,6 +132,7 @@ class MailInspector<N extends InspectorNode> {
     const mine = ++this.request,
       controller = new AbortController();
     this.abort?.();
+    if (this.isDisposed()) return;
     this.abort = () => {
       controller.abort();
     };
@@ -152,26 +176,31 @@ class MailInspector<N extends InspectorNode> {
     if (this.withdrawn) return;
     this.withdrawn = true;
     this.cancel();
+    if (this.isDisposed()) return;
     this.clear();
     this.health(message, "unavailable");
     this.note("No message text is shown. Open the message again to read it.");
   }
   open(next: unknown, identity: unknown) {
+    if (this.isDisposed()) return;
     if (!validId(next)) return;
     this.id = next;
     this.expected = typeof identity === "string" ? identity : null;
     this.withdrawn = false;
     this.header();
+    if (this.isDisposed()) return;
     if (validIdentity(identity)) this.load();
     else
       this.withdraw(
         REASONS["invalid-identity"] ?? "This message could not be identified, so no text is shown.",
       );
-    this.options.onChange?.(this.id);
+    if (!this.isDisposed()) this.options.onChange?.(this.id);
   }
   close() {
+    if (this.isDisposed()) return;
     if (this.id === null) return;
     this.cancel();
+    if (this.isDisposed()) return;
     this.id = null;
     this.expected = null;
     this.withdrawn = false;
@@ -180,9 +209,12 @@ class MailInspector<N extends InspectorNode> {
     this.options.onChange?.(null);
   }
   roster() {
+    if (this.isDisposed()) return;
     if (this.id === null) return;
     this.header();
+    if (this.isDisposed()) return;
     const row = this.options.describe(this.id);
+    if (this.isDisposed()) return;
     if (!row) this.withdraw("This message left the recent bus window; its text was withdrawn.");
     else if (row.identity !== this.expected)
       this.withdraw(REASONS["identity-mismatch"] ?? "This message changed identity.");
@@ -190,10 +222,12 @@ class MailInspector<N extends InspectorNode> {
       this.withdraw("The bus is not currently readable; the message text was withdrawn.");
   }
   cover() {
+    if (this.isDisposed()) return;
     if (this.id !== null && this.reading)
       this.withdraw("Covered before it was read; open the message again to read it.");
   }
   suspend() {
+    if (this.isDisposed()) return;
     if (this.id !== null)
       this.withdraw("Not kept while the page was hidden; open the message again to read it.");
   }
@@ -204,12 +238,13 @@ class MailInspector<N extends InspectorNode> {
     return this.id;
   }
   focusTarget() {
-    return this.options.get("mail-inspector-title");
+    return this.title;
   }
 }
 export function createMailInspector<N extends InspectorNode>(options: Options<N>) {
   const inspector = new MailInspector(options);
   return {
+    dispose: inspector.dispose.bind(inspector),
     open: inspector.open.bind(inspector),
     close: inspector.close.bind(inspector),
     roster: inspector.roster.bind(inspector),

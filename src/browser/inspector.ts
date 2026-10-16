@@ -17,7 +17,14 @@ function missing(row: RosterDescription | null) {
     ? (REASONS["inventory-unavailable"] ?? "Inventory unavailable")
     : (REASONS["identity-unavailable"] ?? "Identity unavailable");
 }
+function readableIdentity(row: RosterDescription | null) {
+  return row && row.inventory !== "unavailable" ? row.identity : null;
+}
 class Inspector<N extends InspectorNode> {
+  private disposed = false;
+  private readonly closeButton: N;
+  private readonly title: N;
+  private readonly closeListener: () => void;
   private id: string | null = null;
   private expected: string | null = null;
   private identity: string | null | undefined;
@@ -32,14 +39,35 @@ class Inspector<N extends InspectorNode> {
   constructor(private readonly options: InspectorOptions<N>) {
     this.view = new InspectionView(options);
     this.rosterView = new RosterView(options);
-    options.get("inspector-close").addEventListener("click", () => {
+    this.closeButton = options.get("inspector-close");
+    this.title = options.get("inspector-title");
+    this.closeListener = () => {
+      if (this.isDisposed()) return;
       (
         options.requestClose ??
         (() => {
           this.close();
         })
       )();
-    });
+    };
+    this.closeButton.addEventListener("click", this.closeListener);
+  }
+  dispose() {
+    if (this.isDisposed()) return;
+    this.disposed = true;
+    this.id = null;
+    this.expected = null;
+    this.identity = undefined;
+    this.held = undefined;
+    this.covered = false;
+    this.closeButton.removeEventListener("click", this.closeListener);
+    this.view.dispose();
+    this.rosterView.dispose();
+    this.stop();
+  }
+  // Read again after collaborator calls, which may dispose this panel synchronously.
+  private isDisposed() {
+    return this.disposed;
   }
   private pendingRead(snapshot: QuerySnapshot) {
     if (!snapshot.pending || !this.view.windowed || !this.view.last) return false;
@@ -47,6 +75,7 @@ class Inspector<N extends InspectorNode> {
     return true;
   }
   private receive(snapshot: QuerySnapshot) {
+    if (this.isDisposed()) return;
     if (this.pendingRead(snapshot)) return;
     if (!snapshot.error && snapshot.hasData && snapshot.data === this.seen) return;
     if (snapshot.hasData) this.seen = snapshot.data;
@@ -73,7 +102,7 @@ class Inspector<N extends InspectorNode> {
     this.view.receive(data);
   }
   private poll() {
-    if (this.id === null) return;
+    if (this.isDisposed() || this.id === null) return;
     const key = "observer.inspect." + this.id;
     this.options.QuerySpine.define(key, {
       path:
@@ -87,29 +116,35 @@ class Inspector<N extends InspectorNode> {
       validate: valid,
       retainOnUnsubscribe: false,
     });
-    this.unsubscribe = this.options.QuerySpine.subscribe(key, (snapshot) => {
+    if (this.isDisposed()) return;
+    const unsubscribe = this.options.QuerySpine.subscribe(key, (snapshot) => {
       if ("observer.inspect." + (this.id ?? "null") === key) this.receive(snapshot);
     });
+    if (this.isDisposed()) unsubscribe();
+    else this.unsubscribe = unsubscribe;
   }
   private stop() {
-    this.unsubscribe?.();
+    const unsubscribe = this.unsubscribe;
     this.unsubscribe = null;
+    unsubscribe?.();
     this.seen = null;
   }
   private row() {
     return this.id ? this.options.describe(this.id) : null;
   }
   private header() {
-    this.rosterView.header(this.row(), this.expected);
+    const row = this.row();
+    if (!this.isDisposed()) this.rosterView.header(row, this.expected);
   }
   private restart() {
     this.stop();
+    if (this.isDisposed()) return;
     this.view.restart();
     if (!this.covered && !this.suspended) this.poll();
   }
   private withhold(message: string) {
     this.stop();
-    this.view.withhold(message);
+    if (!this.isDisposed()) this.view.withhold(message);
   }
   private lock(message: string) {
     this.locked = true;
@@ -117,9 +152,10 @@ class Inspector<N extends InspectorNode> {
     this.withhold(message);
   }
   private sync() {
-    if (this.id === null || this.suspended || this.locked) return;
+    if (this.isDisposed() || this.id === null || this.suspended || this.locked) return;
     const row = this.row(),
-      next = row && row.inventory !== "unavailable" ? row.identity : null;
+      next = readableIdentity(row);
+    if (this.isDisposed()) return;
     if (next !== null && next !== this.expected) {
       this.lock(REPLACED);
       return;
@@ -130,6 +166,7 @@ class Inspector<N extends InspectorNode> {
     else this.restart();
   }
   open(next: string, target?: string | null) {
+    if (this.isDisposed()) return;
     if (!next) return;
     this.id = next;
     this.expected = target ?? null;
@@ -140,11 +177,13 @@ class Inspector<N extends InspectorNode> {
     this.covered = false;
     this.header();
     this.sync();
-    this.options.onChange?.(this.id);
+    if (!this.isDisposed()) this.options.onChange?.(this.id);
   }
   close() {
+    if (this.isDisposed()) return;
     if (this.id === null) return;
     this.stop();
+    if (this.isDisposed()) return;
     this.id = null;
     this.expected = null;
     this.identity = undefined;
@@ -156,9 +195,11 @@ class Inspector<N extends InspectorNode> {
     this.options.onChange?.(null);
   }
   cover() {
+    if (this.isDisposed()) return;
     if (this.id === null || this.covered) return;
     this.covered = true;
     this.stop();
+    if (this.isDisposed()) return;
     if (this.view.windowed && this.view.last)
       this.view.withdrawSnapshot("Covered · this window is read again when shown.", "loading");
   }
@@ -168,6 +209,7 @@ class Inspector<N extends InspectorNode> {
     );
   }
   reveal() {
+    if (this.isDisposed()) return;
     if (this.id === null || !this.covered) return;
     this.covered = false;
     if (this.suspended || this.locked) return;
@@ -175,17 +217,21 @@ class Inspector<N extends InspectorNode> {
     if (this.canPoll()) this.poll();
   }
   suspend() {
+    if (this.isDisposed()) return;
     if (!this.id || this.suspended) return;
     if (!this.locked) this.held = this.identity;
     this.stop();
+    if (this.isDisposed()) return;
     this.view.hidden();
     this.suspended = true;
   }
   resume() {
+    if (this.isDisposed()) return;
     if (!this.suspended) return;
     this.suspended = false;
     const row = this.row(),
-      next = row && row.inventory !== "unavailable" ? row.identity : null;
+      next = readableIdentity(row);
+    if (this.isDisposed()) return;
     if (!this.locked && next !== null && next === this.held && next === this.expected) {
       this.identity = next;
       this.restart();
@@ -194,6 +240,7 @@ class Inspector<N extends InspectorNode> {
     this.lock(next === null ? missing(row) : REPLACED);
   }
   roster() {
+    if (this.isDisposed()) return;
     if (this.id) {
       this.header();
       this.sync();
@@ -209,12 +256,13 @@ class Inspector<N extends InspectorNode> {
     return this.covered;
   }
   focusTarget() {
-    return this.options.get("inspector-title");
+    return this.title;
   }
 }
 export function createInspector<N extends InspectorNode>(options: InspectorOptions<N>) {
   const inspector = new Inspector(options);
   return {
+    dispose: inspector.dispose.bind(inspector),
     open: inspector.open.bind(inspector),
     close: inspector.close.bind(inspector),
     cover: inspector.cover.bind(inspector),

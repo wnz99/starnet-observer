@@ -2,18 +2,18 @@ import type { InspectorDocument, InspectorNode } from "./dom.js";
 import type { QuerySnapshot, QuerySpec } from "../queryspine/types.js";
 export interface HelperDescription {
   readonly id: string;
-  readonly identity: string;
+  readonly identity: string | null;
   readonly eligible: boolean;
   readonly name: string;
   readonly stale: boolean;
-  readonly status: string;
+  readonly status?: string | undefined;
   readonly task?: string;
   readonly lifecycle?: string;
   readonly title?: string;
 }
 export interface RosterDescription {
   readonly name: string;
-  readonly status: string;
+  readonly status?: string | undefined;
   readonly stale: boolean;
   readonly title: string;
   readonly meta: readonly string[];

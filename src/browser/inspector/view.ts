@@ -14,15 +14,17 @@ export class InspectionView<N extends InspectorNode> {
   private follow = true;
   private paused = false;
   private unseen = 0;
+  private disposed = false;
+  private readonly listeners: { node: N; event: string; listener: () => void }[] = [];
   constructor(private readonly options: ViewOptions<N>) {
     this.rows = new InspectionRows(options);
     const { get } = options;
-    get("inspector-follow").addEventListener("click", () => {
+    this.listen(get("inspector-follow"), "click", () => {
       this.follow = !this.follow;
       if (this.follow) this.toEnd();
       this.controls();
     });
-    get("inspector-pause").addEventListener("click", () => {
+    this.listen(get("inspector-pause"), "click", () => {
       this.paused = !this.paused;
       const data = this.pending;
       if (!this.paused && data) {
@@ -30,14 +32,30 @@ export class InspectionView<N extends InspectorNode> {
         this.apply(data);
       } else this.controls();
     });
-    get("inspector-jump").addEventListener("click", () => {
+    this.listen(get("inspector-jump"), "click", () => {
       this.follow = true;
       this.toEnd();
       this.controls();
     });
-    get("inspector-log").addEventListener("scroll", () => {
+    this.listen(get("inspector-log"), "scroll", () => {
       this.scrolled();
     });
+  }
+  private listen(node: N, event: string, callback: () => void) {
+    const listener = () => {
+      if (!this.disposed) callback();
+    };
+    this.listeners.push({ node, event, listener });
+    node.addEventListener(event, listener);
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const { node, event, listener } of this.listeners)
+      node.removeEventListener(event, listener);
+    this.listeners.length = 0;
+    this.last = null;
+    this.pending = null;
   }
   private scrolled() {
     const log = this.options.get("inspector-log");
