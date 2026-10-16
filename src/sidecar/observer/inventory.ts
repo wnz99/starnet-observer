@@ -6,10 +6,43 @@ import { required } from "./required.js";
 import type { State } from "./state.js";
 import type { Pane, Row } from "./contracts.js";
 import type { InjectedIdentity } from "./contracts.js";
-const title = (value: unknown) =>
-  redactText(String(value || ""))
-    .replace(/[\x00-\x1f\x7f]/g, " ")
-    .slice(0, 160);
+const TITLE_LIMIT = 160;
+const ID_DIGEST_LENGTH = 24;
+const INVENTORY_TIMEOUT = 3000;
+const INVENTORY_BUFFER = 2_097_152;
+const CONTROL_CODE_LIMIT = 32;
+const DELETE_CODE = 127;
+function objectTitle(value: object) {
+  // JSON objects have no callable own conversion methods. Shadowing the inherited
+  // string conversion therefore fails exactly as native String conversion does.
+  if (Object.hasOwn(value, "toString"))
+    throw new TypeError("Cannot convert object to primitive value");
+  return "[object Object]";
+}
+// Inventory is JSON, so its title values use ordinary JSON value stringification.
+function titleString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value))
+    return value.map((entry: unknown) => (entry === null ? "" : titleString(entry))).join(",");
+  if (typeof value === "object") return objectTitle(value);
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    typeof value === "symbol"
+  )
+    return String(value);
+  return "";
+}
+function title(value: unknown) {
+  return Array.from(redactText(titleString(value || "")), (character) => {
+    const code = character.charCodeAt(0);
+    return code < CONTROL_CODE_LIMIT || code === DELETE_CODE ? " " : character;
+  })
+    .join("")
+    .slice(0, TITLE_LIMIT);
+}
 export class InventoryReader {
   constructor(private readonly state: State) {}
   object(value: unknown): value is Record<string, unknown> {
@@ -25,7 +58,8 @@ export class InventoryReader {
       throw new Error("Invalid inventory");
     const panes: Pane[] = [],
       seen = new Set<string>();
-    for (const pane of value.result.agents) {
+    const agents: unknown[] = value.result.agents;
+    for (const pane of agents) {
       if (!this.selected(pane)) continue;
       if (
         typeof pane.pane_id !== "string" ||
@@ -40,7 +74,7 @@ export class InventoryReader {
   }
   retainUnavailable(source: "herdr" | "desktop", reason: string) {
     this.state.sources[source] = { ...this.state.sources[source], health: "unavailable", reason };
-    this.state.rowsBySource[source] = this.state.rowsBySource[source].map((row) => ({
+    this.state.rowsBySource[source] = this.state.sourceRows(source).map((row) => ({
       ...row,
       inventoryHealth: "unavailable",
     }));
@@ -50,7 +84,9 @@ export class InventoryReader {
     if (this.state.identities.resolveMany) return this.state.identities.resolveMany(panes, refresh);
     const results: InjectedIdentity[] = [];
     for (const pane of panes)
-      results.push(await required(this.state.identities.resolve)(pane, refresh));
+      results.push(
+        await required(this.state.identities.resolve).call(this.state.identities, pane, refresh),
+      );
     return results;
   }
   async buildRows(
@@ -72,7 +108,7 @@ export class InventoryReader {
           .createHash("sha256")
           .update(this.state.endpoint + "\0" + pane.pane_id)
           .digest("hex")
-          .slice(0, 24);
+          .slice(0, ID_DIGEST_LENGTH);
       const identity = required(resolved[index]),
         sessionId = identity.sessionId;
       if (identity.proof) proofs.set(id, identity.proof);
@@ -84,7 +120,7 @@ export class InventoryReader {
         title: title(pane.terminal_title_stripped || pane.agent),
         ...(this.state.projects.resolveMany
           ? projects[index]
-          : await required(this.state.projects.resolve)(cwds[index])),
+          : await required(this.state.projects.resolve).call(this.state.projects, cwds[index])),
         status: status(pane.agent_status),
         sessionId,
         identitySource: identity.source,
@@ -103,8 +139,8 @@ export class InventoryReader {
   async refreshHerdr() {
     try {
       const result = await this.state.execute("herdr", ["agent", "list"], {
-        timeout: 3000,
-        maxBuffer: 2 * 1024 * 1024,
+        timeout: INVENTORY_TIMEOUT,
+        maxBuffer: INVENTORY_BUFFER,
         env: stationChildEnv(process.env, { HERDR_SOCKET_PATH: this.state.endpoint }),
       });
       const inventory: unknown = JSON.parse(result.stdout),

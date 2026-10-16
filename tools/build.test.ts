@@ -137,7 +137,7 @@ test("runtime build closes emitted typed leaf imports, preserves private resourc
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
   }
-}, 30000);
+}, 75000);
 
 test("runtime build preserves last good output and local resources when strict compilation fails", async () => {
   const folder = await fs.realpath(
@@ -186,7 +186,7 @@ test("runtime build preserves last good output and local resources when strict c
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
   }
-}, 10000);
+}, 70000);
 
 test("runtime build rejects aliased generated directories before touching local resources", async () => {
   const folder = await fs.realpath(

@@ -6,7 +6,9 @@ export class Refresh {
     if (!this.state.desktopPending)
       this.state.desktopPending = this.state.inventory
         .refreshDesktop()
-        .then(() => { this.state.publication.publish(); })
+        .then(() => {
+          this.state.publication.publish();
+        })
         .finally(() => {
           this.state.desktopPending = null;
         });
@@ -15,7 +17,7 @@ export class Refresh {
         try {
           const data = await this.state.bus.read();
           if (!this.state.closed) this.state.mail = data;
-        } catch (_) {
+        } catch {
           if (!this.state.closed)
             this.state.mail = {
               rows: this.state.mail ? this.state.mail.rows : [],
@@ -33,10 +35,10 @@ export class Refresh {
     await this.state.inventory.refreshHerdr();
     if (this.state.closed) return this.state.snapshot.snapshot();
     this.state.publication.publish();
-    if (this.state.sources.herdr.health === "available") {
+    if (this.state.herdrSource.health === "available") {
       this.state.enrichmentTarget = {
         parents: [...this.state.coreRows],
-        warmed: new Set(),
+        warmed: new Set<string>(),
         proofs: new Map(this.state.identityProofs),
         owners: new Map(
           this.state.coreRows.map((row) => [

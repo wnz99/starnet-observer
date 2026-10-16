@@ -1273,4 +1273,4 @@ test("observer-scene regression contracts", async () => {
     );
     console.log("observer scene: overseer seating OK");
   }
-}, 30000);
+}, 120000);

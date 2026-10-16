@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import type { ObserverRow } from "../../shared/observer.js";
 import type { Snapshot } from "../inspector/contracts.js";
 import type { BusState } from "../bus/types.js";
 import type { SessionInspection } from "../../shared/inspection.js";
@@ -16,6 +17,7 @@ export function deferred() {
   });
   return { promise, resolve };
 }
+const FIXTURE_TIME = 1000;
 export function inspection(
   value: Partial<Omit<Snapshot, "turns" | "stats">> & {
     available?: boolean;
@@ -25,8 +27,8 @@ export function inspection(
   } = {},
 ): SessionInspection & ({ available: true } | { available: false }) {
   if (value.available === false)
-    return { ...unavailable("fixture", "fixture", 1000), available: false };
-  const base = unavailable("fixture", "fixture", 1000);
+    return { ...unavailable("fixture", "fixture", FIXTURE_TIME), available: false };
+  const base = unavailable("fixture", "fixture", FIXTURE_TIME);
   return {
     ...base,
     ...value,
@@ -67,8 +69,8 @@ export function nativeSession(row: Record<string, unknown>): string | null {
 }
 export function usageFixture(
   value: {
-    [K in keyof NonNullable<import("../../shared/observer.js").ObserverRow["usage"]>]?:
-      NonNullable<import("../../shared/observer.js").ObserverRow["usage"]>[K] | undefined;
+    [K in keyof NonNullable<ObserverRow["usage"]>]?:
+      NonNullable<ObserverRow["usage"]>[K] | undefined;
   } = {},
 ) {
   return {
@@ -80,9 +82,13 @@ export function usageFixture(
     ...(value.coverage === undefined ? {} : { coverage: value.coverage }),
   };
 }
-export function lastFixture(
-  value: Partial<NonNullable<import("../../shared/observer.js").ObserverRow["tool"]["last"]>>,
-) {
+export function lastFixture(value: Partial<NonNullable<ObserverRow["tool"]["last"]>>) {
   return { name: null, phase: null, outcome: null, at: null, ...value };
 }
-export function settled<T>(work:()=>T):Promise<Awaited<T>>{try{return Promise.resolve(work())}catch(error){return Promise.reject(error instanceof Error?error:new Error('Fixture failed'))}}
+export function settled<T>(work: () => T): Promise<Awaited<T>> {
+  try {
+    return Promise.resolve(work());
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error("Fixture failed"));
+  }
+}

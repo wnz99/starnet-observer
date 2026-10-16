@@ -1,4 +1,11 @@
-import { settled } from './testing.fixture.js';
+const AVAILABLE_TOOL = true;
+const UNAVAILABLE_TOOL = false;
+const PUBLISHED_CORE = true;
+const NO_DETAIL_READ = false;
+const NO_OBSOLETE_DESCENDANTS = false;
+const CLOSE_STILL_PENDING = false;
+import { settled } from "./testing.fixture.js";
+import type { ChildBinding } from "../inspector/contracts.js";
 import type { HelperTranscripts } from "../helpers/contracts.js";
 import type { BusState } from "../bus/types.js";
 import {
@@ -29,19 +36,22 @@ import type { ObserverOptions, Inventory, Row } from "./contracts.js";
 test("observer regression contracts", async () => {
   // Inventory fixtures never consult a developer's real private overseer record.
   const emptyOverseerState: NonNullable<ObserverOptions["overseerState"]> = {
-    read:  () => settled(() => ({ state: "empty" })),
-    match:  () => settled(() => false),
+    read: () => settled(() => ({ state: "empty" })),
+    match: () => settled(() => false),
   };
   const makeCoreObserver = (options: ObserverOptions = {}) =>
     makeNativeObserver({ overseerState: emptyOverseerState, ...options });
-  // Legacy scenarios assert completed source observations. Track only injected fixture work;
-  // the progressive fixtures below exercise the production core-return boundary directly.
+  // Legacy scenarios assert completed source observations using tracked injected fixture work.
+  // Progressive fixtures below exercise production core publication directly.
   function makeObserver(options?: ObserverOptions) {
     if (!options) return makeCoreObserver();
     const work = new Set<Promise<unknown>>();
-    function track<A extends unknown[], R>(method: (...args: A) => R | Promise<R>) {
+    function track<A extends unknown[], R>(
+      method: (...args: A) => R | Promise<R>,
+      receiver: object,
+    ) {
       return (...args: A) => {
-        const promise = (async () => await method(...args))();
+        const promise = Promise.resolve().then(() => method.apply(receiver, args));
         work.add(promise);
         void promise.then(
           () => {
@@ -57,19 +67,27 @@ test("observer regression contracts", async () => {
     const tracked: ObserverOptions = { ...options, warmDetails: false };
     if (options.transcripts) {
       const adapter = options.transcripts;
-      tracked.transcripts = { ...adapter, ...(adapter.read ? { read: track(adapter.read) } : {}) };
+      tracked.transcripts = {
+        ...adapter,
+        ...(adapter.read ? { read: track(adapter.read, adapter) } : {}),
+      };
     }
     if (options.helpers) {
       const adapter = options.helpers;
       tracked.helpers = {
         ...adapter,
-        ...(adapter.children ? { children: track(adapter.children) } : {}),
-        ...(adapter.prepareChildren ? { prepareChildren: track(adapter.prepareChildren) } : {}),
+        ...(adapter.children ? { children: track(adapter.children, adapter) } : {}),
+        ...(adapter.prepareChildren
+          ? { prepareChildren: track(adapter.prepareChildren, adapter) }
+          : {}),
       };
     }
     if (options.desktop)
-      tracked.desktop = { ...options.desktop, inventory: track(options.desktop.inventory) };
-    if (options.bus) tracked.bus = { ...options.bus, read: track(options.bus.read) };
+      tracked.desktop = {
+        ...options.desktop,
+        inventory: track(options.desktop.inventory, options.desktop),
+      };
+    if (options.bus) tracked.bus = { ...options.bus, read: track(options.bus.read, options.bus) };
     const observer = makeCoreObserver(tracked);
     let pending: Promise<Inventory> | null = null;
     const get = () =>
@@ -93,7 +111,7 @@ test("observer regression contracts", async () => {
     };
   }
   assert.throws(() => makeObserver(), /requires an injected now clock/);
-  // Last activity for idle age: working is now; otherwise the newer of last conversation entry and last tool event, never in the future.
+  // Working-session idle age uses current time, otherwise the newer conversation or tool event, clamped against future timestamps.
   assert.equal(lastActivity("working", { lastEntryAt: 5 }, 1000), 1000);
   assert.equal(
     lastActivity(
@@ -128,6 +146,9 @@ test("observer regression contracts", async () => {
     await progressivePublication();
     await progressiveOwnership();
     await progressiveOptionalFreshness();
+    await sparseEvidenceShape();
+    await receiverAdapters();
+    await titleCoercion();
     await boundedWarmup();
     await queuedWarmOwnership();
     await progressiveClose();
@@ -164,11 +185,12 @@ test("observer regression contracts", async () => {
         reason: null,
       };
     const observer = makeObserver({
-      readIdentityConfiguration:  () => settled(() => "unconfigured"),
+      readIdentityConfiguration: () => settled(() => "unconfigured"),
       now: () => now,
       endpoint: "test",
       desktop: {
-        inventory:  () => settled(() => ({ health: "unavailable", reason: "unsupported", windows: [] })),
+        inventory: () =>
+          settled(() => ({ health: "unavailable", reason: "unsupported", windows: [] })),
       },
       bus: {
         read: () => {
@@ -176,12 +198,14 @@ test("observer regression contracts", async () => {
           return busState;
         },
       },
-      projects: { resolve:  () => settled(() => ({ project: "project", projectId: "fixture" })) },
+      projects: { resolve: () => settled(() => ({ project: "project", projectId: "fixture" })) },
       transcripts: {
-        read:  (...args) => { return settled(() => {
-          reads.push(args);
-          return { available: false };
-        }); },
+        read: (...args) => {
+          return settled(() => {
+            reads.push(args);
+            return { available: false };
+          });
+        },
         retain() {},
         inspect: async () => {
           if (inspectRelease)
@@ -334,8 +358,8 @@ test("observer regression contracts", async () => {
   async function boundedDiscovery() {
     for (const batchProjects of [false, true]) {
       const agents = Array.from({ length: 9 }, (_, index) => ({
-        ...pane("batch-" + index),
-        cwd: "/fixture/" + index,
+        ...pane(`batch-${String(index)}`),
+        cwd: `/fixture/${String(index)}`,
       }));
       let active = 0,
         maximum = 0,
@@ -344,7 +368,7 @@ test("observer regression contracts", async () => {
         projectActive = 0;
       const gates: (() => void)[] = [],
         projectGates: (() => void)[] = [],
-        projectCalls = [];
+        projectCalls: unknown[] = [];
       const project = async (cwd: unknown) => {
         projectCalls.push(cwd);
         projectMaximum = Math.max(projectMaximum, ++projectActive);
@@ -354,14 +378,19 @@ test("observer regression contracts", async () => {
       };
       const observer = makeObserver({
         now: () => 1000,
-        execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents } }) })),
+        execute: () => settled(() => ({ stdout: JSON.stringify({ result: { agents } }) })),
         identities: {
-          resolveMany:  (panes) => settled(() => panes.map(() => ({ sessionId: ID, source: "fixture" }))),
+          resolveMany: (panes) =>
+            settled(() => panes.map(() => ({ sessionId: ID, source: "fixture" }))),
         },
         projects: batchProjects
           ? {
-              resolveMany:  (cwds) =>
-                settled(() => Promise.all(cwds.map((cwd) => Promise.resolve({ projectId: fixtureString(cwd) })))),
+              resolveMany: (cwds) =>
+                settled(() =>
+                  Promise.all(
+                    cwds.map((cwd) => Promise.resolve({ projectId: fixtureString(cwd) })),
+                  ),
+                ),
             }
           : { resolve: project },
         transcripts: {
@@ -378,28 +407,37 @@ test("observer regression contracts", async () => {
           },
         },
         helpers: {
-          children:  () => settled(() => ({ rows: [], annotations: new Map(), overflow: new Map() })),
+          children: () =>
+            settled(() => ({
+              rows: [],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            })),
         },
-        desktop: { inventory:  () => settled(() => ({ health: "available", windows: [] })) },
-        bus: { read:  () => settled(() => busFixture({ rows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "available", windows: [] })) },
+        bus: { read: () => settled(() => busFixture({ rows: [] })) },
       });
-      let complete = false;
+      const refreshState = { complete: false };
       const refreshing = observer.get().then((value) => {
-        complete = true;
+        refreshState.complete = true;
         return value;
       });
-      for (let attempts = 0; !complete && attempts < 1000; attempts++) {
+      for (let attempts = 0; !refreshState.complete && attempts < 1000; attempts++) {
         await new Promise<void>((resolve) => setImmediate(resolve));
         gates
           .splice(0)
           .reverse()
-          .forEach((resolve) => { resolve(); });
+          .forEach((resolve) => {
+            resolve();
+          });
         projectGates
           .splice(0)
           .reverse()
-          .forEach((resolve) => { resolve(); });
+          .forEach((resolve) => {
+            resolve();
+          });
       }
-      assert(complete, "bounded refresh completes");
+      assert(refreshState.complete, "bounded refresh completes");
       const snapshot = await refreshing;
       assert.equal(maximum, 4, "summary reads use four concurrent rows");
       assert(projectMaximum <= 4, "single-project injected adapter stays bounded");
@@ -419,134 +457,148 @@ test("observer regression contracts", async () => {
   }
 
   async function composedSummaryBound() {
-    for (const closeEarly of [false, true]) {
-      // Helper identity order differs from roster order: its first root is outside
-      // the four summaries admitted initially. Identical pending keys cannot hide it.
-      const agents = Array.from({ length: 9 }, (_, index) =>
-        pane("composed-" + index, "00000000-0000-0000-0000-" + String(9 - index).padStart(12, "0")),
-      );
-      agents.push(pane("composed-presence", null));
-      const gates = new Map(),
-        calls: (string | null | undefined)[] = [],
-        helperGate = deferred();
-      let active = 0,
-        maximum = 0,
-        edgeReads = 0,
-        cleaning = false;
-      const transcripts: HelperTranscripts & { retain(ids: Set<string>): void } = {
-        retain() {},
-        inspectChild:  () => settled(() => ({ available: false })),
-        bindChild:  () => settled(() => null),
-        claudeCandidates:  () => settled(() => []),
-        read: async (
-          _id: string,
-          _provider: Row["provider"],
-          sessionId: string | null | undefined,
-        ) => {
-          if (cleaning) return { available: false };
-          calls.push(sessionId);
-          maximum = Math.max(maximum, ++active);
-          try {
-            await new Promise((resolve, reject) => gates.set(sessionId, { resolve, reject }));
-            return { available: true };
-          } finally {
-            active--;
-          }
-        },
-      };
-      const helpers = makeHelperObserver({
-        transcripts,
-        now: () => 1000,
-        readEdges: async () => {
-          edgeReads++;
-          await helperGate.promise;
-          return { rows: [] };
-        },
-      });
-      const observer = makeCoreObserver({
-        now: () => 1000,
-        warmDetails: false,
-        transcripts,
-        helpers,
-        identities: {
-          resolveMany:  (rows) =>
-            settled(() => rows.map((row) => ({ sessionId: nativeSession(row), source: "native" }))),
-        },
-        projects: { resolveMany:  (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))) },
-        execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents } }) })),
-        desktop: { inventory:  () => settled(() => ({ health: "available", windows: [] })) },
-        bus: { read:  () => settled(() => busFixture({ rows: [] })) },
-      });
-      try {
-        const core = await observer.get();
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        assert.equal(core.sessions.length, agents.length, "core publishes while summaries wait");
-        assert.equal(maximum, 4, "actual helper composition shares the four-summary bound");
-        if (closeEarly) {
-          const closing = observer.close();
-          for (const gate of gates.values()) gate.resolve();
-          await closing;
-          assert.equal(
-            calls.length,
-            4,
-            "close settles queued helper roots without admitting more reads",
+    for (const closeEarly of [false, true]) await composedSummaryBoundScenario(closeEarly);
+  }
+  async function composedSummaryBoundScenario(closeEarly: boolean) {
+    // Helper identity order differs from roster order: its first root is outside
+    // the four summaries admitted initially. Identical pending keys cannot hide it.
+    const agents = Array.from({ length: 9 }, (_, index) =>
+      pane(
+        `composed-${String(index)}`,
+        "00000000-0000-0000-0000-" + String(9 - index).padStart(12, "0"),
+      ),
+    );
+    agents.push(pane("composed-presence", null));
+    const gates = new Map<
+        string | null | undefined,
+        { resolve: () => void; reject: (error: Error) => void }
+      >(),
+      calls: (string | null | undefined)[] = [],
+      helperGate = deferred();
+    let active = 0,
+      maximum = 0,
+      edgeReads = 0,
+      cleaning = false;
+    const transcripts: HelperTranscripts & { retain(ids: Set<string>): void } = {
+      retain() {},
+      inspectChild: () => settled(() => ({ available: false })),
+      bindChild: () => settled(() => null),
+      claudeCandidates: () => settled(() => []),
+      read: async (
+        _id: string,
+        _provider: Row["provider"],
+        sessionId: string | null | undefined,
+      ) => {
+        if (cleaning) return { available: false };
+        calls.push(sessionId);
+        maximum = Math.max(maximum, ++active);
+        try {
+          await new Promise<void>((resolve, reject: (reason: unknown) => void) =>
+            gates.set(sessionId, { resolve, reject }),
           );
-          assert.equal(edgeReads, 0, "close cannot discover helpers from abandoned summaries");
-          assert(
-            core.sessions.every((row) => !must(row.tool).available),
-            "late results cannot mutate published core",
-          );
-        } else {
-          gates.get(must(agents[0]).agent_session.value).resolve();
-          const partial = await inventoryWhen(
-            observer,
-            (data) => must(must(data.sessions[0]).tool).available,
-          );
-          assert.equal(
-            must(must(partial.sessions[1]).tool).available,
-            false,
-            "one summary publishes while other roots wait",
-          );
-          const failedSession = must(agents[4]).agent_session.value;
-          // Reject an admitted summary: helper eligibility must reuse the unavailable
-          // result rather than retrying it through a separate admission path.
-          for (let attempt = 0; attempt < 1000 && edgeReads === 0; attempt++) {
-            for (const [sessionId, gate] of gates) {
-              if (sessionId === null) continue; // Presence-only summary cannot gate helper roots.
-              if (sessionId === failedSession) gate.reject(Error("fixture failure"));
-              else gate.resolve();
-            }
-            await new Promise<void>((resolve) => setImmediate(resolve));
-          }
-          assert.equal(
-            edgeReads,
-            1,
-            "helper discovery starts before the unrelated presence summary settles",
-          );
-          assert.equal(active, 1, "presence-only summary remains held when helper work starts");
-          const complete = await inventoryWhen(
-            observer,
-            (data) => data.sessions.filter((row) => must(row.tool).available).length === 8,
-          );
-          assert.equal(
-            must(must(complete.sessions[4]).tool).available,
-            false,
-            "failed summary remains unavailable",
-          );
-          assert.equal(
-            calls.length,
-            agents.length,
-            "helper roots reuse every completed summary including failures",
-          );
-          assert.equal(new Set(calls).size, agents.length);
-          assert.equal(maximum, 4);
+          return { available: true };
+        } finally {
+          active--;
         }
-      } finally {
-        cleaning = true;
-        helperGate.resolve();
-        for (const gate of gates.values()) gate.resolve();
-        await observer.close();
+      },
+    };
+    const helpers = makeHelperObserver({
+      transcripts,
+      now: () => 1000,
+      readEdges: async () => {
+        edgeReads++;
+        await helperGate.promise;
+        return { rows: [] };
+      },
+    });
+    const observer = makeCoreObserver({
+      now: () => 1000,
+      warmDetails: false,
+      transcripts,
+      helpers,
+      identities: {
+        resolveMany: (rows) =>
+          settled(() => rows.map((row) => ({ sessionId: nativeSession(row), source: "native" }))),
+      },
+      projects: {
+        resolveMany: (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))),
+      },
+      execute: () => settled(() => ({ stdout: JSON.stringify({ result: { agents } }) })),
+      desktop: { inventory: () => settled(() => ({ health: "available", windows: [] })) },
+      bus: { read: () => settled(() => busFixture({ rows: [] })) },
+    });
+    function settleHelperGates(failedSession: string | null) {
+      for (const [sessionId, gate] of gates) {
+        if (sessionId === null) continue; // Presence-only summary cannot gate helper roots.
+        if (sessionId === failedSession) gate.reject(Error("fixture failure"));
+        else gate.resolve();
       }
+    }
+    try {
+      const core = await observer.get();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(core.sessions.length, agents.length, "core publishes while summaries wait");
+      assert.equal(maximum, 4, "actual helper composition shares the four-summary bound");
+      if (closeEarly) {
+        const closing = observer.close();
+        for (const gate of gates.values()) gate.resolve();
+        await closing;
+        assert.equal(
+          calls.length,
+          4,
+          "close settles queued helper roots without admitting more reads",
+        );
+        assert.equal(edgeReads, 0, "close cannot discover helpers from abandoned summaries");
+        assert(
+          core.sessions.every((row) => !must(row.tool).available),
+          "late results cannot mutate published core",
+        );
+      } else {
+        must(gates.get(must(agents[0]).agent_session.value)).resolve();
+        const partial = await inventoryWhen(
+          observer,
+          (data) => must(must(data.sessions[0]).tool).available,
+        );
+        assert.equal(
+          must(must(partial.sessions[1]).tool).available,
+          UNAVAILABLE_TOOL,
+          "one summary publishes while other roots wait",
+        );
+        const failedSession = must(agents[4]).agent_session.value;
+        // Reject an admitted summary: helper eligibility must reuse the unavailable
+        // result rather than retrying it through a separate admission path.
+        for (let attempt = 0; attempt < 1000 && edgeReads === 0; attempt++) {
+          settleHelperGates(failedSession);
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+        assert.equal(
+          edgeReads,
+          1,
+          "helper discovery starts before the unrelated presence summary settles",
+        );
+        assert.equal(active, 1, "presence-only summary remains held when helper work starts");
+        const complete = await inventoryWhen(
+          observer,
+          (data) => data.sessions.filter((row) => must(row.tool).available).length === 8,
+        );
+        assert.equal(
+          must(must(complete.sessions[4]).tool).available,
+          UNAVAILABLE_TOOL,
+          "failed summary remains unavailable",
+        );
+        assert.equal(
+          calls.length,
+          agents.length,
+          "helper roots reuse every completed summary including failures",
+        );
+        assert.equal(new Set(calls).size, agents.length);
+        assert.equal(maximum, 4);
+      }
+    } finally {
+      cleaning = true;
+      helperGate.resolve();
+      for (const gate of gates.values()) gate.resolve();
+      await observer.close();
     }
   }
 
@@ -566,10 +618,12 @@ test("observer regression contracts", async () => {
       release: (() => void) | true | null | undefined;
     const retained: string[][] = [];
     const desktop = {
-      inventory:  () =>
-        settled(() => desktopFail
-          ? { health: "unavailable", reason: "permission-denied", windows: [] }
-          : { health: "available", reason: null, observedAt: clock, windows: rows }),
+      inventory: () =>
+        settled(() =>
+          desktopFail
+            ? { health: "unavailable", reason: "permission-denied", windows: [] }
+            : { health: "available", reason: null, observedAt: clock, windows: rows },
+        ),
       inspect: async () => {
         if (release)
           await new Promise<void>((resolve) => {
@@ -579,19 +633,21 @@ test("observer regression contracts", async () => {
       },
     };
     const observer = makeObserver({
-      readIdentityConfiguration:  () => settled(() => "unconfigured"),
+      readIdentityConfiguration: () => settled(() => "unconfigured"),
       now: () => clock,
       desktop,
-      projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+      projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
       bus: { read: () => busFixture({ health: "available", rows: [] }) },
       transcripts: {
-        read:  () => settled(() => ({ available: false })),
+        read: () => settled(() => ({ available: false })),
         retain: (ids) => retained.push([...ids]),
       },
-      execute:  () => { return settled(() => {
-        if (fail) throw Error("private");
-        return { stdout: JSON.stringify({ result: { agents: [pane("legacy")] } }) };
-      }); },
+      execute: () => {
+        return settled(() => {
+          if (fail) throw Error("private");
+          return { stdout: JSON.stringify({ result: { agents: [pane("legacy")] } }) };
+        });
+      },
     });
     const first = await observer.get();
     assert.equal(first.sources.desktop.health, "available");
@@ -642,9 +698,10 @@ test("observer regression contracts", async () => {
     const temp = await fs.realpath(
       await fs.mkdtemp(path.join(os.tmpdir(), "observer-cold-build-")),
     );
-    let release: (() => void) | true | null | undefined,
-      began = false,
-      timer;
+    let release: (() => void) | true | null | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const compilerState = { began: false };
+
     const buildGate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -653,25 +710,28 @@ test("observer regression contracts", async () => {
       platform: "darwin",
       cacheDir: temp,
       execute: async () => {
-        began = true;
+        compilerState.began = true;
         await buildGate;
         throw Error("fixture compiler unavailable");
       },
     });
     const observer = makeObserver({
-      readIdentityConfiguration:  () => settled(() => "unconfigured"),
+      readIdentityConfiguration: () => settled(() => "unconfigured"),
       now: () => 1000,
       desktop,
-      projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+      projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
       bus: { read: () => busFixture({ health: "available", rows: [] }) },
-      transcripts: { read:  () => settled(() => ({ available: false })), retain() {} },
-      execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("legacy")] } }) })),
+      transcripts: { read: () => settled(() => ({ available: false })), retain() {} },
+      execute: () =>
+        settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("legacy")] } }) })),
     });
     try {
       const snapshot = await Promise.race<Inventory>([
         observer.get(),
-        new Promise((_, reject) => {
-          timer = setTimeout(() => { reject(Error("cold build held Herdr")); }, 500);
+        new Promise((_, reject: (reason: unknown) => void) => {
+          timer = setTimeout(() => {
+            reject(Error("cold build held Herdr"));
+          }, 500);
         }),
       ]);
       clearTimeout(timer);
@@ -679,10 +739,10 @@ test("observer regression contracts", async () => {
       assert.equal(snapshot.sources.herdr.health, "available");
       assert.equal(snapshot.sources.desktop.reason, "native-reader-building");
       assert.equal(snapshot.sessions.length, 1);
-      // Wait for the fake compiler to reach its gate, then release it before disposing its private fixture.
-      for (let attempt = 0; !began && attempt < 100; attempt++)
+      // The fake compiler reaches its gate before release and private fixture disposal.
+      for (let attempt = 0; !compilerState.began && attempt < 100; attempt++)
         await new Promise<void>((resolve) => setTimeout(resolve, 5));
-      assert(began);
+      assert(compilerState.began);
       fixtureRelease(release);
       for (let attempt = 0; attempt < 100; attempt++) {
         if ((await desktop.inventory()).reason !== "native-reader-building") break;
@@ -724,17 +784,19 @@ test("observer regression contracts", async () => {
         }),
       });
       const observer = makeObserver({
-        readIdentityConfiguration:  () => settled(() => "unconfigured"),
+        readIdentityConfiguration: () => settled(() => "unconfigured"),
         now: () => clock,
         transcripts,
         helpers,
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
-        projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
-        execute:  () => { return settled(() => {
-          if (fail) throw new Error("unavailable");
-          return { stdout: JSON.stringify({ result: { agents: inventory } }) };
-        }); },
+        projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
+        execute: () => {
+          return settled(() => {
+            if (fail) throw new Error("unavailable");
+            return { stdout: JSON.stringify({ result: { agents: inventory } }) };
+          });
+        },
       });
       let result = await observer.get();
       const helper = result.sessions.find((row) => row.source === "helper");
@@ -768,15 +830,16 @@ test("observer regression contracts", async () => {
     const id = (number: number) => "00000000-0000-0000-0000-" + String(number).padStart(12, "0");
 
     const transcripts = {
-      read:  () => settled(() => ({ available: true })),
+      read: () => settled(() => ({ available: true })),
       retain() {},
-      claudeCandidates:  () => settled(() => []),
-      bindChild:  (provider: Row["provider"], sessionId: string, parentSessionId: string) => settled(() => ({
-        provider,
-        sessionId,
-        parentSessionId,
-      })),
-      inspectChild:  () => settled(() => inspection({ available: true, turns: [] })),
+      claudeCandidates: () => settled(() => []),
+      bindChild: (provider: Row["provider"], sessionId: string, parentSessionId: string) =>
+        settled(() => ({
+          provider,
+          sessionId,
+          parentSessionId,
+        })),
+      inspectChild: () => settled(() => inspection({ available: true, turns: [] })),
     };
     for (const [existing, rootId] of [
       [false, id(1)],
@@ -795,7 +858,7 @@ test("observer regression contracts", async () => {
       if (existing)
         inventory.push({ ...pane("child", id(2)), cwd: "child", agent_status: "blocked" });
       const observer = makeObserver({
-        readIdentityConfiguration:  () => settled(() => "unconfigured"),
+        readIdentityConfiguration: () => settled(() => "unconfigured"),
         now: () => 1000,
         transcripts,
         helpers: makeHelperObserver({
@@ -803,22 +866,24 @@ test("observer regression contracts", async () => {
           transcripts,
           readEdges: () => ({ rows: edges }),
         }),
-        execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
+        execute: () =>
+          settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
         projects: {
-          resolve:  (cwd) => settled(() => ({
-            projectId: fixtureString(cwd),
-            project: fixtureString(cwd),
-            projectKind: "repository-parent",
-            repoId: cwd + "-repo",
-            repo: cwd + " repo",
-            checkoutId: cwd + "-checkout",
-            checkoutKind: "worktree",
-            folder: "src",
-            worktreeId: cwd + "-worktree",
-            worktree: cwd + " worktree",
-          })),
+          resolve: (cwd) =>
+            settled(() => ({
+              projectId: fixtureString(cwd),
+              project: fixtureString(cwd),
+              projectKind: "repository-parent",
+              repoId: fixtureString(cwd) + "-repo",
+              repo: fixtureString(cwd) + " repo",
+              checkoutId: fixtureString(cwd) + "-checkout",
+              checkoutKind: "worktree",
+              folder: "src",
+              worktreeId: fixtureString(cwd) + "-worktree",
+              worktree: fixtureString(cwd) + " worktree",
+            })),
         },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
       });
       const { sessions } = await observer.get();
@@ -871,7 +936,7 @@ test("observer regression contracts", async () => {
           }) +
             line({
               type: "response_item",
-              payload: { type: "message", role: "assistant", content: "PANE " + number },
+              payload: { type: "message", role: "assistant", content: `PANE ${String(number)}` },
             }),
         );
       }
@@ -887,7 +952,7 @@ test("observer regression contracts", async () => {
         status: "open",
       }));
       const observer = makeObserver({
-        readIdentityConfiguration:  () => settled(() => "unconfigured"),
+        readIdentityConfiguration: () => settled(() => "unconfigured"),
         now: () => clock,
         transcripts,
         helpers: makeHelperObserver({
@@ -895,15 +960,17 @@ test("observer regression contracts", async () => {
           transcripts,
           readEdges: () => ({ rows: edges }),
         }),
-        execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
+        execute: () =>
+          settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
         projects: {
-          resolve:  (cwd) => settled(() => ({
-            projectId: fixtureString(cwd),
-            repoId: cwd + "-repo",
-            worktreeId: cwd + "-worktree",
-          })),
+          resolve: (cwd) =>
+            settled(() => ({
+              projectId: fixtureString(cwd),
+              repoId: fixtureString(cwd) + "-repo",
+              worktreeId: fixtureString(cwd) + "-worktree",
+            })),
         },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
       });
       let result = await observer.get();
@@ -946,7 +1013,7 @@ test("observer regression contracts", async () => {
         }) +
         line({
           type: "response_item",
-          payload: { type: "message", role: "assistant", content: "PANE " + number },
+          payload: { type: "message", role: "assistant", content: `PANE ${String(number)}` },
         });
       for (let number = 1; number <= 66; number++)
         await fs.writeFile(path.join(root, id(number) + ".jsonl"), content(number));
@@ -963,7 +1030,7 @@ test("observer regression contracts", async () => {
         status: "open",
       }));
       const observer = makeObserver({
-        readIdentityConfiguration:  () => settled(() => "unconfigured"),
+        readIdentityConfiguration: () => settled(() => "unconfigured"),
         now: () => clock,
         transcripts,
         helpers: makeHelperObserver({
@@ -971,15 +1038,17 @@ test("observer regression contracts", async () => {
           transcripts,
           readEdges: () => ({ rows: edges }),
         }),
-        execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
+        execute: () =>
+          settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
         projects: {
-          resolve:  (cwd) => settled(() => ({
-            projectId: fixtureString(cwd),
-            repoId: cwd + "-repo",
-            worktreeId: cwd + "-worktree",
-          })),
+          resolve: (cwd) =>
+            settled(() => ({
+              projectId: fixtureString(cwd),
+              repoId: fixtureString(cwd) + "-repo",
+              worktreeId: fixtureString(cwd) + "-worktree",
+            })),
         },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
       });
       let result = await observer.get();
@@ -996,7 +1065,7 @@ test("observer regression contracts", async () => {
         assert.equal(must(row).worktreeId, "parent-worktree");
         assert.equal(must(row).source, "herdr");
         assert.equal(must(row).status, "blocked");
-        assert.equal(must(row).inspectionIdentity, "codex:" + must(row).sessionId);
+        assert.equal(must(row).inspectionIdentity, "codex:" + fixtureString(must(row).sessionId));
         assert.equal(
           must((await observer.inspect(must(row).id)).turns[0]).text,
           row === boundary ? "PANE 65" : "PANE 66",
@@ -1017,7 +1086,7 @@ test("observer regression contracts", async () => {
     }
   }
 
-  // The browser retains A while inspect() refreshes the server inventory to B.
+  // The browser retains A during inspection-driven server inventory refresh to B.
   async function exactTargetInspection() {
     const secondSession = "00000000-0000-0000-0000-000000000002";
     const desktopId = "obs_" + "d".repeat(24),
@@ -1047,55 +1116,63 @@ test("observer regression contracts", async () => {
       });
     };
     const observer = makeObserver({
-      readIdentityConfiguration:  () => settled(() => "unconfigured"),
+      readIdentityConfiguration: () => settled(() => "unconfigured"),
       now: () => clock,
       endpoint: "exact-target-fixture",
-      projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+      projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
       bus: { read: () => busFixture({ rows: [], health: "available" }) },
-      execute:  () => { return settled(() => {
-        inventoryReads++;
-        if (herdrHealth !== "available") throw Error("fixture unavailable");
-        return {
-          stdout: JSON.stringify({
-            result: {
-              agents: [
-                {
-                  ...pane("parent-a"),
-                  agent: provider,
-                  agent_session: { agent: provider, kind: "id", value: ID },
-                },
-                pane("parent-b", secondSession),
-                pane("selected", selectedSession),
-              ],
-            },
-          }),
-        };
-      }); },
-      transcripts: { read:  () => settled(() => ({ available: false })), retain() {}, inspect: inspectBody },
+      execute: () => {
+        return settled(() => {
+          inventoryReads++;
+          if (herdrHealth !== "available") throw Error("fixture unavailable");
+          return {
+            stdout: JSON.stringify({
+              result: {
+                agents: [
+                  {
+                    ...pane("parent-a"),
+                    agent: provider,
+                    agent_session: { agent: provider, kind: "id", value: ID },
+                  },
+                  pane("parent-b", secondSession),
+                  pane("selected", selectedSession),
+                ],
+              },
+            }),
+          };
+        });
+      },
+      transcripts: {
+        read: () => settled(() => ({ available: false })),
+        retain() {},
+        inspect: inspectBody,
+      },
       desktop: {
-        inventory:  () => settled(() => ({
-          health: desktopHealth,
-          windows: [{ id: desktopId, provider: "claude", inspectionIdentity: desktopIdentity }],
-        })),
+        inventory: () =>
+          settled(() => ({
+            health: desktopHealth,
+            windows: [{ id: desktopId, provider: "claude", inspectionIdentity: desktopIdentity }],
+          })),
         inspect: inspectBody,
       },
       helpers: {
-        children:  (parents) => settled(() => ({
-          rows: [
-            {
-              id: helperId,
-              source: "helper",
-              provider: "codex",
-              inspectionIdentity: "helper:" + helperId,
-              parentId: must(parents[parentIndex]).id,
-              inventoryHealth: "available",
-            },
-          ],
-          annotations: new Map<string, Partial<Row>>([
-            [must(parents[2]).id, { parentId: must(parents[parentIndex]).id }],
-          ]),
-          overflow: new Map(),
-        })),
+        children: (parents) =>
+          settled(() => ({
+            rows: [
+              {
+                id: helperId,
+                source: "helper",
+                provider: "codex",
+                inspectionIdentity: "helper:" + helperId,
+                parentId: must(parents[parentIndex]).id,
+                inventoryHealth: "available",
+              },
+            ],
+            annotations: new Map<string, Partial<Row>>([
+              [must(parents[2]).id, { parentId: must(parents[parentIndex]).id }],
+            ]),
+            overflow: new Map<string, number>(),
+          })),
         inspect: inspectBody,
       },
     });
@@ -1243,27 +1320,29 @@ test("observer regression contracts", async () => {
     const original = { ...pane("footer"), terminal_id: terminal, revision };
     const resolver = makeIdentityResolver({
       now: () => clock,
-      readConfiguration:  () => settled(() => "configured"),
-      readProcessBirth:  (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
-      rpc:  (method, params) => { return settled(() => {
-        const native = nativeIdentityResult(method, params);
-        if (native) return native;
-        if (method === "agent.get")
-          return { result: { agent: { ...original, terminal_id: terminal, revision } } };
-        readCalls++;
-        return {
-          result: {
-            read: {
-              pane_id: "footer",
-              source: "recent",
-              format: "text",
-              revision: 0,
-              truncated: true,
-              text: "\n  " + displayed + " · model\n  ? for shortcuts\n",
+      readConfiguration: () => settled(() => "configured"),
+      readProcessBirth: (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
+      rpc: (method, params) => {
+        return settled(() => {
+          const native = nativeIdentityResult(method, params);
+          if (native) return native;
+          if (method === "agent.get")
+            return { result: { agent: { ...original, terminal_id: terminal, revision } } };
+          readCalls++;
+          return {
+            result: {
+              read: {
+                pane_id: "footer",
+                source: "recent",
+                format: "text",
+                revision: 0,
+                truncated: true,
+                text: "\n  " + displayed + " · model\n  ? for shortcuts\n",
+              },
             },
-          },
-        };
-      }); },
+          };
+        });
+      },
     });
     const helperId = "obs_" + "f".repeat(24),
       helperIdentity = "helper:" + helperId;
@@ -1271,12 +1350,13 @@ test("observer regression contracts", async () => {
       now: () => clock,
       identities: resolver,
       endpoint: "footer-race-fixture",
-      execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: [original] } }) })),
-      projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+      execute: () =>
+        settled(() => ({ stdout: JSON.stringify({ result: { agents: [original] } }) })),
+      projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
       bus: { read: () => busFixture({ rows: [], health: "available" }) },
-      desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+      desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
       transcripts: {
-        read:  (_id, _provider, session) => settled(() => ({ available: !!session })),
+        read: (_id, _provider, session) => settled(() => ({ available: !!session })),
         retain() {},
         inspect: async () => {
           detailCalls++;
@@ -1293,20 +1373,21 @@ test("observer regression contracts", async () => {
         },
       },
       helpers: {
-        children:  (parents) => settled(() => ({
-          rows: [
-            {
-              id: helperId,
-              provider: "codex",
-              source: "helper",
-              inventoryHealth: "available",
-              parentId: must(parents[0]).id,
-              inspectionIdentity: helperIdentity,
-            },
-          ],
-          annotations: new Map(),
-          overflow: new Map(),
-        })),
+        children: (parents) =>
+          settled(() => ({
+            rows: [
+              {
+                id: helperId,
+                provider: "codex",
+                source: "helper",
+                inventoryHealth: "available",
+                parentId: must(parents[0]).id,
+                inspectionIdentity: helperIdentity,
+              },
+            ],
+            annotations: new Map<string, Partial<Row>>(),
+            overflow: new Map<string, number>(),
+          })),
         inspect: async () => {
           detailCalls++;
           if (release)
@@ -1390,19 +1471,20 @@ test("observer regression contracts", async () => {
       const observer = makeObserver({
         now: () => clock,
         identities: {
-          resolve:  () => settled(() => ({
-            sessionId: session,
-            source: "footer",
-            proof: {
-              paneId: "final-race",
-              provider: "codex",
-              contentRevision: 1,
-              observedAt: clock,
-              terminalId: terminal,
+          resolve: () =>
+            settled(() => ({
               sessionId: session,
-              birth: { pid: 41, startSeconds: birth, startMicroseconds: 0 },
-            },
-          })),
+              source: "footer",
+              proof: {
+                paneId: "final-race",
+                provider: "codex",
+                contentRevision: 1,
+                observedAt: clock,
+                terminalId: terminal,
+                sessionId: session,
+                birth: { pid: 41, startSeconds: birth, startMicroseconds: 0 },
+              },
+            })),
           revalidate: async () => {
             if (++validations === 2)
               await new Promise<void>((resolve) => {
@@ -1411,21 +1493,24 @@ test("observer regression contracts", async () => {
             return true;
           },
         },
-        execute:  () => settled(() => ({
-          stdout: JSON.stringify({ result: { agents: [pane("final-race", session)] } }),
-        })),
-        projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({ result: { agents: [pane("final-race", session)] } }),
+          })),
+        projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         transcripts: {
-          read:  () => settled(() => ({ available: true })),
+          read: () => settled(() => ({ available: true })),
           retain() {},
-          inspect:  () =>
-            settled(() => inspection({
-              available: true,
-              health: "available",
-              turns: [{ text: "FINAL RACE CANARY" }],
-            })),
+          inspect: () =>
+            settled(() =>
+              inspection({
+                available: true,
+                health: "available",
+                turns: [{ text: "FINAL RACE CANARY" }],
+              }),
+            ),
         },
       });
       const first = await observer.get();
@@ -1451,8 +1536,8 @@ test("observer regression contracts", async () => {
 
   async function footerConfigurationRace() {
     for (const helper of [false, true]) {
+      const terminal = "term_original";
       let sequence = 8,
-        terminal = "term_original",
         contentRead = false,
         configurationAfterRead = 0,
         release: (() => void) | true | null | undefined,
@@ -1464,7 +1549,7 @@ test("observer regression contracts", async () => {
       const original = { ...pane("configuration-race"), terminal_id: terminal, revision: 1 };
       const resolver = makeIdentityResolver({
         now: () => 1000,
-        readProcessBirth:  (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
+        readProcessBirth: (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
         readConfiguration: async () => {
           // Pause the final configuration verification after selected content has been read.
           if (contentRead && ++configurationAfterRead === 1) {
@@ -1475,59 +1560,70 @@ test("observer regression contracts", async () => {
           }
           return "configured";
         },
-        rpc:  (method, params) => { return settled(() => {
-          const native = nativeIdentityResult(method, params, sequence);
-          if (native) return native;
-          return method === "agent.get"
-            ? { result: { agent: { ...original, terminal_id: terminal } } }
-            : {
-                result: {
-                  read: {
-                    pane_id: original.pane_id,
-                    source: "recent",
-                    format: "text",
-                    text: "\n  " + ID + " · model\n  ? for shortcuts\n",
+        rpc: (method, params) => {
+          return settled(() => {
+            const native = nativeIdentityResult(method, params, sequence);
+            if (native) return native;
+            return method === "agent.get"
+              ? { result: { agent: { ...original, terminal_id: terminal } } }
+              : {
+                  result: {
+                    read: {
+                      pane_id: original.pane_id,
+                      source: "recent",
+                      format: "text",
+                      text: "\n  " + ID + " · model\n  ? for shortcuts\n",
+                    },
                   },
-                },
-              };
-        }); },
+                };
+          });
+        },
       });
       const helperId = "obs_" + "e".repeat(24);
-      const inspectBody =  () => { return settled(() => {
-        contentRead = true;
-        return inspection({
-          available: true,
-          health: "available",
-          turns: [{ text: "CONFIGURATION RACE CANARY" }],
-          stats: { totalTokens: 42 },
+      const inspectBody = () => {
+        return settled(() => {
+          contentRead = true;
+          return inspection({
+            available: true,
+            health: "available",
+            turns: [{ text: "CONFIGURATION RACE CANARY" }],
+            stats: { totalTokens: 42 },
+          });
         });
-      }); };
+      };
       const observer = makeObserver({
         now: () => 1000,
         identities: resolver,
-        execute:  () => { return settled(() => {
-          inventoryReads++;
-          return { stdout: JSON.stringify({ result: { agents: [original] } }) };
-        }); },
-        projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+        execute: () => {
+          return settled(() => {
+            inventoryReads++;
+            return { stdout: JSON.stringify({ result: { agents: [original] } }) };
+          });
+        },
+        projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
-        transcripts: { read:  () => settled(() => ({ available: true })), retain() {}, inspect: inspectBody },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
+        transcripts: {
+          read: () => settled(() => ({ available: true })),
+          retain() {},
+          inspect: inspectBody,
+        },
         helpers: {
-          children:  (parents) => settled(() => ({
-            rows: [
-              {
-                id: helperId,
-                provider: "codex",
-                source: "helper",
-                inventoryHealth: "available",
-                parentId: must(parents[0]).id,
-                inspectionIdentity: "helper:" + helperId,
-              },
-            ],
-            annotations: new Map(),
-            overflow: new Map(),
-          })),
+          children: (parents) =>
+            settled(() => ({
+              rows: [
+                {
+                  id: helperId,
+                  provider: "codex",
+                  source: "helper",
+                  inventoryHealth: "available",
+                  parentId: must(parents[0]).id,
+                  inspectionIdentity: "helper:" + helperId,
+                },
+              ],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            })),
           inspect: inspectBody,
         },
       });
@@ -1562,8 +1658,8 @@ test("observer regression contracts", async () => {
       responsive = false,
       inventoryReads = 0;
     const agents: Record<string, unknown>[] = Array.from({ length: 4 }, (_, index) => ({
-      ...pane("stalled-" + index),
-      terminal_id: "term_" + index,
+      ...pane(`stalled-${String(index)}`),
+      terminal_id: `term_${String(index)}`,
       revision: 1,
     }));
     agents.push({
@@ -1571,6 +1667,21 @@ test("observer regression contracts", async () => {
       agent: "claude",
       agent_session: { agent: "claude", kind: "id", value: ID },
     });
+    function readFixtureRequest(data: Buffer) {
+      const request: unknown = JSON.parse(data.toString());
+      assert(
+        request &&
+          typeof request === "object" &&
+          "method" in request &&
+          "params" in request &&
+          "id" in request,
+      );
+      assert(typeof request.method === "string");
+      const params = request.params;
+      assert(params && typeof params === "object" && !Array.isArray(params));
+      const parameters: Record<string, unknown> = { ...params };
+      return { request: { method: request.method, id: request.id }, parameters };
+    }
     const server = net.createServer((connection) => {
       sockets.add(connection);
       connection.on("error", () => {});
@@ -1578,14 +1689,14 @@ test("observer regression contracts", async () => {
       connection.once("data", (data) => {
         requests++;
         if (!responsive) return;
-        const request = JSON.parse(data.toString());
+        const { request, parameters } = readFixtureRequest(data);
         const result =
-          nativeIdentityResult(request.method, request.params)?.result ||
+          nativeIdentityResult(request.method, parameters)?.result ||
           (request.method === "agent.get"
-            ? { agent: agents.find((agent) => agent.pane_id === request.params.target) }
+            ? { agent: agents.find((agent) => agent.pane_id === parameters.target) }
             : {
                 read: {
-                  pane_id: request.params.pane_id,
+                  pane_id: parameters.pane_id,
                   source: "recent",
                   format: "text",
                   text: "\n  " + ID + " · model\n  ? for shortcuts\n",
@@ -1600,23 +1711,26 @@ test("observer regression contracts", async () => {
       const observer = makeObserver({
         now: () => clock,
         endpoint,
-        readIdentityConfiguration:  () => settled(() => "configured"),
-        readProcessBirth:  (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
-        execute:  () => { return settled(() => {
-          inventoryReads++;
-          return { stdout: JSON.stringify({ result: { agents } }) };
-        }); },
-        projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+        readIdentityConfiguration: () => settled(() => "configured"),
+        readProcessBirth: (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
+        execute: () => {
+          return settled(() => {
+            inventoryReads++;
+            return { stdout: JSON.stringify({ result: { agents } }) };
+          });
+        },
+        projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
         bus: { read: () => busFixture({ rows: [], health: "available" }) },
         transcripts: {
-          read:  (_id, _provider, session) => settled(() => ({ available: !!session })),
+          read: (_id, _provider, session) => settled(() => ({ available: !!session })),
           retain() {},
         },
         desktop: {
-          inventory:  () => settled(() => ({
-            health: "available",
-            windows: [{ id: "obs_" + "d".repeat(24), provider: "claude" }],
-          })),
+          inventory: () =>
+            settled(() => ({
+              health: "available",
+              windows: [{ id: "obs_" + "d".repeat(24), provider: "claude" }],
+            })),
         },
       });
       const start = performance.now();
@@ -1626,7 +1740,7 @@ test("observer regression contracts", async () => {
         elapsed = performance.now() - start;
       assert(
         elapsed < 3000,
-        "shared footer timeout must not accumulate per pane: " + Math.round(elapsed) + "ms",
+        `shared footer timeout must not accumulate per pane: ${String(Math.round(elapsed))}ms`,
       );
       assert.equal(requests, 1, "endpoint timeout suppresses remaining requests in this refresh");
       assert.equal(inventoryReads, 1);
@@ -1655,7 +1769,7 @@ test("observer regression contracts", async () => {
       );
       console.log(
         "observer stalled endpoint: " +
-          Math.round(elapsed) +
+          String(Math.round(elapsed)) +
           "ms, one timed-out request, socket closed, retry recovered",
       );
     } finally {
@@ -1696,7 +1810,7 @@ test("observer regression contracts", async () => {
           },
         ];
         await fs.writeFile(
-          path.join(folder, session + ".jsonl"),
+          path.join(folder, fixtureString(session) + ".jsonl"),
           rows.map((row) => JSON.stringify(row) + "\n").join(""),
         );
       }
@@ -1718,49 +1832,58 @@ test("observer regression contracts", async () => {
         const helpers = makeHelperObserver({
           now,
           transcripts,
-          readEdges:  () => settled(() => ({
-            rows: [
-              { parent_thread_id: ID, child_thread_id: child, status: "open" },
-              { parent_thread_id: child, child_thread_id: descendant, status: "open" },
-            ],
-          })),
+          readEdges: () =>
+            settled(() => ({
+              rows: [
+                { parent_thread_id: ID, child_thread_id: child, status: "open" },
+                { parent_thread_id: child, child_thread_id: descendant, status: "open" },
+              ],
+            })),
         });
         const resolver = makeIdentityResolver({
           now,
-          readConfiguration:  () => settled(() => "configured"),
-          readProcessBirth:  (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
-          rpc:  (method, params) => { return settled(() => {
-            const native = nativeIdentityResult(method, params);
-            if (native) return native;
-            const agent = agents.find(
-              (agent) => agent.pane_id === (params.target || params.pane_id),
-            );
-            if (method === "agent.get") return { result: { agent: { ...agent } } };
-            assert.equal(method, "pane.read");
-            return {
-              result: {
-                read: {
-                  pane_id: must(agent).pane_id,
-                  source: "recent",
-                  format: "text",
-                  text: "\n  " + must(agent).agent_session.value + " · model\n  ? for shortcuts\n",
+          readConfiguration: () => settled(() => "configured"),
+          readProcessBirth: (pid) =>
+            settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
+          rpc: (method, params) => {
+            return settled(() => {
+              const native = nativeIdentityResult(method, params);
+              if (native) return native;
+              const agent = agents.find(
+                (agent) => agent.pane_id === (params.target || params.pane_id),
+              );
+              if (method === "agent.get") return { result: { agent: { ...agent } } };
+              assert.equal(method, "pane.read");
+              return {
+                result: {
+                  read: {
+                    pane_id: must(agent).pane_id,
+                    source: "recent",
+                    format: "text",
+                    text:
+                      "\n  " +
+                      fixtureString(must(agent).agent_session.value) +
+                      " · model\n  ? for shortcuts\n",
+                  },
                 },
-              },
-            };
-          }); },
+              };
+            });
+          },
         });
         const observer = makeObserver({
           now,
           identities: resolver,
           transcripts,
           helpers,
-          execute:  () => { return settled(() => {
-            inventoryReads++;
-            return { stdout: JSON.stringify({ result: { agents } }) };
-          }); },
-          projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
+          execute: () => {
+            return settled(() => {
+              inventoryReads++;
+              return { stdout: JSON.stringify({ result: { agents } }) };
+            });
+          },
+          projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
           bus: { read: () => busFixture({ rows: [], health: "available" }) },
-          desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+          desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         });
         const inventory = await observer.get();
         const parentRow = inventory.sessions.find((row) => row.paneId === must(agents[0]).pane_id);
@@ -1782,12 +1905,12 @@ test("observer regression contracts", async () => {
         );
         const result = await observer.inspect(
           must(row).id,
-          must(row).inspectionIdentity + "|" + must(row).parentId,
+          fixtureString(must(row).inspectionIdentity) + "|" + fixtureString(must(row).parentId),
         );
         assert.equal(inventoryReads, 1, "proof-set race has no roster refresh");
         assert.equal(
           detailRead,
-          false,
+          NO_DETAIL_READ,
           "multiple distinct footer roots rejected before selected transcript read",
         );
         assert.equal(result.health, "unavailable");
@@ -1849,96 +1972,102 @@ test("observer regression contracts", async () => {
     const observer = makeObserver({
       now: () => clock,
       identities: {
-        resolve:  (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
+        resolve: (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
       },
-      projects: { resolve:  () => settled(() => ({})) },
+      projects: { resolve: () => settled(() => ({})) },
       bus: { read: () => busFixture({ rows: [] }) },
-      execute:  () => { return settled(() => {
-        if (fail) throw Error("unavailable");
-        return {
-          stdout: JSON.stringify({
-            result: {
-              agents: [
-                { ...pane("parent-a"), agent: "claude" },
-                { ...pane("parent-b", second), agent: "claude" },
-                {
-                  ...pane("duplicate-a"),
-                  agent: "claude",
-                  agent_status: conflict ? "blocked" : "working",
-                },
-              ],
-            },
-          }),
-        };
-      }); },
+      execute: () => {
+        return settled(() => {
+          if (fail) throw Error("unavailable");
+          return {
+            stdout: JSON.stringify({
+              result: {
+                agents: [
+                  { ...pane("parent-a"), agent: "claude" },
+                  { ...pane("parent-b", second), agent: "claude" },
+                  {
+                    ...pane("duplicate-a"),
+                    agent: "claude",
+                    agent_status: conflict ? "blocked" : "working",
+                  },
+                ],
+              },
+            }),
+          };
+        });
+      },
       transcripts: {
-        read:  () => { return settled(() => {
-          reads++;
-          return { available: true, last: null, usage: usage(10) };
-        }); },
+        read: () => {
+          return settled(() => {
+            reads++;
+            return { available: true, last: null, usage: usage(10) };
+          });
+        },
         retain() {},
       },
       desktop: {
-        inventory:  () => settled(() => ({
-          health: "available",
-          observedAt: clock,
-          windows: [
-            {
-              provider: "claude",
-              id: "desktop",
-              sessionId: null,
-              status: "idle",
-              presence: "window",
-            },
-          ],
-        })),
+        inventory: () =>
+          settled(() => ({
+            health: "available",
+            observedAt: clock,
+            windows: [
+              {
+                provider: "claude",
+                id: "desktop",
+                sessionId: null,
+                status: "idle",
+                presence: "window",
+              },
+            ],
+          })),
       },
       helpers: {
-        children:  (parents) => settled(() => ({
-          annotations: new Map(),
-          overflow: new Map(),
-          rows: [
-            {
-              id: helperA,
-              provider: "claude",
-              sessionId: "same-child",
-              parentId: must(parents[0]).id,
-              source: "helper",
-              presence: "verified-lineage",
-              inspectionIdentity: "helper:" + helperA,
-              inventoryHealth: fail ? "unavailable" : "available",
-              observedAt: clock,
-              status: "done",
-              usage: usage(3, "partial"),
-            },
-            {
-              id: helperB,
-              provider: "claude",
-              sessionId: "same-child",
-              parentId: must(parents[1]).id,
-              source: "helper",
-              presence: "verified-lineage",
-              inspectionIdentity: "helper:" + helperB,
-              inventoryHealth: "available",
-              observedAt: clock,
-              status: "blocked",
-              usage: usage(7, "partial"),
-            },
-            {
-              id: helperA,
-              provider: "claude",
-              sessionId: "same-child",
-              parentId: must(parents[0]).id,
-              source: "helper",
-              presence: "verified-lineage",
-              inspectionIdentity: "helper:" + helperA,
-              inventoryHealth: "unavailable",
-              observedAt: 999999,
-              status: "unknown",
-              usage: usage(999),
-            },
-          ],
-        })),
+        children: (parents) =>
+          settled(() => ({
+            annotations: new Map<string, Partial<Row>>(),
+            overflow: new Map<string, number>(),
+            rows: [
+              {
+                id: helperA,
+                provider: "claude",
+                sessionId: "same-child",
+                parentId: must(parents[0]).id,
+                source: "helper",
+                presence: "verified-lineage",
+                inspectionIdentity: "helper:" + helperA,
+                inventoryHealth: fail ? "unavailable" : "available",
+                observedAt: clock,
+                status: "done",
+                usage: usage(3, "partial"),
+              },
+              {
+                id: helperB,
+                provider: "claude",
+                sessionId: "same-child",
+                parentId: must(parents[1]).id,
+                source: "helper",
+                presence: "verified-lineage",
+                inspectionIdentity: "helper:" + helperB,
+                inventoryHealth: "available",
+                observedAt: clock,
+                status: "blocked",
+                usage: usage(7, "partial"),
+              },
+              {
+                id: helperA,
+                provider: "claude",
+                sessionId: "same-child",
+                parentId: must(parents[0]).id,
+                source: "helper",
+                presence: "verified-lineage",
+                inspectionIdentity: "helper:" + helperA,
+                inventoryHealth: "unavailable",
+                observedAt: 999999,
+                status: "unknown",
+                usage: usage(999),
+              },
+            ],
+          })),
       },
     });
     const first = await observer.get();
@@ -1952,7 +2081,8 @@ test("observer regression contracts", async () => {
     });
     assert.deepEqual(first.aggregate.usage.inputTokens, wrapper(30, "partial"));
     assert.deepEqual(first.aggregate.usage.outputTokens, wrapper(null));
-    assert.deepEqual(first.aggregate.coverage.counters.inputTokens, {
+    const { aggregate: firstAggregate } = first;
+    assert.deepEqual(firstAggregate.coverage.counters.inputTokens, {
       eligible: 4,
       available: 2,
       partial: 2,
@@ -1973,8 +2103,9 @@ test("observer regression contracts", async () => {
     const conflicting = await observer.get();
     assert.equal(conflicting.aggregate.coverage.conflicting, 1);
     assert.equal(conflicting.aggregate.agents.verifiedSessions, 3);
+    const { aggregate: conflictingAggregate } = conflicting;
     assert.equal(
-      conflicting.aggregate.usage.inputTokens.value,
+      conflictingAggregate.usage.inputTokens.value,
       20,
       "conflicting duplicates excluded once from every count",
     );
@@ -1982,12 +2113,13 @@ test("observer regression contracts", async () => {
     fail = true;
     const stale = await observer.get();
     assert.equal(stale.aggregate.coverage.stale, 4);
+    const { aggregate: staleAggregate } = stale;
     assert.equal(
-      stale.aggregate.usage.inputTokens.value,
+      staleAggregate.usage.inputTokens.value,
       null,
       "unavailable ancestor makes helper values stale too",
     );
-    assert.equal(stale.aggregate.agents.statuses.working, 0);
+    assert.equal(staleAggregate.agents.statuses.working, 0);
   }
 
   async function aggregateAgeAndOverflow() {
@@ -1997,40 +2129,50 @@ test("observer regression contracts", async () => {
     const observer = makeObserver({
       now: () => clock,
       identities: {
-        resolve:  (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
+        resolve: (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
       },
-      execute:  () => settled(() => ({
-        stdout: JSON.stringify({ result: { agents: [pane("a"), pane("b", second)] } }),
-      })),
-      projects: { resolve:  () => settled(() => ({})) },
+      execute: () =>
+        settled(() => ({
+          stdout: JSON.stringify({ result: { agents: [pane("a"), pane("b", second)] } }),
+        })),
+      projects: { resolve: () => settled(() => ({})) },
       bus: { read: () => busFixture({ rows: [] }) },
       helpers: {
-        children:  () => settled(() => ({ rows: [], annotations: new Map(), overflow: new Map() })),
+        children: () =>
+          settled(() => ({
+            rows: [],
+            annotations: new Map<string, Partial<Row>>(),
+            overflow: new Map<string, number>(),
+          })),
       },
       transcripts: {
         retain() {},
-        read:  () => settled(() => ({
-          available: true,
-          usage: usageFixture({
-            inputTokens: { value: overflow ? Number.MAX_SAFE_INTEGER : 10, state: "available" },
-            outputTokens: { value: 1, state: "available" },
-            cacheReadTokens: { value: 0, state: "available" },
-            cacheWriteTokens: { value: 0, state: "available" },
-          }),
-        })),
+        read: () =>
+          settled(() => ({
+            available: true,
+            usage: usageFixture({
+              inputTokens: { value: overflow ? Number.MAX_SAFE_INTEGER : 10, state: "available" },
+              outputTokens: { value: 1, state: "available" },
+              cacheReadTokens: { value: 0, state: "available" },
+              cacheWriteTokens: { value: 0, state: "available" },
+            }),
+          })),
       },
       desktop: {
-        inventory:  () => { return settled(() => {
-          return {
-            health: "available",
-            observedAt: clock,
-            windows: [{ provider: "claude", id: "app", status: "idle" }],
-          };
-        }); },
+        inventory: () => {
+          return settled(() => {
+            return {
+              health: "available",
+              observedAt: clock,
+              windows: [{ provider: "claude", id: "app", status: "idle" }],
+            };
+          });
+        },
       },
     });
     let result = await observer.get();
-    assert.equal(result.aggregate.usage.inputTokens.value, 20);
+    const { aggregate: initialAggregate } = result;
+    assert.equal(initialAggregate.usage.inputTokens.value, 20);
     clock += 3000;
     overflow = true;
     result = await observer.get();
@@ -2059,40 +2201,44 @@ test("observer regression contracts", async () => {
     const observer = makeObserver(
       progressiveOptions({
         now: () => clock,
-        execute:  () => settled(() => ({
-          stdout: JSON.stringify({ result: { agents: [pane("old"), pane("fresh")] } }),
-        })),
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({ result: { agents: [pane("old"), pane("fresh")] } }),
+          })),
         transcripts: {
           retain() {},
-          read:  (id) => { return settled(() => {
-            firstId ??= id;
-            return {
-              available: true,
-              last: lastFixture({ name: "Read", phase: "started" }),
-              usage: usage(id === firstId ? 999 : 42, id === firstId && !conflict ? 1000 : clock),
-            };
-          }); },
+          read: (id) => {
+            return settled(() => {
+              firstId ??= id;
+              return {
+                available: true,
+                last: lastFixture({ name: "Read", phase: "started" }),
+                usage: usage(id === firstId ? 999 : 42, id === firstId && !conflict ? 1000 : clock),
+              };
+            });
+          },
         },
         helpers: {
-          prepareChildren:  (parents) => settled(() => ({
-            annotations: new Map(),
-            overflow: new Map(),
-            rows: [
-              {
-                id: child,
-                provider: "claude",
-                sessionId: "child",
-                source: "helper",
-                presence: "verified-lineage",
-                inspectionIdentity: "helper:" + child,
-                parentId: must(parents[0]).id,
-                status: "working",
-                inventoryHealth: "available",
-                observedAt: clock,
-                usage: usage(777, 1000),
-              },
-            ],
-          })),
+          prepareChildren: (parents) =>
+            settled(() => ({
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+              rows: [
+                {
+                  id: child,
+                  provider: "claude",
+                  sessionId: "child",
+                  source: "helper",
+                  presence: "verified-lineage",
+                  inspectionIdentity: "helper:" + child,
+                  parentId: must(parents[0]).id,
+                  status: "working",
+                  inventoryHealth: "available",
+                  observedAt: clock,
+                  usage: usage(777, 1000),
+                },
+              ],
+            })),
         },
       }),
     );
@@ -2103,8 +2249,9 @@ test("observer regression contracts", async () => {
         2,
         "duplicate roots count once alongside helper",
       );
+      const { aggregate: resultAggregate } = result;
       assert.equal(
-        result.aggregate.agents.statuses.working,
+        resultAggregate.agents.statuses.working,
         2,
         "fresh helper inventory keeps its status",
       );
@@ -2124,10 +2271,13 @@ test("observer regression contracts", async () => {
         1,
         "new helper inventory cannot refresh its old bound usage",
       );
-      assert.equal(result.aggregate.coverage.counters.inputTokens.stale, 1);
+      const {
+        counters: { inputTokens: resultInputCoverage },
+      } = result.aggregate.coverage;
+      assert.equal(resultInputCoverage.stale, 1);
       assert.equal(
         must(must(result.sessions.find((row) => row.id === firstId)).tool).available,
-        false,
+        UNAVAILABLE_TOOL,
         "newly accepted cached summaries keep their old source time",
       );
       clock += 3000;
@@ -2138,7 +2288,8 @@ test("observer regression contracts", async () => {
         1,
         "contradictory fresh duplicate usage still fails closed",
       );
-      assert.equal(conflicting.aggregate.usage.inputTokens.value, null);
+      const { aggregate: conflictingAggregate } = conflicting;
+      assert.equal(conflictingAggregate.usage.inputTokens.value, null);
       assert.equal(
         conflicting.aggregate.usageObservedAt,
         null,
@@ -2158,7 +2309,7 @@ test("observer regression contracts", async () => {
         [second, 7],
       ] as const) {
         await fs.writeFile(
-          path.join(folder, session + ".jsonl"),
+          path.join(folder, fixtureString(session) + ".jsonl"),
           [
             { type: "user", sessionId: session, message: { content: "parent fixture" } },
             {
@@ -2209,21 +2360,22 @@ test("observer regression contracts", async () => {
         transcripts,
         helpers: makeHelperObserver({ now: () => 1000, transcripts }),
         identities: {
-          resolve:  (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
+          resolve: (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
         },
-        execute:  () => settled(() => ({
-          stdout: JSON.stringify({
-            result: {
-              agents: [
-                { ...pane("a"), agent: "claude" },
-                { ...pane("b", second), agent: "claude" },
-              ],
-            },
-          }),
-        })),
-        projects: { resolve:  () => settled(() => ({})) },
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({
+              result: {
+                agents: [
+                  { ...pane("a"), agent: "claude" },
+                  { ...pane("b", second), agent: "claude" },
+                ],
+              },
+            }),
+          })),
+        projects: { resolve: () => settled(() => ({})) },
         bus: { read: () => busFixture({ rows: [] }) },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
       });
       const result = await observer.get(),
         children = result.sessions.filter((row) => row.source === "helper");
@@ -2244,8 +2396,14 @@ test("observer regression contracts", async () => {
         { value: 10, state: "partial" },
         "own bound helper usage reaches totals before inspection",
       );
-      assert.equal(result.aggregate.coverage.counters.inputTokens.available, 2);
-      assert.equal(result.aggregate.coverage.counters.inputTokens.unavailable, 2);
+      const {
+        counters: { inputTokens: availableInputCoverage },
+      } = result.aggregate.coverage;
+      assert.equal(availableInputCoverage.available, 2);
+      const {
+        counters: { inputTokens: unavailableInputCoverage },
+      } = result.aggregate.coverage;
+      assert.equal(unavailableInputCoverage.unavailable, 2);
     } finally {
       await fs.rm(folder, { recursive: true, force: true });
     }
@@ -2256,10 +2414,12 @@ test("observer regression contracts", async () => {
       inventory = [pane("a"), pane("b")];
     const events: string[] = [];
     const identities: NonNullable<ObserverOptions["identities"]> = {
-      resolveMany:  (panes) => { return settled(() => {
-        events.push("identities:" + panes.length);
-        return panes.map((row) => ({ sessionId: nativeSession(row), source: "native" }));
-      }); },
+      resolveMany: (panes) => {
+        return settled(() => {
+          events.push(`identities:${String(panes.length)}`);
+          return panes.map((row) => ({ sessionId: nativeSession(row), source: "native" }));
+        });
+      },
       resolve: async (row) => {
         events.push("identity:" + row.pane_id);
         await new Promise<void>((resolve) => setImmediate(resolve));
@@ -2271,8 +2431,8 @@ test("observer regression contracts", async () => {
       now: () => clock,
       endpoint: "ordering",
       identities,
-      execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
-      desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+      execute: () => settled(() => ({ stdout: JSON.stringify({ result: { agents: inventory } }) })),
+      desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
       bus: { read: () => busFixture({ rows: [] }) },
       transcripts: {
         retain() {},
@@ -2290,10 +2450,16 @@ test("observer regression contracts", async () => {
         },
       },
       helpers: {
-        children:  (parents) => { return settled(() => {
-          events.push("helpers:" + parents.length);
-          return { rows: [], annotations: new Map(), overflow: new Map() };
-        }); },
+        children: (parents) => {
+          return settled(() => {
+            events.push(`helpers:${String(parents.length)}`);
+            return {
+              rows: [],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            };
+          });
+        },
       },
     });
     assert.equal(
@@ -2357,7 +2523,7 @@ test("observer regression contracts", async () => {
       "transcript",
       "transcript",
     ]);
-    assert.equal(events.at(-1), "helpers:2");
+    assert.equal(events[events.length - 1], "helpers:2");
   }
 
   async function refreshStartCache() {
@@ -2370,17 +2536,23 @@ test("observer regression contracts", async () => {
       });
       const observer = makeCoreObserver({
         now: () => clock,
-        readIdentityConfiguration:  () => settled(() => "unconfigured"),
+        readIdentityConfiguration: () => settled(() => "unconfigured"),
         execute: async () => {
           reads++;
           await gate;
           return { stdout: JSON.stringify({ result: { agents: [] } }) };
         },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         helpers: {
-          children:  () => { return settled(() => {
-            return { rows: [], annotations: new Map(), overflow: new Map() };
-          }); },
+          children: () => {
+            return settled(() => {
+              return {
+                rows: [],
+                annotations: new Map<string, Partial<Row>>(),
+                overflow: new Map<string, number>(),
+              };
+            });
+          },
         },
         transcripts: { retain() {} },
         bus: { read: () => busFixture({ rows: [] }) },
@@ -2424,15 +2596,18 @@ test("observer regression contracts", async () => {
       desktopGate = deferred(),
       helperGate = deferred(),
       busGate = deferred();
-    const started = new Set();
+    const started = new Set<string>();
     const observer = makeCoreObserver({
       now: () => 1000,
       warmDetails: false,
       identities: {
-        resolveMany:  (rows) => settled(() => rows.map(() => ({ sessionId: ID, source: "native" }))),
+        resolveMany: (rows) => settled(() => rows.map(() => ({ sessionId: ID, source: "native" }))),
       },
-      projects: { resolveMany:  (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))) },
-      execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("early")] } }) })),
+      projects: {
+        resolveMany: (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))),
+      },
+      execute: () =>
+        settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("early")] } }) })),
       transcripts: {
         retain() {},
         read: async () => {
@@ -2440,13 +2615,19 @@ test("observer regression contracts", async () => {
           await summary.promise;
           return { available: true, usage: usageFixture({ observedAt: 777 }) };
         },
-        inspect:  () => settled(() => inspection({ available: true, health: "available", turns: [] })),
+        inspect: () =>
+          settled(() => inspection({ available: true, health: "available", turns: [] })),
       },
       helpers: {
         prepareChildren: async () => {
           started.add("helper");
           await helperGate.promise;
-          return { rows: [], annotations: new Map(), overflow: new Map(), commitBindings() {} };
+          return {
+            rows: [],
+            annotations: new Map<string, Partial<Row>>(),
+            overflow: new Map<string, number>(),
+            commitBindings() {},
+          };
         },
       },
       desktop: {
@@ -2473,12 +2654,12 @@ test("observer regression contracts", async () => {
     try {
       assert.equal(
         published,
-        true,
+        PUBLISHED_CORE,
         "core rooms publish while every optional source remains blocked",
       );
       const core = await first;
       assert.equal(core.sessions.length, 1);
-      assert.equal(must(must(core.sessions[0]).tool).available, false);
+      assert.equal(must(must(core.sessions[0]).tool).available, UNAVAILABLE_TOOL);
       assert.equal(must(core.sessions[0]).usage, null);
       assert.equal(core.bus, null);
       assert.deepEqual([...started].sort(), ["bus", "desktop", "helper", "summary"]);
@@ -2492,12 +2673,12 @@ test("observer regression contracts", async () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
       assert.equal(
         must(must((await observer.get()).sessions[0]).tool).available,
-        true,
+        AVAILABLE_TOOL,
         "summary publication does not wait for helpers",
       );
       assert.equal(
         must(must(core.sessions[0]).tool).available,
-        false,
+        UNAVAILABLE_TOOL,
         "published snapshots remain immutable",
       );
     } finally {
@@ -2527,28 +2708,265 @@ test("observer regression contracts", async () => {
       now: () => 1000,
       warmDetails: false,
       identities: {
-        resolveMany:  (rows) =>
+        resolveMany: (rows) =>
           settled(() => rows.map((row) => ({ sessionId: nativeSession(row), source: "native" }))),
       },
-      projects: { resolveMany:  (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))) },
-      execute:  () => settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("root")] } }) })),
+      projects: {
+        resolveMany: (rows) => settled(() => rows.map(() => ({ projectId: "fixture" }))),
+      },
+      execute: () =>
+        settled(() => ({ stdout: JSON.stringify({ result: { agents: [pane("root")] } }) })),
       transcripts: {
         retain() {},
-        read:  () => settled(() => ({ available: true })),
-        inspect:  () => settled(() => inspection({ available: true, health: "available", turns: [] })),
+        read: () => settled(() => ({ available: true })),
+        inspect: () =>
+          settled(() => inspection({ available: true, health: "available", turns: [] })),
       },
       helpers: {
-        prepareChildren:  () => settled(() => ({
-          rows: [],
-          annotations: new Map(),
-          overflow: new Map(),
-          commitBindings() {},
-        })),
+        prepareChildren: () =>
+          settled(() => ({
+            rows: [],
+            annotations: new Map<string, Partial<Row>>(),
+            overflow: new Map<string, number>(),
+            commitBindings() {},
+          })),
       },
-      desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
-      bus: { read:  () => settled(() => busFixture({ health: "available", rows: [], observedAt: 900 })) },
+      desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
+      bus: {
+        read: () => settled(() => busFixture({ health: "available", rows: [], observedAt: 900 })),
+      },
       ...overrides,
     };
+  }
+  async function titleCoercion() {
+    let title: unknown = "accepted",
+      clock = 1000;
+    const observer = makeCoreObserver(
+      progressiveOptions({
+        now: () => clock,
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({
+              result: { agents: [{ ...pane("title"), terminal_title_stripped: title }] },
+            }),
+          })),
+      }),
+    );
+    try {
+      await observer.get();
+      const examples: [unknown, string][] = [
+        [{}, "[object Object]"],
+        [[0, false, null, ["x", {}]], "0,false,,x,[object Object]"],
+        [{ valueOf: 1 }, "[object Object]"],
+        [false, "codex"],
+      ];
+      for (const [input, expected] of examples) {
+        title = input;
+        clock += 3000;
+        const snapshot = await observer.get();
+        assert.equal(snapshot.sources.herdr.health, "available");
+        assert.equal(
+          must(snapshot.sessions[0]).title,
+          expected,
+          "JSON title conversion preserves native object/array coercion",
+        );
+      }
+      for (const input of [{ toString: 1 }, [null, { toString: "not-callable" }]]) {
+        title = input;
+        clock += 3000;
+        const snapshot = await observer.get();
+        assert.equal(
+          snapshot.sources.herdr.health,
+          "unavailable",
+          "non-callable JSON conversion method fails inventory closed",
+        );
+        assert.equal(
+          must(snapshot.sessions[0]).title,
+          "codex",
+          "failed title coercion retains the last accepted row",
+        );
+        assert.equal(must(snapshot.sessions[0]).inventoryHealth, "unavailable");
+      }
+    } finally {
+      await observer.close();
+    }
+  }
+  async function receiverAdapters() {
+    const childSession = "00000000-0000-0000-0000-000000000002";
+    const calls = new Set<string>();
+    class ReceiverTranscripts {
+      retain() {
+        assert.equal(this, transcripts);
+      }
+      read() {
+        assert.equal(this, transcripts);
+        calls.add("read");
+        return { available: true };
+      }
+      inspect() {
+        assert.equal(this, transcripts);
+        calls.add("inspect");
+        return inspection({ available: true });
+      }
+      inspectChild() {
+        assert.equal(this, transcripts);
+        calls.add("inspectChild");
+        return inspection({ available: true });
+      }
+      bindChild(
+        provider: Row["provider"],
+        sessionId: string,
+        parentSessionId: string,
+      ): ChildBinding {
+        assert.equal(this, transcripts);
+        calls.add("bindChild");
+        return { provider, sessionId, parentSessionId };
+      }
+      claudeCandidates(parent: string): { sessionId: string }[] {
+        assert.equal(this, transcripts);
+        calls.add("originalCandidates");
+        return parent === ID ? [{ sessionId: childSession }] : [];
+      }
+      helperMetadata() {
+        assert.equal(this, transcripts);
+        calls.add("helperMetadata");
+        return undefined;
+      }
+      claudeClaims() {
+        assert.equal(this, transcripts);
+        calls.add("claudeClaims");
+        return undefined;
+      }
+    }
+    const transcripts = new ReceiverTranscripts();
+    assert(!Object.hasOwn(transcripts, "read"), "fixture methods are inherited");
+    const bus = {
+      read() {
+        assert.equal(this, bus);
+        return busFixture();
+      },
+      inspect(id: number) {
+        assert.equal(this, bus);
+        calls.add("busInspect");
+        return {
+          id,
+          identity: null,
+          health: "unavailable" as const,
+          reason: "fixture",
+          asOf: "fixture",
+          text: null,
+          truncated: false,
+          window: { maxTextChars: 0 },
+        };
+      },
+    };
+    const desktop = {
+      inventory() {
+        assert.equal(this, desktop);
+        return {
+          health: "available",
+          windows: [
+            {
+              id: "desktop-fixture",
+              provider: "codex" as const,
+              inspectionIdentity: "obs_" + "e".repeat(24),
+            },
+          ],
+        };
+      },
+      inspect() {
+        assert.equal(this, desktop);
+        calls.add("desktopInspect");
+        return inspection({ available: true });
+      },
+    };
+    const options = progressiveOptions({
+      transcripts,
+      bus,
+      desktop,
+      execute: () =>
+        settled(() => ({
+          stdout: JSON.stringify({
+            result: { agents: [{ ...pane("receiver"), agent: "claude" }] },
+          }),
+        })),
+    });
+    delete options.helpers;
+    const observer = makeCoreObserver(options);
+    transcripts.claudeCandidates = function (parent: string) {
+      assert.equal(this, transcripts);
+      calls.add("currentCandidates");
+      return parent === ID ? [{ sessionId: childSession }] : [];
+    };
+    try {
+      const snapshot = await inventoryWhen(observer, (data) => data.sessions.length === 3);
+      const child = must(snapshot.sessions.find((row) => row.source === "helper"));
+      const root = must(snapshot.sessions.find((row) => row.source === "herdr"));
+      assert.equal((await observer.inspect(root.id)).health, "available");
+      assert.equal((await observer.inspect(child.id)).health, "available");
+      assert.equal((await observer.inspect("desktop-fixture")).health, "available");
+      assert.equal((await observer.inspectMessage(7)).reason, "fixture");
+      assert.deepEqual(
+        [...calls].sort(),
+        [
+          "bindChild",
+          "busInspect",
+          "desktopInspect",
+          "claudeClaims",
+          "currentCandidates",
+          "helperMetadata",
+          "inspect",
+          "inspectChild",
+          "read",
+        ].sort(),
+        "default helpers keep current inherited adapter methods and original receiver",
+      );
+    } finally {
+      await observer.close();
+    }
+  }
+  async function sparseEvidenceShape() {
+    const child = "obs_" + "f".repeat(24);
+    const observer = makeCoreObserver(
+      progressiveOptions({
+        helpers: {
+          prepareChildren: (parents) =>
+            settled(() => ({
+              rows: [
+                {
+                  id: child,
+                  provider: "codex",
+                  source: "helper",
+                  parentId: must(parents[0]).id,
+                  inspectionIdentity: "helper:" + child,
+                  inventoryHealth: "available",
+                  tool: { available: true },
+                },
+              ],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            })),
+        },
+      }),
+    );
+    try {
+      const snapshot = await inventoryWhen(observer, (data) =>
+        data.sessions.some((row) => row.id === child),
+      );
+      const tool = must(must(snapshot.sessions.find((row) => row.id === child)).tool);
+      assert(
+        Object.hasOwn(tool, "observedAt"),
+        "sparse evidence still publishes the timestamp property",
+      );
+      assert.equal(tool.observedAt, undefined, "missing source time remains explicitly undefined");
+      assert.equal(
+        tool.available,
+        UNAVAILABLE_TOOL,
+        "untimestamped helper evidence is unavailable",
+      );
+    } finally {
+      await observer.close();
+    }
   }
   async function progressiveOptionalFreshness() {
     for (const timestamped of [true, false]) {
@@ -2577,7 +2995,12 @@ test("observer regression contracts", async () => {
           helpers: {
             prepareChildren: async () => {
               await helper.promise;
-              return { rows: [], annotations: new Map(), overflow: new Map(), commitBindings() {} };
+              return {
+                rows: [],
+                annotations: new Map<string, Partial<Row>>(),
+                overflow: new Map<string, number>(),
+                commitBindings() {},
+              };
             },
           },
         }),
@@ -2589,16 +3012,18 @@ test("observer regression contracts", async () => {
           observer,
           (data) => must(must(data.sessions[0]).tool).available,
         );
-        assert.equal(accepted.aggregate.usage.inputTokens.value, 42);
+        const { aggregate: acceptedAggregate } = accepted;
+        assert.equal(acceptedAggregate.usage.inputTokens.value, 42);
         for (clock of [3000, 5000, 7000]) {
           const live = await observer.get();
           assert.equal(must(live.sessions[0]).observedAt, clock);
           assert.equal(
             must(must(live.sessions[0]).tool).available,
-            true,
+            AVAILABLE_TOOL,
             "optional evidence is live through exactly six seconds",
           );
-          assert.equal(live.aggregate.usage.inputTokens.value, 42);
+          const { aggregate: liveAggregate } = live;
+          assert.equal(liveAggregate.usage.inputTokens.value, 42);
           assert.equal(live.aggregate.usageObservedAt, 1000);
           assert.equal(
             must(must(live.sessions[0]).tool).observedAt,
@@ -2610,7 +3035,7 @@ test("observer regression contracts", async () => {
         const expired = await observer.get();
         assert.equal(
           must(must(expired.sessions[0]).tool).available,
-          false,
+          UNAVAILABLE_TOOL,
           "cached snapshots age optional activity at six seconds",
         );
         assert.equal(
@@ -2619,14 +3044,18 @@ test("observer regression contracts", async () => {
           "optional age never changes inventory observation",
         );
         assert.equal(must(expired.sessions[0]).inventoryHealth, "available");
-        assert.equal(expired.aggregate.agents.statuses.working, 1);
+        const { aggregate: expiredAggregate } = expired;
+        assert.equal(expiredAggregate.agents.statuses.working, 1);
         assert.equal(expired.aggregate.agents.stale, 0);
         assert.deepEqual(expired.aggregate.usage.inputTokens, {
           value: null,
           state: "unavailable",
         });
         assert.equal(expired.aggregate.coverage.stale, 1);
-        assert.equal(expired.aggregate.coverage.counters.inputTokens.stale, 1);
+        const {
+          counters: { inputTokens: expiredInputCoverage },
+        } = expired.aggregate.coverage;
+        assert.equal(expiredInputCoverage.stale, 1);
         assert.equal(
           must(must(expired.sessions[0]).usage).observedAt,
           1000,
@@ -2639,14 +3068,15 @@ test("observer regression contracts", async () => {
         );
         assert.equal(
           must(must(accepted.sessions[0]).tool).available,
-          true,
+          AVAILABLE_TOOL,
           "previous published snapshot stays immutable",
         );
         assert.equal(reads, 1, "unchanged ownership does not restart a held sweep");
         clock = 9000;
         const held = await observer.get();
         assert.equal(must(held.sessions[0]).observedAt, 9000);
-        assert.equal(held.aggregate.agents.statuses.working, 1);
+        const { aggregate: heldAggregate } = held;
+        assert.equal(heldAggregate.agents.statuses.working, 1);
         assert.equal(
           held.aggregate.coverage.stale,
           1,
@@ -2661,8 +3091,9 @@ test("observer regression contracts", async () => {
           observer,
           (data) => must(data.sessions[0]).usage?.observedAt === clock,
         );
-        assert.equal(must(must(recovered.sessions[0]).tool).available, true);
-        assert.equal(recovered.aggregate.usage.inputTokens.value, 42);
+        assert.equal(must(must(recovered.sessions[0]).tool).available, AVAILABLE_TOOL);
+        const { aggregate: recoveredAggregate } = recovered;
+        assert.equal(recoveredAggregate.usage.inputTokens.value, 42);
         assert.equal(recovered.aggregate.coverage.stale, 0);
       } finally {
         summary.resolve();
@@ -2672,35 +3103,41 @@ test("observer regression contracts", async () => {
     }
   }
   async function progressiveOwnership() {
-    for (const change of ["unchanged", "session", "process", "removed", "unavailable"]) {
-      let clock = 1000,
-        session = ID,
-        pid = 7,
-        present = true,
-        failed = false,
-        revision = 0,
-        sweeps = 0;
-      const summary = deferred(),
-        helper = deferred(),
-        warm: string[] = [],
-        bindings = new Set<string>();
-      const child = "obs_" + "c".repeat(24),
-        grandchild = "obs_" + "d".repeat(24);
-      const observer = makeCoreObserver(
-        progressiveOptions({
-          now: () => clock,
-          warmDetails: true,
-          execute:  () => { return settled(() => {
+    for (const change of ["unchanged", "session", "process", "removed", "unavailable"])
+      await progressiveOwnershipScenario(change);
+  }
+  async function progressiveOwnershipScenario(change: string) {
+    let clock = 1000,
+      session = ID,
+      pid = 7,
+      present = true,
+      failed = false,
+      revision = 0,
+      sweeps = 0;
+    const summary = deferred(),
+      helper = deferred(),
+      warm: string[] = [],
+      bindings = new Set<string>();
+    const child = "obs_" + "c".repeat(24),
+      grandchild = "obs_" + "d".repeat(24);
+    const observer = makeCoreObserver(
+      progressiveOptions({
+        now: () => clock,
+        warmDetails: true,
+        execute: () => {
+          return settled(() => {
             if (failed) throw Error("fixture unavailable");
             return {
               stdout: JSON.stringify({
                 result: { agents: present ? [pane("root", session)] : [] },
               }),
             };
-          }); },
-          identities: {
-            resolveMany:  (rows) =>
-              settled(() => rows.map((row) => ({
+          });
+        },
+        identities: {
+          resolveMany: (rows) =>
+            settled(() =>
+              rows.map((row) => ({
                 sessionId: nativeSession(row),
                 source: "footer",
                 proof: {
@@ -2713,144 +3150,150 @@ test("observer regression contracts", async () => {
                   revision: ++revision,
                   birth: { pid, startSeconds: 1, startMicroseconds: 2 },
                 },
-              }))),
-            revalidateAll:  () => settled(() => true),
+              })),
+            ),
+          revalidateAll: () => settled(() => true),
+        },
+        transcripts: {
+          retain() {},
+          read: async () => {
+            await summary.promise;
+            return { available: true, usage: usageFixture({ observedAt: 700 }) };
           },
-          transcripts: {
-            retain() {},
-            read: async () => {
-              await summary.promise;
-              return { available: true, usage: usageFixture({ observedAt: 700 }) };
-            },
-            inspect:  (id) => { return settled(() => {
+          inspect: (id) => {
+            return settled(() => {
               warm.push(id);
               return inspection({ available: true, health: "available", turns: [] });
-            }); },
+            });
           },
-          helpers: {
-            prepareChildren: async (parents) => {
-              const sweep = ++sweeps;
-              await helper.promise;
-              // Later changed-owner sweeps supply their own empty result; old work must not leak through.
-              const rows: Row[] =
-                sweep === 1 || change === "unchanged"
-                  ? [
-                      {
-                        id: child,
-                        source: "helper",
-                        provider: "codex",
-                        sessionId: "child",
-                        parentId: must(parents[0]).id,
-                        inventoryHealth: "available",
-                        inspectionIdentity: "helper:" + child,
-                        observedAt: 777,
-                        tool: { available: false },
-                      },
-                      {
-                        id: grandchild,
-                        source: "helper",
-                        provider: "codex",
-                        sessionId: "grandchild",
-                        parentId: child,
-                        inventoryHealth: "available",
-                        inspectionIdentity: "helper:" + grandchild,
-                        observedAt: 778,
-                        tool: { available: false },
-                      },
-                    ]
-                  : [];
-              return {
-                rows,
-                annotations: new Map(),
-                overflow: new Map(),
-                commitBindings(ids) {
-                  bindings.clear();
-                  for (const row of rows) if (ids.has(row.id)) bindings.add(row.id);
-                },
-              };
-            },
-            inspect:  (row) => { return settled(() => {
+        },
+        helpers: {
+          prepareChildren: async (parents) => {
+            const sweep = ++sweeps;
+            await helper.promise;
+            // Later changed-owner sweeps supply their own empty result; old work must not leak through.
+            const rows: Row[] =
+              sweep === 1 || change === "unchanged"
+                ? [
+                    {
+                      id: child,
+                      source: "helper",
+                      provider: "codex",
+                      sessionId: "child",
+                      parentId: must(parents[0]).id,
+                      inventoryHealth: "available",
+                      inspectionIdentity: "helper:" + child,
+                      observedAt: 777,
+                      tool: { available: false },
+                    },
+                    {
+                      id: grandchild,
+                      source: "helper",
+                      provider: "codex",
+                      sessionId: "grandchild",
+                      parentId: child,
+                      inventoryHealth: "available",
+                      inspectionIdentity: "helper:" + grandchild,
+                      observedAt: 778,
+                      tool: { available: false },
+                    },
+                  ]
+                : [];
+            return {
+              rows,
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+              commitBindings(ids) {
+                bindings.clear();
+                for (const row of rows) if (ids.has(row.id)) bindings.add(row.id);
+              },
+            };
+          },
+          inspect: (row) => {
+            return settled(() => {
               assert(bindings.has(row.id), "visible helper and binding publish together");
               warm.push(row.id);
               return inspection({ available: true, health: "available", turns: [] });
-            }); },
+            });
           },
-        }),
-      );
-      try {
-        const first = await observer.get();
-        const root = must(first.sessions[0]).id;
-        for (let round = 0; round < 3; round++) {
-          clock += 2000;
-          if (round === 1) {
-            if (change === "session") session = "00000000-0000-0000-0000-000000000002";
-            if (change === "process") pid++;
-            if (change === "removed") present = false;
-            if (change === "unavailable") failed = true;
-          }
-          await observer.get();
-        }
-        assert.equal(sweeps, 1, "polling never overlaps or cancels an active sweep");
-        summary.resolve();
-        helper.resolve();
-        if (change === "unchanged") {
-          const enriched = await inventoryWhen(
-            observer,
-            (data) => data.sessions.length === 3 && warm.includes(grandchild),
-          );
-          assert.equal(must(enriched.sessions[0]).observedAt, 7000);
-          assert.equal(must(must(enriched.sessions[0]).usage).observedAt, 700);
-          assert.equal(must(enriched.sessions[1]).observedAt, 777);
-          assert.equal(must(enriched.sessions[2]).observedAt, 778);
-          assert.equal(
-            sweeps,
-            1,
-            "unchanged ownership retains enrichment across three generations",
-          );
-          assert.deepEqual([...bindings], [child, grandchild]);
-          assert.equal(
-            (await observer.inspect(grandchild, "helper:" + grandchild + "|" + child)).health,
-            "available",
-          );
-          clock += 2000;
-          await observer.get();
-          const retained = await observer.get();
-          assert.equal(
-            must(retained.sessions[1]).observedAt,
-            777,
-            "a later core cannot restamp helper evidence",
-          );
-          assert.equal(must(must(retained.sessions[0]).usage).observedAt, 700);
-        } else {
-          // Synchronize on actual fixture work; get exposes only public snapshots.
-          await summary.promise;
-          await helper.promise;
-          await new Promise<void>((resolve) => setImmediate(resolve));
-          const latest = await observer.get();
-          assert.equal(
-            latest.sessions.some((row) => row.id === child || row.id === grandchild),
-            false,
-            change + ": obsolete ancestry rejected",
-          );
-          assert.equal(bindings.size, 0);
-          assert(!warm.includes(child));
-          assert(!warm.includes(grandchild));
-          if (change === "removed") assert(!warm.includes(root));
-        }
-      } finally {
-        summary.resolve();
-        helper.resolve();
-        await observer.close();
+        },
+      }),
+    );
+    function changeOwnership(round: number) {
+      if (round !== 1) return;
+      if (change === "session") session = "00000000-0000-0000-0000-000000000002";
+      if (change === "process") pid++;
+      if (change === "removed") present = false;
+      if (change === "unavailable") failed = true;
+    }
+    try {
+      const first = await observer.get();
+      const root = must(first.sessions[0]).id;
+      for (let round = 0; round < 3; round++) {
+        clock += 2000;
+        changeOwnership(round);
+        await observer.get();
       }
+      assert.equal(sweeps, 1, "polling never overlaps or cancels an active sweep");
+      summary.resolve();
+      helper.resolve();
+      if (change === "unchanged") {
+        const enriched = await inventoryWhen(
+          observer,
+          (data) => data.sessions.length === 3 && warm.includes(grandchild),
+        );
+        assert.equal(must(enriched.sessions[0]).observedAt, 7000);
+        assert.equal(must(must(enriched.sessions[0]).usage).observedAt, 700);
+        assert.equal(must(enriched.sessions[1]).observedAt, 777);
+        assert.equal(must(enriched.sessions[2]).observedAt, 778);
+        assert.equal(sweeps, 1, "unchanged ownership retains enrichment across three generations");
+        assert.deepEqual([...bindings], [child, grandchild]);
+        assert.equal(
+          (await observer.inspect(grandchild, "helper:" + grandchild + "|" + child)).health,
+          "available",
+        );
+        clock += 2000;
+        await observer.get();
+        const retained = await observer.get();
+        assert.equal(
+          must(retained.sessions[1]).observedAt,
+          777,
+          "a later core cannot restamp helper evidence",
+        );
+        assert.equal(must(must(retained.sessions[0]).usage).observedAt, 700);
+      } else {
+        // Synchronize on actual fixture work; get exposes only public snapshots.
+        await summary.promise;
+        await helper.promise;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        const latest = await observer.get();
+        assert.equal(
+          latest.sessions.some((row) => row.id === child || row.id === grandchild),
+          NO_OBSOLETE_DESCENDANTS,
+          change + ": obsolete ancestry rejected",
+        );
+        assert.equal(bindings.size, 0);
+        assert(!warm.includes(child));
+        assert(!warm.includes(grandchild));
+        if (change === "removed") assert(!warm.includes(root));
+      }
+    } finally {
+      summary.resolve();
+      helper.resolve();
+      await observer.close();
     }
   }
+
   async function boundedWarmup() {
     let clock = 1000,
       inventoryReads = 0,
       active = 0,
       maximum = 0;
     const panes = Array.from({ length: 40 }, (_, index) =>
-      pane("warm-" + index, "00000000-0000-0000-0000-" + String(index + 1).padStart(12, "0")),
+      pane(
+        `warm-${String(index)}`,
+        "00000000-0000-0000-0000-" + String(index + 1).padStart(12, "0"),
+      ),
     );
     const jobs: { id: string; gate: ReturnType<typeof deferred> }[] = [],
       observers: ReturnType<typeof makeNativeObserver>[] = [];
@@ -2858,13 +3301,16 @@ test("observer regression contracts", async () => {
       progressiveOptions({
         now: () => clock,
         warmDetails: true,
-        execute:  () => { return settled(() => {
-          inventoryReads++;
-          return { stdout: JSON.stringify({ result: { agents: panes } }) };
-        }); },
+        execute: () => {
+          return settled(() => {
+            inventoryReads++;
+            return { stdout: JSON.stringify({ result: { agents: panes } }) };
+          });
+        },
         transcripts: {
           retain() {},
-          read:  () => settled(() => ({ available: true, usage: usageFixture({ observedAt: clock }) })),
+          read: () =>
+            settled(() => ({ available: true, usage: usageFixture({ observedAt: clock }) })),
           inspect: async (id) => {
             const gate = deferred();
             active++;
@@ -2893,13 +3339,13 @@ test("observer regression contracts", async () => {
           data.sessions.every((row) => row.usage?.observedAt === clock),
         );
       }
-      // Advance beyond cooldown while reads are held. Warmup must never request new inventory itself.
+      // Advance beyond cooldown with held reads. Warmup never requests new inventory itself.
       clock += 61000;
       const demands = inventoryReads;
       for (let completed = 0; completed < 32; completed++) {
         await fixtureUntil(
           () => !!jobs[completed],
-          "warm job " + completed + ", total=" + jobs.length,
+          `warm job ${String(completed)}, total=${String(jobs.length)}`,
         );
         must(jobs[completed]).gate.resolve();
         await must(jobs[completed]).gate.promise;
@@ -2929,7 +3375,7 @@ test("observer regression contracts", async () => {
       for (let index = 32; index < 34; index++) {
         await fixtureUntil(
           () => !!jobs[index],
-          "second warm job " + index + ", total=" + jobs.length,
+          `second warm job ${String(index)}, total=${String(jobs.length)}`,
         );
         must(jobs[index]).gate.resolve();
       }
@@ -2945,10 +3391,12 @@ test("observer regression contracts", async () => {
           warmDetails: false,
           transcripts: {
             retain() {},
-            read:  () => settled(() => ({ available: true })),
-            inspect:  () => { return settled(() => {
-              assert.fail("disabled warmup read content");
-            }); },
+            read: () => settled(() => ({ available: true })),
+            inspect: () => {
+              return settled(() => {
+                assert.fail("disabled warmup read content");
+              });
+            },
           },
         }),
       );
@@ -2983,21 +3431,23 @@ test("observer regression contracts", async () => {
       progressiveOptions({
         now: () => clock,
         warmDetails: true,
-        execute:  () => settled(() => ({
-          stdout: JSON.stringify({
-            result: {
-              agents: [
-                pane("a"),
-                pane("b", "00000000-0000-0000-0000-000000000002"),
-                pane("c", thirdSession),
-                ...(fourth ? [pane("d", "00000000-0000-0000-0000-000000000004")] : []),
-              ],
-            },
-          }),
-        })),
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({
+              result: {
+                agents: [
+                  pane("a"),
+                  pane("b", "00000000-0000-0000-0000-000000000002"),
+                  pane("c", thirdSession),
+                  ...(fourth ? [pane("d", "00000000-0000-0000-0000-000000000004")] : []),
+                ],
+              },
+            }),
+          })),
         transcripts: {
           retain() {},
-          read:  () => settled(() => ({ available: true, usage: usageFixture({ observedAt: clock }) })),
+          read: () =>
+            settled(() => ({ available: true, usage: usageFixture({ observedAt: clock }) })),
           inspect: async (_id, _provider, session) => {
             reads.push(session);
             if (reads.length <= 2) {
@@ -3009,27 +3459,30 @@ test("observer regression contracts", async () => {
           },
         },
         helpers: {
-          prepareChildren:  (parents) => settled(() => ({
-            rows: [
-              {
-                id: child,
-                source: "helper",
-                provider: "codex",
-                sessionId: "child",
-                inspectionIdentity: "helper:" + child,
-                parentId: must(parents[parentIndex]).id,
-                inventoryHealth: "available",
-                observedAt: 900,
-              },
-            ],
-            annotations: new Map(),
-            overflow: new Map(),
-            commitBindings() {},
-          })),
-          inspect:  (row) => { return settled(() => {
-            helperParents.push(must(row.parentId));
-            return inspection({ available: true, health: "available", turns: [] });
-          }); },
+          prepareChildren: (parents) =>
+            settled(() => ({
+              rows: [
+                {
+                  id: child,
+                  source: "helper",
+                  provider: "codex",
+                  sessionId: "child",
+                  inspectionIdentity: "helper:" + child,
+                  parentId: must(parents[parentIndex]).id,
+                  inventoryHealth: "available",
+                  observedAt: 900,
+                },
+              ],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+              commitBindings() {},
+            })),
+          inspect: (row) => {
+            return settled(() => {
+              helperParents.push(must(row.parentId));
+              return inspection({ available: true, health: "available", turns: [] });
+            });
+          },
         },
       }),
     );
@@ -3094,26 +3547,30 @@ test("observer regression contracts", async () => {
             await summary.promise;
             return { available: true };
           },
-          inspect:  () => { return settled(() => {
-            reads++;
-            return { available: false };
-          }); },
+          inspect: () => {
+            return settled(() => {
+              reads++;
+              return { available: false };
+            });
+          },
         },
         helpers: {
           prepareChildren: async () => {
             await helpers.promise;
             return {
               rows: [],
-              annotations: new Map(),
-              overflow: new Map(),
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
               commitBindings() {
                 assert.fail("closed observer committed helper bindings");
               },
             };
           },
-          close:  () => { return settled(() => {
-            helperCloses++;
-          }); },
+          close: () => {
+            return settled(() => {
+              helperCloses++;
+            });
+          },
         },
         bus: {
           read: async () => {
@@ -3133,16 +3590,21 @@ test("observer regression contracts", async () => {
     const closing = observer.close();
     assert.equal(observer.close(), closing);
     let complete = false;
-    closing.then(() => {
+    void closing.then(() => {
       complete = true;
     });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(complete, false, "close waits for accepted bounded work");
+    assert.equal(complete, CLOSE_STILL_PENDING, "close waits for accepted bounded work");
     summary.resolve();
     helpers.resolve();
     bus.resolve();
     desktop.resolve();
     await closing;
+    assert.deepEqual(
+      await observer.inspectMessage(7),
+      { id: 7, health: "unavailable", reason: "unreadable", text: null },
+      "closed message inspection preserves its exact public shape",
+    );
     const after = await observer.get();
     assert.deepEqual(after, before, "late optional results cannot publish after close");
     assert.equal(reads, 0);
@@ -3153,21 +3615,22 @@ test("observer regression contracts", async () => {
       activeObserver = makeCoreObserver(
         progressiveOptions({
           warmDetails: true,
-          execute:  () => settled(() => ({
-            stdout: JSON.stringify({
-              result: {
-                agents: Array.from({ length: 4 }, (_, index) =>
-                  pane(
-                    "close-" + index,
-                    "00000000-0000-0000-0000-" + String(index + 1).padStart(12, "0"),
+          execute: () =>
+            settled(() => ({
+              stdout: JSON.stringify({
+                result: {
+                  agents: Array.from({ length: 4 }, (_, index) =>
+                    pane(
+                      `close-${String(index)}`,
+                      "00000000-0000-0000-0000-" + String(index + 1).padStart(12, "0"),
+                    ),
                   ),
-                ),
-              },
-            }),
-          })),
+                },
+              }),
+            })),
           transcripts: {
             retain() {},
-            read:  () => settled(() => ({ available: true })),
+            read: () => settled(() => ({ available: true })),
             inspect: async () => {
               const job = deferred();
               jobs.push(job);
@@ -3181,11 +3644,15 @@ test("observer regression contracts", async () => {
       await activeObserver.get();
       await fixtureUntil(() => jobs.length === 2, "two warm jobs did not start");
       const stopping = activeObserver.close();
-      jobs.forEach((job) => { job.resolve(); });
+      jobs.forEach((job) => {
+        job.resolve();
+      });
       await stopping;
       assert.equal(jobs.length, 2, "teardown clears queued targets before active work settles");
     } finally {
-      jobs.forEach((job) => { job.resolve(); });
+      jobs.forEach((job) => {
+        job.resolve();
+      });
       await activeObserver.close();
     }
     const stuck = deferred();
@@ -3201,7 +3668,7 @@ test("observer regression contracts", async () => {
       }),
     );
     await bounded.get();
-    let published;
+    let published: Inventory | undefined;
     const setTimer = globalThis.setTimeout,
       clearTimer = globalThis.clearTimeout;
     let deadline: (() => void) | undefined,
@@ -3260,15 +3727,17 @@ test("observer regression contracts", async () => {
       mode = "available",
       coreFails = false;
     const child = "obs_" + "b".repeat(24),
-      bindings = new Set(),
+      bindings = new Set<string>(),
       recovery = deferred();
     const observer = makeCoreObserver(
       progressiveOptions({
         now: () => clock,
-        execute:  () => { return settled(() => {
-          if (coreFails) throw Error("fixture unavailable");
-          return { stdout: JSON.stringify({ result: { agents: [pane("root")] } }) };
-        }); },
+        execute: () => {
+          return settled(() => {
+            if (coreFails) throw Error("fixture unavailable");
+            return { stdout: JSON.stringify({ result: { agents: [pane("root")] } }) };
+          });
+        },
         helpers: {
           prepareChildren: async (parents) => {
             if (mode === "recovering") await recovery.promise;
@@ -3289,15 +3758,16 @@ test("observer regression contracts", async () => {
                         observedAt: 777,
                       },
                     ],
-              annotations: new Map(),
-              overflow: new Map(),
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
               commitBindings(ids) {
                 bindings.clear();
                 for (const id of ids) bindings.add(id);
               },
             };
           },
-          inspect:  () => settled(() => inspection({ available: true, health: "available", turns: [] })),
+          inspect: () =>
+            settled(() => inspection({ available: true, health: "available", turns: [] })),
         },
       }),
     );
@@ -3349,25 +3819,28 @@ test("observer regression contracts", async () => {
     const observer = makeCoreObserver(
       progressiveOptions({
         now: () => clock,
-        execute:  () => settled(() => ({
-          stdout: JSON.stringify({
-            result: {
-              agents: [
-                { ...pane("root"), cwd },
-                { ...pane("child", "00000000-0000-0000-0000-000000000002"), cwd: "child-room" },
-                { ...pane("capped", "00000000-0000-0000-0000-000000000003"), cwd: "capped-room" },
-              ],
-            },
-          }),
-        })),
+        execute: () =>
+          settled(() => ({
+            stdout: JSON.stringify({
+              result: {
+                agents: [
+                  { ...pane("root"), cwd },
+                  { ...pane("child", "00000000-0000-0000-0000-000000000002"), cwd: "child-room" },
+                  { ...pane("capped", "00000000-0000-0000-0000-000000000003"), cwd: "capped-room" },
+                ],
+              },
+            }),
+          })),
         projects: {
-          resolveMany:  (cwds) =>
-            settled(() => cwds.map((value) => ({
-              projectId: fixtureString(value),
-              project: fixtureString(value),
-              repoId: fixtureString(value) + "-repo",
-              worktree: fixtureString(value) + "-tree",
-            }))),
+          resolveMany: (cwds) =>
+            settled(() =>
+              cwds.map((value) => ({
+                projectId: fixtureString(value),
+                project: fixtureString(value),
+                repoId: fixtureString(value) + "-repo",
+                worktree: fixtureString(value) + "-tree",
+              })),
+            ),
         },
         helpers: {
           prepareChildren: async (parents) => {
@@ -3396,7 +3869,7 @@ test("observer regression contracts", async () => {
                 [must(parents[2]).id, oldGrouping],
               ]),
               groupOwners: new Map([[must(parents[2]).id, must(parents[0]).id]]),
-              overflow: new Map(),
+              overflow: new Map<string, number>(),
               commitBindings() {},
             };
           },
@@ -3447,7 +3920,11 @@ test("observer regression contracts", async () => {
         helpers: {
           prepareChildren: async () => {
             await helper.promise;
-            return { rows: [], annotations: new Map(), overflow: new Map() };
+            return {
+              rows: [],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            };
           },
         },
       }),
@@ -3470,9 +3947,9 @@ test("observer regression contracts", async () => {
         1000,
         "healthy core does not restamp tool-only evidence",
       );
-      assert.equal(must(must(boundary.sessions[0]).tool).available, true);
+      assert.equal(must(must(boundary.sessions[0]).tool).available, AVAILABLE_TOOL);
       clock++;
-      assert.equal(must(must((await observer.get()).sessions[0]).tool).available, false);
+      assert.equal(must(must((await observer.get()).sessions[0]).tool).available, UNAVAILABLE_TOOL);
     } finally {
       helper.resolve();
       await observer.close();
@@ -3503,22 +3980,29 @@ test("observer regression contracts", async () => {
         endpoint,
         overseerState: state,
         identities: {
-          resolveMany:  (panes) =>
+          resolveMany: (panes) =>
             settled(() => panes.map(() => ({ sessionId: null, source: "unavailable" }))),
         },
-        execute:  (_command, args, settings) => { return settled(() => {
-          assert.deepEqual(args, ["agent", "list"], "role proof adds no per-row subprocess");
-          assert.equal(must(settings.env).HERDR_SOCKET_PATH, endpoint);
-          if (fail) throw Error("inventory unavailable");
-          return { stdout: JSON.stringify({ result: { agents: inventory } }) };
-        }); },
-        projects: { resolve:  () => settled(() => ({ projectId: "fixture" })) },
-        transcripts: { read:  () => settled(() => ({ available: false })), retain() {} },
+        execute: (_command, args, settings) => {
+          return settled(() => {
+            assert.deepEqual(args, ["agent", "list"], "role proof adds no per-row subprocess");
+            assert.equal(must(settings.env).HERDR_SOCKET_PATH, endpoint);
+            if (fail) throw Error("inventory unavailable");
+            return { stdout: JSON.stringify({ result: { agents: inventory } }) };
+          });
+        },
+        projects: { resolve: () => settled(() => ({ projectId: "fixture" })) },
+        transcripts: { read: () => settled(() => ({ available: false })), retain() {} },
         helpers: {
-          children:  () => settled(() => ({ rows: [], annotations: new Map(), overflow: new Map() })),
+          children: () =>
+            settled(() => ({
+              rows: [],
+              annotations: new Map<string, Partial<Row>>(),
+              overflow: new Map<string, number>(),
+            })),
         },
         bus: { read: () => busFixture({ rows: [] }) },
-        desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
+        desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
         warmDetails: false,
       });
       observers.push(observer);
@@ -3558,13 +4042,13 @@ test("observer regression contracts", async () => {
         "private state path never enters rows",
       );
     } finally {
-      for (const observer of observers) observer.close();
+      await Promise.all(observers.map((observer) => observer.close()));
       await fs.rm(directory, { recursive: true, force: true });
     }
   }
 
   // A transcript UUID belongs to one host; copied histories on other machines are
-  // independent observations, while duplicate panes on the same host still agree or conflict.
+  // Separate hosts remain independent observations. Duplicate panes on one host still agree or conflict.
   function aggregateHostOwnership() {
     const usage = (value: number) =>
       usageFixture({

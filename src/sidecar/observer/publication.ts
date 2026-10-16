@@ -20,17 +20,19 @@ export class Publisher {
     if (this.state.closed) return;
     let roots = this.state.coreRows.map((row) => {
       if (row.inventoryHealth === "available") return row;
-      const previous = this.state.rowsBySource.herdr.find((value) => value.id === row.id);
+      const previous = this.state.sourceRows("herdr").find((value) => value.id === row.id);
       return { ...row, tool: previous?.tool || row.tool, usage: previous?.usage || null };
     });
     let children: Row[] =
-      this.state.sources.herdr.health === "available"
+      this.state.herdrSource.health === "available"
         ? []
-        : this.state.rowsBySource.helper.map((row) => ({ ...row, inventoryHealth: "unavailable" }));
+        : this.state
+            .sourceRows("helper")
+            .map((row) => ({ ...row, inventoryHealth: "unavailable" }));
     if (this.state.lineage) {
       const publication = new Publication(this.state, this.state.lineage, roots);
       roots = publication.roots(roots);
-      if (this.state.sources.herdr.health === "available") children = publication.children();
+      if (this.state.herdrSource.health === "available") children = publication.children();
       publication.commit();
     }
     const roster = [...roots, ...children];

@@ -72,7 +72,7 @@ export interface ObserverRow {
   usage?: Usage | null;
   tool: {
     available: boolean;
-    observedAt?: number | string | null;
+    observedAt?: number | string | null | undefined;
     lastEntryAt?: number | null;
     last?: {
       name: string | null;

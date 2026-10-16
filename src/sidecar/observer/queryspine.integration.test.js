@@ -1,4 +1,4 @@
-const Harness=globalThis.Harness;
+const Harness = globalThis.Harness;
 const { test } = require("bun:test");
 const assert = require("node:assert/strict");
 const { makeObserver } = require("./index.ts");

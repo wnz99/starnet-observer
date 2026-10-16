@@ -2,6 +2,7 @@ import type { State } from "./state.js";
 import type { Sweep, Tool, Row } from "./contracts.js";
 import { currentOwner, sameIdentity, sameProof } from "./ownership.js";
 import { required } from "./required.js";
+const SUMMARY_CONCURRENCY = 4;
 type Summaries = Map<string, ReturnType<Enrichment["deferred"]>>;
 export class Enrichment {
   constructor(private readonly state: State) {}
@@ -14,6 +15,17 @@ export class Enrichment {
     });
     return { promise, resolve: finish };
   }
+  private observedTool(tool: Tool, readAt: number) {
+    const observedAt = tool.usage?.observedAt ?? readAt;
+    const usage = tool.usage;
+    return {
+      observedAt,
+      tool:
+        usage && (usage.observedAt === null || usage.observedAt === undefined)
+          ? { ...tool, usage: { ...usage, observedAt } }
+          : tool,
+    };
+  }
   async readSummary(target: Sweep, row: Row, results: Summaries) {
     const result = required(results.get(row.id)),
       owners = target.owners.get(row.id);
@@ -24,17 +36,20 @@ export class Enrichment {
     const readAt = this.state.now();
     let tool: Tool;
     try {
-      tool = await required(this.state.transcripts.read)(row.id, row.provider, row.sessionId);
+      tool = await required(this.state.transcripts.read).call(
+        this.state.transcripts,
+        row.id,
+        row.provider,
+        row.sessionId,
+      );
     } catch {
       tool = { available: false };
     }
     result.resolve(tool);
     if (this.state.closed || !currentOwner(this.state, owners)) return;
     // Timestamp-less injected adapters use the captured read start, never a later core poll.
-    const observedAt = tool.usage?.observedAt ?? readAt;
-    if (tool.usage && tool.usage.observedAt == null)
-      tool = { ...tool, usage: { ...tool.usage, observedAt } };
-    this.state.summaries.set(row.id, { owners, tool, observedAt });
+    const observed = this.observedTool(tool, readAt);
+    this.state.summaries.set(row.id, { owners, ...observed });
     this.state.publication.publish();
     this.state.warmup.scheduleWarmup(target);
   }
@@ -45,7 +60,9 @@ export class Enrichment {
         await this.readSummary(target, entry.value, results);
     };
     try {
-      await Promise.all(Array.from({ length: Math.min(4, target.parents.length) }, next));
+      await Promise.all(
+        Array.from({ length: Math.min(SUMMARY_CONCURRENCY, target.parents.length) }, next),
+      );
     } finally {
       // Closed sweeps may leave queued rows unread. Never strand helper work.
       for (const result of results.values()) result.resolve({ available: false });
@@ -60,10 +77,10 @@ export class Enrichment {
               ? tool
               : { available: false };
           })
-        : required(this.state.helpers.children)(target.parents));
+        : required(this.state.helpers.children).call(this.state.helpers, target.parents));
       if (this.state.closed) return;
       if (result.health === "unavailable" && result.reason !== "unsupported") {
-        result.commitBindings?.(new Set());
+        result.commitBindings?.(new Set<string>());
         if (this.state.lineage) this.state.lineage.failed = true;
       } else this.state.lineage = { ...target, result };
       this.state.publication.publish();

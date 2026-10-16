@@ -2,15 +2,18 @@ import { grouping } from "../helpers/evidence.js";
 import { sameIdentity, sameProof } from "./ownership.js";
 import { required } from "./required.js";
 import type { State } from "./state.js";
-import type { Row, Lineage } from "./contracts.js";
+import type { Row, Lineage, HelperResult } from "./contracts.js";
+const MAX_ANCESTRY = 64;
 export class Publication {
   private readonly candidates: Map<string, Row>;
+  private readonly result: HelperResult;
   readonly accepted: Set<string>;
   constructor(
     private readonly s: State,
     private readonly lineage: Lineage,
     roots: Row[],
   ) {
+    this.result = lineage.result;
     this.candidates = new Map([
       ...roots.map((row): [string, Row] => [
         row.id,
@@ -33,18 +36,21 @@ export class Publication {
   private valid(id: string | null | undefined, seen = new Set<string>()): boolean {
     if (typeof id !== "string") return false;
     const row = this.candidates.get(id);
-    if (!row || seen.has(id) || seen.size >= 64) return false;
-    seen.add(id);
+    if (!row || seen.has(id) || seen.size >= MAX_ANCESTRY) return false;
+    const visited = new Set(seen).add(id);
     const parent = this.lineage.parents.find((value) => value.id === id);
     if (parent && !this.validParent(id, parent)) return false;
     if (!parent && row.source !== "helper") return false;
-    const ownerId = this.lineage.result.groupOwners?.get(id);
-    if (ownerId && !this.valid(ownerId, new Set(seen))) return false;
-    return Object.hasOwn(row, "parentId") ? this.valid(row.parentId, seen) : !!parent;
+    return this.validLinks(row, visited, parent);
+  }
+  private validLinks(row: Row, visited: Set<string>, parent: Row | undefined) {
+    const ownerId = this.result.groupOwners?.get(row.id);
+    if (ownerId && !this.valid(ownerId, new Set(visited))) return false;
+    return Object.hasOwn(row, "parentId") ? this.valid(row.parentId, visited) : !!parent;
   }
   private currentGrouping(id: string): ReturnType<typeof grouping> {
     const row = required(this.candidates.get(id)),
-      ownerId = row.parentId || this.lineage.result.groupOwners?.get(id);
+      ownerId = row.parentId || this.result.groupOwners?.get(id);
     return ownerId
       ? this.currentGrouping(ownerId)
       : grouping(required(this.s.coreRows.find((value) => value.id === id)));
@@ -54,26 +60,26 @@ export class Publication {
       !this.lineage.failed && this.accepted.has(row.id)
         ? {
             ...row,
-            ...this.lineage.result.annotations.get(row.id),
+            ...this.result.annotations.get(row.id),
             ...this.currentGrouping(row.id),
-            helperOverflow: this.lineage.result.overflow.get(row.id) || 0,
+            helperOverflow: this.result.overflow.get(row.id) || 0,
           }
         : row,
     );
   }
   children(): Row[] {
-    return this.lineage.result.rows
+    return this.result.rows
       .filter((row) => this.accepted.has(row.id))
       .map((row) => ({
         ...row,
         ...(this.lineage.failed ? { inventoryHealth: "unavailable" as const } : {}),
         ...this.currentGrouping(row.id),
-        helperOverflow: this.lineage.result.overflow.get(row.id) || 0,
+        helperOverflow: this.result.overflow.get(row.id) || 0,
       }));
   }
   commit() {
     // This synchronous install and row publication form a single observable commit.
-    if (this.s.sources.herdr.health !== "available") this.lineage.failed = true;
-    this.lineage.result.commitBindings?.(this.lineage.failed ? new Set() : this.accepted);
+    if (this.s.herdrSource.health !== "available") this.lineage.failed = true;
+    this.result.commitBindings?.(this.lineage.failed ? new Set<string>() : this.accepted);
   }
 }

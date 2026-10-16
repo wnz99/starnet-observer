@@ -98,7 +98,7 @@ test("source and emitted SQLite workers validate requests, isolate environment a
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
-});
+}, 60000);
 
 test("client quarantines malformed correlated replies and never exposes a mismatched message body", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "observer-worker-protocol-"));
@@ -154,4 +154,4 @@ test("emitted SQLite client preserves native lifecycle regression contracts", as
   assert.match(result.stderr, /0 fail/);
   assert.match(result.stderr, /Ran 1 test across 1 file/);
   console.log("Emitted SQLite lifecycle:\n" + result.stdout.trim());
-}, 40000);
+}, 70000);

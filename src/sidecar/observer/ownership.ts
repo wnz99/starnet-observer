@@ -2,17 +2,28 @@ import type { Row, Owners, Owner } from "./contracts.js";
 import type { FooterProof } from "../identity/types.js";
 import type { State } from "./state.js";
 
-export function sameProof(a: FooterProof | null | undefined, b: FooterProof | null | undefined) {
+const MAX_ANCESTRY = 64;
+function sameBirth(a: FooterProof["birth"], b: FooterProof["birth"]) {
   return (
-    (!a && !b) ||
-    (!!a &&
-      !!b &&
-      a.paneId === b.paneId &&
-      a.terminalId === b.terminalId &&
-      a.sessionId === b.sessionId &&
-      a.birth?.pid === b.birth?.pid &&
-      a.birth?.startSeconds === b.birth?.startSeconds &&
-      a.birth?.startMicroseconds === b.birth?.startMicroseconds)
+    a.pid === b.pid &&
+    a.startSeconds === b.startSeconds &&
+    a.startMicroseconds === b.startMicroseconds
+  );
+}
+function invalidOwner(row: Row, proofs: Map<string, FooterProof>) {
+  return (
+    row.inventoryHealth !== "available" ||
+    !row.inspectionIdentity ||
+    (row.identitySource === "footer" && !proofs.has(row.id))
+  );
+}
+export function sameProof(a: FooterProof | null | undefined, b: FooterProof | null | undefined) {
+  if (!a || !b) return !a && !b;
+  return (
+    a.paneId === b.paneId &&
+    a.terminalId === b.terminalId &&
+    a.sessionId === b.sessionId &&
+    sameBirth(a.birth, b.birth)
   );
 }
 
@@ -38,21 +49,16 @@ export function capture(
   proofs = s.identityProofs,
 ) {
   const targets: Owner[] = [],
-    seen = new Set();
-  while (row) {
-    if (
-      seen.has(row.id) ||
-      seen.size >= 64 ||
-      row.inventoryHealth !== "available" ||
-      !row.inspectionIdentity ||
-      (row.identitySource === "footer" && !proofs.has(row.id))
-    )
+    seen = new Set<string>();
+  let current = row;
+  while (current) {
+    if (seen.has(current.id) || seen.size >= MAX_ANCESTRY || invalidOwner(current, proofs))
       return null;
-    seen.add(row.id);
-    targets.push({ row, proof: proofs.get(row.id) });
-    if (!Object.hasOwn(row, "parentId")) return targets;
-    const parentId = row.parentId;
-    row = roster.find((value) => value.id === parentId);
+    seen.add(current.id);
+    targets.push({ row: current, proof: proofs.get(current.id) });
+    if (!Object.hasOwn(current, "parentId")) return targets;
+    const parentId = current.parentId;
+    current = roster.find((value) => value.id === parentId);
   }
   return null;
 }

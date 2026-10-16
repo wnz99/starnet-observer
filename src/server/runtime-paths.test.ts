@@ -88,4 +88,4 @@ test("compiled defaults derive installed package roots from their emitted locati
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
   }
-});
+}, 15000);

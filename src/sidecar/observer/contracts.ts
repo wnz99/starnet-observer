@@ -15,7 +15,7 @@ import type { publicBus } from "../bus/public.js";
 import type { BusState } from "../bus/types.js";
 export type Row = HelperRow;
 export type Tool = ObserverRow["tool"];
-export type Awaitable<T> = T | Promise<T>;
+type Awaitable<T> = T | Promise<T>;
 export type Execute = (
   command: string,
   args: string[],

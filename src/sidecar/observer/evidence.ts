@@ -6,7 +6,7 @@ export const COUNTERS = [
   "cacheWriteTokens",
 ] as const;
 export type CounterKey = (typeof COUNTERS)[number];
-export const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 export function freshObservation(at: unknown, now: number): at is number {
   return typeof at === "number" && Number.isFinite(at) && now - at <= 6000;
 }
@@ -23,7 +23,7 @@ export function status(value: unknown) {
       return "unknown";
   }
 }
-// Last sign of life for idle-age shading: a working pane is active now; otherwise the newest timestamped conversation
+// Idle-age shading uses the last sign of life. A working pane is active now; otherwise use the newest timestamped conversation
 // entry or tool event. File mtime is not evidence (Claude touches transcripts without activity). Clamped to the
 // inventory clock, so a skewed row time cannot read as the future.
 export function lastActivity(
@@ -47,19 +47,23 @@ export function lastActivity(
   ].filter((time): time is number => typeof time === "number" && Number.isFinite(time));
   return times.length > 0 ? Math.min(now, Math.max(...times)) : null;
 }
-export function identity(row: Row) {
-  const helper =
+function helperIdentity(row: Row) {
+  return (
     row.provider === "claude" &&
     row.source === "helper" &&
     row.presence === "verified-lineage" &&
-    /^helper:obs_[a-f0-9]{24}$/.test(row.inspectionIdentity || "");
+    /^helper:obs_[a-f0-9]{24}$/.test(row.inspectionIdentity || "")
+  );
+}
+export function identity(row: Row) {
+  const helper = helperIdentity(row);
   const verified =
     helper ||
     (row.source !== "desktop" && UUID.test(row.sessionId || "") && !!row.inspectionIdentity);
   const value = helper
-    ? row.provider + ":" + row.inspectionIdentity
+    ? `${row.provider}:${String(row.inspectionIdentity)}`
     : verified
-      ? row.provider + ":" + row.sessionId?.toLowerCase()
+      ? `${row.provider}:${String(row.sessionId?.toLowerCase())}`
       : "presence:" + row.id;
   return { verified, key: JSON.stringify([row.host || null, value]) };
 }
@@ -67,7 +71,7 @@ export const fresh = (row: Row, now: number) =>
   row.inventoryHealth === "available" && freshObservation(row.observedAt, now);
 export const freshUsage = (row: Row, now: number) =>
   fresh(row, now) && freshObservation(usageObservation(row), now);
-export const rank = (row: Row, now: number) =>
+const rank = (row: Row, now: number) =>
   [fresh(row, now) ? 1 : 0, row.observedAt ?? -1, row.source === "herdr" ? 1 : 0] as const;
 export function compare(a: Row, b: Row, now: number) {
   const ar = rank(a, now),

@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: "TypeScript refactor"
-status: paused
-stopped_at: "User-requested machine handover; implementation stopped"
-last_updated: "2026-10-16T09:09:09.227637+00:00"
+current_phase_name: TypeScript refactor
+status: In progress; Task 4 independently approved; integrating approved browser preparation and Task 5 runtime wiring.
+last_updated: "2026-10-16T10:06:46.616Z"
 last_activity: 2026-10-16
-last_activity_desc: "Paused; reviewed leaf integration and separate observer/browser WIP snapshots preserved."
-state_head: c8e3379ad654b1a2225e417736e9581442ddfa13
+last_activity_desc: Explicitly resumed; verified transfer snapshots and restored isolated worktrees.
+state_head: 981c1f8e2abf9f0d0de35b5f1b11a12e7cebe04f
+stopped_at: Task 5 browser, theme and public-build integration
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: Paused by user; Tasks 1–3 and Task 4 leaf packages approved; observer/browser WIP requires completion and review.
-Last activity: 2026-10-16 — Implementation stopped; portable handover and separate WIP transfer snapshots prepared.
+Status: In progress; Task 4 independently approved; integrating approved browser preparation and Task 5 runtime wiring.
+Last activity: 2026-10-16 — User explicitly resumed approved revision 4; transfer evidence verified and isolated continuation started.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Stopped at: User-requested machine handover; no PR or merge.
+Current work: Task 5 integration after independent Task 4 and browser preparation approval; no PR or merge.
 Resume file: [TypeScript handover](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-HANDOVER.md)
-Next action: Wait for explicit resume on the next machine; follow the handover and approved revision 4 plan. Existing PR/review/merge authorization remains subject to its gates. No paid/live approval is inferred.
+Next action: Integrate reviewed browser preparation and complete Task 5 under approved revision 5. User explicitly resumed implementation on 2026-10-16 through PR, required checks/CI and merge. No paid/live runs or optional configuration changes are authorized.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Paused by user; detailed handover and separate observer/browser WIP snapshots preserved | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Resumed; Task 4 accepted, Task 5 integration underway | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

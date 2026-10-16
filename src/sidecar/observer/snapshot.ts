@@ -13,7 +13,31 @@ export class Snapshots {
       .map((source) => source.observedAt)
       .filter((value): value is number => typeof value === "number");
     const at = this.state.now();
-    const sessions = this.state.lastGood.map((row) => {
+    const sessions = this.sessions(at);
+    return {
+      sessions,
+      aggregate: aggregateRows(sessions, at),
+      observedAt: times.length > 0 ? Math.max(...times) : null,
+      health: available ? "available" : "unavailable",
+      error: available ? null : this.state.herdrSource.reason,
+      sources: {
+        herdr: { ...this.state.sources.herdr },
+        desktop: { ...this.state.sources.desktop },
+      },
+      bus: this.state.mail
+        ? publicBus(
+            this.state.mail,
+            this.state.lastGood.map((row) => ({
+              id: row.id,
+              provider: row.provider,
+              sessionId: row.sessionId ?? null,
+            })),
+          )
+        : null,
+    };
+  }
+  private sessions(at: number) {
+    return this.state.lastGood.map((row) => {
       const observedAt =
         row.usage?.observedAt ??
         (row.source === "herdr" ? this.state.summaries.get(row.id)?.observedAt : row.observedAt);
@@ -34,33 +58,12 @@ export class Snapshots {
             ...aged,
             tool: {
               ...aged.tool,
-              observedAt: observedAt ?? null,
+              observedAt,
               available: freshObservation(observedAt, at),
             },
           }
         : aged;
     });
-    return {
-      sessions,
-      aggregate: aggregateRows(sessions, at),
-      observedAt: times.length > 0 ? Math.max(...times) : null,
-      health: available ? "available" : "unavailable",
-      error: available ? null : this.state.sources.herdr.reason,
-      sources: {
-        herdr: { ...this.state.sources.herdr },
-        desktop: { ...this.state.sources.desktop },
-      },
-      bus: this.state.mail
-        ? publicBus(
-            this.state.mail,
-            this.state.lastGood.map((row) => ({
-              id: row.id,
-              provider: row.provider,
-              sessionId: row.sessionId ?? null,
-            })),
-          )
-        : null,
-    };
   }
   get() {
     if (this.state.closed) return Promise.resolve(this.snapshot());

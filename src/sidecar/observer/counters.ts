@@ -2,7 +2,7 @@ import type { ObserverSnapshot } from "../../shared/observer.js";
 import type { Row } from "./contracts.js";
 import { COUNTERS, freshUsage, usageObservation } from "./evidence.js";
 import type { CounterKey } from "./evidence.js";
-export const emptyCoverage = () => ({
+const emptyCoverage = () => ({
   eligible: 0,
   available: 0,
   partial: 0,
@@ -20,6 +20,14 @@ export class Counters {
   private totals = counterMap<number | null>(() => null);
   private observedAt = counterMap<number | null>(() => null);
   private overflow = new Set<CounterKey>();
+  private accumulate(key: CounterKey, value: number, observedAt: unknown) {
+    if (typeof observedAt === "number")
+      this.observedAt[key] =
+        this.observedAt[key] === null ? observedAt : Math.min(this.observedAt[key], observedAt);
+    const sum = (this.totals[key] ?? 0) + value;
+    if (!Number.isSafeInteger(sum)) this.overflow.add(key);
+    this.totals[key] = this.overflow.has(key) ? null : sum;
+  }
   private add(row: Row, key: CounterKey, stale: boolean) {
     const counter = this.coverage.counters[key];
     counter.eligible++;
@@ -39,18 +47,13 @@ export class Counters {
       return null;
     }
     counter[item.state]++;
-    const observedAt = usageObservation(row);
-    if (typeof observedAt === "number")
-      this.observedAt[key] =
-        this.observedAt[key] === null ? observedAt : Math.min(this.observedAt[key], observedAt);
-    const sum = (this.totals[key] ?? 0) + item.value;
-    if (!Number.isSafeInteger(sum)) this.overflow.add(key);
-    this.totals[key] = this.overflow.has(key) ? null : sum;
+    this.accumulate(key, item.value, usageObservation(row));
     return item.state;
   }
   contribute(row: Row, stale: boolean, now: number) {
     this.coverage.eligible++;
-    const usageStale = stale || (row.usage != null && !freshUsage(row, now));
+    const usageStale =
+      stale || (row.usage !== null && row.usage !== undefined && !freshUsage(row, now));
     let usable = 0,
       complete = 0;
     for (const key of COUNTERS) {

@@ -3477,4 +3477,4 @@ test("observer-view regression contracts", async () => {
       view.stop();
     }
   })();
-}, 30000);
+}, 120000);

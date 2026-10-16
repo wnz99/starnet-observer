@@ -1,5 +1,6 @@
 import { freshObservation } from "./evidence.js";
 import type { State } from "./state.js";
+const CLOSE_TIMEOUT = 10000;
 export class Lifecycle {
   constructor(private readonly state: State) {}
   close() {
@@ -19,26 +20,26 @@ export class Lifecycle {
               ...this.state.warmRunning,
             ]),
             new Promise<void>((resolve) => {
-              timer = setTimeout(resolve, 10000);
-              timer.unref?.();
+              timer = setTimeout(resolve, CLOSE_TIMEOUT);
+              timer.unref();
             }),
           ]);
         } finally {
           clearTimeout(timer);
         }
-        await Promise.all([
-          this.state.sqlite?.close(),
-          this.state.options.bus?.close?.(),
-          this.state.options.helpers?.close?.(),
-        ]);
+        await this.closeAdapters();
       })();
     }
     return this.state.closePromise;
   }
+  private closeAdapters() {
+    const { bus, helpers } = this.state.options;
+    return Promise.all([this.state.sqlite?.close(), bus?.close?.(), helpers?.close?.()]);
+  }
   controlTarget(paneId: string) {
     const proof = this.state.controlTargets.get(paneId);
     return !this.state.closed &&
-      this.state.sources.herdr.health === "available" &&
+      this.state.herdrSource.health === "available" &&
       proof &&
       freshObservation(proof.observedAt, this.state.now())
       ? structuredClone(proof)

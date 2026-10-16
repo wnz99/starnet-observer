@@ -1,4 +1,5 @@
-import { settled } from './testing.fixture.js';
+import type { Row } from "./contracts.js";
+import { settled } from "./testing.fixture.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -41,10 +42,12 @@ async function observerWarmReuse(temp: string) {
         return {
           stat: () => handle.stat(),
           close: () => handle.close(),
-          read:  (buffer: Buffer, offset: number, length: number, position: number) => { return settled(() => {
-            reads++;
-            return handle.read(buffer, offset, length, position);
-          }); },
+          read: (buffer: Buffer, offset: number, length: number, position: number) => {
+            return settled(() => {
+              reads++;
+              return handle.read(buffer, offset, length, position);
+            });
+          },
         };
       },
     },
@@ -52,21 +55,23 @@ async function observerWarmReuse(temp: string) {
   const inspect = transcripts.inspect;
   const observer = makeObserver({
     now: () => clock,
-    identities: { resolveMany:  () => settled(() => [{ sessionId: ID, source: "native" }]) },
-    execute:  () => settled(() => ({
-      stdout: JSON.stringify({
-        result: { agents: [{ pane_id: "warm", agent: "codex", cwd: directory }] },
-      }),
-    })),
-    projects: { resolveMany:  () => settled(() => [{}]) },
-    desktop: { inventory:  () => settled(() => ({ health: "unavailable", windows: [] })) },
-    helpers: {
-      prepareChildren:  () => settled(() => ({
-        rows: [],
-        annotations: new Map(),
-        overflow: new Map(),
-        commitBindings() {},
+    identities: { resolveMany: () => settled(() => [{ sessionId: ID, source: "native" }]) },
+    execute: () =>
+      settled(() => ({
+        stdout: JSON.stringify({
+          result: { agents: [{ pane_id: "warm", agent: "codex", cwd: directory }] },
+        }),
       })),
+    projects: { resolveMany: () => settled(() => [{}]) },
+    desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
+    helpers: {
+      prepareChildren: () =>
+        settled(() => ({
+          rows: [],
+          annotations: new Map<string, Partial<Row>>(),
+          overflow: new Map<string, number>(),
+          commitBindings() {},
+        })),
     },
     bus: { read: () => busFixture({ health: "available", rows: [] }) },
     transcripts: {

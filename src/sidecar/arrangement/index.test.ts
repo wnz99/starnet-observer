@@ -82,7 +82,15 @@ test("observer-arrangement regression contracts", async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "observer-arrange-"));
     try {
       const git = (cwd: string, args: string[]) =>
-        execFile("git", ["-c", "core.hooksPath=/dev/null", "-C", cwd, ...args]);
+        execFile("git", [
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-c",
+          "commit.gpgsign=false",
+          "-C",
+          cwd,
+          ...args,
+        ]);
       const repository = async (folder: string, remote?: string) => {
         await fs.mkdir(folder, { recursive: true });
         await git(folder, ["init", "-q"]);

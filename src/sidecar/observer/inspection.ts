@@ -4,12 +4,16 @@ import type { SessionInspection } from "../../shared/inspection.js";
 import { unavailable } from "../inspector/fields.js";
 import { inspectionProof } from "./inspection-proof.js";
 import { required } from "./required.js";
+const MAX_EXPECTED_IDENTITY = 128;
+export const PREPARE_INSPECTION = true;
 const EXPECTED_IDENTITY =
   /^(?:(?:codex|claude):[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|(?:helper:)?obs_[a-f0-9]{24})(?:\|obs_[a-f0-9]{24})?$/i;
 function invalidExpected(value: unknown) {
   return (
     value !== undefined &&
-    (typeof value !== "string" || value.length > 128 || !EXPECTED_IDENTITY.test(value))
+    (typeof value !== "string" ||
+      value.length > MAX_EXPECTED_IDENTITY ||
+      !EXPECTED_IDENTITY.test(value))
   );
 }
 function reason(row: Row | undefined) {
@@ -21,11 +25,11 @@ async function read(s: State, row: Row) {
   if (row.source === "desktop")
     return {
       kind: "desktop" as const,
-      data: await required(s.desktop.inspect)(required(row.inspectionIdentity)),
+      data: await required(s.desktop.inspect).call(s.desktop, required(row.inspectionIdentity)),
     };
   const data = await (row.source === "helper" || Object.hasOwn(row, "parentId")
-    ? required(s.helpers.inspect)(row)
-    : required(s.transcripts.inspect)(row.id, row.provider, row.sessionId));
+    ? required(s.helpers.inspect).call(s.helpers, row)
+    : required(s.transcripts.inspect).call(s.transcripts, row.id, row.provider, row.sessionId));
   return { kind: "transcript" as const, data };
 }
 function current(s: State, row: Row) {
@@ -62,7 +66,8 @@ function project(
   const data = result.data;
   if (!data.available || !("health" in data) || data.health === "unavailable")
     return unavailable(id, "transcript-unavailable", s.now());
-  const { available, ...projection } = data;
+  const projection = { ...data };
+  Reflect.deleteProperty(projection, "available");
   return {
     ...projection,
     id,
@@ -80,27 +85,46 @@ export async function inspect(
   if (s.closed) return unavailable(id, "inventory-unavailable", s.now());
   // Bound caller input independently of HTTP; omission preserves legacy inspection callers.
   if (invalidExpected(expectedIdentity)) return unavailable(id, "invalid-identity", s.now());
-  const inventory = preparing
-      ? s.pending
-        ? await s.pending
-        : s.snapshot.snapshot()
-      : await s.snapshot.get(),
+  const inventory = await inspectionInventory(s, preparing),
     row = inventory.sessions.find((value) => value.id === id),
     failure = reason(row);
   if (failure || !row) return unavailable(id, failure || "unknown-session", s.now());
-  const inspectionIdentity =
-    row.inspectionIdentity +
-    (row.source === "helper" || Object.hasOwn(row, "parentId") ? "|" + row.parentId : "");
+  const inspectionIdentity = expectedInspectionIdentity(row);
   if (expectedIdentity !== undefined && expectedIdentity !== inspectionIdentity)
     return unavailable(id, "identity-mismatch", s.now());
-  const proof = inspectionProof(s, row, inventory.sessions);
+  return inspectOwned(s, row, {
+    id,
+    expectedIdentity,
+    inspectionIdentity,
+    roster: inventory.sessions,
+  });
+}
+function inspectionInventory(s: State, preparing: boolean) {
+  if (!preparing) return s.snapshot.get();
+  return s.pending || Promise.resolve(s.snapshot.snapshot());
+}
+export function expectedInspectionIdentity(row: Row) {
+  return `${String(row.inspectionIdentity)}${row.source === "helper" || Object.hasOwn(row, "parentId") ? `|${String(row.parentId)}` : ""}`;
+}
+async function inspectOwned(
+  s: State,
+  row: Row,
+  request: {
+    id: string;
+    expectedIdentity: unknown;
+    inspectionIdentity: string;
+    roster: Row[];
+  },
+) {
+  const { id, expectedIdentity, inspectionIdentity, roster } = request;
+  const proof = inspectionProof(s, row, roster);
   if (!proof || !(await proof.validate())) return unavailable(id, "identity-unavailable", s.now());
   const result = await read(s, row);
-  // A concurrent roster refresh can change/remove the source identity while the read is in flight.
+  // Concurrent roster refreshes can change or remove source identity during the read.
   const owner = current(s, row);
   if (!owner.matches) return unavailable(id, changedReason(owner.live, expectedIdentity), s.now());
   if (!(await proof.validate())) return unavailable(id, "identity-unavailable", s.now());
-  // Revalidation itself is asynchronous: check ownership again after its last await.
+  // Ownership must remain current after asynchronous proof revalidation finishes.
   if (!proof.current()) return unavailable(id, "identity-unavailable", s.now());
   return project(s, result, id, inspectionIdentity);
 }

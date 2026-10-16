@@ -80,6 +80,12 @@ export class State {
       identities: Identities;
     },
   ) {}
+  sourceRows(source: "herdr" | "desktop" | "helper") {
+    return this.rowsBySource[source];
+  }
+  get herdrSource() {
+    return this.sources.herdr;
+  }
   get options() {
     return this.dependencies.options;
   }

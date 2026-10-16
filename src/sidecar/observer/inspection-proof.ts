@@ -2,6 +2,7 @@ import type { State } from "./state.js";
 import type { Row } from "./contracts.js";
 import type { FooterProof } from "../identity/types.js";
 import { currentOwner } from "./ownership.js";
+const MAX_ANCESTRY = 64;
 function ancestry(s: State, row: Row, roster: Row[]) {
   // A helper's content is owned by its full live ancestry, including a footer-bound
   // root. Keep these private proofs outside public inventory and projection rows.
@@ -14,7 +15,7 @@ function ancestry(s: State, row: Row, roster: Row[]) {
     if (
       !next ||
       visited.has(next.id) ||
-      visited.size > 64 ||
+      visited.size > MAX_ANCESTRY ||
       next.inventoryHealth !== "available" ||
       !next.inspectionIdentity
     )
@@ -40,8 +41,8 @@ export function inspectionProof(s: State, row: Row, roster: Row[]) {
   async function validate() {
     if (proofs.length === 0) return true;
     if (s.identities.revalidateAll) return s.identities.revalidateAll(proofs);
-    // Existing injected single-proof adapters remain supported; serial checks
-    // cannot establish coherent ownership for a multi-pane ancestry.
+    // Existing injected single-proof adapters remain supported.
+    // Multi-pane ancestry needs one coherent ownership proof instead of serial checks.
     const proof = proofs[0];
     return (
       proofs.length === 1 &&
