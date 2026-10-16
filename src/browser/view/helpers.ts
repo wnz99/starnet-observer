@@ -1,7 +1,7 @@
 import type { Bounds, Scene, Viewport } from "../scene/types.js";
 import { CACHE, LOD } from "./primitives.js";
 import type { Envelope, Plate } from "./types.js";
-export { CREW_HEIGHT, LOD, MIN_HIT, SPRITE_SCALE, ZOOM_STEP } from "./primitives.js";
+export { CREW_HEIGHT, MIN_HIT, SPRITE_SCALE, ZOOM_STEP } from "./primitives.js";
 const IDLE_TINT = { grayscale: 0.85, darkness: 0.55, precision: 2 };
 const CACHE_MIN_RESOLUTION = 0.01;
 const CACHE_MAX_BUCKET = 2;

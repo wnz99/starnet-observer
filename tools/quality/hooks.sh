@@ -49,7 +49,8 @@ case "${1:-}" in
       check_required=true
     done
     if [ "$check_required" = true ]; then
-      sh "$repo_root/tools/quality/check-static.sh"
+      bun run lint
+      bun run typecheck
     fi
     ;;
   *) printf '%s\n' 'Usage: hooks.sh {hygiene|pre-commit|pre-push}' >&2; exit 64 ;;

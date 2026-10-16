@@ -148,10 +148,6 @@ test("pre-push checks only clean HEAD and skips deleted refs", () => {
   const push = (oid: string) =>
     runHook(root, "pre-push", `refs/heads/fixture ${oid} refs/heads/fixture ${zero}\n`);
   try {
-    writeFileSync(
-      join(root, "tools/quality/check-static.sh"),
-      readFileSync(resolve(import.meta.dirname, "check-static.sh")),
-    );
     executable(root, "bin/bun", '#!/bin/sh\nprintf "%s\\n" "$*" >> "$OBSERVER_HOOK_COMMANDS"\n');
     const head = commitFixture(root);
     expect(push(head).status).toBe(0);
