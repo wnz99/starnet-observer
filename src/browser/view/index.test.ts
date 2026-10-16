@@ -1,14 +1,39 @@
-"use strict";
-const { test } = require("bun:test");
+import type { ThemeSceneColor } from "../../shared/theme-keys.js";
+import type { ThemeContents } from "../../shared/theme.js";
+import type { FixtureCanvas, FixtureImage } from "../sprites/runtime.fixture.js";
+import { ThemeFixtureDocument } from "../theme/dom.fixture.js";
+import type { RuntimeThemeWarning } from "../theme/dom.js";
+import { OfficeImageFixture } from "./drawing.fixture.js";
+
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import * as crypto from "node:crypto";
+import type { SceneArtRoleName } from "../../shared/scene-art-roles.js";
+import { SCENE_ART_ROLE_NAMES, SCENE_ART_ROLES } from "../../shared/scene-art-roles.js";
+import { createMail } from "../mail.js";
+import { createModel } from "../model.js";
+import type { LayoutRow } from "../model/types.js";
+import * as Scene from "../scene/index.js";
+import type { Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
+import { load } from "../sprites/runtime.fixture.js";
+import type { SpriteAppearance, SpriteBody } from "../sprites/types.js";
+import { canonicalTheme } from "../theme.fixture.js";
+import { createThemePack } from "../theme.js";
+import type { Resource } from "./drawing.fixture.js";
+import { drawing, Handlers, present } from "./drawing.fixture.js";
+import { createViewFactory } from "./index.js";
+import type {
+  AppearanceTheme,
+  ViewContext,
+  ViewEvent,
+  ViewOptions,
+  ViewSprites,
+  ZoomLimits,
+} from "./types.js";
+const Model = createModel(canonicalTheme());
+const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
 
 test("observer-view regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const Model = require("../../src/browser/model.ts").createModel(
-    require("../assets/themes/starnet/theme.json"),
-  );
-  const Scene = require("./observer-scene.js");
-  const View = require("./observer-view.js");
-
   // Pure helpers: zoom tiers, plate priority and the static-layer budget.
   assert.equal(View.idleFilter(0), "none");
   assert.equal(
@@ -32,7 +57,7 @@ test("observer-view regression contracts", async () => {
     ["waiting", "far"],
     "a colliding lower-priority plate is dropped, not overlapped",
   );
-  // Camera-facing skirts: for corners() winding, exactly the +y (left, shaded) and +x (right, lit) faces are emitted.
+  // Camera-facing skirts: across corner winding, exactly the +y (left, shaded) and +x (right, lit) faces are emitted.
   const faces = View.visibleFaces([
     { x: 0, y: 0 },
     { x: 0, y: 4 },
@@ -85,7 +110,7 @@ test("observer-view regression contracts", async () => {
     ["focus", "on"],
     "off-stage labels never pile up on the edges",
   );
-  assert.deepEqual([staged[0].x, staged[0].y], [800 - 60 - 4, 500 - 14 - 4]);
+  assert.deepEqual([present(staged[0]).x, present(staged[0]).y], [800 - 60 - 4, 500 - 14 - 4]);
   const huge = { minX: 0, minY: 0, maxX: 20000, maxY: 9000 },
     resolution = View.cacheResolution(huge, 3, 2);
   assert(
@@ -99,12 +124,12 @@ test("observer-view regression contracts", async () => {
   );
 
   // Painted wall and corner furnishings stay inside the reserved regions the walk graph treats as obstacles.
-  {
+  function verifyFurnishingReservations() {
     const layout = Model.createLayout(),
-      rows = Array.from({ length: 24 }, (_, index) => ({
-        id: "obs_" + index,
-        project: "P" + (index % 8),
-        projectId: "p" + (index % 8),
+      rows: LayoutRow[] = Array.from({ length: 24 }, (_, index) => ({
+        id: "obs_" + String(index),
+        project: "P" + String(index % 8),
+        projectId: "p" + String(index % 8),
         projectKind: "group",
         repo: "r",
         repoId: "r",
@@ -114,12 +139,12 @@ test("observer-view regression contracts", async () => {
       }));
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0),
-      within = (r, x, y, pad = 0) =>
+      within = (r: Rect, x: number, y: number, pad = 0) =>
         x - pad >= r.x - 1e-9 &&
         x + pad <= r.x + r.w + 1e-9 &&
         y - pad >= r.y - 1e-9 &&
         y + pad <= r.y + r.h + 1e-9;
-    const outside = (part, r) =>
+    const outside = (part: ReturnType<typeof View.furnishing>[number], r: Rect) =>
       part.box
         ? !(
             within(r, part.box.x, part.box.y) &&
@@ -129,7 +154,7 @@ test("observer-view regression contracts", async () => {
           ? part.line.some((p) => !within(r, p.x, p.y))
           : part.quad
             ? part.quad.some((p) => !within(r, p.x, p.y))
-            : !within(r, part.ellipse.x, part.ellipse.y, part.radius);
+            : !within(r, present(part.ellipse).x, present(part.ellipse).y, part.radius);
     let checked = 0;
     assert(scene.platforms.length >= 2);
     for (const platform of scene.platforms)
@@ -150,41 +175,45 @@ test("observer-view regression contracts", async () => {
       });
     assert(checked > 100, "every kind is exercised on every wall edge");
   }
+  verifyFurnishingReservations();
 
   // Doubles: a recording 2D context, a canvas with listeners, and a sprite engine with a known extent.
   function context() {
-    const calls = { fillText: [], at: [], shadows: 0, drawImage: 0, fills: {} };
-    const target = {
+    const calls = {
+      fillText: emptyStrings(),
+      at: emptyTextCalls(),
+      shadows: 0,
+      drawImage: 0,
+      fills: emptyCounts(),
+    };
+    const target = drawing({
       calls,
-      measureText: (text) => ({ width: String(text).length * 7 }),
+      measureText: (text: string) => ({ width: text.length * 7 }),
       createRadialGradient: () => ({ addColorStop() {} }),
-      fillText: (text, x, y) => {
-        calls.fillText.push(String(text));
-        calls.at.push({ text: String(text), x, y });
+      fillText: (text: string, x: number, y: number) => {
+        calls.fillText.push(text);
+        calls.at.push({ text: text, x, y });
       },
       fill() {
         if (target.fillStyle === "rgba(0,0,0,0.38)") calls.shadows++;
-        calls.fills[target.fillStyle] = (calls.fills[target.fillStyle] || 0) + 1;
+        const color = canvasStyleText(target.fillStyle);
+        calls.fills[color] = (calls.fills[color] || 0) + 1;
       },
       drawImage: () => {
         calls.drawImage++;
       },
-      getContext() {
-        return target;
-      },
-    };
+    });
     return new Proxy(target, {
-      get: (t, key) => (key in t ? t[key] : () => {}),
-      set: (t, key, value) => {
-        t[key] = value;
-        return true;
+      set: (t, key, value: unknown) => {
+        return Reflect.set(t, key, value);
       },
     });
   }
   function canvas(width = 800, height = 500) {
     const ctx = context(),
-      handlers = new Map();
+      handlers = new Handlers();
     return {
+      __id: "view-canvas",
       ctx,
       handlers,
       clientWidth: width,
@@ -193,21 +222,29 @@ test("observer-view regression contracts", async () => {
       height: 0,
       style: {},
       getContext: () => ctx,
-      addEventListener(name, fn) {
+      addEventListener(name: string, fn: (event: ViewEvent) => void) {
         handlers.set(name, fn);
       },
-      removeEventListener(name) {
+      removeEventListener(name: string) {
         handlers.delete(name);
       },
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       setPointerCapture() {},
     };
   }
-  function sprites(extent = true) {
-    const appearances = [];
+  function recordedCalls(node: ReturnType<typeof canvas>) {
+    return node.ctx.calls;
+  }
+  function sprites({ extent = true } = {}) {
+    const appearances: AppearanceRecord[] = [];
     return {
       appearances,
-      drawBody(ctx, body, now, appearance) {
+      drawBody(
+        _ctx: ViewContext<Resource>,
+        body: SpriteBody<Resource>,
+        _now: number,
+        appearance: SpriteAppearance,
+      ) {
         appearances.push({
           id: body.id,
           ...appearance,
@@ -225,12 +262,12 @@ test("observer-view regression contracts", async () => {
     width = 800,
     height = 500,
     reduced = () => false,
-    statuses = ["working"],
+    statuses = workingStatuses(),
     onObservatory = () => {},
-  } = {}) {
+  }: SetupOptions = {}) {
     const layout = Model.createLayout(),
-      rows = statuses.map((status, index) => ({
-        id: "obs_" + index,
+      rows: LayoutRow[] = statuses.map((status, index) => ({
+        id: "obs_" + String(index),
         project: "Mama",
         projectId: "mama",
         projectKind: "group",
@@ -238,14 +275,14 @@ test("observer-view regression contracts", async () => {
         repoId: "web",
         provider: index % 2 ? "codex" : "claude",
         status,
-        worktree: "wt-" + index,
+        worktree: "wt-" + String(index),
       }));
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(width, height),
-      frames = [],
-      selected = [],
-      cameras = [],
+      frames: ((now: number) => void)[] = [],
+      selected: string[] = [],
+      cameras: ZoomLimits[] = [],
       labels = { text: "Claude — Ship it" };
     let staleNow = false;
     const view = View.create({
@@ -268,7 +305,7 @@ test("observer-view regression contracts", async () => {
         now: () => 0,
       },
     });
-    const mail = [];
+    const mail: number[] = [];
     view.start();
     view.update(scene, {
       stale: () => staleNow,
@@ -293,15 +330,16 @@ test("observer-view regression contracts", async () => {
       labels,
       sprite,
       mail,
-      setStale: (value) => {
-        staleNow = value;
+      setStale: ({ stale }: { stale: boolean }) => {
+        staleNow = stale;
       },
     };
   }
-  const regionOf = (view, id) => view.hitRegions().find((region) => region.id === id);
+  const regionOf = (view: ViewInstance, id: string) =>
+    present(view.hitRegions().find((region) => region.id === id));
 
   // DPR changes only the backing store: camera, hit regions and pointer math are identical at DPR 1 and 2.
-  {
+  function verifyDprAndResize() {
     const one = setup({ dpr: 1 }),
       two = setup({ dpr: 2 });
     one.view.paint(16);
@@ -326,9 +364,10 @@ test("observer-view regression contracts", async () => {
     one.view.paint(32);
     assert.deepEqual(one.view.camera(), Scene.fit(one.scene.bounds, { width: 400, height: 500 }));
   }
+  verifyDprAndResize();
 
   // Click selects through the real painted extent; a drag pans instead and never selects.
-  {
+  function verifyPointerSelectionAndDrag() {
     const { view, node, selected } = setup();
     view.zoomBy(4);
     view.paint(16);
@@ -354,7 +393,7 @@ test("observer-view regression contracts", async () => {
     assert.deepEqual(selected, ["obs_0"], "a cancelled tap never selects");
     assert.notEqual(view.camera().tx, before.tx);
     assert.equal(view.mode(), "manual");
-    // Hover follows the pointer each paint and shows the live label, which can change while hovered.
+    // Hover follows the pointer each paint and shows the live label, which can change when hovered.
     node.handlers.get("pointermove")({
       clientX: regionOf(view, "obs_0").left + 2,
       clientY: regionOf(view, "obs_0").top + 2,
@@ -363,11 +402,12 @@ test("observer-view regression contracts", async () => {
     });
     view.paint(32);
     assert.equal(view.hovered(), "obs_0");
-    assert(node.ctx.calls.fillText.includes("Claude — Ship it"));
+    assert(recordedCalls(node).fillText.includes("Claude — Ship it"));
   }
+  verifyPointerSelectionAndDrag();
 
   // Wheel zoom keeps the floor point under the cursor (when not clamped); keyboard only acts with no modifiers.
-  {
+  function verifyCursorZoomAndKeyboard() {
     const { view, node, scene } = setup();
     view.zoomBy(3);
     view.paint(16);
@@ -408,13 +448,14 @@ test("observer-view regression contracts", async () => {
         prevented = true;
       },
     });
-    assert.equal(prevented, false);
+    assert.deepEqual({ value: prevented }, { value: false });
     node.handlers.get("keydown")({ key: "0", preventDefault() {} });
     assert.equal(view.mode(), "overview");
   }
+  verifyCursorZoomAndKeyboard();
 
   // The focused station opens the observatory with O in either case, without stealing modified shortcuts.
-  {
+  function verifyObservatoryShortcut() {
     let opened = 0;
     const { view, node } = setup({
       onObservatory: () => {
@@ -441,18 +482,19 @@ test("observer-view regression contracts", async () => {
           prevented = true;
         },
       });
-      assert.equal(
-        prevented,
-        false,
+      assert.deepEqual(
+        { value: prevented },
+        { value: false },
         modifier + " remains available to browser and system shortcuts",
       );
     }
     assert.equal(opened, 2, "modified shortcuts never open the observatory");
     view.stop();
   }
+  verifyObservatoryShortcut();
 
   // Touch: pinch zooms around the midpoint exactly like zoomAt.
-  {
+  function verifyPinchZoom() {
     const { view, node, scene } = setup();
     view.zoomBy(2);
     view.paint(16);
@@ -483,62 +525,69 @@ test("observer-view regression contracts", async () => {
       }),
     );
   }
+  verifyPinchZoom();
 
-  // Zoom clamps are reported for the toolbar buttons.
-  {
+  // Zoom clamps are reported across the toolbar buttons.
+  function verifyZoomLimitReports() {
     const { view, cameras } = setup();
     view.paint(16);
     view.zoomBy(1000);
-    assert.equal(cameras.at(-1).canZoomIn, false);
-    assert.equal(cameras.at(-1).canZoomOut, true);
+    assert.deepEqual({ value: present(cameras.at(-1)).canZoomIn }, { value: false });
+    assert.deepEqual({ value: present(cameras.at(-1)).canZoomOut }, { value: true });
     view.zoomBy(1e-6);
-    assert.equal(cameras.at(-1).canZoomOut, false);
+    assert.deepEqual({ value: present(cameras.at(-1)).canZoomOut }, { value: false });
   }
+  verifyZoomLimitReports();
 
   // Sprites: upright bodies, seated working pose facing the camera; fallback silhouettes keep hit regions.
-  {
+  function verifySpritePosesAndFallback() {
     const { view, sprite } = setup({ statuses: ["working", "blocked"] });
     view.paint(16);
-    const working = sprite.appearances.find((entry) => entry.id === "obs_0"),
-      waiting = sprite.appearances.find((entry) => entry.id === "obs_1");
-    assert.equal(working.sitting, true);
-    assert.equal(working.dir, "south");
-    assert.equal(working.skipGroundShadow, true);
-    assert.equal(waiting.sitting, false);
-    const fallback = setup({ sprite: sprites(false) });
+    const working = present(sprite.appearances).find((entry) => entry.id === "obs_0"),
+      waiting = present(sprite.appearances).find((entry) => entry.id === "obs_1");
+    assert.deepEqual({ value: present(working).sitting }, { value: true });
+    assert.equal(present(working).dir, "south");
+    assert.deepEqual({ value: present(working).skipGroundShadow }, { value: true });
+    assert.deepEqual({ value: present(waiting).sitting }, { value: false });
+    const fallback = setup({ sprite: sprites({ extent: false }) });
     fallback.view.paint(16);
     assert(
       regionOf(fallback.view, "obs_0").height > 0,
       "a fallback crew member stays visible and clickable",
     );
   }
+  verifySpritePosesAndFallback();
 
   // Stale and reduced motion freeze sprite animation and ambience; stale is read on every paint.
-  {
+  function verifyStaleAndReducedMotion() {
     let reduced = false;
     const run = setup({ reduced: () => reduced });
     run.view.paint(16);
-    assert.equal(run.sprite.appearances.at(-1).reducedMotion, false);
-    run.setStale(true);
+    assert.deepEqual(
+      { value: present(present(run.sprite.appearances).at(-1)).reducedMotion },
+      { value: false },
+    );
+    run.setStale({ stale: true });
     run.view.paint(32);
-    assert.equal(
-      run.sprite.appearances.at(-1).reducedMotion,
-      true,
+    assert.deepEqual(
+      { value: present(present(run.sprite.appearances).at(-1)).reducedMotion },
+      { value: true },
       "stale inventory stops breathing and blinks",
     );
-    run.setStale(false);
+    run.setStale({ stale: false });
     reduced = true;
     run.view.paint(48);
-    assert.equal(
-      run.sprite.appearances.at(-1).reducedMotion,
-      true,
+    assert.deepEqual(
+      { value: present(present(run.sprite.appearances).at(-1)).reducedMotion },
+      { value: true },
       "a preference change applies on the next frame",
     );
     assert.equal(run.mail.length, 3, "the mail frame is requested once per paint");
   }
+  verifyStaleAndReducedMotion();
 
   // Static layer: built once, reused across pans, rebuilt on a status change, not on a title change.
-  {
+  function verifyStaticCacheInvalidation() {
     const { view, scene, layout, rows } = setup({ statuses: ["working", "idle"] });
     view.paint(16);
     view.zoomBy(1.0001);
@@ -546,24 +595,25 @@ test("observer-view regression contracts", async () => {
     const builds = view.cacheBuilds();
     view.paint(48);
     assert.equal(view.cacheBuilds(), builds, "pan and repaint reuse the cache");
-    rows[0].title = "New title";
+    present(rows[0]).title = "New title";
     layout.reconcile(rows);
     view.update(Scene.build(layout.onPage(0), 0));
     view.paint(64);
     assert.equal(view.cacheBuilds(), builds, "a title change never rebuilds");
-    rows[1].status = "working";
+    present(rows[1]).status = "working";
     layout.reconcile(rows);
     view.update(Scene.build(layout.onPage(0), 0));
     view.paint(80);
     assert.equal(view.cacheBuilds(), builds + 1, "a status change rebuilds the light pools");
     assert(scene.revision);
   }
+  verifyStaticCacheInvalidation();
 
   // Repository partitions: a later repository section brings two low walls leaving the central aisle open; they paint.
-  {
+  function verifyPartitionPaint() {
     const layout = Model.createLayout(),
-      rows = Array.from({ length: 10 }, (_, index) => ({
-        id: "obs_" + index,
+      rows: LayoutRow[] = Array.from({ length: 10 }, (_, index) => ({
+        id: "obs_" + String(index),
         project: "Mama",
         projectId: "mama",
         projectKind: "group",
@@ -574,7 +624,7 @@ test("observer-view regression contracts", async () => {
       }));
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0),
-      walls = scene.platforms[0].sections.flatMap((section) => section.partitions);
+      walls = present(scene.platforms[0]).sections.flatMap((section) => section.partitions);
     assert.equal(walls.length, 2);
     assert(walls.every((wall) => wall.w === 8 && wall.h === 1));
     const node = canvas();
@@ -592,9 +642,10 @@ test("observer-view regression contracts", async () => {
     view.update(scene, {});
     assert.doesNotThrow(() => view.paint(16));
   }
+  verifyPartitionPaint();
 
-  // Off-deck envelope groups share the pod anchor: they are stacked for display, never painted on top of each other.
-  {
+  // Off-deck envelope groups share the pod anchor: they are stacked across display, never painted on top of each other.
+  function verifyEnvelopeStacking() {
     const pod = { x: 11, y: 9, z: 1.2 },
       envelopes = [
         { point: pod, count: 2, mark: false, label: "D3", alpha: 1, color: "#ffbd5c" },
@@ -608,71 +659,76 @@ test("observer-view regression contracts", async () => {
       ],
       "stable order by label",
     );
-    assert.deepEqual(envelopes[0].point, pod, "logical coordinates are untouched");
+    assert.deepEqual(present(envelopes[0]).point, pod, "logical coordinates are untouched");
     const run = setup();
     run.view.update(run.scene, { mailFrame: () => ({ drones: [], envelopes }) });
     run.view.paint(16);
-    const d2 = run.node.ctx.calls.at.find((call) => call.text.startsWith("D2")),
-      d3 = run.node.ctx.calls.at.find((call) => call.text.startsWith("D3"));
+    const d2 = recordedCalls(run.node).at.find((call) => call.text.startsWith("D2")),
+      d3 = recordedCalls(run.node).at.find((call) => call.text.startsWith("D3"));
     assert(d2 && d3 && d2.y !== d3.y, "D2 and D3 labels paint at distinct positions");
   }
+  verifyEnvelopeStacking();
 
   // Every body gets a projected contact shadow, sprite or fallback.
-  {
+  function verifyContactShadows() {
     const sprite = setup({ statuses: ["working", "idle"] }),
-      fallback = setup({ sprite: sprites(false), statuses: ["working", "idle"] });
+      fallback = setup({ sprite: sprites({ extent: false }), statuses: ["working", "idle"] });
     sprite.view.paint(16);
     fallback.view.paint(16);
     // Two crew plus the ambient Observatory Viewer, which stands on its own neutral shadow.
-    assert.equal(sprite.node.ctx.calls.shadows, 3, "one contact shadow per sprite body");
-    assert.equal(fallback.node.ctx.calls.shadows, 3, "and per fallback silhouette");
+    assert.equal(recordedCalls(sprite.node).shadows, 3, "one contact shadow per sprite body");
+    assert.equal(recordedCalls(fallback.node).shadows, 3, "and per fallback silhouette");
   }
+  verifyContactShadows();
 
-  // The allocated static canvas honours the budget in integers, for one and eight platforms at max zoom and DPR 2.
-  for (const projects of [1, 8]) {
-    const layout = Model.createLayout(),
-      rows = Array.from({ length: projects }, (_, index) => ({
-        id: "obs_" + index,
-        project: "P" + index,
-        projectId: "p" + index,
-        projectKind: "group",
-        repo: "r" + index,
-        repoId: "r" + index,
-        provider: "codex",
-        status: "working",
-      }));
-    layout.reconcile(rows);
-    const scene = Scene.build(layout.onPage(0), 0),
-      sizes = [];
-    const view = View.create({
-      canvas: canvas(1728, 831),
-      env: {
-        raf: () => 1,
-        caf() {},
-        dpr: () => 2,
-        now: () => 0,
-        sprites: sprites(),
-        createCanvas: (w, h) => {
-          sizes.push([w, h]);
-          return canvas();
+  // The allocated static canvas honours the budget in integers, across one and eight platforms at max zoom and DPR 2.
+  function verifyIntegerCacheBudget() {
+    for (const projects of [1, 8]) {
+      const layout = Model.createLayout(),
+        rows: LayoutRow[] = Array.from({ length: projects }, (_, index) => ({
+          id: "obs_" + String(index),
+          project: "P" + String(index),
+          projectId: "p" + String(index),
+          projectKind: "group",
+          repo: "r" + String(index),
+          repoId: "r" + String(index),
+          provider: "codex",
+          status: "working",
+        }));
+      layout.reconcile(rows);
+      const scene = Scene.build(layout.onPage(0), 0),
+        sizes: [number, number][] = [];
+      const view = View.create({
+        canvas: canvas(1728, 831),
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 2,
+          now: () => 0,
+          sprites: sprites(),
+          createCanvas: (w, h) => {
+            sizes.push([w, h]);
+            return canvas();
+          },
         },
-      },
-    });
-    view.update(scene, {});
-    for (const zoom of [1, 1e6]) {
-      view.zoomBy(zoom);
-      view.paint(16);
+      });
+      view.update(scene, {});
+      for (const zoom of [1, 1e6]) {
+        view.zoomBy(zoom);
+        view.paint(16);
+      }
+      assert.equal(scene.platforms.length, projects);
+      for (const [w, h] of sizes)
+        assert(
+          Number.isInteger(w) && Number.isInteger(h) && w <= 4096 && h <= 4096 && w * h <= 4e6,
+          String(projects) + " platforms: " + String(w) + "x" + String(h) + " within budget",
+        );
     }
-    assert.equal(scene.platforms.length, projects);
-    for (const [w, h] of sizes)
-      assert(
-        Number.isInteger(w) && Number.isInteger(h) && w <= 4096 && h <= 4096 && w * h <= 4e6,
-        projects + " platforms: " + w + "x" + h + " within budget",
-      );
   }
+  verifyIntegerCacheBudget();
 
   // Lifecycle: start and stop are idempotent and own their listeners.
-  {
+  function verifyLifecycleOwnership() {
     const { view, node, frames } = setup();
     view.start();
     view.start();
@@ -681,24 +737,26 @@ test("observer-view regression contracts", async () => {
     view.stop();
     view.stop();
     assert.equal(node.handlers.size, 0, "stop removes every listener");
-    assert.equal(view.running(), false);
+    assert.deepEqual({ value: view.running() }, { value: false });
   }
+  verifyLifecycleOwnership();
 
   // Focus centres the worker; Overview returns to the fit.
-  {
+  function verifyWorkerFocus() {
     const { view, scene } = setup();
     view.paint(16);
     view.focus("obs_0");
     assert.equal(view.mode(), "focus");
     assert.deepEqual(
       view.camera(),
-      Scene.focus(scene.workers[0].chair, scene.bounds, { width: 800, height: 500 }),
+      Scene.focus(present(scene.workers[0]).chair, scene.bounds, { width: 800, height: 500 }),
     );
     view.overview();
     assert.deepEqual(view.camera(), Scene.fit(scene.bounds, { width: 800, height: 500 }));
   }
+  verifyWorkerFocus();
   // Reduced motion snaps a strolling focused worker to its chair; the camera follows at once so it stays in view.
-  {
+  function verifyReducedFocusSnap() {
     let reduced = false;
     const { view, scene } = setup({ statuses: ["idle"], reduced: () => reduced });
     for (let t = 0; t < 12000; t += 200) view.paint(t);
@@ -708,9 +766,10 @@ test("observer-view regression contracts", async () => {
     view.paint(12400);
     assert.deepEqual(
       view.camera(),
-      Scene.focus(scene.workers[0].chair, scene.bounds, { width: 800, height: 500 }),
+      Scene.focus(present(scene.workers[0]).chair, scene.bounds, { width: 800, height: 500 }),
     );
   }
+  verifyReducedFocusSnap();
   // ---------- Task 2: paint only on visible change ----------
   function scheduled({
     statuses = ["working"],
@@ -719,13 +778,15 @@ test("observer-view regression contracts", async () => {
     reduced = () => false,
     width = 800,
     height = 500,
-  } = {}) {
+  }: SetupOptions = {}) {
     const layout = Model.createLayout(),
-      list = count ? Array.from({ length: count }, (_, i) => "working") : statuses;
-    const rows = list.map((status, index) => ({
-      id: "obs_" + index,
-      project: "P" + (count ? index % 8 : 0),
-      projectId: "p" + (count ? index % 8 : 0),
+      list: NonNullable<LayoutRow["status"]>[] = count
+        ? Array.from({ length: count }, () => "working")
+        : statuses;
+    const rows: LayoutRow[] = list.map((status, index) => ({
+      id: "obs_" + String(index),
+      project: "P" + String(count ? index % 8 : 0),
+      projectId: "p" + String(count ? index % 8 : 0),
       projectKind: "group",
       repo: "r",
       repoId: "r",
@@ -736,37 +797,41 @@ test("observer-view regression contracts", async () => {
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(width, height),
-      frames = [],
-      cameras = [],
-      queries = new Map(),
-      fontHandlers = new Map(),
-      removed = [];
+      frames: ((now: number) => void)[] = [],
+      cameras: ZoomLimits[] = [],
+      queries = new Map<string, MediaQuery>(),
+      fontHandlers = new Map<string, () => void>(),
+      removed: string[] = [];
     let staleNow = false,
-      resized = null,
-      fontsReady;
-    const mediaFor = (query) =>
-      queries.get(query) ||
-      queries
-        .set(query, {
-          query,
-          handlers: new Set(),
-          addEventListener(name, fn) {
-            this.handlers.add(fn);
-          },
-          removeEventListener(name, fn) {
-            this.handlers.delete(fn);
-            removed.push(query);
-          },
-        })
-        .get(query);
+      resized: (() => void) | null = null,
+      fontsReady: () => void = () => {
+        throw new Error("Font readiness not initialized");
+      };
+    const mediaFor = (query: string): MediaQuery =>
+      present(
+        queries.get(query) ||
+          queries
+            .set(query, {
+              query,
+              handlers: new Set<() => void>(),
+              addEventListener(_name: string, fn: () => void) {
+                this.handlers.add(fn);
+              },
+              removeEventListener(_name: string, fn: () => void) {
+                this.handlers.delete(fn);
+                removed.push(query);
+              },
+            })
+            .get(query),
+      );
     const fonts = {
-      ready: new Promise((resolve) => {
+      ready: new Promise<void>((resolve) => {
         fontsReady = resolve;
       }),
-      addEventListener(name, fn) {
+      addEventListener(name: string, fn: () => void) {
         fontHandlers.set(name, fn);
       },
-      removeEventListener(name) {
+      removeEventListener(name: string) {
         fontHandlers.delete(name);
         removed.push("fonts:" + name);
       },
@@ -775,11 +840,9 @@ test("observer-view regression contracts", async () => {
     let desks = 0;
     const ctx = node.ctx,
       counting = new Proxy(ctx, {
-        get: (t, key) => t[key],
-        set: (t, key, value) => {
+        set: (t, key, value: unknown) => {
           if (key === "fillStyle" && value === View.PALETTE.consoleTop) desks++;
-          t[key] = value;
-          return true;
+          return Reflect.set(t, key, value);
         },
       });
     node.getContext = () => counting;
@@ -800,7 +863,7 @@ test("observer-view regression contracts", async () => {
         now: () => 0,
         window: { matchMedia: mediaFor, document: { fonts } },
         ResizeObserver: class {
-          constructor(fn) {
+          constructor(fn: () => void) {
             resized = fn;
           }
           observe() {}
@@ -810,7 +873,7 @@ test("observer-view regression contracts", async () => {
         },
       },
     });
-    const paints = [];
+    const paints: number[] = [];
     view.start();
     view.update(scene, {
       stale: () => staleNow,
@@ -823,7 +886,7 @@ test("observer-view regression contracts", async () => {
     // Drive the RAF queue like a browser: run what is scheduled, up to `limit` frames.
     const run = (limit = 500, from = 0) => {
       let t = from;
-      for (let i = 0; i < limit && frames.length; i++) frames.shift()((t += 16));
+      for (let i = 0; i < limit && frames.length > 0; i++) present(frames.shift())((t += 16));
       return t;
     };
     return {
@@ -839,9 +902,11 @@ test("observer-view regression contracts", async () => {
       run,
       sprite,
       fonts: () => fontsReady,
-      resize: () => resized && resized(),
-      setStale: (value) => {
-        staleNow = value;
+      resize: () => {
+        resized?.();
+      },
+      setStale: ({ stale }: { stale: boolean }) => {
+        staleNow = stale;
       },
       desks: () => desks,
       resetDesks: () => {
@@ -849,10 +914,10 @@ test("observer-view regression contracts", async () => {
       },
     };
   }
-  {
+  function verifyFrozenScheduling() {
     // Frozen (stale): one paint, then no frame is parked until something invalidates.
     const h = scheduled();
-    h.setStale(true);
+    h.setStale({ stale: true });
     h.run(500);
     assert.equal(h.paints.length, 1, "an unchanged frozen scene paints once over 500 frames");
     assert.equal(h.frames.length, 0, "no steady RAF");
@@ -864,50 +929,68 @@ test("observer-view regression contracts", async () => {
     assert.equal(h.paints.length, 2);
     // Every visual input of a frozen scene repaints it exactly once.
     const sources = {
-      pointer: () =>
+      pointer: () => {
         h.node.handlers.get("pointermove")({
           clientX: 10,
           clientY: 10,
           pointerId: 1,
           pointerType: "mouse",
-        }),
-      leave: () => h.node.handlers.get("pointerleave")({}),
-      wheel: () =>
+        });
+      },
+      leave: () => {
+        h.node.handlers.get("pointerleave")({});
+      },
+      wheel: () => {
         h.node.handlers.get("wheel")({
           clientX: 400,
           clientY: 250,
           deltaY: -120,
           preventDefault() {},
-        }),
-      keyboard: () => h.node.handlers.get("keydown")({ key: "+", preventDefault() {} }),
+        });
+      },
+      keyboard: () => {
+        h.node.handlers.get("keydown")({ key: "+", preventDefault() {} });
+      },
       resize: () => {
         h.node.clientWidth = 640;
         h.resize();
       },
-      reducedMotion: () => [...h.queries.get("(prefers-reduced-motion: reduce)").handlers][0](),
-      dpr: () => [...h.queries.get("(resolution: 1dppx)").handlers][0](),
-      fonts: () => h.fontHandlers.get("loadingdone")(),
-      update: () => h.view.update(h.scene),
-      focus: () => h.view.focus("obs_0"),
-      overview: () => h.view.overview(),
+      reducedMotion: () => {
+        present([...present(h.queries.get("(prefers-reduced-motion: reduce)")).handlers][0])();
+      },
+      dpr: () => {
+        present([...present(h.queries.get("(resolution: 1dppx)")).handlers][0])();
+      },
+      fonts: () => {
+        present(h.fontHandlers.get("loadingdone"))();
+      },
+      update: () => {
+        h.view.update(h.scene);
+      },
+      focus: () => {
+        h.view.focus("obs_0");
+      },
+      overview: () => {
+        h.view.overview();
+      },
     };
     for (const [name, trigger] of Object.entries(sources)) {
-      const before = h.paints.length;
+      const before: number = h.paints.length;
       trigger();
       h.run();
       assert.equal(h.paints.length, before + 1, name + " repaints a frozen scene once");
       assert.equal(h.frames.length, 0, name + " leaves no loop behind");
     }
     // A camera that did not move costs nothing; unchanged zoom limits are not re-reported to the toolbar.
-    const reports = h.cameras.length,
-      paints = h.paints.length;
+    const reports: number = h.cameras.length;
+    const paints: number = h.paints.length;
     h.view.overview();
     h.view.overview();
     h.run();
     assert.equal(h.paints.length, paints, "an unchanged camera does not repaint");
     assert.equal(h.cameras.length, reports, "nor re-report limits");
     // Live: the loop keeps animating.
-    h.setStale(false);
+    h.setStale({ stale: false });
     h.view.invalidate();
     h.run(10);
     assert(h.paints.length >= paints + 10, "a live scene animates every frame");
@@ -915,72 +998,74 @@ test("observer-view regression contracts", async () => {
     // Stop removes every watcher and the parked frame.
     h.view.stop();
     assert(
-      h.queries.get("(prefers-reduced-motion: reduce)").handlers.size === 0 &&
+      present(h.queries.get("(prefers-reduced-motion: reduce)")).handlers.size === 0 &&
         h.fontHandlers.size === 0,
       "media and font listeners are removed",
     );
     assert.equal(h.frames.length, 1);
     const parked = h.frames.shift();
-    parked(9999);
+    present(parked)(9999);
     assert.equal(h.frames.length, 0, "a stopped view never reschedules");
   }
-  {
+  verifyFrozenScheduling();
+  function verifyReducedSinglePaint() {
     // Reduced motion is frozen too.
     const h = scheduled({ reduced: () => true });
     h.run(200);
     assert.equal(h.paints.length, 1, "reduced motion paints once");
   }
+  verifyReducedSinglePaint();
   const readinessChecks = (async () => {
-    // Sprite readiness: a frozen scene waiting on a skin repaints when that set loads, and never for a set that cannot.
-    let settle;
-    const jobs = [];
+    // Sprite readiness: a frozen scene waiting on a skin repaints when that set loads, and never across a set that cannot.
+    const jobs: { skin: string; promise: Promise<boolean>; resolve: (value: boolean) => void }[] =
+      [];
     const sprite = {
       drawBody: () => null,
-      ensureSkin: (skin) => {
+      ensureSkin: (skin: string) => {
         const job = jobs.find((value) => value.skin === skin);
         if (job) return job.promise;
-        const entry = { skin };
-        entry.promise = new Promise((resolve) => {
-          entry.resolve = resolve;
-        });
+        const gate = deferred<boolean>();
+        const entry = { skin, promise: gate.promise, resolve: gate.resolve };
         jobs.push(entry);
         return entry.promise;
       },
     };
     const h = scheduled({ sprite, statuses: ["working", "working"] });
-    h.setStale(true);
+    h.setStale({ stale: true });
     h.run();
     assert.equal(h.paints.length, 1);
     assert.equal(jobs.length, 2, "one readiness job per skin, reused across paints");
     h.view.paint(1);
     h.view.paint(2);
     assert.equal(jobs.length, 2);
-    jobs[0].resolve(false);
-    await null;
-    await null;
+    const skinUnavailable = false;
+    present(jobs[0]).resolve(skinUnavailable);
+    await Promise.resolve();
+    await Promise.resolve();
     assert.equal(h.frames.length, 0, "a set that loaded nothing schedules no work");
-    jobs[1].resolve(true);
-    await null;
-    await null;
+    const skinReady = true;
+    present(jobs[1]).resolve(skinReady);
+    await Promise.resolve();
+    await Promise.resolve();
     assert.equal(h.frames.length, 1, "a loaded skin repaints the frozen scene");
     h.run();
     assert.equal(h.frames.length, 0);
     // Fonts settling after start repaint once.
     const f = scheduled();
-    f.setStale(true);
+    f.setStale({ stale: true });
     f.run();
     const before = f.paints.length;
     f.fonts()();
-    await null;
-    await null;
+    await Promise.resolve();
+    await Promise.resolve();
     f.run();
     assert.equal(f.paints.length, before + 1, "font readiness repaints");
   })();
-  {
+  function verifyFurnitureCulling() {
     // 192 workers: focus drops wholly offscreen furniture but still paints every crew body; overview draws every desk.
     const sprite = sprites(),
       h = scheduled({ count: 192, sprite });
-    h.setStale(true);
+    h.setStale({ stale: true });
     h.view.paint(16);
     assert.equal(h.desks(), 192, "overview draws every desk");
     h.view.focus("obs_0");
@@ -990,7 +1075,7 @@ test("observer-view regression contracts", async () => {
     const focusDesks = h.desks();
     assert(
       focusDesks > 0 && focusDesks < 60,
-      "focus submits only nearby desks (" + focusDesks + ")",
+      "focus submits only nearby desks (" + String(focusDesks) + ")",
     );
     assert.equal(
       sprite.appearances.length,
@@ -1008,7 +1093,7 @@ test("observer-view regression contracts", async () => {
           [d.x + d.w, d.y],
           [d.x, d.y + d.h],
           [d.x + d.w, d.y + d.h],
-        ])
+        ] satisfies [number, number][])
           for (const z of [0, 1.1]) {
             const p = Scene.toScreen({ x, y, z }, camera);
             xs.push(p.x);
@@ -1023,10 +1108,10 @@ test("observer-view regression contracts", async () => {
       }).length;
     assert(
       focusDesks >= inView,
-      "every on-screen desk is drawn (" + focusDesks + " >= " + inView + ")",
+      "every on-screen desk is drawn (" + String(focusDesks) + " >= " + String(inView) + ")",
     );
     // Edge entry: panning brings desks back the same frame.
-    const counts = [];
+    const counts: number[] = [];
     for (let step = 0; step < 6; step++) {
       h.node.handlers.get("keydown")({ key: "ArrowLeft", preventDefault() {} });
       h.resetDesks();
@@ -1038,8 +1123,9 @@ test("observer-view regression contracts", async () => {
       "panning changes which desks are submitted",
     );
   }
+  verifyFurnitureCulling();
   // Task 4: helpers at their reviewed scale and footprint, list-only overflow, the Observatory and platform zoom.
-  {
+  function verifyHelpersAndObservatory() {
     const layout = Model.createLayout(),
       base = {
         project: "Mama",
@@ -1049,10 +1135,10 @@ test("observer-view regression contracts", async () => {
         repoId: "web",
         provider: "codex",
       };
-    const root = { ...base, id: "obs_r", status: "working", worktree: "wt" };
-    const helpers = Array.from({ length: 10 }, (_, i) => ({
+    const root: LayoutRow = { ...base, id: "obs_r", status: "working", worktree: "wt" };
+    const helpers: LayoutRow[] = Array.from({ length: 10 }, (_, i) => ({
       ...base,
-      id: "hlp_" + i,
+      id: "hlp_" + String(i),
       source: "helper",
       parentId: "obs_r",
       status: "unknown",
@@ -1065,10 +1151,10 @@ test("observer-view regression contracts", async () => {
     assert.equal(scene.helperOverflow.length, 2, "fixture: two listed helpers have no station");
     const node = canvas(),
       sprite = sprites(),
-      frames = [],
-      selected = [],
-      platforms = [],
-      modes = [];
+      frames: ((now: number) => void)[] = [],
+      selected: string[] = [],
+      platforms: string[] = [],
+      modes: { mode: string; platform: string | null }[] = [];
     let now = 0;
     const view = View.create({
       canvas: node,
@@ -1105,58 +1191,59 @@ test("observer-view regression contracts", async () => {
       "helpers go through the stateful sprite call",
     );
     assert(
-      node.ctx.calls.fillText.includes("+2 helpers in list"),
+      recordedCalls(node).fillText.includes("+2 helpers in list"),
       "listed helpers without a station are counted beside their parent",
     );
     // The jump seat stays inside the reviewed w1 × h0.72 footprint; the root console would overhang it.
-    const points = [],
-      recorder = new Proxy(
-        {},
-        {
-          get: (target, key) =>
-            key === "moveTo" || key === "lineTo" || key === "ellipse"
-              ? (x, y) => points.push([x, y])
-              : key === "createRadialGradient"
-                ? () => ({ addColorStop() {} })
-                : () => {},
-          set: () => true,
+    const points: [number, number][] = [],
+      recorder = drawing({
+        moveTo: (x: number, y: number) => {
+          points.push([x, y]);
         },
-      );
-    const desk = fitted[0].desk,
-      inside = ([x, y]) =>
+        lineTo: (x: number, y: number) => {
+          points.push([x, y]);
+        },
+        ellipse: (x: number, y: number) => {
+          points.push([x, y]);
+        },
+      });
+    const desk = present(fitted[0]).desk,
+      inside = ([x, y]: [number, number]) =>
         x >= 24 * (desk.x - desk.y - desk.h) - 1e-6 &&
         x <= 24 * (desk.x + desk.w - desk.y) + 1e-6 &&
         y >= 12 * (desk.x + desk.y) - 24 * 1.1 - 1e-6 &&
         y <= 12 * (desk.x + desk.w + desk.y + desk.h) + 1e-6;
-    View.paintHelperDesk(recorder, fitted[0], 0, true);
+    const effectsEnabled = true;
+    View.paintHelperDesk(recorder, present(fitted[0]), 0, effectsEnabled);
     assert(
       points.length > 10 && points.every(inside),
       "the helper station paints inside its desk footprint",
     );
     points.length = 0;
-    View.paintDesk(recorder, fitted[0], 0, true);
+    View.paintDesk(recorder, present(fitted[0]), 0, effectsEnabled);
     assert(!points.every(inside), "control: the two-unit root console exceeds a helper desk");
     // Observatory: signed, ambient Viewer labelled at detail, never a hit target.
     view.overview();
-    node.ctx.calls.fillText.length = 0;
-    node.ctx.calls.fills = {};
+    recordedCalls(node).fillText.length = 0;
+    recordedCalls(node).fills = {};
     view.paint(24);
     assert.equal(
-      node.ctx.calls.fills[View.PALETTE.consoleTop],
+      recordedCalls(node).fills[View.PALETTE.consoleTop],
       1,
       "one root console; the eight helpers get jump seats, not root desks",
     );
     assert(
-      node.ctx.calls.fillText.includes("OBSERVATORY ✦"),
+      recordedCalls(node).fillText.includes("OBSERVATORY ✦"),
       "the Observatory is signed beside the mailroom",
     );
     assert(
-      !view.hitRegions().some((region) => region.id === scene.observatory.viewer.id),
+      !view.hitRegions().some((region) => region.id === present(scene.observatory.viewer).id),
       "the Viewer is never a hit target",
     );
     // Double-click: an exact worker hit wins; a drag or pinch never zooms; a platform fits without selecting anyone.
-    const dbl = (point) =>
+    const dbl = (point: Point) => {
       node.handlers.get("dblclick")({ clientX: point.x, clientY: point.y, preventDefault() {} });
+    };
     const rootRegion = regionOf(view, "obs_r");
     dbl({ x: rootRegion.left + rootRegion.width / 2, y: rootRegion.top + rootRegion.height / 2 });
     assert.deepEqual(selected, ["obs_r"], "a worker under the pointer wins over its platform");
@@ -1164,7 +1251,7 @@ test("observer-view regression contracts", async () => {
     const platform = scene.platforms[0],
       floor = () =>
         Scene.toScreen(
-          { x: platform.rect.x + 1.5, y: platform.rect.y + 24.5, z: 0 },
+          { x: present(platform).rect.x + 1.5, y: present(platform).rect.y + 24.5, z: 0 },
           view.camera(),
         );
     let at = floor();
@@ -1173,13 +1260,14 @@ test("observer-view regression contracts", async () => {
       null,
       "fixture: an empty platform floor point",
     );
-    const pointer = (name, point, id = 1) =>
+    const pointer = (name: string, point: Point, id = 1) => {
       node.handlers.get(name)({
         clientX: point.x,
         clientY: point.y,
         pointerId: id,
         pointerType: "mouse",
       });
+    };
     pointer("pointerdown", at);
     pointer("pointermove", { x: at.x + 40, y: at.y });
     pointer("pointerup", { x: at.x + 40, y: at.y });
@@ -1199,20 +1287,20 @@ test("observer-view regression contracts", async () => {
     now += 1000;
     dbl(at);
     assert.equal(view.mode(), "platform");
-    assert.equal(view.platform(), platform.key);
-    assert.deepEqual(platforms, [platform.key]);
+    assert.equal(view.platform(), present(platform).key);
+    assert.deepEqual(platforms, [present(platform).key]);
     assert.deepEqual(
       view.camera(),
-      Scene.focusPlatform(scene, platform.key, { width: 800, height: 500 }),
+      Scene.focusPlatform(scene, present(platform).key, { width: 800, height: 500 }),
       "the platform is fitted by the reviewed geometry",
     );
-    assert.deepEqual(modes.at(-1), { mode: "platform", platform: platform.key });
+    assert.deepEqual(modes.at(-1), { mode: "platform", platform: present(platform).key });
     assert.deepEqual(selected, ["obs_r"], "platform zoom never selects or inspects");
     node.clientWidth = 600;
     view.paint(48);
     assert.deepEqual(
       view.camera(),
-      Scene.focusPlatform(scene, platform.key, { width: 600, height: 500 }),
+      Scene.focusPlatform(scene, present(platform).key, { width: 600, height: 500 }),
       "a resize keeps the platform target",
     );
     const other = Model.createLayout();
@@ -1221,19 +1309,24 @@ test("observer-view regression contracts", async () => {
     view.update(next, {});
     assert.equal(view.mode(), "overview", "a removed platform returns to the overview");
     assert.deepEqual(view.camera(), Scene.fit(next.bounds, { width: 600, height: 500 }));
-    assert.equal(modes.at(-1).mode, "overview");
-    assert.equal(view.focusPlatform("missing"), false, "an unknown platform changes nothing");
+    assert.equal(present(modes.at(-1)).mode, "overview");
+    assert.deepEqual(
+      { value: view.focusPlatform("missing") },
+      { value: false },
+      "an unknown platform changes nothing",
+    );
     view.stop();
     assert(!node.handlers.has("dblclick"), "stop removes the double-click listener");
   }
+  verifyHelpersAndObservatory();
   // Task 4: a worker double-click keeps its worker across the real click sequence. The first click's focus moves the
   // camera and a frame paints before the second click; the old screen point must not become platform floor.
-  {
-    const run = (count) => {
+  function verifyDoubleClickGestures() {
+    const run = (count: number) => {
       const layout = Model.createLayout();
       layout.reconcile(
         Array.from({ length: count }, (_, index) => ({
-          id: "w" + index,
+          id: "w" + String(index),
           projectId: "p",
           project: "P",
           repoId: "r",
@@ -1244,11 +1337,10 @@ test("observer-view regression contracts", async () => {
       );
       const scene = Scene.build(layout.onPage(0), 0),
         node = canvas(),
-        log = [];
-      let view,
-        selected = null,
+        log: string[] = [];
+      let selected: string | null = null,
         now = 0;
-      view = View.create({
+      const view: ViewInstance = View.create({
         canvas: node,
         onSelect: (id) => {
           log.push(id);
@@ -1264,12 +1356,18 @@ test("observer-view regression contracts", async () => {
           now: () => now,
           dpr: () => 1,
           createCanvas: () => canvas(),
-          sprites: { drawBody: (ctx, body) => ({ top: body.py - 19, w: 10, h: 19 }) },
+          sprites: {
+            drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+              top: body.py - 19,
+              w: 10,
+              h: 19,
+            }),
+          },
         },
       });
       view.start();
       view.update(scene, { mailFrame: () => ({ drones: [], envelopes: [] }) });
-      const start = (target) => {
+      const start = (target: string) => {
         view.overview();
         now += 1000;
         view.paint(now);
@@ -1277,14 +1375,14 @@ test("observer-view regression contracts", async () => {
         log.length = 0;
         const region = view.hitRegions().find((value) => value.id === target);
         return {
-          clientX: region.left + region.width / 2,
-          clientY: region.top + region.height / 2,
+          clientX: present(region).left + present(region).width / 2,
+          clientY: present(region).top + present(region).height / 2,
           pointerId: 1,
           pointerType: "mouse",
           preventDefault() {},
         };
       };
-      const click = (event) => {
+      const click = (event: ViewEvent) => {
         node.handlers.get("pointerdown")(event);
         node.handlers.get("pointerup")(event);
       };
@@ -1303,13 +1401,13 @@ test("observer-view regression contracts", async () => {
         click,
         between,
         state: () => ({ selected, mode: view.mode(), platform: view.platform() }),
-        tick: (ms) => {
+        tick: (ms: number) => {
           now += ms;
         },
       };
     };
     for (const count of [8, 16, 24])
-      for (const target of ["w0", "w" + (count - 1)]) {
+      for (const target of ["w0", "w" + String(count - 1)]) {
         const h = run(count),
           event = h.start(target);
         h.click(event);
@@ -1320,7 +1418,7 @@ test("observer-view regression contracts", async () => {
         assert.deepEqual(
           h.state(),
           { selected: target, mode: "focus", platform: null },
-          count + " workers: " + target + " keeps its double-click across the repaint",
+          String(count) + " workers: " + target + " keeps its double-click across the repaint",
         );
         assert(
           h.log.every((id) => id === target),
@@ -1348,7 +1446,7 @@ test("observer-view regression contracts", async () => {
       const rest = Model.createLayout();
       rest.reconcile(
         Array.from({ length: 23 }, (_, index) => ({
-          id: "w" + index,
+          id: "w" + String(index),
           projectId: "p",
           project: "P",
           repoId: "r",
@@ -1411,7 +1509,7 @@ test("observer-view regression contracts", async () => {
       h.between();
       const platform = h.scene.platforms[0],
         floor = Scene.toScreen(
-          { x: platform.rect.x + 1.5, y: platform.rect.y + 24.5, z: 0 },
+          { x: present(platform).rect.x + 1.5, y: present(platform).rect.y + 24.5, z: 0 },
           h.view.camera(),
         );
       const away = { ...event, clientX: floor.x, clientY: floor.y };
@@ -1427,19 +1525,20 @@ test("observer-view regression contracts", async () => {
       assert.deepEqual(h.log, ["w7"], "an unrelated click never reuses the earlier worker");
       assert.deepEqual(
         [h.state().mode, h.state().platform],
-        ["platform", platform.key],
+        ["platform", present(platform).key],
         "and its own double-click fits the platform there",
       );
       h.view.stop();
     }
   }
+  verifyDoubleClickGestures();
   // Task 5: a worker's drawn name plate is its title control. A click there toggles its panel once per gesture; a body
   // click still focuses at once; a title double-click never zooms; only accepted, drawn plates are title targets.
-  {
+  function verifyTitleTargets() {
     const layout = Model.createLayout();
     layout.reconcile(
-      ["working", "blocked", "working"].map((status, index) => ({
-        id: "w" + index,
+      workingTitleStatuses().map((status, index) => ({
+        id: "w" + String(index),
         projectId: "p",
         project: "P",
         repoId: "r",
@@ -1450,11 +1549,10 @@ test("observer-view regression contracts", async () => {
     );
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(),
-      toggles = [],
-      selected = [];
-    let now = 0,
-      view;
-    view = View.create({
+      toggles: string[] = [],
+      selected: string[] = [];
+    let now = 0;
+    const view: ViewInstance = View.create({
       canvas: node,
       onSelect: (id) => {
         selected.push(id);
@@ -1469,7 +1567,13 @@ test("observer-view regression contracts", async () => {
         now: () => now,
         dpr: () => 1,
         createCanvas: () => canvas(),
-        sprites: { drawBody: (ctx, body) => ({ top: body.py - 19, w: 10, h: 19 }) },
+        sprites: {
+          drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+            top: body.py - 19,
+            w: 10,
+            h: 19,
+          }),
+        },
       },
     });
     view.start();
@@ -1486,9 +1590,9 @@ test("observer-view regression contracts", async () => {
     );
     const body = view.hitRegions().find((region) => region.id === "w0");
     assert(
-      plate.top + plate.height <= body.top + 1 ||
-        plate.left + plate.width < body.left ||
-        plate.left > body.left + body.width,
+      plate.top + plate.height <= present(body).top + 1 ||
+        plate.left + plate.width < present(body).left ||
+        plate.left > present(body).left + present(body).width,
       "fixture: the plate sits apart from the body",
     );
     const at = {
@@ -1498,7 +1602,7 @@ test("observer-view regression contracts", async () => {
       pointerType: "mouse",
       preventDefault() {},
     };
-    const click = (event) => {
+    const click = (event: ViewEvent) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
     };
@@ -1523,7 +1627,11 @@ test("observer-view regression contracts", async () => {
     view.paint(now);
     toggles.length = 0;
     const w2 = view.hitRegions().find((region) => region.id === "w2");
-    click({ ...at, clientX: w2.left + w2.width / 2, clientY: w2.top + w2.height / 2 });
+    click({
+      ...at,
+      clientX: present(w2).left + present(w2).width / 2,
+      clientY: present(w2).top + present(w2).height / 2,
+    });
     assert.deepEqual(selected, ["w2"], "a body click focuses at once");
     assert.deepEqual(toggles, []);
     now += 16;
@@ -1546,8 +1654,8 @@ test("observer-view regression contracts", async () => {
     // Hovering a worker's own plate keeps it hovered, so the plate stays to be clicked.
     const hoverPlate = view.titleRegions().find((region) => region.id === "w2");
     node.handlers.get("pointermove")({
-      clientX: hoverPlate.left + 2,
-      clientY: hoverPlate.top + 2,
+      clientX: present(hoverPlate).left + 2,
+      clientY: present(hoverPlate).top + 2,
       pointerId: 9,
       pointerType: "mouse",
     });
@@ -1557,7 +1665,11 @@ test("observer-view regression contracts", async () => {
     // Camera and scene changes retire old title targets until repaint, like repository signs.
     now += 1000;
     const oldTitle = view.titleRegions().find((region) => region.id === "w2");
-    const oldPoint = { ...at, clientX: oldTitle.left + 2, clientY: oldTitle.top + 2 };
+    const oldPoint = {
+      ...at,
+      clientX: present(oldTitle).left + 2,
+      clientY: present(oldTitle).top + 2,
+    };
     const before = toggles.length;
     view.zoomBy(1.2);
     click(oldPoint);
@@ -1580,35 +1692,38 @@ test("observer-view regression contracts", async () => {
     view.stop();
     assert.deepEqual(view.titleRegions(), [], "stop clears title targets");
   }
+  verifyTitleTargets();
   // Task 5: drawn repository section signs toggle exact repository highlighting. Only accepted signs of sections that hold
   // a worker with that exact repository id are targets; same-name repositories stay apart; a sign click toggles once per
   // gesture and never zooms; a camera or scene change before the next paint makes old sign boxes hit nothing.
-  {
+  function verifyRepositorySigns() {
     const layout = Model.createLayout(),
-      rows = [
-        ["a0", "repo_a", "working"],
-        ["a1", "repo_a", "idle"],
-        ["b0", "repo_b", "working"],
-        ["x0", undefined, "idle"],
-      ].map(([id, repoId, status]) => ({
+      rows: LayoutRow[] = (
+        [
+          ["a0", "repo_a", "working"],
+          ["a1", "repo_a", "idle"],
+          ["b0", "repo_b", "working"],
+          ["x0", undefined, "idle"],
+        ] satisfies [string, string | undefined, NonNullable<LayoutRow["status"]>][]
+      ).map(([id, repoId, status]) => ({
         id,
         projectId: "p",
         project: "P",
         projectKind: "group",
         repo: repoId ? "api" : "loose",
-        repoId,
+        ...(repoId === undefined ? {} : { repoId }),
         provider: "codex",
         status,
       }));
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(1000, 700),
-      repoToggles = [],
-      toggles = [],
-      selected = [];
+      repoToggles: string[] = [],
+      toggles: string[] = [],
+      selected: string[] = [];
     let now = 0,
-      chosen = null,
-      staleIds = new Set();
+      chosen: string | null = null,
+      staleIds: Set<string> = new Set();
     const view = View.create({
       canvas: node,
       onSelect: (id) => selected.push(id),
@@ -1621,7 +1736,13 @@ test("observer-view regression contracts", async () => {
         now: () => now,
         dpr: () => 1,
         createCanvas: () => canvas(),
-        sprites: { drawBody: (ctx, body) => ({ top: body.py - 19, w: 10, h: 19 }) },
+        sprites: {
+          drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+            top: body.py - 19,
+            w: 10,
+            h: 19,
+          }),
+        },
       },
     });
     view.start();
@@ -1634,7 +1755,7 @@ test("observer-view regression contracts", async () => {
         chosen = chosen === repo ? null : repo;
       },
     });
-    assert(view.focusPlatform(scene.platforms[0].key));
+    assert(view.focusPlatform(present(scene.platforms[0]).key));
     now += 16;
     view.paint(now);
     assert.notEqual(
@@ -1643,14 +1764,17 @@ test("observer-view regression contracts", async () => {
       "fixture: section signs are drawn at this zoom",
     );
     const signs = view.signRegions(),
-      inside = (r, x, y) =>
-        x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
+      inside = (
+        r: { left: number; top: number; width: number; height: number },
+        x: number,
+        y: number,
+      ) => x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
     assert.deepEqual(
       signs.map((sign) => sign.repo).sort(),
       ["repo_a", "repo_b"],
       "two same-name repositories keep two exact targets; a section without a repository id has none",
     );
-    const clear = (sign) => {
+    const clear = (sign: ReturnType<ViewInstance["signRegions"]>[number]) => {
       const x = sign.left + sign.width / 2,
         y = sign.top + sign.height / 2;
       return (
@@ -1664,9 +1788,9 @@ test("observer-view regression contracts", async () => {
       );
     };
     const signA = signs.find((sign) => sign.repo === "repo_a"),
-      at = clear(signA);
+      at = clear(present(signA));
     assert(at, "fixture: the repo_a sign is not under a worker body or title");
-    const click = (event) => {
+    const click = (event: ViewEvent) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
     };
@@ -1679,12 +1803,12 @@ test("observer-view regression contracts", async () => {
     node.handlers.get("dblclick")({ ...at, detail: 2 });
     assert.deepEqual(repoToggles, ["repo_a"], "a sign double-click toggles once");
     assert.deepEqual([view.camera(), view.mode()], [camera, mode], "and never zooms or pans");
-    // The highlight is read per paint: rings for every repo_a worker, a double ring for the freshly working one, and the
+    // The highlight is read per paint: rings across every repo_a worker, a double ring across the freshly working one, and the
     // selected sign recoloured without moving.
-    const strokes = [],
-      texts = [];
+    const strokes: [ViewContext<Resource>["strokeStyle"], number][] = [],
+      texts: [string, ViewContext<Resource>["fillStyle"]][] = [];
     node.ctx.stroke = () => strokes.push([node.ctx.strokeStyle, node.ctx.lineWidth]);
-    node.ctx.fillText = (text) => texts.push([String(text), node.ctx.fillStyle]);
+    node.ctx.fillText = (text) => texts.push([text, node.ctx.fillStyle]);
     now += 16;
     view.paint(now);
     const rings = strokes
@@ -1721,7 +1845,7 @@ test("observer-view regression contracts", async () => {
     now += 16;
     view.paint(now);
     const moved = view.signRegions().find((sign) => sign.repo === "repo_a"),
-      again = clear(moved);
+      again = clear(present(moved));
     assert(again, "fixture: the moved sign is clear");
     now += 1000;
     click(again);
@@ -1734,11 +1858,12 @@ test("observer-view regression contracts", async () => {
     view.stop();
     assert.deepEqual(view.signRegions(), [], "stop clears sign targets");
   }
+  verifyRepositorySigns();
   // Task 4: each worker animates on its own row freshness; a fresh source never animates a stale row's sprite or desk.
-  {
+  function verifyOwnRowFreshness() {
     const layout = Model.createLayout(),
-      rows = ["herdr", "desktop"].map((project, index) => ({
-        id: "obs_" + index,
+      rows: LayoutRow[] = ["herdr", "desktop"].map((project, index) => ({
+        id: "obs_" + String(index),
         project,
         projectId: project,
         projectKind: "group",
@@ -1768,14 +1893,26 @@ test("observer-view regression contracts", async () => {
       rowStale: (worker) => worker.id === "obs_0",
       mailFrame: () => ({ drones: [], envelopes: [] }),
     });
-    assert.equal(view.paint(16), true, "scene ambience follows overall freshness");
-    const last = (id) => sprite.appearances.filter((value) => value.id === id).at(-1);
-    assert.equal(last("obs_0").reducedMotion, true, "the stale row's sprite is frozen");
-    assert.equal(last("obs_1").reducedMotion, false);
-    assert.equal(last("obs_0").sitting, false, "and shows no observed work");
-    assert.equal(last("obs_1").sitting, true);
+    assert.deepEqual(
+      { value: view.paint(16) },
+      { value: true },
+      "scene ambience follows overall freshness",
+    );
+    const last = (id: string) => sprite.appearances.filter((value) => value.id === id).at(-1);
+    assert.deepEqual(
+      { value: present(last("obs_0")).reducedMotion },
+      { value: true },
+      "the stale row's sprite is frozen",
+    );
+    assert.deepEqual({ value: present(last("obs_1")).reducedMotion }, { value: false });
+    assert.deepEqual(
+      { value: present(last("obs_0")).sitting },
+      { value: false },
+      "and shows no observed work",
+    );
+    assert.deepEqual({ value: present(last("obs_1")).sitting }, { value: true });
     assert.equal(
-      node.ctx.calls.fillText.filter((text) => text === "STALE").length,
+      recordedCalls(node).fillText.filter((text) => text === "STALE").length,
       1,
       "only the stale row's platform is marked stale",
     );
@@ -1784,22 +1921,23 @@ test("observer-view regression contracts", async () => {
       "observer view: helper scale/footprint/overflow, Observatory, double-click precedence/suppression/platform fit/resize/removal and per-row freshness OK",
     );
   }
+  verifyOwnRowFreshness();
   // Task 3: offscreen crew go through the shared sprite seam: every body's state advances, only on-stage bodies paint.
   const crewChecks = readinessChecks.then(async () => {
-    const runtime = await require("../../src/browser/sprites/runtime.fixture.ts").load();
-    const stateOf = (b) =>
+    const runtime = await load();
+    const stateOf = (body: SpriteBody<FixtureImage | FixtureCanvas> | undefined) =>
       JSON.stringify(
-        Object.keys(b)
-          .filter((key) => key.startsWith("_"))
-          .sort()
-          .map((key) => [key, b[key]]),
-        (key, value) => (value && typeof value === "object" && value.__id ? value.__id : value),
+        Object.entries(present(body))
+          .filter(([key]) => key.startsWith("_"))
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        (_key: string, value: unknown) =>
+          value && typeof value === "object" && "__id" in value && value.__id ? value.__id : value,
       );
     const layout = Model.createLayout(),
-      rows = Array.from({ length: 192 }, (_, i) => ({
-        id: "obs_" + i,
-        project: "P" + (i % 8),
-        projectId: "p" + (i % 8),
+      rows: LayoutRow[] = Array.from({ length: 192 }, (_, i) => ({
+        id: "obs_" + String(i),
+        project: "P" + String(i % 8),
+        projectId: "p" + String(i % 8),
         projectKind: "group",
         repo: "r",
         repoId: "r",
@@ -1809,14 +1947,19 @@ test("observer-view regression contracts", async () => {
       }));
     layout.reconcile(rows);
     const scene = Scene.build(layout.onPage(0), 0);
-    const build = (label) => {
-      const bodies = new Map();
+    const build = (label: string) => {
+      const bodies = new Map<string, SpriteBody<FixtureImage | FixtureCanvas>>();
       let painted = 0,
         rejected = 0;
       const sprites = {
-        ensureSkin: (skin) => runtime.SPRITES.ensureSkin(skin),
-        drawBody(ctx, body, now, appearance) {
-          bodies.set(body.id, body);
+        ensureSkin: (skin: string) => runtime.SPRITES.ensureSkin(skin),
+        drawBody(
+          _ctx: ViewContext<Resource>,
+          body: SpriteBody<FixtureCanvas | FixtureImage>,
+          now: number,
+          appearance: SpriteAppearance | undefined,
+        ) {
+          bodies.set(present(body.id), body);
           const result = runtime.SPRITES.drawBody(runtime.context([]), body, now, appearance);
           if (result && result.painted === false) rejected++;
           else painted++;
@@ -1850,13 +1993,17 @@ test("observer-view regression contracts", async () => {
         assert.equal(
           stateOf(culled.bodies.get(id)),
           stateOf(body),
-          "frame " + t + " " + id + ": culled crew keep identical render state",
+          "frame " + String(t) + " " + id + ": culled crew keep identical render state",
         );
     }
     const { painted, rejected } = culled.counts();
     assert(
       rejected > painted * 3,
-      "focus rejects most crew emission (" + rejected + " rejected, " + painted + " painted)",
+      "focus rejects most crew emission (" +
+        String(rejected) +
+        " rejected, " +
+        String(painted) +
+        " painted)",
     );
     assert.equal(always.counts().rejected, 0, "the overview paints every body");
     assert.equal(
@@ -1867,7 +2014,7 @@ test("observer-view regression contracts", async () => {
     const regions = culled.view.hitRegions();
     assert(
       regions.length < 192 && regions.length > 0,
-      "only painted crew are hit-testable (" + regions.length + ")",
+      "only painted crew are hit-testable (" + String(regions.length) + ")",
     );
     // Re-entry: back at the overview every body paints from the same state as the always-painted view.
     culled.view.overview();
@@ -1879,13 +2026,13 @@ test("observer-view regression contracts", async () => {
       assert.equal(stateOf(culled.bodies.get(id)), stateOf(body), id + ": re-entry state matches");
     assert.equal(culled.view.hitRegions().length, 192, "and every body is hit-testable again");
   });
-  await crewChecks.then(() =>
+  await crewChecks.then(() => {
     console.log(
       "observer view: LOD/plate/cache budget helpers, DPR equivalence, resize refit, click vs drag, live hover, cursor and pinch zoom, keyboard, clamps, sprite poses and fallback, stale/reduced freeze, cache reuse, lifecycle and focus OK, frozen single paint, invalidation sources, sprite/font readiness, camera report dedupe and offscreen furniture culling OK",
-    ),
-  );
+    );
+  });
 
-  {
+  function verifyCheckoutSigns() {
     const layout = Model.createLayout();
     layout.reconcile([
       {
@@ -1904,10 +2051,10 @@ test("observer-view regression contracts", async () => {
     ]);
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(1000, 700);
-    const labelColors = [],
-      fillText = node.ctx.fillText;
+    const labelColors: [string, ViewContext<Resource>["fillStyle"]][] = [],
+      fillText = node.ctx.fillText.bind(node.ctx);
     node.ctx.fillText = (...args) => {
-      labelColors.push([String(args[0]), node.ctx.fillStyle]);
+      labelColors.push([args[0], node.ctx.fillStyle]);
       fillText(...args);
     };
     const view = View.create({
@@ -1917,126 +2064,140 @@ test("observer-view regression contracts", async () => {
     });
     view.start();
     view.update(scene, {});
-    view.focusPlatform(scene.platforms[0].key);
+    view.focusPlatform(present(scene.platforms[0]).key);
     view.paint(16);
     assert(
       labelColors.some(([text, color]) => text === "Worktree review · abcd" && color === "#123456"),
       "checkout signs use the instance theme label color",
     );
     for (const text of ["api", "Worktree review · abcd", "src"])
-      assert(node.ctx.calls.fillText.includes(text), "checkout sign paints " + text);
-    assert.equal(view.signRegions()[0].repo, "r", "multi-line sign retains repository target");
+      assert(recordedCalls(node).fillText.includes(text), "checkout sign paints " + text);
+    assert.equal(
+      present(view.signRegions()[0]).repo,
+      "r",
+      "multi-line sign retains repository target",
+    );
     view.stop();
   }
+  verifyCheckoutSigns();
 
   // Long equal-basename checkout labels retain their discriminator, including a real four-character hash collision.
-  for (const [name, ids, suffixes] of [
-    ["a-very-long-same-checkout-name", ["checkout_aaaa", "checkout_bbbb"], ["aaaa", "bbbb"]],
-    [
-      "same-name",
-      ["checkout_7785594026262a4b150b", "checkout_95a43a6b39b11304150b"],
-      ["b150b", "4150b"],
-    ],
-  ]) {
-    const layout = Model.createLayout();
-    layout.reconcile(
-      ids.map((checkoutId, index) => ({
-        id: "sign-" + index,
-        projectId: "p",
-        project: "P",
-        repoId: "r",
-        repo: "api",
-        checkoutId,
-        checkoutKind: "worktree",
-        worktree: name,
-        folder: "src",
-        provider: "codex",
-        status: "idle",
-      })),
-    );
-    const scene = Scene.build(layout.onPage(0), 0),
-      lines = [];
-    for (const platform of scene.platforms) {
-      const node = canvas(1600, 1000);
-      const view = View.create({
-        canvas: node,
-        env: { raf: () => 1, caf() {}, now: () => 0, dpr: () => 1, createCanvas: () => canvas() },
-      });
-      view.start();
-      view.update(scene, {});
-      view.focusPlatform(platform.key);
-      view.paint(16);
-      lines.push(...node.ctx.calls.fillText.filter((text) => text.startsWith("Worktree ")));
-      assert(node.ctx.calls.fillText.includes("api"), "repository text remains painted");
-      assert(node.ctx.calls.fillText.includes("src"), "folder text remains painted");
-      assert(
-        view.signRegions().every((sign) => sign.repo === "r"),
-        "repository hit targets stay exact",
+  function verifyCheckoutDiscriminators() {
+    for (const [name, ids, suffixes] of [
+      ["a-very-long-same-checkout-name", ["checkout_aaaa", "checkout_bbbb"], ["aaaa", "bbbb"]],
+      [
+        "same-name",
+        ["checkout_7785594026262a4b150b", "checkout_95a43a6b39b11304150b"],
+        ["b150b", "4150b"],
+      ],
+    ] satisfies [string, string[], string[]][]) {
+      const layout = Model.createLayout();
+      layout.reconcile(
+        present(ids).map((checkoutId, index: number) => ({
+          id: "sign-" + String(index),
+          projectId: "p",
+          project: "P",
+          repoId: "r",
+          repo: "api",
+          checkoutId,
+          checkoutKind: "worktree",
+          worktree: name,
+          folder: "src",
+          provider: "codex",
+          status: "idle",
+        })),
       );
-      view.stop();
+      const scene = Scene.build(layout.onPage(0), 0),
+        lines: string[] = [];
+      for (const platform of scene.platforms) {
+        const node = canvas(1600, 1000);
+        const view = View.create({
+          canvas: node,
+          env: { raf: () => 1, caf() {}, now: () => 0, dpr: () => 1, createCanvas: () => canvas() },
+        });
+        view.start();
+        view.update(scene, {});
+        view.focusPlatform(platform.key);
+        view.paint(16);
+        lines.push(...recordedCalls(node).fillText.filter((text) => text.startsWith("Worktree ")));
+        assert(recordedCalls(node).fillText.includes("api"), "repository text remains painted");
+        assert(recordedCalls(node).fillText.includes("src"), "folder text remains painted");
+        assert(
+          view.signRegions().every((sign) => sign.repo === "r"),
+          "repository hit targets stay exact",
+        );
+        view.stop();
+      }
+      const distinct = [...new Set(lines)];
+      assert.equal(distinct.length, 2, "same-basename checkouts paint two distinct signs");
+      for (const suffix of present(suffixes))
+        assert(
+          distinct.some((text) => text.endsWith(" · " + suffix)),
+          "painted sign retains " + suffix,
+        );
+      assert(
+        distinct.every((text) => text.length * 7 <= 180),
+        "checkout sign text stays within existing width",
+      );
     }
-    const distinct = [...new Set(lines)];
-    assert.equal(distinct.length, 2, "same-basename checkouts paint two distinct signs");
-    for (const suffix of suffixes)
-      assert(
-        distinct.some((text) => text.endsWith(" · " + suffix)),
-        "painted sign retains " + suffix,
-      );
-    assert(
-      distinct.every((text) => text.length * 7 <= 180),
-      "checkout sign text stays within existing width",
-    );
   }
+  verifyCheckoutDiscriminators();
   // ---------- Theme: instance palette, effect modes and replacement loading ----------
-  {
-    const crypto = require("node:crypto");
-    const Mail = require("../../src/browser/mail.ts").createMail(
-      require("../assets/themes/starnet/theme.json"),
-    );
-    const base = require("../assets/themes/starnet/theme.json").scene;
-    const keys = Object.keys(base.colors);
+  function verifyThemeColors() {
+    const Mail = createMail(canonicalTheme());
+    const base = canonicalTheme().scene;
+    const keys = sceneColorKeys(base.colors);
     /* Recording context: every colour reaching fillStyle/strokeStyle or a gradient stop, plus each stroke's style and dash,
      in paint order. Canvas normalizes '#000' and case, so the record does too; dynamic alphas are rounded because engines
      format the last float digits differently. */
-    const norm = (value) => {
-      const text = String(value)
+    const norm = (value: ViewContext<Resource>["fillStyle"] | undefined) => {
+      const text = canvasStyleText(value)
         .toLowerCase()
         .replace(/-?\d+\.\d+(?:e[-+]?\d+)?/g, (number) => Number(number).toFixed(6));
       return text === "#000" ? "#000000" : text;
     };
-    function recorder(log, strokes, firstStops) {
-      let dash = [];
-      const target = {
-        measureText: (text) => ({ width: String(text).length * 7 }),
-        setLineDash: (value) => {
+    function recorder() {
+      const log: string[] = [],
+        strokes: string[] = [],
+        firstStops: string[][] = [];
+      let dash: number[] = [];
+      const target = drawing({
+        measureText: (text: string) => ({ width: text.length * 7 }),
+        setLineDash: (value: number[]) => {
           dash = value;
         },
         stroke: () => strokes.push(norm(target.strokeStyle) + "|" + dash.join(",")),
         strokeRect: () => strokes.push(norm(target.strokeStyle) + "|" + dash.join(",")),
         createRadialGradient: () => {
-          const stops = [];
+          const stops: string[] = [];
           firstStops.push(stops);
           return {
-            addColorStop: (offset, color) => {
+            addColorStop: (_offset: number, color: string) => {
               stops.push(norm(color));
               log.push("stop:" + norm(color));
             },
           };
         },
-      };
-      return new Proxy(target, {
-        get: (t, key) => (key in t ? t[key] : () => {}),
-        set: (t, key, value) => {
+      });
+      const ctx = new Proxy(target, {
+        set: (t, key, value: unknown) => {
           if ((key === "fillStyle" || key === "strokeStyle") && typeof value === "string")
-            log.push(key[0] + ":" + norm(value));
-          t[key] = value;
-          return true;
+            log.push(key.charAt(0) + ":" + norm(value));
+          return Reflect.set(t, key, value);
         },
       });
+      return { ctx, log, strokes, firstStops };
     }
-    const statuses = ["working", "blocked", "idle", "done", "unknown", "working"];
-    const rows = statuses.map((status, i) => ({
-      id: "r" + i,
+    const statuses: NonNullable<LayoutRow["status"]>[] = [
+      "working",
+      "blocked",
+      "idle",
+      "done",
+      "unknown",
+      "working",
+    ];
+    const rows: LayoutRow[] = statuses.map((status, i) => ({
+      id: "r" + String(i),
       project: i < 3 ? "Alpha" : "Beta",
       projectId: i < 3 ? "alpha" : "beta",
       projectKind: "group",
@@ -2044,7 +2205,7 @@ test("observer-view regression contracts", async () => {
       repoId: i % 2 ? "web" : "api",
       provider: i % 2 ? "codex" : "claude",
       status,
-      worktree: "wt" + i,
+      worktree: "wt" + String(i),
     }));
     rows.push(
       {
@@ -2072,7 +2233,7 @@ test("observer-view regression contracts", async () => {
         status: "blocked",
       },
     );
-    const SCENARIOS = [
+    const SCENARIOS: [string, boolean, boolean, boolean, boolean, number][] = [
       ["fx-off", false, false, false, true, 1],
       ["fx-on", true, false, false, true, 1],
       ["fx-on-detail", true, false, false, false, 3],
@@ -2080,19 +2241,28 @@ test("observer-view regression contracts", async () => {
       ["reduced", true, false, true, true, 2.2],
     ];
     // One deterministic paint per scenario: every status, helpers and tethers, mail, selection, focus, stale and fallback bodies.
-    function record(theme, { only = null, focus = "r2", list = rows, at = 4321 } = {}) {
+    function createThemeCourier(theme: AppearanceTheme | null | undefined) {
+      const colors = theme?.scene?.colors;
+      return Mail.createCourier(colors ? { colors } : undefined);
+    }
+    function record(
+      theme: AppearanceTheme | null | undefined,
+      {
+        only = null,
+        focus = "r2",
+        list = rows,
+        at = 4321,
+      }: { only?: string[] | null; focus?: string | null; list?: LayoutRow[]; at?: number } = {},
+    ) {
       const layout = Model.createLayout();
       layout.reconcile(list);
       const scene = Scene.build(layout.onPage(0), 0),
-        courier = Mail.createCourier(theme ? { colors: theme.scene.colors } : undefined),
-        result = {};
-      for (const [name, fx, stale, reduced, sprite, zoom] of SCENARIOS) {
-        if (only && !only.includes(name)) continue;
-        const log = [],
-          strokes = [],
-          firstStops = [],
-          ctx = recorder(log, strokes, firstStops);
+        courier = createThemeCourier(theme),
+        result: Record<string, ColorRecord> = {};
+      function paintScenario([name, fx, stale, reduced, sprite, zoom]: (typeof SCENARIOS)[number]) {
+        const { ctx, log, strokes, firstStops } = recorder();
         const node = {
+          __id: "recorded-view",
           clientWidth: 1200,
           clientHeight: 800,
           width: 0,
@@ -2103,9 +2273,9 @@ test("observer-view regression contracts", async () => {
           removeEventListener() {},
           getBoundingClientRect: () => ({ left: 0, top: 0 }),
         };
-        const options = {
+        const options: ViewOptions<Resource> = {
           canvas: node,
-          nameFor: (id) => "W " + id,
+          nameFor: (id: string) => "W " + id,
           hoverLabel: () => "hover",
           reducedMotion: () => reduced,
           env: {
@@ -2115,7 +2285,13 @@ test("observer-view regression contracts", async () => {
             now: () => 0,
             createCanvas: () => node,
             sprites: {
-              drawBody: sprite ? (c, body) => ({ top: body.py - 60, w: 30, h: 60 }) : () => null,
+              drawBody: sprite
+                ? (_c: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+                    top: body.py - 60,
+                    w: 30,
+                    h: 60,
+                  })
+                : () => null,
             },
           },
         };
@@ -2133,7 +2309,7 @@ test("observer-view regression contracts", async () => {
           point: { x: 6, y: 6, z: 2.2 },
           parked: false,
           phase: "pickup",
-          parcels: [scene.platforms[0].accent, scene.platforms[0].accent],
+          parcels: [present(scene.platforms[0]).accent, present(scene.platforms[0]).accent],
         });
         view.update(scene, {
           stale: () => stale,
@@ -2146,9 +2322,13 @@ test("observer-view regression contracts", async () => {
         view.paint(at);
         result[name] = { log, strokes, firstStops };
       }
+      for (const scenario of SCENARIOS) {
+        if (only && !only.includes(scenario[0])) continue;
+        paintScenario(scenario);
+      }
       return { result, scene };
     }
-    const digest = (result) =>
+    const digest = (result: Record<string, ColorRecord>) =>
       crypto
         .createHash("sha256")
         .update(
@@ -2167,28 +2347,26 @@ test("observer-view regression contracts", async () => {
       "default paint colours, order and count match the idle-aging baseline",
     );
     assert.equal(
-      digest(
-        record(
-          require("../../src/browser/theme.ts")
-            .createThemePack(require("../assets/themes/starnet/theme.json"))
-            .getDefault(),
-        ).result,
-      ),
+      digest(record(createThemePack(canonicalTheme()).getDefault()).result),
       HEAD_DEFAULT,
       "the canonical snapshot paints the same default",
     );
-    assert.equal(
-      omitted["fx-on"].log.filter((entry) => entry === "f:" + base.colors["pixie-core"]).length >=
-        26,
-      true,
+    assert.deepEqual(
+      {
+        value:
+          present(omitted["fx-on"]).log.filter(
+            (entry) => entry === "f:" + base.colors["pixie-core"],
+          ).length >= 26,
+      },
+      { value: true },
     );
 
     // A synthetic palette with a distinct colour per key: every recorded colour is attributable to exactly one key.
-    const custom = Object.fromEntries(
+    const custom: Record<string, string> = Object.fromEntries(
       keys.map((key, index) => [
         key,
         key.endsWith("transparent")
-          ? "rgba(1,2," + (index % 250) + ",0)"
+          ? "rgba(1,2," + String(index % 250) + ",0)"
           : "#" + (0x100000 + index * 0x10101).toString(16).slice(-6),
       ]),
     );
@@ -2197,7 +2375,7 @@ test("observer-view regression contracts", async () => {
     const keyOf = new Map(keys.map((key) => [norm(custom[key]), key]));
     const prefix = keys
       .map((key) => {
-        const hex = /^#(..)(..)(..)$/.exec(custom[key]);
+        const hex = /^#(..)(..)(..)$/.exec(present(custom[key]));
         return hex
           ? [
               key,
@@ -2208,14 +2386,15 @@ test("observer-view regression contracts", async () => {
             ]
           : null;
       })
-      .filter(Boolean);
-    const attribute = (color) =>
+      .filter(presentValue);
+    const attribute = (color: string) =>
       keyOf.get(color) ||
       prefix.find(
-        ([, rgb]) => color.startsWith("rgba(" + rgb + ",") || color === "rgb(" + rgb + ")",
+        ([, rgb]) =>
+          color.startsWith("rgba(" + String(rgb) + ",") || color === "rgb(" + String(rgb) + ")",
       )?.[0] ||
       null;
-    const used = (run) =>
+    const used = (run: Record<string, ColorRecord>) =>
       new Set(
         Object.values(run)
           .flatMap((value) =>
@@ -2223,7 +2402,7 @@ test("observer-view regression contracts", async () => {
           )
           .filter(Boolean),
       );
-    const snapshot = (extra = {}) => ({
+    const snapshot = (extra: Partial<ThemeContents["scene"]> = {}) => ({
       version: 1,
       requestedId: "synthetic",
       effectiveId: "synthetic",
@@ -2231,14 +2410,14 @@ test("observer-view regression contracts", async () => {
     });
     // Unfocused, so the whole station (observatory, corner props, every status) is on stage.
     const wide = Array.from({ length: 24 }, (_, i) => ({
-      id: "w" + i,
-      project: "P" + (i % 8),
-      projectId: "p" + (i % 8),
+      id: "w" + String(i),
+      project: "P" + String(i % 8),
+      projectId: "p" + String(i % 8),
       projectKind: "group",
       repo: "r",
       repoId: "r",
       provider: i % 2 ? "codex" : "claude",
-      status: statuses[i % statuses.length],
+      status: present(statuses[i % statuses.length]),
     }));
     const themed = record(snapshot()).result,
       themedKeys = new Set([
@@ -2278,11 +2457,11 @@ test("observer-view regression contracts", async () => {
       other = record(snapshot(), { only: ["fx-on"] }).result,
       after = record(undefined, { only: ["fx-on"] }).result;
     assert.deepEqual(
-      after["fx-on"].log,
-      before["fx-on"].log,
+      present(after["fx-on"]).log,
+      present(before["fx-on"]).log,
       "default view unchanged by a simultaneous custom view",
     );
-    assert.notDeepEqual(other["fx-on"].log, before["fx-on"].log);
+    assert.notDeepEqual(present(other["fx-on"]).log, present(before["fx-on"]).log);
     assert(
       Object.isFrozen(View.PALETTE) &&
         View.PALETTE.cyan === base.colors.cyan &&
@@ -2303,10 +2482,11 @@ test("observer-view regression contracts", async () => {
     ])
       assert(dry.has(key), key + " stays with rain off");
     assert.equal(
-      record(snapshot({ backgroundFx: "none" }), { only: ["fx-on"] }).result["fx-on"].log.filter(
-        (entry) => attribute(entry.slice(2)) === "pixie-core",
-      ).length,
-      themed["fx-on"].log.filter((entry) => attribute(entry.slice(2)) === "pixie-core").length,
+      present(
+        record(snapshot({ backgroundFx: "none" }), { only: ["fx-on"] }).result["fx-on"],
+      ).log.filter((entry) => attribute(entry.slice(2)) === "pixie-core").length,
+      present(themed["fx-on"]).log.filter((entry) => attribute(entry.slice(2)) === "pixie-core")
+        .length,
       "the same 26 pixies",
     );
 
@@ -2367,23 +2547,25 @@ test("observer-view regression contracts", async () => {
       assert(calmKeys.has(key), key + " remains with ambientFx none");
     const halos = Object.values(calm.result)
       .flatMap((value) => value.firstStops)
-      .map((stops) => attribute(stops[0]));
+      .map((stops) => attribute(present(stops[0])));
     assert.deepEqual(
       [...new Set(halos)].sort(),
       ["blocked", "repo", "working"],
       "only status-lamp and selection glows remain",
     );
-    const tethers = (scene) =>
+    const tethers = (scene: SceneGeometry) =>
       scene.workers
         .filter((worker) => worker.connector)
         .map((worker) => norm(worker.accent) + "|4,4");
     assert(
       tethers(calm.scene).length > 0 &&
-        tethers(calm.scene).every((tether) => calm.result["fx-off"].strokes.includes(tether)),
+        tethers(calm.scene).every((tether) =>
+          present(calm.result["fx-off"]).strokes.includes(tether),
+        ),
       "helper tethers remain",
     );
     assert(
-      calm.result.stale.strokes.some((stroke) => stroke === norm(custom.stale) + "|3,3"),
+      present(calm.result.stale).strokes.some((stroke) => stroke === norm(custom.stale) + "|3,3"),
       "the dashed STALE plate keeps the stale colour",
     );
     const calmOff = used(
@@ -2395,17 +2577,22 @@ test("observer-view regression contracts", async () => {
       "theme view: HEAD-equal default paint, complete custom palette, isolated simultaneous views, backgroundFx/ambientFx layers OK",
     );
   }
+  verifyThemeColors();
 
   // A replacement crew group still loading draws canonical frames; a frozen scene repaints once it settles, ready or failed.
   await (async () => {
-    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
     for (const outcome of ["ready", "failed", "rejected"]) {
-      let settle,
+      let settle: () => void = () => {
+          throw new Error("Skin job not initialized");
+        },
         state = "loading",
         ensured = 0;
-      const job = new Promise((resolve, reject) => {
-        settle = () =>
-          outcome === "rejected" ? reject(new Error("x")) : resolve(outcome === "ready");
+      const job = new Promise<boolean>((resolve, reject) => {
+        settle = () => {
+          if (outcome === "rejected") reject(new Error("x"));
+          else resolve(outcome === "ready");
+        };
       });
       job.catch(() => {});
       const sprite = {
@@ -2424,13 +2611,13 @@ test("observer-view regression contracts", async () => {
         outcome + ": a loading replacement is watched even though canonical frames painted",
       );
       state = outcome === "ready" ? "ready" : "failed";
-      settle();
+      present(settle)();
       await flush();
       assert.equal(run.frames.length, 1, outcome + ": settlement schedules one repaint");
       run.run();
       assert.equal(run.frames.length, 0, outcome + ": the settled group never re-arms a loop");
     }
-    // Ready or inherited groups and older sprite engines without replacementState are not watched while frames paint.
+    // Ready or inherited groups and older sprite engines without replacementState are not watched when frames paint.
     for (const sprite of [
       {
         ...sprites(),
@@ -2452,18 +2639,15 @@ test("observer-view regression contracts", async () => {
     console.log("theme view: loading replacement crew watch and settled repaint OK");
   })();
 
-  // ---------- Home-office art: atomic activation, canonical station crew while pending/failed, resumable load ----------
+  // ---------- Home-office art: atomic activation, canonical station crew when pending/failed, resumable load ----------
   await (async () => {
-    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
-    const ThemePack = require("../../src/browser/theme.ts").createThemePack(
-      require("../assets/themes/starnet/theme.json"),
-    );
+    const ThemePack = createThemePack(canonicalTheme());
     const flush = async () => {
-      for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve));
+      for (let i = 0; i < 4; i++) await new Promise<void>((resolve) => setImmediate(resolve));
     };
     const base = ThemePack.getDefault();
     const assets = Object.fromEntries(
-      Object.keys(SCENE_ART_ROLES).map((role) => [
+      SCENE_ART_ROLE_NAMES.map((role) => [
         role,
         "/assets/themes/office/scene/" + role.toLowerCase() + ".png",
       ]),
@@ -2480,7 +2664,7 @@ test("observer-view regression contracts", async () => {
         ambientFx: "none",
       },
     });
-    // Synthetic decode gate: every image waits for release(); `outcome` decides load failure or a wrong-size role.
+    // Synthetic decode gate: every image waits across release; `outcome` decides load failure or a wrong-size role.
     /* `hold` keeps one role's decode on its own gate (releaseHeld; `heldFails` rejects it then); `providers` and
      `statuses` shape the root rows. */
     function harness({
@@ -2491,28 +2675,42 @@ test("observer-view regression contracts", async () => {
       heldFails = false,
       providers = ["claude", "codex", "claude"],
       statuses = ["working", "idle", "blocked"],
+    }: {
+      outcome?: string;
+      replacement?: string;
+      withTheme?: AppearanceTheme | null;
+      hold?: SceneArtRoleName | null;
+      heldFails?: boolean;
+      providers?: string[];
+      statuses?: NonNullable<LayoutRow["status"]>[];
     } = {}) {
-      let release, releaseHeld;
-      const gate = new Promise((resolve) => {
+      let release: () => void = () => {
+          throw new Error("Office decode not initialized");
+        },
+        releaseHeld: () => void = () => {
+          throw new Error("Held decode not initialized");
+        };
+      const gate = new Promise<void>((resolve) => {
           release = resolve;
         }),
-        heldGate = new Promise((resolve) => {
+        heldGate = new Promise<void>((resolve) => {
           releaseHeld = resolve;
         });
       const counts = { constructed: 0 };
-      class FakeImage {
+      class FakeImage extends OfficeImageFixture {
         constructor() {
+          super();
           counts.constructed++;
         }
-        set src(url) {
+        override set src(url: string) {
           this._src = url;
-          const role = Object.keys(assets).find((key) => assets[key] === url),
+          const role = present(SCENE_ART_ROLE_NAMES.find((key) => assets[key] === url)),
             size = SCENE_ART_ROLES[role].source;
           this.naturalWidth =
             outcome === "wrong-size" && role === "chair" ? size.width + 1 : size.width;
           this.naturalHeight = size.height;
         }
-        get src() {
+        override get src() {
           return this._src;
         }
         decode() {
@@ -2526,22 +2724,22 @@ test("observer-view regression contracts", async () => {
           });
         }
       }
-      const status = ThemePack.createStatus(withTheme, {}),
-        warnings = [];
+      const status = ThemePack.createStatus(withTheme, new ThemeFixtureDocument()),
+        warnings: RuntimeThemeWarning[] = [];
       const sprite = {
         ...sprites(),
         replacementState: () => replacement,
         ensureSkin: () => new Promise(() => {}),
       };
       const layout = Model.createLayout(),
-        rows = statuses.map((value, index) => ({
-          id: "o" + index,
+        rows: LayoutRow[] = statuses.map((value, index) => ({
+          id: "o" + String(index),
           project: "P",
           projectId: "p",
           projectKind: "group",
           repo: "r",
           repoId: "r",
-          provider: providers[index],
+          provider: present(providers[index]),
           status: value,
           worktree: "wt",
         }));
@@ -2560,7 +2758,7 @@ test("observer-view regression contracts", async () => {
       layout.reconcile(rows);
       const scene = Scene.build(layout.onPage(0), 0),
         node = canvas(),
-        frames = [];
+        frames: ((now: number) => void)[] = [];
       const view = View.create({
         theme: withTheme,
         canvas: node,
@@ -2594,7 +2792,7 @@ test("observer-view regression contracts", async () => {
       });
       const run = () => {
         let t = 0;
-        for (let i = 0; i < 50 && frames.length; i++) frames.shift()((t += 16));
+        for (let i = 0; i < 50 && frames.length > 0; i++) present(frames.shift())((t += 16));
       };
       return {
         view,
@@ -2610,8 +2808,9 @@ test("observer-view regression contracts", async () => {
         releaseHeld,
       };
     }
-    const groups = (h) => h.sprite.appearances.map((appearance) => appearance.group);
-    const workers = (h) => h.scene.workers.length;
+    const groups = (h: ReturnType<typeof harness>) =>
+      h.sprite.appearances.map((appearance) => appearance.group);
+    const workers = (h: ReturnType<typeof harness>) => h.scene.workers.length;
 
     {
       // Pending: complete station art, every body drawn by the sprite engine in its canonical default group, status truthful.
@@ -2628,7 +2827,7 @@ test("observer-view regression contracts", async () => {
       ]);
       assert.equal(h.view.cacheBuilds(), 1);
       // Ready: one activation, one static rebuild through the existing scheduler; ready humans draw without the default group.
-      h.release();
+      present(h.release)();
       await flush();
       assert.equal(h.frames.length, 1, "readiness schedules one paint");
       h.sprite.appearances.length = 0;
@@ -2659,7 +2858,7 @@ test("observer-view regression contracts", async () => {
       // Active office without a ready human group: original procedural human at the fallback bounds, never the android sprite.
       for (const replacement of ["inherited", "loading", "failed"]) {
         const h = harness({ replacement });
-        h.release();
+        present(h.release)();
         await flush();
         h.sprite.appearances.length = 0;
         h.run();
@@ -2673,18 +2872,18 @@ test("observer-view regression contracts", async () => {
         assert.equal(regions.length, workers(h), replacement + ": every human is hit-testable");
         const root = regions.find((region) => region.id === "o1");
         assert(
-          Math.abs(root.width - Math.max(20, 16 * zoom)) < 1e-6 &&
-            Math.abs(root.height - Math.max(20, 40 * zoom)) < 1e-6,
+          Math.abs(present(root).width - Math.max(20, 16 * zoom)) < 1e-6 &&
+            Math.abs(present(root).height - Math.max(20, 40 * zoom)) < 1e-6,
           replacement + ": fallback hit bounds",
         );
       }
     }
     {
-      // Settlement while stopped records readiness without painting; start() activates through the scheduler.
+      // Settlement when stopped records readiness without painting; starting activates through the scheduler.
       const h = harness();
       h.run();
       h.view.stop();
-      h.release();
+      present(h.release)();
       await flush();
       assert.equal(h.frames.length, 0, "no paint is scheduled while stopped");
       assert.equal(h.view.cacheBuilds(), 1);
@@ -2697,7 +2896,7 @@ test("observer-view regression contracts", async () => {
       assert.equal(h.counts.constructed, 34);
     }
     {
-      // Hide/resume while pending keeps the same load; it still activates afterwards.
+      // Hide/resume when pending keeps the same load; it still activates afterwards.
       const h = harness();
       h.run();
       h.view.stop();
@@ -2706,7 +2905,7 @@ test("observer-view regression contracts", async () => {
       h.view.start();
       h.run();
       assert.equal(h.counts.constructed, 34, "pending load survives suspension");
-      h.release();
+      present(h.release)();
       await flush();
       h.sprite.appearances.length = 0;
       h.run();
@@ -2716,11 +2915,11 @@ test("observer-view regression contracts", async () => {
     for (const [outcome, code, text] of [
       ["fail", "scene-art-load", "did not load"],
       ["wrong-size", "scene-art-dimensions", "has the wrong image sizes"],
-    ]) {
+    ] satisfies [string, string, string][]) {
       // Failure: one bounded warning, permanent station art with canonical crew, no extra rebuild.
       const h = harness({ outcome, replacement: "ready" });
       h.run();
-      h.release();
+      present(h.release)();
       await flush();
       assert.equal(h.frames.length, 0, outcome + ": station art is unchanged, so nothing repaints");
       h.view.stop();
@@ -2734,30 +2933,36 @@ test("observer-view regression contracts", async () => {
       );
       assert.equal(h.view.cacheBuilds(), 1);
       assert.equal(h.warnings.length, 1);
-      assert.deepEqual([h.warnings[0].code, h.warnings[0].pack], [code, "office"]);
+      assert.deepEqual(
+        [present(h.warnings[0]).code, present(h.warnings[0]).pack],
+        [code, "office"],
+      );
       assert.deepEqual(h.status.lines(), [
         "Theme pack office office art " + text + "; showing station art.",
       ]);
-      assert(!/[\\/]|Error/.test(h.warnings[0].message), outcome + ": no path or raw error");
+      assert(
+        !/[\\/]|Error/.test(present(present(h.warnings[0]).message)),
+        outcome + ": no path or raw error",
+      );
     }
     for (const [outcome, code, text, heldFails] of [
       ["fail", "scene-art-load", "did not load", true],
       ["wrong-size", "scene-art-dimensions", "has the wrong image sizes", false],
-    ]) {
-      // A known failure leaves pending at once while an unrelated role is still decoding; the held role settling later
+    ] satisfies [string, string, string, boolean][]) {
+      // A known failure leaves pending at once when an unrelated role is still decoding; the held role settling later
       // (rejecting or resolving) neither reactivates, repaints nor warns again.
       const h = harness({ outcome, replacement: "ready", hold: "floor", heldFails });
       h.run();
-      h.release();
+      present(h.release)();
       await flush();
       assert.equal(h.warnings.length, 1, outcome + ": failed before the held role decodes");
-      assert.equal(h.warnings[0].code, code);
+      assert.equal(present(h.warnings[0]).code, code);
       assert.deepEqual(
         h.status.lines(),
         ["Theme pack office office art " + text + "; showing station art."],
         outcome + ": the loading notice is replaced once",
       );
-      h.releaseHeld();
+      present(h.releaseHeld)();
       await flush();
       assert.equal(h.warnings.length, 1, outcome + ": no extra warning after the late settlement");
       assert.equal(h.frames.length, 0, outcome + ": no repaint or activation");
@@ -2775,35 +2980,35 @@ test("observer-view regression contracts", async () => {
       ]);
     }
     {
-      // Procedural humans keep the provider visible: in one project with one status, swapping a Claude worker for a
-      // Codex one changes its hair tone (amber to cyan) while hits, heights and foot anchors stay identical.
+      // Procedural humans keep the provider visible: in one project with one status, swapping a Claude worker across a
+      // Codex one changes its hair tone (amber to cyan) when hits, heights and foot anchors stay identical.
       const amber = base.scene.colors.amber,
         cyan = base.scene.colors.cyan;
       for (const replacement of ["inherited", "loading", "failed"]) {
-        const paint = (providers) => {
+        const paint = (providers: string[]) => {
           const h = harness({ replacement, providers, statuses: ["working", "working"] });
           return h;
         };
         const same = paint(["claude", "claude"]),
           mixed = paint(["claude", "codex"]);
         for (const h of [same, mixed]) {
-          h.release();
+          present(h.release)();
         }
         await flush();
         for (const h of [same, mixed]) {
           h.sprite.appearances.length = 0;
-          h.node.ctx.calls.fills = {};
+          recordedCalls(h.node).fills = {};
           h.run();
         }
         assert.equal(mixed.sprite.appearances.length, 0, replacement + ": procedural humans");
-        const tones = (h) => [
-          h.node.ctx.calls.fills[amber] || 0,
-          h.node.ctx.calls.fills[cyan] || 0,
+        const tones = (h: ReturnType<typeof harness>) => [
+          recordedCalls(h.node).fills[amber] || 0,
+          recordedCalls(h.node).fills[cyan] || 0,
         ];
         const [sameAmber, sameCyan] = tones(same),
           [mixedAmber, mixedCyan] = tones(mixed);
         assert(
-          mixedCyan > sameCyan && mixedAmber < sameAmber,
+          present(mixedCyan) > present(sameCyan) && present(mixedAmber) < present(sameAmber),
           replacement + ": Claude and Codex humans draw differently",
         );
         assert.deepEqual(
@@ -2831,33 +3036,29 @@ test("observer-view regression contracts", async () => {
 
   // ---------- Home-office art: every station role translated to its fixed PNG role, same passes, depth and hits ----------
   await (async () => {
-    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
-    const ThemePack = require("../../src/browser/theme.ts").createThemePack(
-      require("../assets/themes/starnet/theme.json"),
-    );
-    const Mail = require("../../src/browser/mail.ts").createMail(
-      require("../assets/themes/starnet/theme.json"),
-    );
+    const ThemePack = createThemePack(canonicalTheme());
+    const Mail = createMail(canonicalTheme());
     const flush = async () => {
-      for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve));
+      for (let i = 0; i < 4; i++) await new Promise<void>((resolve) => setImmediate(resolve));
     };
-    const ROLE_NAMES = Object.keys(SCENE_ART_ROLES),
+    const ROLE_NAMES = [...SCENE_ART_ROLE_NAMES],
       base = ThemePack.getDefault().scene,
-      keys = Object.keys(base.colors);
+      keys = sceneColorKeys(base.colors);
     // One distinct colour per scene key, so every recorded colour names exactly one key.
-    const custom = Object.fromEntries(
+    const custom: Record<string, string> = Object.fromEntries(
       keys.map((key, index) => [
         key,
         key.endsWith("transparent")
-          ? "rgba(1,2," + (index % 250) + ",0)"
+          ? "rgba(1,2," + String(index % 250) + ",0)"
           : "#" + (0x200000 + index * 0x10101).toString(16).slice(-6),
       ]),
     );
-    const norm = (value) => String(value).toLowerCase();
+    const norm = (value: string | CanvasGradient | CanvasPattern | undefined) =>
+      canvasStyleText(value).toLowerCase();
     const keyOf = new Map(keys.map((key) => [norm(custom[key]), key]));
     const rgbKey = keys
       .map((key) => {
-        const hex = /^#(..)(..)(..)$/.exec(custom[key]);
+        const hex = /^#(..)(..)(..)$/.exec(present(custom[key]));
         return hex
           ? [
               key,
@@ -2868,12 +3069,13 @@ test("observer-view regression contracts", async () => {
             ]
           : null;
       })
-      .filter(Boolean);
-    const attribute = (color) =>
+      .filter(presentValue);
+    const attribute = (color: string) =>
       keyOf.get(norm(color)) ||
       rgbKey.find(
         ([, rgb]) =>
-          norm(color).startsWith("rgba(" + rgb + ",") || norm(color) === "rgb(" + rgb + ")",
+          norm(color).startsWith("rgba(" + String(rgb) + ",") ||
+          norm(color) === "rgb(" + String(rgb) + ")",
       )?.[0] ||
       null;
     const assets = Object.fromEntries(
@@ -2902,14 +3104,15 @@ test("observer-view regression contracts", async () => {
       warnings: [],
       scene: { ...base, colors: custom },
     });
-    class RoleImage {
-      set src(url) {
+    class RoleImage extends OfficeImageFixture {
+      role: SceneArtRoleName = "floor";
+      override set src(url: string) {
         this._src = url;
-        this.role = ROLE_NAMES.find((role) => assets[role] === url);
+        this.role = present(ROLE_NAMES.find((role) => assets[role] === url));
         ({ width: this.naturalWidth, height: this.naturalHeight } =
           SCENE_ART_ROLES[this.role].source);
       }
-      get src() {
+      override get src() {
         return this._src;
       }
       decode() {
@@ -2918,52 +3121,107 @@ test("observer-view regression contracts", async () => {
     }
     // Recording context: colours, composite modes, role images (with their exact draw rectangles) and crew bodies, in order.
     function recorder() {
-      const log = [],
-        images = [],
-        events = [],
-        composites = [];
-      let dash = [];
-      const target = {
-        measureText: (text) => ({ width: String(text).length * 7 }),
-        setLineDash: (value) => {
+      const log: string[] = [],
+        images: {
+          role:
+            | "chair"
+            | "viewer"
+            | "floor"
+            | "desk"
+            | "floorAlt"
+            | "corridor"
+            | "wallRearX"
+            | "wallRearY"
+            | "wallCorner"
+            | "bookcaseX"
+            | "bookcaseY"
+            | "boardX"
+            | "boardY"
+            | "cabinetX"
+            | "cabinetY"
+            | "radiatorX"
+            | "radiatorY"
+            | "waterCooler"
+            | "plant"
+            | "basket"
+            | "lamp"
+            | "mailReception"
+            | "mailPad"
+            | "mailTray"
+            | "dispatchCounter"
+            | "mailSorter"
+            | "helperDesk"
+            | "helperChair"
+            | "partitionX"
+            | "partitionY"
+            | "apron"
+            | "planningBoard"
+            | "planningShelf"
+            | "carrier";
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+        }[] = [],
+        events: string[] = [],
+        composites: string[] = [];
+      let dash: number[] = [];
+      const target = drawing({
+        measureText: (text: string) => ({ width: text.length * 7 }),
+        setLineDash: (value: number[]) => {
           dash = value;
         },
         createRadialGradient: () => ({
-          addColorStop: (offset, color) => log.push("stop:" + norm(color)),
+          addColorStop: (_offset: number, color: string) => log.push("stop:" + norm(color)),
         }),
         stroke: () => log.push("stroke:" + norm(target.strokeStyle) + "|" + dash.join(",")),
         strokeRect: () => log.push("stroke:" + norm(target.strokeStyle) + "|" + dash.join(",")),
-        drawImage: (image, x, y, w, h) => {
-          if (image && image.role) {
+        drawImage: (
+          ...[image, x, y, w, h]: [
+            image: Resource & { role?: SceneArtRoleName },
+            x: number,
+            y: number,
+            w: number,
+            h: number,
+          ]
+        ) => {
+          if (image.role) {
             images.push({ role: image.role, x, y, w, h });
             events.push("role:" + image.role);
           }
         },
-      };
+      });
       const ctx = new Proxy(target, {
-        get: (t, key) => (key in t ? t[key] : () => {}),
-        set: (t, key, value) => {
+        set: (t, key, value: unknown) => {
           if ((key === "fillStyle" || key === "strokeStyle") && typeof value === "string")
-            log.push(key[0] + ":" + norm(value));
-          if (key === "globalCompositeOperation") composites.push(value);
-          if (key === "imageSmoothingEnabled") composites.push("smoothing:" + value);
-          t[key] = value;
-          return true;
+            log.push(key.charAt(0) + ":" + norm(value));
+          if (key === "globalCompositeOperation" && typeof value === "string")
+            composites.push(value);
+          if (key === "imageSmoothingEnabled" && typeof value === "boolean")
+            composites.push("smoothing:" + String(value));
+          return Reflect.set(t, key, value);
         },
       });
       return { ctx, log, images, events, composites };
     }
-    const statuses = ["working", "blocked", "idle", "done", "unknown", "working"];
-    const rows = Array.from({ length: 24 }, (_, i) => ({
-      id: "w" + i,
-      project: "P" + (i % 8),
-      projectId: "p" + (i % 8),
+    const statuses: NonNullable<LayoutRow["status"]>[] = [
+      "working",
+      "blocked",
+      "idle",
+      "done",
+      "unknown",
+      "working",
+    ];
+    const rows: LayoutRow[] = Array.from({ length: 24 }, (_, i) => ({
+      id: "w" + String(i),
+      project: "P" + String(i % 8),
+      projectId: "p" + String(i % 8),
       projectKind: "group",
       repo: i % 16 < 8 ? "api" : "web",
       repoId: i % 16 < 8 ? "api" : "web",
       provider: i % 2 ? "codex" : "claude",
-      status: statuses[i % statuses.length],
-      worktree: "wt" + i,
+      status: present(statuses[i % statuses.length]),
+      worktree: "wt" + String(i),
     }));
     rows.push(
       {
@@ -3005,7 +3263,7 @@ test("observer-view regression contracts", async () => {
           point: { x: 6, y: 6, z: 2.2 },
           parked: false,
           phase: "pickup",
-          parcels: [scene.platforms[0].accent, scene.platforms[1].accent],
+          parcels: [present(scene.platforms[0]).accent, present(scene.platforms[1]).accent],
         },
         { point: { x: 4, y: 9, z: 0.4 }, parked: true, phase: "parked", parcels: [] },
       );
@@ -3013,21 +3271,33 @@ test("observer-view regression contracts", async () => {
     };
     // ready: whether the human crew group is ready (office draws sprite bodies only then).
     // sprites: a real sprite runtime in place of the constant-returning stub.
-    async function paintWith(
-      theme,
-      {
-        fx = true,
-        ready = true,
-        focus = null,
-        zoom = 1,
-        stale = false,
-        at = 4321,
-        reduced = true,
-        sprites = null,
-      } = {},
-    ) {
+    interface OfficePaintOptions {
+      fx?: boolean;
+      ready?: boolean;
+      focus?: string | null;
+      zoom?: number;
+      stale?: boolean;
+      at?: number;
+      reduced?: boolean;
+      sprites?: ViewSprites<Resource, FixtureCanvas | FixtureImage> | null;
+    }
+    function officePaintOptions({
+      fx = true,
+      ready = true,
+      focus = null,
+      zoom = 1,
+      stale = false,
+      at = 4321,
+      reduced = true,
+      sprites = null,
+    }: OfficePaintOptions) {
+      return { fx, ready, focus, zoom, stale, at, reduced, sprites };
+    }
+    async function paintWith(theme: AppearanceTheme, options: OfficePaintOptions = {}) {
+      const { fx, ready, focus, zoom, stale, at, reduced, sprites } = officePaintOptions(options);
       const rec = recorder();
       const node = {
+        __id: "recorded-office",
         clientWidth: 1600,
         clientHeight: 1000,
         width: 0,
@@ -3039,8 +3309,8 @@ test("observer-view regression contracts", async () => {
         getBoundingClientRect: () => ({ left: 0, top: 0 }),
       };
       const sprite = sprites || {
-        drawBody: (c, body) => {
-          rec.events.push("body:" + body.id);
+        drawBody: (_c: ViewContext<Resource>, body: SpriteBody<FixtureCanvas | FixtureImage>) => {
+          rec.events.push("body:" + String(body.id));
           return { top: body.py - 60, w: 30, h: 60 };
         },
         replacementState: () => (ready ? "ready" : "inherited"),
@@ -3089,72 +3359,75 @@ test("observer-view regression contracts", async () => {
 
     const office = await paintWith(officeTheme),
       station = await paintWith(stationTheme);
-    // Every one of the 34 fixed roles reaches the canvas in one active office paint; the station draws none.
-    assert.deepEqual(
-      [...new Set(office.images.map((image) => image.role))].sort(),
-      ROLE_NAMES.slice().sort(),
-      "all 34 roles are drawn in the office",
-    );
-    assert.equal(station.images.length, 0, "station art never draws a role image");
-    // Native size, whole-pixel placement for every role draw, including the root and helper chairs.
-    for (const image of office.images) {
-      const { width, height } = SCENE_ART_ROLES[image.role].source;
+    function verifyOfficeRoleGeometry() {
+      // Every one of the 34 fixed roles reaches the canvas in one active office paint; the station draws none.
       assert.deepEqual(
-        [image.w, image.h],
-        [width, height],
-        image.role + " draws at its native size",
+        [...new Set(office.images.map((image) => image.role))].sort(),
+        ROLE_NAMES.slice().sort(),
+        "all 34 roles are drawn in the office",
       );
-      assert(
-        Number.isInteger(image.x) && Number.isInteger(image.y),
-        image.role + " draws on whole pixels",
+      assert.equal(station.images.length, 0, "station art never draws a role image");
+      // Native size, whole-pixel placement across every role draw, including the root and helper chairs.
+      for (const image of office.images) {
+        const { width, height } = SCENE_ART_ROLES[image.role].source;
+        assert.deepEqual(
+          [image.w, image.h],
+          [width, height],
+          image.role + " draws at its native size",
+        );
+        assert(
+          Number.isInteger(image.x) && Number.isInteger(image.y),
+          image.role + " draws on whole pixels",
+        );
+      }
+      const helpers = scene.workers.filter((worker) => worker.kind === "helper");
+      assert(helpers.length >= 2, "helper stations are exercised");
+      assert.equal(
+        office.images.filter((image) => image.role === "helperChair").length,
+        helpers.length,
+        "one native helper chair per helper",
       );
+      assert.equal(
+        office.images.filter((image) => image.role === "chair").length,
+        scene.workers.length - helpers.length + 1,
+        "root chairs and the observatory chair",
+      );
+      for (const worker of scene.workers) {
+        const role = worker.kind === "helper" ? "helperChair" : "chair",
+          at = Scene.project(worker.chair),
+          foot = SCENE_ART_ROLES[role].foot;
+        assert(
+          office.images.some(
+            (image) =>
+              image.role === role &&
+              image.x === Math.round(at.x - foot.x) &&
+              image.y === Math.round(at.y - foot.y),
+          ),
+          worker.id + " chair at its seat anchor",
+        );
+      }
+      // Paper carriers at the exact airborne points; parcel colours and counts are preserved.
+      const drones = mailFrame().drones,
+        carriers = office.images.filter((image) => image.role === "carrier");
+      assert.equal(carriers.length, drones.length, "one carrier per drone");
+      for (const drone of drones) {
+        const at = Scene.project(drone.point);
+        assert(
+          carriers.some(
+            (image) => image.x === Math.round(at.x - 12) && image.y === Math.round(at.y - 16),
+          ),
+          "carrier at its drone point",
+        );
+      }
+      const parcels = (log: string[]) =>
+        log.filter(
+          (entry) =>
+            entry === "f:" + norm(present(scene.platforms[0]).accent) ||
+            entry === "f:" + norm(present(scene.platforms[1]).accent),
+        ).length;
+      assert(parcels(office.log) >= 2, "parcel colours reach the canvas");
     }
-    const helpers = scene.workers.filter((worker) => worker.kind === "helper");
-    assert(helpers.length >= 2, "helper stations are exercised");
-    assert.equal(
-      office.images.filter((image) => image.role === "helperChair").length,
-      helpers.length,
-      "one native helper chair per helper",
-    );
-    assert.equal(
-      office.images.filter((image) => image.role === "chair").length,
-      scene.workers.length - helpers.length + 1,
-      "root chairs and the observatory chair",
-    );
-    for (const worker of scene.workers) {
-      const role = worker.kind === "helper" ? "helperChair" : "chair",
-        at = Scene.project(worker.chair),
-        foot = SCENE_ART_ROLES[role].foot;
-      assert(
-        office.images.some(
-          (image) =>
-            image.role === role &&
-            image.x === Math.round(at.x - foot.x) &&
-            image.y === Math.round(at.y - foot.y),
-        ),
-        worker.id + " chair at its seat anchor",
-      );
-    }
-    // Paper carriers at the exact airborne points; parcel colours and counts are preserved.
-    const drones = mailFrame().drones,
-      carriers = office.images.filter((image) => image.role === "carrier");
-    assert.equal(carriers.length, drones.length, "one carrier per drone");
-    for (const drone of drones) {
-      const at = Scene.project(drone.point);
-      assert(
-        carriers.some(
-          (image) => image.x === Math.round(at.x - 12) && image.y === Math.round(at.y - 16),
-        ),
-        "carrier at its drone point",
-      );
-    }
-    const parcels = (log) =>
-      log.filter(
-        (entry) =>
-          entry === "f:" + norm(scene.platforms[0].accent) ||
-          entry === "f:" + norm(scene.platforms[1].accent),
-      ).length;
-    assert(parcels(office.log) >= 2, "parcel colours reach the canvas");
+    verifyOfficeRoleGeometry();
     // No station-only primitives or decorative effects in the office.
     const STATION_ONLY = [
       "space",
@@ -3238,41 +3511,44 @@ test("observer-view regression contracts", async () => {
       "magnified office pixel art is nearest-neighbour, then smoothing is restored",
     );
     assert(
-      !station.composites.some((value) => String(value).startsWith("smoothing")),
+      !station.composites.some((value) => value.startsWith("smoothing")),
       "station paint never changes image smoothing",
     );
     assert(!office.composites.includes("lighter"), "no additive glow in the office");
-    // Flat warm backdrop and two-tone outlined side faces from semantic colours; functional cues remain.
-    for (const key of [
-      "office-backdrop",
-      "hullLeft",
-      "hullRight",
-      "body-outline",
-      "contact-shadow",
-      "drone-shadow",
-      "envelope-outline",
-      "focus",
-      "repo",
-      "working",
-      "blocked",
-      "idle",
-      "unknown",
-      "amber",
-      "cyan",
-    ])
-      assert(office.used.has(key), key + " paints in the office");
-    assert(
-      office.log.includes("f:" + norm(custom.hullLeft)) &&
-        office.log.includes("f:" + norm(custom.hullRight)) &&
-        office.log.includes("s:" + norm(custom["body-outline"])),
-      "two-tone faces with outlines",
-    );
-    assert(
-      scene.workers
-        .filter((worker) => worker.connector)
-        .every((worker) => office.log.includes("stroke:" + norm(worker.accent) + "|4,4")),
-      "helper tethers remain",
-    );
+    function verifyOfficeSemanticColors() {
+      // Flat warm backdrop and two-tone outlined side faces from semantic colours; functional cues remain.
+      for (const key of [
+        "office-backdrop",
+        "hullLeft",
+        "hullRight",
+        "body-outline",
+        "contact-shadow",
+        "drone-shadow",
+        "envelope-outline",
+        "focus",
+        "repo",
+        "working",
+        "blocked",
+        "idle",
+        "unknown",
+        "amber",
+        "cyan",
+      ])
+        assert(office.used.has(key), key + " paints in the office");
+      assert(
+        office.log.includes("f:" + norm(custom.hullLeft)) &&
+          office.log.includes("f:" + norm(custom.hullRight)) &&
+          office.log.includes("s:" + norm(custom["body-outline"])),
+        "two-tone faces with outlines",
+      );
+      assert(
+        scene.workers
+          .filter((worker) => worker.connector)
+          .every((worker) => office.log.includes("stroke:" + norm(worker.accent) + "|4,4")),
+        "helper tethers remain",
+      );
+    }
+    verifyOfficeSemanticColors();
     assert(
       (await paintWith(officeTheme, { stale: true })).log.some(
         (entry) => entry === "stroke:" + norm(custom.stale) + "|3,3",
@@ -3280,68 +3556,82 @@ test("observer-view regression contracts", async () => {
       "the dashed STALE plate remains",
     );
     // Steady status lamps: each observed status keeps its own colour, identical across animation times.
-    const lamps = (run) =>
+    const lamps = (run: Awaited<ReturnType<typeof paintWith>>) =>
       run.log
         .filter((entry) =>
-          ["working", "blocked", "idle", "unknown"].includes(attribute(entry.slice(2))),
+          ["working", "blocked", "idle", "unknown"].includes(attribute(entry.slice(2)) ?? ""),
         )
         .sort();
     const live = [1000, 2600, 7300].map((at) => paintWith(officeTheme, { at, reduced: false }));
     const [first, ...later] = await Promise.all(live);
     for (const run of later)
-      assert.deepEqual(lamps(run), lamps(first), "status lamps never blink or fade over time");
-    assert(!first.composites.includes("lighter"), "no additive glow in a live office");
-    // Wall and corner props keep the hashed station slot and stay inside the reserved wall/corner regions.
-    for (const platform of scene.platforms)
-      platform.decorationRegions.forEach((region) => {
-        if (region.kind !== "wall" && region.kind !== "corner") return;
-        for (const unit of View.wallUnits(region))
-          for (const kind of region.kind === "corner" ? View.CORNER_KINDS : View.WALL_KINDS) {
-            const { role, rect } = View.officeFurnishing(kind, unit, region.edge),
-              r = region.rect;
-            assert(
-              rect.x >= r.x - 1e-9 &&
-                rect.y >= r.y - 1e-9 &&
-                rect.x + rect.w <= r.x + r.w + 1e-9 &&
-                rect.y + rect.h <= r.y + r.h + 1e-9,
-              role + " fits its reserved region",
-            );
-            if (region.kind === "wall")
-              assert.equal(
-                SCENE_ART_ROLES[role].orientation,
-                region.edge === "rear-x" ? "x" : "y",
-                role + " matches the wall orientation",
-              );
-          }
-      });
-    // Same depth occlusion: each seated worker paints after its chair and before its desk; hits match the station.
-    for (const worker of scene.workers) {
-      const chair = office.events.findIndex(
-        (event, index) =>
-          event === "role:" + (worker.kind === "helper" ? "helperChair" : "chair") &&
-          office.events.slice(index + 1).includes("body:" + worker.id),
+      assert.deepEqual(
+        lamps(run),
+        lamps(present(first)),
+        "status lamps never blink or fade over time",
       );
-      const body = office.events.indexOf("body:" + worker.id),
-        desk = office.events.indexOf(
-          "role:" + (worker.kind === "helper" ? "helperDesk" : "desk"),
-          body,
-        );
-      assert(chair >= 0 && chair < body && body < desk, worker.id + ": chair, body, desk");
+    assert(!present(first).composites.includes("lighter"), "no additive glow in a live office");
+    // Wall and corner props keep the hashed station slot and stay inside the reserved wall/corner regions.
+    function verifyOfficeRegion(
+      region: SceneGeometry["platforms"][number]["decorationRegions"][number],
+    ) {
+      if (region.kind !== "wall" && region.kind !== "corner") return;
+      for (const unit of View.wallUnits(region))
+        for (const kind of region.kind === "corner" ? View.CORNER_KINDS : View.WALL_KINDS)
+          verifyOfficeFurnishing(kind, unit, region);
     }
-    assert.deepEqual(
-      office.view.hitRegions(),
-      station.view.hitRegions(),
-      "hit regions are identical",
-    );
-    assert.deepEqual(office.view.camera(), station.view.camera());
+    function verifyOfficeFurnishing(
+      kind: Parameters<typeof View.officeFurnishing>[0],
+      unit: Parameters<typeof View.officeFurnishing>[1],
+      region: SceneGeometry["platforms"][number]["decorationRegions"][number],
+    ) {
+      const { role, rect } = View.officeFurnishing(kind, unit, region.edge),
+        r = region.rect;
+      assert(
+        rect.x >= r.x - 1e-9 &&
+          rect.y >= r.y - 1e-9 &&
+          rect.x + rect.w <= r.x + r.w + 1e-9 &&
+          rect.y + rect.h <= r.y + r.h + 1e-9,
+        role + " fits its reserved region",
+      );
+      if (region.kind === "wall")
+        assert.equal(
+          SCENE_ART_ROLES[role].orientation,
+          region.edge === "rear-x" ? "x" : "y",
+          role + " matches the wall orientation",
+        );
+    }
+    for (const platform of scene.platforms) platform.decorationRegions.forEach(verifyOfficeRegion);
+    function verifyOfficeDepthAndHits() {
+      // Same depth occlusion: each seated worker paints after its chair and before its desk; hits match the station.
+      for (const worker of scene.workers) {
+        const chair = office.events.findIndex(
+          (event, index) =>
+            event === "role:" + (worker.kind === "helper" ? "helperChair" : "chair") &&
+            office.events.slice(index + 1).includes("body:" + worker.id),
+        );
+        const body = office.events.indexOf("body:" + worker.id),
+          desk = office.events.indexOf(
+            "role:" + (worker.kind === "helper" ? "helperDesk" : "desk"),
+            body,
+          );
+        assert(chair >= 0 && chair < body && body < desk, worker.id + ": chair, body, desk");
+      }
+      assert.deepEqual(
+        office.view.hitRegions(),
+        station.view.hitRegions(),
+        "hit regions are identical",
+      );
+      assert.deepEqual(office.view.camera(), station.view.camera());
+    }
+    verifyOfficeDepthAndHits();
     /* The real sprite engine, with ready review-metadata replacement groups: seated main and helper crew keep the
      station's seat placement in the office, so their returned extents and every hit region stay identical. */
     {
-      const { load } = require("../../src/browser/sprites/runtime.fixture.ts");
-      const canonicalCrew = require("../assets/themes/starnet/theme.json").crew;
+      const canonicalCrew = canonicalTheme().crew;
       const runtime = async () => {
-        const sprites = { sprites: {} },
-          crew = {};
+        const sprites: { sprites: Record<string, string[]> } = { sprites: {} },
+          crew: Record<string, ThemeContents["crew"][keyof ThemeContents["crew"]]> = {};
         for (const [skin, group] of Object.entries(canonicalCrew)) {
           for (const [track, paths] of Object.entries(group.tracks))
             sprites.sprites[group.set + "." + track] = paths.map((p) =>
@@ -3350,12 +3640,7 @@ test("observer-view regression contracts", async () => {
           crew[skin] = {
             ...group,
             set: "office_" + skin,
-            tracks: Object.fromEntries(
-              Object.entries(group.tracks).map(([track, paths]) => [
-                track,
-                paths.map((p) => p.replace("assets/sprites/", "assets/themes/office/crew/")),
-              ]),
-            ),
+            tracks: replacementTracks(group.tracks),
           };
         }
         const rt = await load({
@@ -3363,7 +3648,7 @@ test("observer-view regression contracts", async () => {
           sprites,
           initOptions: { crew },
           image(img) {
-            img.width = img.height = 144;
+            Object.assign(img, { width: 144, height: 144 });
             img.onload();
           },
         });
@@ -3415,16 +3700,16 @@ test("observer-view regression contracts", async () => {
 
   // Idle tint composes with themed sprite selection and office fallback without leaking into other canvas work.
   await (async () => {
-    const { SCENE_ART_ROLES } = require("../../src/shared/scene-art-roles.ts");
     const assets = Object.fromEntries(
       Object.keys(SCENE_ART_ROLES).map((role) => [
         role,
         "/assets/themes/office/scene/" + role.toLowerCase() + ".png",
       ]),
     );
-    class RoleImage {
-      set src(url) {
-        const role = Object.keys(assets).find((role) => assets[role] === url);
+    class RoleImage extends OfficeImageFixture {
+      role: SceneArtRoleName = "floor";
+      override set src(url: string) {
+        const role = present(SCENE_ART_ROLE_NAMES.find((role) => assets[role] === url));
         this.naturalWidth = SCENE_ART_ROLES[role].source.width;
         this.naturalHeight = SCENE_ART_ROLES[role].source.height;
       }
@@ -3447,15 +3732,15 @@ test("observer-view regression contracts", async () => {
       ]);
       const scene = Scene.build(layout.onPage(0), 0),
         node = canvas(1000, 700),
-        stack = [],
-        bodies = [],
-        tintedFills = [];
+        stack: (string | undefined)[] = [],
+        bodies: (string | undefined)[] = [],
+        tintedFills: ViewContext<Resource>["fillStyle"][] = [];
       node.ctx.filter = "none";
       node.ctx.save = () => stack.push(node.ctx.filter);
       node.ctx.restore = () => {
-        node.ctx.filter = stack.pop();
+        node.ctx.filter = present(stack.pop());
       };
-      const fill = node.ctx.fill;
+      const fill = node.ctx.fill.bind(node.ctx);
       node.ctx.fill = (...args) => {
         if (node.ctx.filter === View.idleFilter(1)) tintedFills.push(node.ctx.fillStyle);
         fill(...args);
@@ -3473,17 +3758,17 @@ test("observer-view regression contracts", async () => {
           Image: RoleImage,
           themeStatus: { reportNotice() {}, reportWarning() {} },
           sprites: {
-            drawBody(ctx) {
+            drawBody(ctx: ViewContext<Resource>) {
               bodies.push(ctx.filter);
               return { top: 0, w: 30, h: 60 };
             },
           },
         },
       });
-      for (let i = 0; i < 4; i++) await new Promise((resolve) => setImmediate(resolve));
+      for (let i = 0; i < 4; i++) await new Promise<void>((resolve) => setImmediate(resolve));
       view.start();
       view.update(scene, {});
-      view.focusPlatform(scene.platforms[0].key);
+      view.focusPlatform(present(scene.platforms[0]).key);
       view.paint(16);
       if (office) {
         assert.equal(bodies.length, 0, "unready office never substitutes station sprites");
@@ -3494,3 +3779,101 @@ test("observer-view regression contracts", async () => {
     }
   })();
 }, 120000);
+
+type ViewInstance = ReturnType<typeof View.create<Resource>>;
+function workingStatuses(): NonNullable<LayoutRow["status"]>[] {
+  return ["working"];
+}
+function emptyStrings(): string[] {
+  return [];
+}
+function emptyTextCalls(): { text: string; x: number; y: number }[] {
+  return [];
+}
+function emptyCounts(): Record<string, number> {
+  return {};
+}
+
+interface AppearanceRecord extends SpriteAppearance {
+  id?: string | undefined;
+  state?: string | undefined;
+  sitting?: boolean | undefined;
+  dir?: string | undefined;
+}
+interface SpriteFixture extends ViewSprites<Resource> {
+  appearances?: AppearanceRecord[];
+}
+interface SetupOptions {
+  dpr?: number;
+  sprite?: SpriteFixture;
+  width?: number;
+  height?: number;
+  reduced?: () => boolean;
+  statuses?: NonNullable<LayoutRow["status"]>[];
+  onObservatory?: () => void;
+  count?: number;
+}
+
+interface ColorRecord {
+  log: string[];
+  strokes: string[];
+  firstStops: string[][];
+}
+function presentValue<T>(value: T | null | undefined | false): value is T {
+  return Boolean(value);
+}
+function sceneColorKeys(colors: ThemeContents["scene"]["colors"]): ThemeSceneColor[] {
+  const keys: ThemeSceneColor[] = [];
+  for (const key of Object.keys(colors)) {
+    if (isSceneColor(colors, key)) keys.push(key);
+  }
+  return keys;
+}
+function isSceneColor(
+  colors: ThemeContents["scene"]["colors"],
+  key: string,
+): key is ThemeSceneColor {
+  return Object.hasOwn(colors, key);
+}
+
+interface MediaQuery {
+  query: string;
+  handlers: Set<() => void>;
+  addEventListener(name: string, fn: () => void): void;
+  removeEventListener(name: string, fn: () => void): void;
+}
+function isTrack(
+  tracks: ThemeContents["crew"][keyof ThemeContents["crew"]]["tracks"],
+  key: string,
+): key is keyof typeof tracks {
+  return Object.hasOwn(tracks, key);
+}
+
+function workingTitleStatuses(): NonNullable<LayoutRow["status"]>[] {
+  return ["working", "blocked", "working"];
+}
+function replacementTracks(tracks: ThemeContents["crew"][keyof ThemeContents["crew"]]["tracks"]) {
+  const replaced = { ...tracks };
+  for (const key of Object.keys(tracks)) {
+    if (isTrack(tracks, key))
+      replaced[key] = tracks[key].map((path) =>
+        path.replace("assets/sprites/", "assets/themes/office/crew/"),
+      );
+  }
+  return replaced;
+}
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {
+    throw new Error("Deferred not initialized");
+  };
+  const promise = new Promise<T>((yes) => {
+    resolve = yes;
+  });
+  return { promise, resolve };
+}
+
+function canvasStyleText(value: ViewContext<Resource>["fillStyle"] | undefined): string {
+  if (typeof value === "string") return value;
+  if (value === undefined) return "undefined";
+  return Object.prototype.toString.call(value);
+}

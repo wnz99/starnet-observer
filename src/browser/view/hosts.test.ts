@@ -1,39 +1,40 @@
-"use strict";
-const { test } = require("bun:test");
+import { test } from "bun:test";
+import assert from "node:assert/strict";
+import { createModel } from "../model.js";
+import type { LayoutRow } from "../model/types.js";
+import * as Scene from "../scene/index.js";
+import type { Point, Rect } from "../scene/types.js";
+import type { SpriteBody } from "../sprites/types.js";
+import { canonicalTheme } from "../theme.fixture.js";
+import type { Resource } from "./drawing.fixture.js";
+import { drawing, Handlers, present } from "./drawing.fixture.js";
+import { createViewFactory } from "./index.js";
+import type { ViewContext, ViewEvent } from "./types.js";
+const Model = createModel(canonicalTheme());
+const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
 
-test("observer-hosts-view regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const Model = require("../../src/browser/model.ts").createModel(
-    require("../assets/themes/starnet/theme.json"),
-  );
-  const Scene = require("./observer-scene.js");
-  const View = require("./observer-view.js");
-
+test("observer-hosts-view regression contracts", () => {
   // Multi-host view: ship clicks select a host (floor or label), blocked agents carry a "!" attention badge.
   function context() {
-    const target = {
-      texts: [],
-      fillText(text) {
-        target.texts.push(String(text));
+    const target = drawing({
+      texts: emptyStrings(),
+      fillText(text: string) {
+        target.texts.push(text);
       },
-      measureText: (text) => ({ width: String(text).length * 7 }),
+      measureText: (text: string) => ({ width: text.length * 7 }),
       createRadialGradient: () => ({ addColorStop() {} }),
-      getContext() {
-        return target;
-      },
-    };
+    });
     return new Proxy(target, {
-      get: (t, key) => (key in t ? t[key] : () => {}),
       set: (t, key, value) => {
-        t[key] = value;
-        return true;
+        return Reflect.set(t, key, value);
       },
     });
   }
   function canvas(width = 1000, height = 700) {
     const ctx = context(),
-      handlers = new Map();
+      handlers = new Handlers();
     return {
+      __id: "view-canvas",
       ctx,
       handlers,
       clientWidth: width,
@@ -42,17 +43,17 @@ test("observer-hosts-view regression contracts", async () => {
       height: 0,
       style: {},
       getContext: () => ctx,
-      addEventListener(name, fn) {
+      addEventListener(name: string, fn: (event: ViewEvent) => void) {
         handlers.set(name, fn);
       },
-      removeEventListener(name) {
+      removeEventListener(name: string) {
         handlers.delete(name);
       },
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       setPointerCapture() {},
     };
   }
-  const row = (id, extra) => ({
+  const row = (id: string, extra: Partial<LayoutRow>): LayoutRow => ({
     id,
     project: "P",
     projectId: "p",
@@ -64,23 +65,32 @@ test("observer-hosts-view regression contracts", async () => {
     ...extra,
   });
 
-  assert.equal(View.needsAttention({ row: { status: "blocked" } }, false), true);
-  assert.equal(
-    View.needsAttention({ row: { status: "blocked" } }, true),
-    false,
+  const freshness = { fresh: false, stale: true };
+  assert.deepEqual(
+    { value: View.needsAttention({ row: { status: "blocked" } }, freshness.fresh) },
+    { value: true },
+  );
+  assert.deepEqual(
+    { value: View.needsAttention({ row: { status: "blocked" } }, freshness.stale) },
+    { value: false },
     "a stale blocked row is last known, not a live alarm",
   );
-  for (const status of ["working", "idle", "done", "unknown"])
-    assert.equal(View.needsAttention({ row: { status } }, false), false, status);
-  {
-    const fills = [];
+  function verifyOtherStatusesHaveNoAttention() {
+    for (const status of ["working", "idle", "done", "unknown"])
+      assert.deepEqual(
+        { value: View.needsAttention({ row: { status } }, freshness.fresh) },
+        { value: false },
+        status,
+      );
+  }
+  verifyOtherStatusesHaveNoAttention();
+  function verifyAttentionPixels() {
+    const fills: number[][] = [];
     const ctx = new Proxy(
-      { fillRect: (...args) => fills.push(args) },
+      drawing({ fillRect: (...args: [number, number, number, number]) => fills.push(args) }),
       {
-        get: (t, key) => (key in t ? t[key] : () => {}),
         set: (t, key, value) => {
-          t[key] = value;
-          return true;
+          return Reflect.set(t, key, value);
         },
       },
     );
@@ -91,9 +101,10 @@ test("observer-hosts-view regression contracts", async () => {
       "centred above the anchor",
     );
   }
+  verifyAttentionPixels();
 
   const layout = Model.createLayout();
-  const rows = [
+  const rows: LayoutRow[] = [
     row("obs_local", { status: "working" }),
     row("obs_blocked", { host: "vm", status: "blocked" }),
     row("obs_idle", { host: "vm", status: "idle" }),
@@ -149,11 +160,11 @@ test("observer-hosts-view regression contracts", async () => {
   ];
   // The shadow crew are on the relay by definition; no vm agent is published (none works in the shared repo).
   const relayMembers = new Map(
-    ghosts.map((ghost) => [ghost.id, { host: ghost.host, repo: ghost.repo }]),
+    ghosts.map((ghost) => [ghost.id, { host: ghost.host ?? null, repo: ghost.repo }]),
   );
   const scene = Scene.build(layout.onPage(0), 0, { hosts, relays, relayMembers });
   assert.ok(
-    scene.platforms.find((platform) => platform.host === "relay:whitenoise").relay,
+    present(scene.platforms.find((platform) => platform.host === "relay:whitenoise")).relay,
     "the shadow room is a relay room",
   );
   assert.ok(
@@ -166,11 +177,11 @@ test("observer-hosts-view regression contracts", async () => {
     "relay lanes only where the relay carries agents",
   );
   assert.equal(
-    scene.links.length,
+    present(scene.links).length,
     2,
     "fixture: an observation link per observed remote ship, none to the shadow",
   );
-  assert.equal(scene.relays.length, 1, "fixture: one relay");
+  assert.equal(present(scene.relays).length, 1, "fixture: one relay");
   assert.deepEqual(
     scene.workers
       .filter((worker) => worker.row.shadow)
@@ -180,10 +191,10 @@ test("observer-hosts-view regression contracts", async () => {
     "fixture: ghost crew seated on the shadow ship",
   );
   const node = canvas(),
-    ships = [];
+    ships: (string | null)[] = [];
   let now = 0,
-    chosenHost = null;
-  const staleIds = new Set();
+    chosenHost: string | null = null;
+  const staleIds: Set<string> = new Set();
   const view = View.create({
     canvas: node,
     nameFor: (id) => id,
@@ -198,7 +209,13 @@ test("observer-hosts-view regression contracts", async () => {
       now: () => now,
       dpr: () => 1,
       createCanvas: () => canvas(),
-      sprites: { drawBody: (ctx, body) => ({ top: body.py - 19, w: 10, h: 19 }) },
+      sprites: {
+        drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+          top: body.py - 19,
+          w: 10,
+          h: 19,
+        }),
+      },
     },
   });
   view.start();
@@ -229,19 +246,19 @@ test("observer-hosts-view regression contracts", async () => {
   assert.equal(view.attentionRegions().length, 1);
 
   // The remote ship's own label is drawn at overview and still when zoomed onto its room (it outranks room signs and is
-  // clamped into view while the hull is on screen).
+  // clamped into view when the hull is on screen).
   const labelled = () => node.ctx.texts.some((text) => /^● VM · 2 agents/.test(text));
   node.ctx.texts.length = 0;
   now += 16;
   view.paint(now);
   assert.ok(labelled(), "remote ship label at overview");
-  const drawn = (text) => node.ctx.texts.includes(text);
+  const drawn = (text: string) => node.ctx.texts.includes(text);
   assert.ok(drawn("ssh · observing"), "a live host's observation link says what it is");
   assert.ok(drawn("ssh · stale"), "a stale host's link shows its real state");
-  {
+  function verifyShadowLabelsAndHighways() {
     // Zoomed onto the shadow ship's room: its ghost crew, its own label and the relay link's label are on screen.
     const shadowRoom = scene.platforms.find((platform) => platform.host === "relay:whitenoise");
-    assert.ok(view.focusPlatform(shadowRoom.key));
+    assert.ok(view.focusPlatform(present(shadowRoom).key));
     node.ctx.texts.length = 0;
     now += 16;
     view.paint(now);
@@ -260,22 +277,26 @@ test("observer-hosts-view regression contracts", async () => {
       ),
       "the highway names its relay and live state, says no mail has crossed yet, and counts the agents here on it",
     );
-    const vmShip = scene.ships.find((ship) => ship.id === "vm"),
-      shadowShip = scene.ships.find((ship) => ship.shadow);
+    const vmShip = present(scene.ships).find((ship) => ship.id === "vm"),
+      shadowShip = present(scene.ships).find((ship) => ship.shadow);
     assert.ok(
-      shadowShip.rect.x > vmShip.rect.x + vmShip.rect.w,
+      present(shadowShip).rect.x > present(vmShip).rect.x + present(vmShip).rect.w,
       "the shadow ship docks beside the ship it links to",
     );
-    assert.equal(shadowShip.mail.hub.y, vmShip.mail.hub.y, "level with its mailroom");
+    assert.equal(
+      present(present(shadowShip).mail).hub.y,
+      present(present(vmShip).mail).hub.y,
+      "level with its mailroom",
+    );
     assert.deepEqual(
-      scene.links.map((link) => link.host),
+      present(scene.links).map((link) => link.host),
       ["vm", "empty"],
       "the column and its ssh links are unchanged by a shadow",
     );
     // The highway is a ground walkway routed around the floors: no strip of it overlaps any room.
     const highway = scene.walkways.filter((walkway) => walkway.kind === "relay-highway");
     assert.ok(highway.length >= 3, "climb, cross, descend");
-    const overlap = (a, b) =>
+    const overlap = (a: Rect, b: Rect) =>
       a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
     for (const segment of highway)
       for (const platform of scene.platforms)
@@ -288,8 +309,9 @@ test("observer-hosts-view regression contracts", async () => {
     now += 16;
     view.paint(now);
   }
+  verifyShadowLabelsAndHighways();
   const vmRoom = scene.platforms.find((platform) => platform.host === "vm");
-  assert.ok(view.focusPlatform(vmRoom.key));
+  assert.ok(view.focusPlatform(present(vmRoom).key));
   node.ctx.texts.length = 0;
   now += 16;
   view.paint(now);
@@ -302,7 +324,7 @@ test("observer-hosts-view regression contracts", async () => {
   now += 16;
   view.paint(now);
   // Ship clicks: anywhere on an empty hull floor (or its label) selects that host; the flagship floor selects this machine.
-  const click = (point) => {
+  const click = (point: Point) => {
     const at = Scene.toScreen(point, view.camera()),
       event = {
         clientX: at.x,
@@ -316,11 +338,17 @@ test("observer-hosts-view regression contracts", async () => {
     now += 400;
     view.paint(now);
   };
-  const empty = scene.ships.find((ship) => ship.id === "empty"),
-    flagship = scene.ships.find((ship) => ship.local);
-  click({ x: empty.mail.rect.x + 2, y: empty.mail.rect.y + empty.mail.rect.h - 2 });
+  const empty = present(scene.ships).find((ship) => ship.id === "empty"),
+    flagship = present(scene.ships).find((ship) => ship.local);
+  click({
+    x: present(present(empty).mail).rect.x + 2,
+    y: present(present(empty).mail).rect.y + present(present(empty).mail).rect.h - 2,
+  });
   assert.deepEqual(ships, ["empty"], "a remote hull floor click selects that host");
-  click({ x: flagship.rect.x + 2, y: flagship.rect.y + flagship.rect.h - 2 });
+  click({
+    x: present(flagship).rect.x + 2,
+    y: present(flagship).rect.y + present(flagship).rect.h - 2,
+  });
   assert.deepEqual(ships, ["empty", null], "the flagship floor selects this machine");
   // Without onShip (a page with no remotes) nothing on the floor is a ship target.
   const plain = View.create({
@@ -357,7 +385,7 @@ test("observer-hosts-view regression contracts", async () => {
   // "~ home": a home-folder room and its own section read "~ home"; a repository room in home keeps its repo section name.
   assert.equal(Model.projectName({ project: "nick", projectHome: true }), "~ home");
   assert.equal(Model.projectName({ project: "web" }), "web");
-  {
+  function verifyHomeLabels() {
     const homeLayout = Model.createLayout();
     homeLayout.reconcile([
       row("obs_home", {
@@ -378,15 +406,22 @@ test("observer-hosts-view regression contracts", async () => {
       }),
     ]);
     const [room] = homeLayout.onPage(0);
-    assert.equal(room.name, "~ home", "the room sign");
+    assert.equal(present(room).name, "~ home", "the room sign");
     const homeScene = Scene.build(homeLayout.onPage(0), 0);
     assert.deepEqual(
-      homeScene.platforms[0].sections.map((section) => section.label).sort(),
+      present(homeScene.platforms[0])
+        .sections.map((section) => section.label)
+        .sort(),
       ["tools · Checkout unavailable", "~ home · Checkout unavailable"],
       "section labels retain home alias and checkout proof state",
     );
   }
+  verifyHomeLabels();
   console.log(
     'observer hosts view: "~ home" labels, blocked "!" badge (fresh only, overview too), ship floor/label selection, observation/relay labels, links only with remotes OK',
   );
 }, 30000);
+
+function emptyStrings(): string[] {
+  return [];
+}
