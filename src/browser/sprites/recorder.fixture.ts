@@ -1,7 +1,7 @@
 const CALL_PRECISION = 4;
 const RGBA_CHANNELS = 4;
 /* Synthetic masters preserve measured alpha padding, image failures/delays and drawing-call/device extent evidence. */
-import type { SpriteResource, SpriteGradient } from "./types.js";
+import type { SpriteResource, SpriteGradient, SpriteContext } from "./types.js";
 export type DrawLog = (string | number)[][];
 type Matrix = readonly [number, number, number, number, number, number];
 type Extents = number[][];
@@ -15,7 +15,7 @@ class Gradient implements SpriteGradient {
   }
 }
 const round = (value: number) => +value.toFixed(CALL_PRECISION);
-export class RecordingContext {
+export class RecordingContext implements SpriteContext<RecordingResource> {
   private matrix: Matrix = [1, 0, 0, 1, 0, 0];
   private readonly stack: { matrix: Matrix; state: ReturnType<RecordingContext["snapshot"]> }[] =
     [];

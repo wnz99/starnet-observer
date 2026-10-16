@@ -1,14 +1,14 @@
 import { createSprites } from "./assets.js";
 import { RecordingContext } from "./recorder.fixture.js";
 import type { DrawLog, RecordingResource } from "./recorder.fixture.js";
-import type { SpriteCatalog, SpriteInit, SpriteResource } from "./types.js";
+import type { SpriteCatalog, SpriteInit, SpriteResource, SpriteCanvas } from "./types.js";
 export type { DrawLog } from "./recorder.fixture.js";
 const WALK_FRAMES = 6,
   CARDINAL_DIRECTIONS = 4,
   SITTING_MASTER_HEIGHT = 70,
   STANDING_CONTENT_HEIGHT = 64;
 type Extents = number[][];
-export class FixtureCanvas implements RecordingResource {
+export class FixtureCanvas implements RecordingResource, SpriteCanvas<RecordingResource> {
   width = 0;
   height = 0;
   private readonly listeners = new Map<string, Set<() => void>>();

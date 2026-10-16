@@ -2,6 +2,9 @@ import type { Inventory } from "../observer/contracts.js";
 import type { ObserverSnapshot } from "../../shared/observer.js";
 type InventoryRow = Inventory["sessions"][number];
 type Tool = NonNullable<InventoryRow["tool"]>;
+type PresentationLast = Omit<NonNullable<Tool["last"]>, "outcome"> & {
+  outcome?: NonNullable<Tool["last"]>["outcome"] | undefined;
+};
 export type Row = Pick<InventoryRow, "id"> &
   Partial<
     Pick<
@@ -32,10 +35,11 @@ export type Row = Pick<InventoryRow, "id"> &
   > & {
     lastActivityAt?: unknown;
     tool?:
-      | (Pick<Tool, "last"> & {
+      | {
+          last?: PresentationLast | null;
           available?: Tool["available"];
           observedAt?: unknown;
-        })
+        }
       | undefined;
     taskStatusEvidence?:
       Pick<NonNullable<InventoryRow["taskStatusEvidence"]>, "status"> | undefined;
@@ -109,7 +113,10 @@ export type ProjectedRow = Pick<Row, "id"> & {
   title: string;
   inspectionIdentity: null;
   lastActivityAt: number | null | undefined;
-  tool: Omit<Tool, "observedAt"> & { observedAt?: number };
+  tool: Omit<Tool, "observedAt" | "last"> & {
+    observedAt?: number;
+    last?: PresentationLast | null;
+  };
   arrangement?: NonNullable<Row["arrangement"]>;
   taskEvidence?: { state: string; summary: null };
   taskStatusEvidence?: { status: string | null };
