@@ -291,3 +291,24 @@ test("unavailable checkout proof and generic Codex title keep explicit fallback 
     "Codex — title not yet published by Herdr",
   );
 });
+
+test("partial helper evidence keeps observed names, task fallback and optional tool outcomes", () => {
+  const row: LayoutRow = {
+    id: "helper-partial",
+    provider: "codex",
+    source: "helper",
+    title: "Helper",
+    status: "idle",
+    taskEvidence: { state: "partial", summary: "Fix tests" },
+    taskStatusEvidence: { status: "running" },
+    lifecycleEvidence: { state: "closed" },
+    tool: { available: true, last: { name: "Read", phase: "running", at: 1 } },
+  };
+  assert.equal(Model.hoverLabel(row, fresh, 1000), "Codex — Helper · Fix tests · idle");
+  assert.equal(Model.activity(row), "Last observed: reading files · result not yet observed");
+  const unavailable: LayoutRow = { ...row, taskEvidence: null, lifecycleEvidence: null };
+  assert.equal(
+    Model.hoverLabel(unavailable, fresh, 1000),
+    "Codex — Helper · task unavailable · idle",
+  );
+});

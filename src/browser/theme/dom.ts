@@ -21,6 +21,7 @@ export interface ThemeDocument {
     listener: () => void,
     options: { once: boolean },
   ): void;
+  removeEventListener(type: "DOMContentLoaded", listener: () => void): void;
 }
 export interface RuntimeThemeWarning {
   readonly code: string;

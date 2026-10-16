@@ -54,6 +54,10 @@ export class ThemeFixtureDocument implements ThemeDocument {
   addEventListener(_type: "DOMContentLoaded", listener: () => void) {
     this.mounted.push(listener);
   }
+  removeEventListener(_type: "DOMContentLoaded", listener: () => void) {
+    const index = this.mounted.indexOf(listener);
+    if (index >= 0) this.mounted.splice(index, 1);
+  }
   mount() {
     this.readyState = "complete";
     for (const listener of this.mounted.splice(0)) listener();

@@ -1,8 +1,28 @@
 import type { ObserverRow } from "../../shared/observer.js";
-export type DisplayRow = Partial<Omit<ObserverRow, "provider" | "source" | "observedAt">> & {
+type DisplayTool = Omit<ObserverRow["tool"], "last"> & {
+  last?: Partial<NonNullable<ObserverRow["tool"]["last"]>> | null;
+};
+export type DisplayRow = Partial<
+  Omit<
+    ObserverRow,
+    | "provider"
+    | "source"
+    | "observedAt"
+    | "tool"
+    | "taskEvidence"
+    | "taskStatusEvidence"
+    | "lifecycleEvidence"
+    | "task"
+  >
+> & {
   observedAt?: number | string | null;
   provider?: string;
   source?: string;
+  tool?: DisplayTool;
+  taskEvidence?: Partial<NonNullable<ObserverRow["taskEvidence"]>> | null;
+  taskStatusEvidence?: Partial<NonNullable<ObserverRow["taskStatusEvidence"]>> | null;
+  lifecycleEvidence?: Partial<NonNullable<ObserverRow["lifecycleEvidence"]>> | null;
+  task?: unknown;
 };
 export type LayoutRow = DisplayRow & { id: string };
 export interface Block {

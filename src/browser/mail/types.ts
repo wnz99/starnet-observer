@@ -37,8 +37,8 @@ export interface FrameOptions {
   readonly pads?: readonly Point[];
 }
 export interface CourierBus<T extends CourierMessage> {
-  readonly health: string;
-  readonly messages: readonly T[];
+  readonly health?: string;
+  readonly messages?: readonly T[];
 }
 export interface UpdateOptions<T extends CourierMessage> {
   readonly now: number;

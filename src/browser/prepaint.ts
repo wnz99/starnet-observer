@@ -9,6 +9,7 @@ type BrowserDocument = Pick<
   | "getElementById"
   | "querySelector"
   | "addEventListener"
+  | "removeEventListener"
 > & { readonly fonts?: FontFaceSet };
 function prepaint(source: unknown, document: BrowserDocument) {
   const bootstrap = readBootstrap(source);
@@ -51,6 +52,9 @@ function prepaint(source: unknown, document: BrowserDocument) {
     querySelector: (selector) => document.querySelector<HTMLElement>(selector),
     addEventListener: (type, listener, options) => {
       document.addEventListener(type, listener, options);
+    },
+    removeEventListener: (type, listener) => {
+      document.removeEventListener(type, listener);
     },
   };
   theme.start(bootstrap.themePack ?? bootstrap.defaultTheme, themeDocument);

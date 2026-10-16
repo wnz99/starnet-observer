@@ -82,7 +82,9 @@ export function applyLogo(snapshot: unknown, document: ThemeDocument, report: Re
   const image = document.getElementById("brand-logo");
   const mark = document.querySelector(".brand-mark");
   if (!image || !LOGO_URL.test(logo.image)) return;
+  let disposed = false;
   const fail = () => {
+    if (disposed) return;
     image.hidden = true;
     image.removeAttribute("src");
     if (mark) mark.hidden = false;
@@ -94,12 +96,14 @@ export function applyLogo(snapshot: unknown, document: ThemeDocument, report: Re
   };
   image.setAttribute("alt", logo.alt);
   image.setAttribute("src", logo.image);
-  if (!image.decode) {
-    fail();
-    return;
-  }
-  void image.decode().then(() => {
-    image.hidden = false;
-    if (mark) mark.hidden = true;
-  }, fail);
+  if (image.decode)
+    void image.decode().then(() => {
+      if (disposed) return;
+      image.hidden = false;
+      if (mark) mark.hidden = true;
+    }, fail);
+  else fail();
+  return () => {
+    disposed = true;
+  };
 }

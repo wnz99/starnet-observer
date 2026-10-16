@@ -11,7 +11,7 @@ import {
   MAX_AIRBORNE,
   MAX_QUEUE,
 } from "./mail.js";
-import type { CourierMessage } from "./mail/types.js";
+import type { CourierMessage, CourierBus } from "./mail/types.js";
 import { canonicalTheme } from "./theme.fixture.js";
 interface Message extends CourierMessage {
   from: string;
@@ -371,5 +371,24 @@ test("original courier route, recovery, frame and theme contracts", () => {
       ["#102030", "#203040"],
       "pending and acknowledged envelopes are themed",
     );
+  }
+});
+
+test("partial observed buses never invent a courier flight", () => {
+  const courier = createMail(canonicalTheme()).createCourier();
+  const buses: CourierBus<CourierMessage>[] = [
+    {},
+    { health: "available" },
+    { messages: [{ id: 1 }] },
+  ];
+  for (const [now, bus] of buses.entries()) {
+    courier.update(bus, {
+      now,
+      deck: 0,
+      route() {
+        throw new Error("A partial observation must not launch mail");
+      },
+    });
+    assert.deepEqual(courier.state(), { airborne: [], queued: 0, skipped: 0, fades: 0 });
   }
 });
