@@ -204,3 +204,27 @@ test("reserved malformed pane ids retain raw ownership until native absence is p
     await fs.rm(home, { recursive: true, force: true });
   }
 });
+
+test("overseer rejects unknown provider values before state or native work", async () => {
+  const unexpected = (): never => {
+    throw new Error("unexpected fixture operation");
+  };
+  const control = makeControl({
+    endpoint: "/fixture/provider-guard.sock",
+    overseerHome: "/fixture/provider-guard",
+    execute: unexpected,
+    fs: { mkdir: unexpected, writeFile: unexpected },
+    overseerState: {
+      read: unexpected,
+      match: unexpected,
+      reserve: unexpected,
+      notePane: unexpected,
+      commit: unexpected,
+      abandon: unexpected,
+      releaseMissing: unexpected,
+    },
+  });
+  for (const provider of [undefined, null, "", "Claude", "gemini", {}, []]) {
+    await assert.rejects(control.overseer(provider), /invalid-provider/);
+  }
+});

@@ -1,4 +1,4 @@
-import type { Message, Relay, Remote, Bus } from "./types.js";
+import type { Message, Relay, Remote, Bus, HostBus } from "./types.js";
 import type { Aliases } from "./aliases.js";
 function relayOf(aliases: Aliases) {
   return (relay: Relay | undefined) =>
@@ -20,16 +20,16 @@ function remoteOf(aliases: Aliases) {
           relay: aliases.alias("relay", "Relay", remote.relay),
           machine: aliases.alias("machine", "Machine", remote.machine),
           lastActivityAt: remote.lastActivityAt,
-          onRelay: remote.onRelay.map((entry) => ({
+          onRelay: (remote.onRelay || []).map((entry) => ({
             id: entry.id,
             repo: aliases.alias("repo", "Shared repo", entry.repo),
           })),
-          peers: remote.peers.map((peer) => ({
+          peers: (remote.peers || []).map((peer) => ({
             machine: aliases.alias("machine", "Machine", peer.machine),
-            repos: peer.repos.map((repo) => aliases.alias("repo", "Shared repo", repo)),
+            repos: (peer.repos || []).map((repo) => aliases.alias("repo", "Shared repo", repo)),
             agents: peer.agents,
             lastSeen: peer.lastSeen,
-            list: peer.list.map((agent) => ({
+            list: (peer.list || []).map((agent) => ({
               id: agent.id,
               provider: agent.provider,
               repo: aliases.alias("repo", "Shared repo", agent.repo),
@@ -57,7 +57,7 @@ function mailOf(aliases: Aliases) {
 export function makeMail(aliases: Aliases) {
   const mail = mailOf(aliases),
     remote = remoteOf(aliases);
-  function bus(value: Bus | null) {
+  function bus(value: Bus | null | undefined) {
     return value
       ? {
           health: value.health,
@@ -69,7 +69,7 @@ export function makeMail(aliases: Aliases) {
         }
       : null;
   }
-  function hostBus(values: Record<string, Bus | null>) {
+  function hostBus(values: Record<string, HostBus | null>) {
     return Object.fromEntries(
       Object.entries(values).map(([id, nullable]) => {
         const value = requireBus(nullable);
@@ -80,7 +80,7 @@ export function makeMail(aliases: Aliases) {
             health: value.health,
             observedAt: value.observedAt,
             window: value.window,
-            messages: value.messages.map((message) =>
+            messages: (value.messages || []).map((message) =>
               mail(message, { key: String(message.id) + "@" + host, host }),
             ),
             ...(value.remote ? { remote: remote(value.remote) } : {}),
@@ -91,7 +91,7 @@ export function makeMail(aliases: Aliases) {
   }
   return { bus, hostBus };
 }
-function requireBus(value: Bus | null) {
+function requireBus(value: HostBus | null) {
   if (value === null) throw new TypeError("Cannot read properties of null");
   return value;
 }

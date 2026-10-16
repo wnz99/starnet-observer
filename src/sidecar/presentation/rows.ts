@@ -51,7 +51,8 @@ function makeCheckouts() {
 }
 function toolOf(row: Row): ProjectedRow["tool"] {
   const tool: ProjectedRow["tool"] = { available: row.tool?.available === true };
-  if (Number.isFinite(row.tool?.observedAt)) tool.observedAt = row.tool?.observedAt;
+  if (typeof row.tool?.observedAt === "number" && Number.isFinite(row.tool.observedAt))
+    tool.observedAt = row.tool.observedAt;
   if (row.tool?.last)
     tool.last = {
       name: TOOL_NAMES.has(row.tool.last.name || "") ? row.tool.last.name : "Tool",
@@ -100,7 +101,10 @@ function rowProjection(row: Row, aliases: Aliases, checkout: (row: Row) => Check
     presence: row.presence,
     helperOverflow: row.helperOverflow,
     usage: row.usage,
-    lastActivityAt: Number.isFinite(row.lastActivityAt) ? row.lastActivityAt : null,
+    lastActivityAt:
+      typeof row.lastActivityAt === "number" && Number.isFinite(row.lastActivityAt)
+        ? row.lastActivityAt
+        : null,
     tool: toolOf(row),
     ...(arrangement ? { arrangement } : {}),
     ...(helper ? helperEvidence(row) : {}),

@@ -97,8 +97,8 @@ async function launch(owner: string, provider: string, context: OverseerContext)
   return { ok: true as const, action: "overseer" as const, paneId: target, name: "overseer", home };
 }
 // Only our persisted launch proof identifies the singleton; labels are display text.
-async function overseer(provider: string, context: OverseerContext) {
-  if (!["claude", "codex"].includes(provider)) throw badRequest("invalid-provider");
+async function overseer(provider: unknown, context: OverseerContext) {
+  if (provider !== "claude" && provider !== "codex") throw badRequest("invalid-provider");
   await checkPrevious(context);
   const owner = await context.state.reserve();
   try {
@@ -119,5 +119,5 @@ export function makeOverseer(
   dependencies: Pick<OverseerContext, "herdr" | "startIn">,
 ) {
   const context = { home, state, fs: options.fs || fsp, ...dependencies };
-  return (provider: string) => overseer(provider, context);
+  return (provider: unknown) => overseer(provider, context);
 }

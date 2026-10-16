@@ -4,15 +4,14 @@ import { makeAliases } from "./aliases.js";
 import type { Aliases, Labels } from "./aliases.js";
 import { makeMail } from "./mail.js";
 import { makeRows } from "./rows.js";
-import type { PresentationSource, SourceHealth } from "./types.js";
-import type { Inventory } from "../observer/contracts.js";
+import type { PresentationInput, PresentationSource, SourceHealth } from "./types.js";
 const source = (value: SourceHealth | undefined) =>
   value ? { health: value.health, observedAt: value.observedAt } : undefined;
-function sources(inventory: Inventory, aliases: Aliases) {
+function sources(inventory: PresentationInput, aliases: Aliases) {
   return {
-    herdr: source(inventory.sources.herdr),
-    desktop: source(inventory.sources.desktop),
-    ...(inventory.sources.hosts
+    herdr: source(inventory.sources?.herdr),
+    desktop: source(inventory.sources?.desktop),
+    ...(inventory.sources?.hosts
       ? {
           hosts: Object.fromEntries(
             Object.entries(inventory.sources.hosts).map(
@@ -27,13 +26,14 @@ function sources(inventory: Inventory, aliases: Aliases) {
       : {}),
   };
 }
-async function snapshot(
-  observer: PresentationSource,
+async function snapshot<Snapshot extends PresentationInput>(
+  observer: PresentationSource<Snapshot>,
   labels: Labels,
   aliases: Aliases,
   rows: ReturnType<typeof makeRows>,
 ) {
   const inventory = await observer.get();
+  const aggregate: Snapshot["aggregate"] = inventory.aggregate;
   // Sort only alias allocation; preserve the source roster's order and room/repository ownership.
   const sorted = [...inventory.sessions].sort(
     (a, b) =>
@@ -46,7 +46,7 @@ async function snapshot(
   return {
     presentation: { company: labels.company, label: "Live activity · fictional company labels" },
     sessions: inventory.sessions.map(rows),
-    aggregate: inventory.aggregate,
+    aggregate,
     health: inventory.health,
     observedAt: inventory.observedAt,
     error: inventory.error ? "Local session inventory unavailable" : null,
@@ -57,8 +57,8 @@ async function snapshot(
 }
 // A server-side allowlist, not a text replacement: private labels never reach the recording page.
 // Opaque ownership IDs and live status/freshness remain unchanged; aliases are display identities only.
-export function makePresentationObserver(
-  observer: PresentationSource,
+export function makePresentationObserver<Snapshot extends PresentationInput>(
+  observer: PresentationSource<Snapshot>,
   now = Date.now,
   labels: Labels = DEFAULT_LABELS,
 ) {

@@ -34,7 +34,10 @@ const pathText = (value: unknown) =>
   !value.split("").some(controlCharacter)
     ? value
     : null;
-export function sanitizeTargets(targets: unknown, rows: ObserverRow[]) {
+export function sanitizeTargets(
+  targets: unknown,
+  rows: readonly Pick<ObserverRow, "source" | "paneId" | "inventoryHealth">[],
+) {
   const panes = new Set(
     rows
       .filter((row) => row.source === "herdr" && row.paneId && row.inventoryHealth === "available")

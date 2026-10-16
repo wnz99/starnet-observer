@@ -1,26 +1,25 @@
 import type { HostSources, HostSource } from "./types.js";
-import type { makeObserver } from "../observer/index.js";
 import type { Inventory } from "../observer/contracts.js";
 import { aggregateRows } from "../observer/index.js";
 import { unavailable } from "../inspector/fields.js";
 import type { makeRemoteHosts } from "./hosts.js";
-type Observer = ReturnType<typeof makeObserver>;
 type Source = Partial<Inventory["sources"]["herdr"]>;
-type LocalInventory = Pick<Inventory, "sessions" | "health" | "observedAt" | "error"> & {
-  sources?: { herdr?: Source; desktop?: Source };
-};
-interface LocalObserver<Snapshot, Inspection, Mail> {
+type LocalInventory = Pick<Inventory, "sessions"> &
+  Partial<Pick<Inventory, "health" | "observedAt" | "error">> & {
+    sources?: { herdr?: Source; desktop?: Source };
+  };
+interface LocalObserver<Snapshot, Inspection, Mail, Proof> {
   get(): Promise<Snapshot>;
   inspect: (id: string, expectedIdentity?: unknown) => Inspection;
   inspectMessage: (id: number, expectedIdentity?: string) => Mail;
-  controlTarget?: Observer["controlTarget"];
+  controlTarget?: (id: string) => Proof;
   close?: () => void | Promise<void>;
 }
 /* The hub's observer: the local snapshot plus every remote's rows. Local rows carry host: null. Aggregates are
    recomputed over the merged roster. `bus` keeps its local shape; each remote's own bus is under `hostBus[id]`
    (there is no cross-host mail: llm-bus is per host). */
-export function makeFederatedObserver<Snapshot extends LocalInventory, Inspection, Mail>(
-  local: LocalObserver<Snapshot, Inspection, Mail>,
+export function makeFederatedObserver<Snapshot extends LocalInventory, Inspection, Mail, Proof>(
+  local: LocalObserver<Snapshot, Inspection, Mail, Proof>,
   remoteHosts: ReturnType<typeof makeRemoteHosts>,
   now = Date.now,
 ) {
@@ -49,7 +48,7 @@ export function makeFederatedObserver<Snapshot extends LocalInventory, Inspectio
   };
 }
 
-function replaceFields<Base extends object, Fields extends object>(
+function replaceFields<Base extends object | undefined, Fields extends object>(
   base: Base,
   fields: Fields,
 ): Omit<Base, keyof Fields> & Fields {
@@ -71,16 +70,17 @@ function mergeInventory<Snapshot extends LocalInventory>(
       .filter((host) => host.health === "available")
       .map((host) => host.observedAt),
   ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const availability = availabilityFields(inventory, available);
   return replaceFields(inventory, {
     sessions,
     aggregate: aggregateRows(sessions, now()),
-    health: available ? "available" : inventory.health,
+    health: availability.health,
     observedAt: times.length > 0 ? Math.max(...times) : null,
-    error: available ? null : inventory.error,
-    sources: {
-      ...inventory.sources,
-      hosts: hostSources(inventory, remote.sources),
-    },
+    error: availability.error,
+    sources: replaceFields<Snapshot["sources"], { hosts: HostSources & { local: HostSource } }>(
+      field(inventory, "sources"),
+      { hosts: hostSources(inventory, remote.sources) },
+    ),
     hostBus: remote.buses,
   });
 }
@@ -128,4 +128,18 @@ function rowTime(
   return typeof row.observedAt === "number" && Number.isFinite(row.observedAt)
     ? row.observedAt
     : (source?.observedAt ?? inventory.observedAt ?? null);
+}
+
+function availabilityFields<Snapshot extends LocalInventory>(
+  inventory: Snapshot,
+  available: boolean,
+): { health: "available" | Snapshot["health"]; error: null | Snapshot["error"] } {
+  return {
+    health: available ? "available" : field(inventory, "health"),
+    error: available ? null : field(inventory, "error"),
+  };
+}
+
+function field<Base, Key extends keyof Base>(base: Base, key: Key): Base[Key] {
+  return base[key];
 }
