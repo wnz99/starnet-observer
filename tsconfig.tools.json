@@ -8,5 +8,11 @@
     "types": ["bun"]
   },
   "include": ["tools/**/*.ts", "**/*.test.ts", "**/*.fixture.ts"],
-  "exclude": ["node_modules", "dist", "package-staging"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "package-staging",
+    "src/browser/**/*.test.ts",
+    "src/browser/**/*.fixture.ts"
+  ]
 }
