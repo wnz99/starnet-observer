@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: TypeScript refactor
-status: In progress; PR 15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending.
-last_updated: "2026-10-16T20:25:07.915651+00:00"
+current_phase_name: Repository simplification
+status: Simplification implementation verified; final delivery recorded in PR 16.
+last_updated: "2026-10-16T20:48:49.053168+00:00"
 last_activity: 2026-10-16
-last_activity_desc: PR 15 head f459415 reviewed clean; Ubuntu CI running; stale planning artifacts removed by user request.
-state_head: f45941579dfa6e458cdde96f1a992e52778bca15
-stopped_at: Final Ubuntu CI before merge and authorized stale branch/worktree cleanup; macOS CI waived, native macOS unverified
+last_activity_desc: Simplification reviewed clean; Ubuntu CI passed 238 tests and installed/browser checks.
+state_head: 82e4e806b8a884c588f8d28fc3ee95cb69fa1d22
+stopped_at: Implementation and CI verified; final delivery and merge outcome on PR 16
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,19 +22,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** Full TypeScript refactor and repository quality baseline, registered as quick task 261016-0z8.
+**Current focus:** Remove agent-created repository overengineering, quick task 261016-srp.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: In progress; PR #15 R3 review clean; final Ubuntu CI running; merge and stale checkout cleanup pending.
-Last activity: 2026-10-16 — Removed stale refactor artifacts by user request; retained PLAN, CONTEXT and SUMMARY with fixed Git history recovery.
+Status: Implementation verified; independent review clean; Ubuntu CI passed. Delivery: PR #16.
+Last activity: 2026-10-16 — Simplification removed bootstrap/migration scaffolding and redundant tools; 238 tests passed in Ubuntu CI.
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261016-srp | Repository simplification | 2026-10-16 | [PR #16](https://github.com/wnz99/starnet-observer/pull/16) | Reviewed; Ubuntu CI 238/238; builds/installed/browser passed | [261016-srp](./quick/261016-srp-simplify-agent-created-repository-toolin/) |
+| 261016-0z8 | Full TypeScript refactor | 2026-10-16 | [PR #15](https://github.com/wnz99/starnet-observer/pull/15) | Merged; independent R1–R5 review clean; pre-push passed | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
 | 261015-r34 | Pixel typography and panel styling for local theme packs | 2026-10-15 | [PR #14](https://github.com/wnz99/starnet-observer/pull/14) | Complete; merge ready | [261015-r34](./quick/261015-r34-pixel-art-mama-interface-variant/) |
 | 261014-wv3 | Standalone theme framework and local appearance comparisons | 2026-10-15 | [PR #13](https://github.com/wnz99/starnet-observer/pull/13) | Complete | [261014-wv3](./quick/261014-wv3-standalone-theme-framework-and-local-app/) |
 | 261015-l8s | PR4 mandatory control correctness and integration | 2026-10-15 | [PR #4](https://github.com/wnz99/starnet-observer/pull/4) | Implementation/review complete; merge ready | [261015-l8s](./quick/261015-l8s-pr4-mandatory-control-correctness-and-in/) |
@@ -68,12 +70,13 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Current work: PR #15 head f45941579dfa6e458cdde96f1a992e52778bca15 has clean independent R3 review. Required Ubuntu CI is running. Hosted macOS CI is waived; native macOS verification remains unverified.
-Resume file: [TypeScript context](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-CONTEXT.md)
-Next action: Check final Ubuntu CI, fix concrete failures, merge when ready, then clean authorized stale branches/worktrees. Reuse accepted unchanged reviews and avoid duplicate full local runs. No paid/live runs or optional settings. See [current summary](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-SUMMARY.md).
+Current work: Simplification implementation and Ubuntu CI are verified. PR #16 records final review and merge.
+Resume file: [Simplification summary](./quick/261016-srp-simplify-agent-created-repository-toolin/261016-srp-SUMMARY.md)
+Next action: Integrate disjoint tooling/source changes, run lint/types, obtain independent diff review, and verify builds/tests in Ubuntu CI. No local tests/builds, paid/live runs or optional external settings.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | PR #15 R3 review clean; final Ubuntu CI, merge and stale checkout cleanup pending | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Merged PR #15; checkout cleanup complete | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-srp | Simplify agent-created repository tooling and unnecessary abstractions | Implementation verified; CI 238/238; PR #16 | [261016-srp](./quick/261016-srp-simplify-agent-created-repository-toolin/) |

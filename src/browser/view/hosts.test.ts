@@ -9,6 +9,8 @@ import { canonicalTheme } from "../theme.fixture.js";
 import type { Resource } from "./drawing.fixture.js";
 import { drawing, Handlers, present } from "./drawing.fixture.js";
 import { createViewFactory } from "./index.js";
+import { paintAttention } from "./attention.js";
+import { lodFor, needsAttention } from "./helpers.js";
 import type { ViewContext, ViewEvent } from "./types.js";
 const Model = createModel(canonicalTheme());
 const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
@@ -67,18 +69,18 @@ test("observer-hosts-view regression contracts", () => {
 
   const freshness = { fresh: false, stale: true };
   assert.deepEqual(
-    { value: View.needsAttention({ row: { status: "blocked" } }, freshness.fresh) },
+    { value: needsAttention({ row: { status: "blocked" } }, freshness.fresh) },
     { value: true },
   );
   assert.deepEqual(
-    { value: View.needsAttention({ row: { status: "blocked" } }, freshness.stale) },
+    { value: needsAttention({ row: { status: "blocked" } }, freshness.stale) },
     { value: false },
     "a stale blocked row is last known, not a live alarm",
   );
   function verifyOtherStatusesHaveNoAttention() {
     for (const status of ["working", "idle", "done", "unknown"])
       assert.deepEqual(
-        { value: View.needsAttention({ row: { status } }, freshness.fresh) },
+        { value: needsAttention({ row: { status } }, freshness.fresh) },
         { value: false },
         status,
       );
@@ -94,7 +96,7 @@ test("observer-hosts-view regression contracts", () => {
         },
       },
     );
-    const box = View.paintAttention(ctx, 100, 50);
+    const box = paintAttention(ctx, 100, 50, canonicalTheme().scene.colors);
     assert.ok(fills.length >= 6, "the badge is built from pixel rectangles");
     assert.ok(
       box.left < 100 && box.left + box.width > 100 && box.top + box.height <= 50 + 1,
@@ -227,7 +229,7 @@ test("observer-hosts-view regression contracts", () => {
   now += 16;
   view.paint(now);
   assert.equal(
-    View.lodFor(view.camera().zoom),
+    lodFor(view.camera().zoom),
     "overview",
     "fixture: whole multi-ship station at overview zoom",
   );

@@ -1,45 +1,46 @@
----
-type: Reference
-title: Development
-description: Install pinned tools, build the observer, and verify deployable artifacts.
----
-
 # Development
 
-Use Bun 1.3.13, Node 24.19.0 and uv 0.13.1. Node runs quality tooling; Bun runs the application and native SQLite tests. Prepend the selected Node installation per command rather than changing account defaults.
+Use the Bun, Node and uv versions pinned by `package.json`, `.node-version` and `tools/quality/check-versions.sh`. Bun runs the application and native SQLite. Node and uv serve development tooling; the installed application has no package dependencies.
+
+## Setup and local checks
 
 ```sh
 sh tools/quality/setup.sh
-bun run check
+bun run lint
+bun run typecheck
+bun run start
+```
+
+Setup installs frozen dependencies, checks versions and installs hooks for the current checkout. It refuses another hook owner and preserves other worktrees' settings. Pre-commit checks formatting and hygiene against the staged snapshot. Pre-push requires a clean checkout of pushed HEAD and runs only lint and all five strict compiler projects. Build and tests are CI work.
+
+Use `bun run format` or `bun run fix` for explicit edits. Ordinary checks do not change source. Keep tests beside their owners. Runtime, browser and tools/test compiler projects enforce distinct ambient boundaries; browser application code cannot depend on Bun or Node globals.
+
+## Build, package and CI
+
+Ubuntu CI runs for pull requests and pushes to main. It installs frozen dependencies and Chromium, then runs `bun run check` once. These cover formatting, shell checks, lint, strict types, unused code/dependencies, duplicate code, builds, native Bun tests, installed-package consumers and real browser fixtures. Test and build commands remain available for CI and deliberate maintenance work:
+
+```sh
+bun run build
 bun run test
 bun run package
 bun run dependency-isolation
 bun run test:browser
-bun run verify:acceptance
-bun run start
 ```
 
-Setup uses frozen dependencies, verifies tool versions and installs hooks only for this checkout. Existing owners and dormant worktree settings cause a refusal. Other worktrees retain their effective hooks. Repeat setup preserves records and local edits; digest validation reports drift rather than overwriting it.
+`build` emits runtime JavaScript to `dist/runtime` and browser resources to `dist/public`. Local startup includes installed private theme packs. `package` stages only tracked distributable sources and canonical assets in a temporary directory, builds there and emits `dist/starnet-observer.tgz`. Package privacy tests reject local configuration, private packs, presets, planning files and development dependencies. LICENSE, NOTICE, Swift source and canonical browser resources travel with the archive.
 
-`check:root` runs versions, hygiene, ShellCheck, formatting, helper lint, Knip and Fallow. `check:static` adds build, typed ESLint and all strict compiler projects. `check` adds native Bun tests and external packaged consumers. Pre-push runs only `lint` and `typecheck` after tool-version and Git safety checks; builds and tests run in CI. Tests stay beside owners, including the two application consumer tests. Normal discovery uses local emitted artifacts; isolation resolves only the installed package.
+The installed-package check creates an external temporary consumer, refuses inherited dependencies and implicit dotenv, installs production dependencies first and verifies the installed bin, HTTP endpoints, resources and native SQLite worker. It then installs the pinned browser harness from `tools/fixtures/consumer/bun.lock` and runs both colocated application consumers. Fixtures are removed afterward. macOS checks can compile the installed Swift resource; Ubuntu checks the explicit unsupported desktop fallback. Hosted CI runs Ubuntu only; it does not establish live macOS desktop or SSH integration.
 
-`build` emits runtime JavaScript to `dist/runtime` and browser HTML/ESM/IIFE/resources to `dist/public`. Local build includes installed private packs. `package` instead stages only tracked distributable sources and canonical assets in a temporary directory, builds there, and emits `dist/starnet-observer.tgz`. It never packs local dist. The archive contains compiled runtime, worker, Swift source, canonical public resources, LICENSE, NOTICE.md and package metadata. Configurations, private packs, presets, references, tooling and development dependencies are excluded.
-
-The isolation adapter installs the frozen package graph with production dependencies first, runs bin/help, HTTP and native SQLite worker fixtures, then installs exactly declared test tools and runs the same colocated consumers. macOS compiles the installed Swift resource; Linux runs portable fixtures and the desktop adapter suite's explicit unsupported fallback. Sandbox roots live outside the checkout, refuse ancestor node_modules, reject source symlinks and remove NODE_PATH. Bun uses `env=false` and `--no-env-file`; exported variables remain supported.
-
-Install Chromium using the locked executable:
+Browser fixtures use synthetic snapshots and injected controls. Install the locked Chromium executable with:
 
 ```sh
 bun node_modules/@playwright/test/cli.js install --with-deps chromium
-bun run test:browser
 ```
 
-Playwright is pinned to 1.64.1 in the root and consumer manifests. Browser fixtures serve emitted artifacts with synthetic snapshots and injected controls. Screenshots and a version/assertion receipt are written to the temporary `observer-browser-evidence-*` directory. A prepared external browser cache can be selected per command with `PLAYWRIGHT_BROWSERS_PATH`; this is not a repository setting. Assertions and manual visual judgment are separate evidence.
+`PLAYWRIGHT_BROWSERS_PATH` can select an existing browser cache per command. Browser checks write screenshots and an assertion receipt under a temporary `observer-browser-evidence-*` directory. Automated assertions and manual visual judgment are separate evidence.
 
-Acceptance modes are `tests`, `coverage`, `quality`, `readonly`, `hooks`, `hygiene`, `replay` and `docs`; omitting the mode runs all. Mutation probes use disposable tracked copies and synthetic inputs. They never read real credentials, agent inventories or private artwork. See [verification](verification.md) for evidence boundaries.
+## Policy and local tools
 
-[Sources](sources.md) owns skill provenance and semantic MCP setup/recovery. Actual Codex app-server verification discovers 11 tools, reads the populated 316-chunk sqlite-vec index and returns CC-043 with high confidence. No provider turn is required. MCP is advisory and absent from hooks and CI. Unanswered integrations stay pending.
+`eslint.config.mjs`, `knip.json`, `.fallowrc.json` and the TypeScript projects own executable quality policy. The baseline was adapted from [repo-starters at c37e2b33f4c957575ad13c6512bdb555aa932b54](https://github.com/wnz99/repo-starters/tree/c37e2b33f4c957575ad13c6512bdb555aa932b54/profiles/typescript); reusable starter helpers carry CC0-1.0 notices. Project and bundled-resource attribution lives in LICENSE and NOTICE.
 
-Local Task 8 verification on Ubuntu 24.04 x86_64: focused ESLint, root and tools strict compiler projects exited 0; record-boundary tests passed 3/3. A disposable emitted keydown-listener removal failed the named keyboard-render assertion (exit 1); restoring the emitted binding passed both consumers (exit 0). Earlier package/consumer checks passed 4/4, and production-first isolation initialization succeeded. These receipts cover their tested snapshots rather than a final hosted head.
-
-The pre-fix acceptance aggregate passed tests, coverage, quality and read-only modes, then exited 1 while cleaning its synthetic staged-format file. The targeted cleanup now uses forced index removal only in that disposable fixture; a focused native Git proof preserved worktree bytes and removed the index entry. Hygiene passed separately. Full hooks, replay and the complete acceptance aggregate remain required on the exact PR head. Following the streamlined delivery workflow, final local pre-push static checks and Ubuntu 24.04 CI own the remaining full static/test/isolation/browser/acceptance gates. Hosted macOS CI is waived by user decision; native macOS verification remains unverified. Hosted Ubuntu CI, final aggregate review and merge are pending; no final-head or live integration success is claimed here.
+Agent skills and semantic MCP are optional local development aids, installed outside this repository. Neither application operation nor hooks/CI require them. Keep their settings, credentials, corpus and machine-specific paths outside version control. Do not run live controls, provider calls, paid jobs or external configuration changes as part of routine verification.

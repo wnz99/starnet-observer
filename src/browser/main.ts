@@ -1,5 +1,4 @@
 import { readBootstrap } from "./bootstrap.js";
-import { createData } from "./data-shim.js";
 import { browserAppDocument, browserAppWindow } from "./app/native.js";
 import { mountObserver } from "./app/mount.js";
 import { createSprites } from "./sprites/assets.js";
@@ -9,7 +8,10 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
   const bootstrap = readBootstrap(window);
   const appDocument = browserAppDocument(document);
   const sprites = createSprites(
-    browserSpriteDependencies(createData(bootstrap.defaultTheme), document),
+    browserSpriteDependencies(
+      { DEFAULT_SKIN: "blank", SKINS: bootstrap.defaultTheme.crew },
+      document,
+    ),
   );
   mountObserver({
     document: appDocument,
