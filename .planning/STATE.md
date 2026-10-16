@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
 current_phase_name: "TypeScript refactor"
-status: executing
-stopped_at: "TypeScript Tasks 1–3 and adapter checkpoint approved; parallel packages next"
-last_updated: "2026-10-16T07:37:56.147444+00:00"
+status: paused
+stopped_at: "User-requested machine handover; implementation stopped"
+last_updated: "2026-10-16T09:09:09.227637+00:00"
 last_activity: 2026-10-16
-last_activity_desc: "TypeScript adapter checkpoint approved; 59 tests passed; parallel packages next."
-state_head: 7420c520547a012bc5bde8ca9f2fa93fe58227d2
+last_activity_desc: "Paused; reviewed leaf integration and separate observer/browser WIP snapshots preserved."
+state_head: c8e3379ad654b1a2225e417736e9581442ddfa13
 progress:
   total_phases: 0
   completed_phases: 0
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 
 Phase: None (0 planned)
 Plan: None
-Status: TypeScript Tasks 1–3 complete and independently approved; Tasks 4–8 pending
-Last activity: 2026-10-16 — Adapter checkpoint approved; 59 tests passed; parallel package preparation complete.
+Status: Paused by user; Tasks 1–3 and Task 4 leaf packages approved; observer/browser WIP requires completion and review.
+Last activity: 2026-10-16 — Implementation stopped; portable handover and separate WIP transfer snapshots prepared.
 
 ## Quick Tasks Completed
 
@@ -68,12 +68,12 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-16
-Stopped at: TypeScript adapter checkpoint independently approved; parallel packages next
-Resume file: None
-Next action: Continue approved sequential TypeScript Tasks 4–8, then PR review/fix loops and merge after final checks. Preserve authorization across compaction. No paid/live integration approval is inferred.
+Stopped at: User-requested machine handover; no PR or merge.
+Resume file: [TypeScript handover](./quick/261016-0z8-full-typescript-refactor-and-repository-/261016-0z8-HANDOVER.md)
+Next action: Wait for explicit resume on the next machine; follow the handover and approved revision 4 plan. Existing PR/review/merge authorization remains subject to its gates. No paid/live approval is inferred.
 
 ### Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261016-0z8 | Full TypeScript refactor and repository quality baseline | In progress; Tasks 1–3 and Task 4 leaf packages reviewed; observer composition next; browser preparation active | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
+| 261016-0z8 | Full TypeScript refactor and repository quality baseline | Paused by user; detailed handover and separate observer/browser WIP snapshots preserved | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |

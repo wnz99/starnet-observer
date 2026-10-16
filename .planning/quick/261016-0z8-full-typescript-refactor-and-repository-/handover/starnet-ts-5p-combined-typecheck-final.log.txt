@@ -1,0 +1,1 @@
+$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit && tsc -p tsconfig.browser-tests.json

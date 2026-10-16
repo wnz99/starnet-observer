@@ -1,0 +1,34 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { createModel } from "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/model.ts";
+import * as Mail from "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/mail.ts";
+import * as Inspector from "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/inspector.ts";
+import * as MailInspector from "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/mail-inspector.ts";
+import { canonicalTheme } from "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/theme.fixture.ts";
+const root = "/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare";
+// Diagnostic adapter only: original synthetic nodes remain original objects.
+function dom(document) {
+  return { createElement: (tag) => document.createElement(tag), children: (node) => node.children,
+    attach: (parent, ...nodes) => parent.append(...nodes), replaceChildren: (parent, ...nodes) => parent.replaceChildren(...nodes),
+    insertBefore: (parent, node, before) => parent.insertBefore(node, before) };
+}
+const defaults = canonicalTheme();
+const model = createModel(defaults);
+const mail = { ...Mail, ...Mail.createMail(defaults) };
+const inspector = { ...Inspector, buildPanel: (document, n) => Inspector.buildPanel(dom(document), n),
+  createInspector: (options) => Inspector.createInspector({ ...options, document: dom(options.document) }) };
+const messageInspector = { ...MailInspector, buildPanel: (document, n) => MailInspector.buildPanel(dom(document), n) };
+for (const filename of ["observer-model.test.js", "observer-mail.test.js", "observer-inspector.test.js", "observer-mail-inspector.test.js"]) {
+  const source = path.join(root, "frontend/app", filename);
+  const nativeRequire = createRequire(source);
+  const replacement = (name) => {
+    if (name === "./observer-model.js") return model;
+    if (name === "./observer-mail.js") return mail;
+    if (name === "./observer-inspector.js") return inspector;
+    if (name === "./observer-mail-inspector.js") return messageInspector;
+    return nativeRequire(name);
+  };
+  replacement.resolve = nativeRequire.resolve;
+  new Function("require", "__dirname", fs.readFileSync(source, "utf8"))(replacement, path.dirname(source));
+}

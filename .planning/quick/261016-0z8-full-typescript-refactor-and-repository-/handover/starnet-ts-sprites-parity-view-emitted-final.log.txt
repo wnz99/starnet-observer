@@ -1,0 +1,26 @@
+bun test v1.3.13 (bf2e2cec)
+
+../../../../../private/tmp/sprite-parity.test.mjs:
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) original recorder pixel-call/state parity through poses, lighting, culling and re-entry [325.99ms]
+
+../../../../../private/tmp/starnet-sprite-original-view.test.mjs:
+observer view: helper scale/footprint/overflow, Observatory, double-click precedence/suppression/platform fit/resize/removal and per-row freshness OK
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+observer view: LOD/plate/cache budget helpers, DPR equivalence, resize refit, click vs drag, live hover, cursor and pinch zoom, keyboard, clamps, sprite poses and fallback, stale/reduced freeze, cache reuse, lifecycle and focus OK, frozen single paint, invalidation sources, sprite/font readiness, camera report dedupe and offscreen furniture culling OK
+theme view: HEAD-equal default paint, complete custom palette, isolated simultaneous views, backgroundFx/ambientFx layers OK
+theme view: loading replacement crew watch and settled repaint OK
+office view: pending/failed station crew, single activation and cache rebuild, ready humans or procedural fallback, stopped settlement, pending/ready resume, bounded failure warnings OK
+[SPRITES] startup sets loaded: approved_android, @replacement:blank, @replacement:blank_blue, @replacement:blank_amber — 84 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank, @replacement:blank_blue, @replacement:blank_amber — 84 animation tracks
+office art: all 34 roles at native size and whole pixels, native chairs, carriers at drone points, no station primitives or glow, two-tone outlined faces, steady statuses, depth and hits OK
+(pass) observer-view regression contracts [3644.28ms]
+
+../../../../../private/tmp/starnet-sprite-emitted.test.mjs:
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) real assets/native browser ESM entries emit and the emitted factory paints through the original recorder [36.08ms]
+
+ 3 pass
+ 0 fail
+Ran 3 tests across 3 files. [4.21s]

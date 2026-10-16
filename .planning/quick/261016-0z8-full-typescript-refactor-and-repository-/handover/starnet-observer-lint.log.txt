@@ -1,0 +1,389 @@
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/counters.ts
+  23:3   error  Method 'add' has a complexity of 14. Maximum allowed is 10  complexity
+  53:44  error  Expected '!==' and instead saw '!='                         eqeqeq
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/enrichment.ts
+  35:45  error  Expected '===' and instead saw '=='                                                            eqeqeq
+  48:55  error  Policy literal '4' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/evidence.ts
+  26:1   error  Remove commented-out code; version history should preserve old implementations                                  clean-code/no-commented-out-code
+  50:8   error  Function 'identity' has a complexity of 13. Maximum allowed is 10                                               complexity
+  60:28  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`  @typescript-eslint/restrict-plus-operands
+  62:30  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | undefined`         @typescript-eslint/restrict-plus-operands
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/identity-process.test.ts
+  25:38  error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  28:53  error  Async arrow function 'rpc' has no 'await' expression                   @typescript-eslint/require-await
+  62:9   error  Async method 'readConfiguration' has no 'await' expression             @typescript-eslint/require-await
+  73:7   error  Async method 'execute' has no 'await' expression                       @typescript-eslint/require-await
+  74:19  error  Async method 'resolve' has no 'await' expression                       @typescript-eslint/require-await
+  76:18  error  Async method 'inventory' has no 'await' expression                     @typescript-eslint/require-await
+  78:9   error  Async method 'children' has no 'await' expression                      @typescript-eslint/require-await
+  82:9   error  Async method 'read' has no 'await' expression                          @typescript-eslint/require-await
+  83:9   error  Async method 'inspect' has no 'await' expression                       @typescript-eslint/require-await
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/index.test.ts
+    31:5   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+    32:5   error  Async method 'match' has no 'await' expression                                                                                                                      @typescript-eslint/require-await
+    37:3   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+    95:3   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+   166:7   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   170:9   error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   178:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   180:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   336:17  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+   337:14  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+   356:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   358:11  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+   380:11  error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+   382:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   383:16  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   390:30  error  Unnecessary conditional, value is always truthy                                                                                                                     @typescript-eslint/no-unnecessary-condition
+   420:18  error  Refactor this function to reduce its Cognitive Complexity from 28 to the 15 allowed                                                                                 sonarjs/cognitive-complexity
+   425:14  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+   437:9   error  Async method 'inspectChild' has no 'await' expression                                                                                                               @typescript-eslint/require-await
+   438:9   error  Async method 'bindChild' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   439:9   error  Async method 'claudeCandidates' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+   471:11  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+   474:21  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+   475:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   476:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   477:16  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   486:46  error  Unsafe call of an `any` typed value                                                                                                                                 @typescript-eslint/no-unsafe-call
+   486:51  error  Unsafe member access .resolve on an `any` value                                                                                                                     @typescript-eslint/no-unsafe-member-access
+   499:11  error  Unsafe call of an `any` typed value                                                                                                                                 @typescript-eslint/no-unsafe-call
+   499:58  error  Unsafe member access .resolve on an `any` value                                                                                                                     @typescript-eslint/no-unsafe-member-access
+   506:13  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+   513:13  error  Blocks are nested too deeply (5). Maximum allowed is 4                                                                                                              max-depth
+   514:15  error  Blocks are nested too deeply (6). Maximum allowed is 4                                                                                                              max-depth
+   515:15  error  Blocks are nested too deeply (6). Maximum allowed is 4                                                                                                              max-depth
+   515:48  error  Unsafe call of an `any` typed value                                                                                                                                 @typescript-eslint/no-unsafe-call
+   515:53  error  Unsafe member access .reject on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+   516:20  error  Unsafe call of an `any` typed value                                                                                                                                 @typescript-eslint/no-unsafe-call
+   516:25  error  Unsafe member access .resolve on an `any` value                                                                                                                     @typescript-eslint/no-unsafe-member-access
+   532:13  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+   546:44  error  Unsafe call of an `any` typed value                                                                                                                                 @typescript-eslint/no-unsafe-call
+   546:49  error  Unsafe member access .resolve on an `any` value                                                                                                                     @typescript-eslint/no-unsafe-member-access
+   568:7   error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   581:7   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   584:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   587:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   590:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   661:7   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   664:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   666:22  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   667:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   681:7   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+   682:29  error  Unnecessary conditional, value is always truthy                                                                                                                     @typescript-eslint/no-unnecessary-condition
+   726:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   730:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   732:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   733:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   770:7   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+   772:7   error  Async method 'claudeCandidates' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+   773:7   error  Async method 'bindChild' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   778:7   error  Async method 'inspectChild' has no 'await' expression                                                                                                               @typescript-eslint/require-await
+   797:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   805:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   807:11  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   811:21  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   812:19  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   813:25  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   816:25  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   817:23  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   820:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   873:71  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+   889:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   897:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   899:11  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   901:21  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   902:25  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   905:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   948:67  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+   965:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+   973:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   975:11  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+   977:21  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   978:25  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `unknown`                                                                        @typescript-eslint/restrict-plus-operands
+   981:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+   998:63  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`                                                      @typescript-eslint/restrict-plus-operands
+  1019:3   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+  1049:7   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+  1052:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1054:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1073:22  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1075:9   error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1082:9   error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  1245:7   error  Async method 'readConfiguration' has no 'await' expression                                                                                                          @typescript-eslint/require-await
+  1246:7   error  Async method 'readProcessBirth' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+  1247:7   error  Async method 'rpc' has no 'await' expression                                                                                                                        @typescript-eslint/require-await
+  1273:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1274:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1276:18  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1278:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1295:9   error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  1392:11  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1413:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1416:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1418:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1420:11  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1422:11  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1454:9   error  'terminal' is never reassigned. Use 'const' instead                                                                                                                 prefer-const
+  1466:9   error  Async method 'readProcessBirth' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+  1477:9   error  Async method 'rpc' has no 'await' expression                                                                                                                        @typescript-eslint/require-await
+  1495:36  error  Async arrow function 'inspectBody' has no 'await' expression                                                                                                        @typescript-eslint/require-await
+  1507:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1511:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1513:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1514:24  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1516:11  error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  1564:15  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  1565:20  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  1580:15  error  Unsafe assignment of an `any` value                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  1582:32  error  Unsafe argument of type `any` assigned to a parameter of type `string`                                                                                              @typescript-eslint/no-unsafe-argument
+  1582:40  error  Unsafe member access .method on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+  1582:48  error  Unsafe argument of type `any` assigned to a parameter of type `Record<string, unknown>`                                                                             @typescript-eslint/no-unsafe-argument
+  1582:56  error  Unsafe member access .params on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+  1583:20  error  Unsafe member access .method on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+  1584:73  error  Unsafe member access .params on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+  1587:19  error  Unsafe assignment of an `any` value                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  1587:36  error  Unsafe member access .params on an `any` value                                                                                                                      @typescript-eslint/no-unsafe-member-access
+  1593:41  error  Unsafe assignment of an `any` value                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  1593:53  error  Unsafe member access .id on an `any` value                                                                                                                          @typescript-eslint/no-unsafe-member-access
+  1602:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+  1603:9   error  Async method 'readProcessBirth' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+  1604:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1608:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1611:11  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1615:11  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1628:9   error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  1656:9   error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  1698:29  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`                                                      @typescript-eslint/restrict-plus-operands
+  1720:11  error  Async method 'readEdges' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1729:11  error  Async method 'readConfiguration' has no 'await' expression                                                                                                          @typescript-eslint/require-await
+  1730:11  error  Async method 'readProcessBirth' has no 'await' expression                                                                                                           @typescript-eslint/require-await
+  1731:11  error  Async method 'rpc' has no 'await' expression                                                                                                                        @typescript-eslint/require-await
+  1745:34  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null`                                                                  @typescript-eslint/restrict-plus-operands
+  1756:11  error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1760:23  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1762:22  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1784:11  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`                                                      @typescript-eslint/restrict-plus-operands
+  1784:48  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`                                                      @typescript-eslint/restrict-plus-operands
+  1789:11  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  1851:9   error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1853:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1855:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  1874:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  1881:9   error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  1896:9   error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  1954:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  1976:7   error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  1985:7   error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  1989:18  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  1999:9   error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2001:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2004:19  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2007:9   error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  2011:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2022:9   error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  2032:18  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2061:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2066:11  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2076:11  error  Async method 'prepareChildren' has no 'await' expression                                                                                                            @typescript-eslint/require-await
+  2106:9   error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2126:20  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2129:9   error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2140:20  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2211:11  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2213:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2223:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2225:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  2246:20  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2247:20  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2258:7   error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2259:21  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2273:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2274:18  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  2292:9   error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  2293:23  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2359:18  error  Placing a void expression inside another expression is forbidden. Move it to its own statement instead                                                              @typescript-eslint/no-confusing-void-expression
+  2372:9   error  Async method 'readIdentityConfiguration' has no 'await' expression                                                                                                  @typescript-eslint/require-await
+  2378:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  2380:11  error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  2431:9   error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2433:19  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2434:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2442:9   error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2475:9   error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2480:65  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2494:9   error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2499:9   error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2529:9   error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2532:19  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2533:7   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2536:9   error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2537:9   error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2540:9   error  Async method 'prepareChildren' has no 'await' expression                                                                                                            @typescript-eslint/require-await
+  2547:18  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  2548:14  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2591:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2597:13  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2600:24  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2612:11  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2621:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2628:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2641:11  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2648:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2663:72  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2664:22  error  Deep property chain exposes object internals; prefer a named query on the owning object                                                                             clean-code/no-train-wrecks
+  2673:18  error  Refactor this function to reduce its Cognitive Complexity from 28 to the 15 allowed                                                                                 sonarjs/cognitive-complexity
+  2692:11  error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2701:13  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  2716:13  error  Async method 'revalidateAll' has no 'await' expression                                                                                                              @typescript-eslint/require-await
+  2724:13  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2771:13  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2785:13  error  Blocks are nested too deeply (5). Maximum allowed is 4                                                                                                              max-depth
+  2786:13  error  Blocks are nested too deeply (5). Maximum allowed is 4                                                                                                              max-depth
+  2787:13  error  Blocks are nested too deeply (5). Maximum allowed is 4                                                                                                              max-depth
+  2788:13  error  Blocks are nested too deeply (5). Maximum allowed is 4                                                                                                              max-depth
+  2831:13  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  2852:12  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2860:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2866:11  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2895:7   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+  2901:11  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2901:11  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2931:11  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2931:11  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  2947:13  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  2948:13  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2985:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  2999:11  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  3011:11  error  Async method 'prepareChildren' has no 'await' expression                                                                                                            @typescript-eslint/require-await
+  3028:11  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3096:11  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3113:11  error  Async method 'close' has no 'await' expression                                                                                                                      @typescript-eslint/require-await
+  3135:5   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  3139:28  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  3155:11  error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3160:21  error  Operands of '+' operations must be a number or string. Got `string` + `number`                                                                                      @typescript-eslint/restrict-plus-operands
+  3169:13  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  3267:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3299:11  error  Async method 'inspect' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3351:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3363:11  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  3472:69  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  3474:83  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object                                                                  clean-code/no-boolean-flag-arguments
+  3505:11  error  Async method 'resolveMany' has no 'await' expression                                                                                                                @typescript-eslint/require-await
+  3508:9   error  Async method 'execute' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3514:21  error  Async method 'resolve' has no 'await' expression                                                                                                                    @typescript-eslint/require-await
+  3515:24  error  Async method 'read' has no 'await' expression                                                                                                                       @typescript-eslint/require-await
+  3517:11  error  Async method 'children' has no 'await' expression                                                                                                                   @typescript-eslint/require-await
+  3520:20  error  Async method 'inventory' has no 'await' expression                                                                                                                  @typescript-eslint/require-await
+  3560:41  error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+  3566:3   error  Remove commented-out code; version history should preserve old implementations                                                                                      clean-code/no-commented-out-code
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/index.ts
+  19:73  error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  19:81  error  Expected the Promise rejection reason to be an Error                   @typescript-eslint/prefer-promise-reject-errors
+  37:1   error  Function 'dependencies' has a complexity of 14. Maximum allowed is 10  complexity
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/inspection-proof.ts
+  17:22  error  Policy literal '64' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+  44:5   error  Remove commented-out code; version history should preserve old implementations                  clean-code/no-commented-out-code
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/inspection.ts
+   12:50  error  Policy literal '128' should usually be a named constant or enum value so the rule is searchable                 clean-code/no-business-policy-literals
+   65:11  error  'available' is assigned a value but never used                                                                  @typescript-eslint/no-unused-vars
+   74:8   error  Async function 'inspect' has a complexity of 18. Maximum allowed is 10                                          complexity
+   92:5   error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`  @typescript-eslint/restrict-plus-operands
+   93:72  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`  @typescript-eslint/restrict-plus-operands
+   99:3   error  Remove commented-out code; version history should preserve old implementations                                  clean-code/no-commented-out-code
+  103:3   error  Remove commented-out code; version history should preserve old implementations                                  clean-code/no-commented-out-code
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/inventory.ts
+   10:21  error  'value || ""' will use Object's default stringification format ('[object Object]') when stringified  @typescript-eslint/no-base-to-string
+   11:14  error  Unexpected control character(s) in regular expression: \x00, \x1f                                    no-control-regex
+   12:15  error  Policy literal '160' should usually be a named constant or enum value so the rule is searchable      clean-code/no-business-policy-literals
+   43:39  error  Deep property chain exposes object internals; prefer a named query on the owning object              clean-code/no-train-wrecks
+   75:21  error  Policy literal '24' should usually be a named constant or enum value so the rule is searchable       clean-code/no-business-policy-literals
+  106:18  error  Policy literal '3000' should usually be a named constant or enum value so the rule is searchable     clean-code/no-business-policy-literals
+  107:20  error  Policy literal '2' should usually be a named constant or enum value so the rule is searchable        clean-code/no-business-policy-literals
+  107:24  error  Policy literal '1024' should usually be a named constant or enum value so the rule is searchable     clean-code/no-business-policy-literals
+  107:31  error  Policy literal '1024' should usually be a named constant or enum value so the rule is searchable     clean-code/no-business-policy-literals
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/lifecycle.ts
+  22:43  error  Policy literal '10000' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+  23:26  error  Unnecessary optional chain on a non-nullish value                                                  @typescript-eslint/no-unnecessary-condition
+  31:11  error  Deep property chain exposes object internals; prefer a named query on the owning object            clean-code/no-train-wrecks
+  32:11  error  Deep property chain exposes object internals; prefer a named query on the owning object            clean-code/no-train-wrecks
+  41:7   error  Deep property chain exposes object internals; prefer a named query on the owning object            clean-code/no-train-wrecks
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/lineage.ts
+  33:3   error  Method 'valid' has a complexity of 14. Maximum allowed is 10                                          complexity
+  37:5   error  Avoid mutating parameter 'seen' as an output argument; return a value or create a local copy instead  clean-code/no-output-argument-mutation
+  41:21  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  47:33  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  57:16  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  59:29  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  65:12  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  71:25  error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+  76:9   error  Deep property chain exposes object internals; prefer a named query on the owning object               clean-code/no-train-wrecks
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/ownership.ts
+   5:8   error  Function 'sameProof' has a complexity of 16. Maximum allowed is 10                                   complexity
+  13:14  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  13:31  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  14:14  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  14:40  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  15:14  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  15:45  error  Unnecessary optional chain on a non-nullish value                                                    @typescript-eslint/no-unnecessary-condition
+  34:8   error  Function 'capture' has a complexity of 11. Maximum allowed is 10                                     complexity
+  55:5   error  Avoid mutating parameter 'row' as an output argument; return a value or create a local copy instead  clean-code/no-output-argument-mutation
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/publication.ts
+  23:24  error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+  27:7   error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+  29:11  error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+  33:11  error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/queryspine.integration.test.js
+  264:45  error  'Harness' is not defined  no-undef
+  265:15  error  'Harness' is not defined  no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/refresh.ts
+  18:18  error  '_' is defined but never used                                                            @typescript-eslint/no-unused-vars
+  36:9   error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/snapshot.ts
+   8:3   error  Method 'snapshot' has too many lines (56). Maximum allowed is 50                         max-lines-per-function
+  48:33  error  Deep property chain exposes object internals; prefer a named query on the owning object  clean-code/no-train-wrecks
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/testing.fixture.ts
+  28:51  error  Policy literal '1000' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+  29:50  error  Policy literal '1000' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+  70:29  error  `import()` type annotations are forbidden                                                         @typescript-eslint/consistent-type-imports
+  71:19  error  `import()` type annotations are forbidden                                                         @typescript-eslint/consistent-type-imports
+  84:30  error  `import()` type annotations are forbidden                                                         @typescript-eslint/consistent-type-imports
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/warm-transcripts.test.ts
+  54:19  error  Async method 'resolveMany' has no 'await' expression      @typescript-eslint/require-await
+  55:5   error  Async method 'execute' has no 'await' expression          @typescript-eslint/require-await
+  60:17  error  Async method 'resolveMany' has no 'await' expression      @typescript-eslint/require-await
+  61:16  error  Async method 'inventory' has no 'await' expression        @typescript-eslint/require-await
+  63:7   error  Async method 'prepareChildren' has no 'await' expression  @typescript-eslint/require-await
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-4d-observer/src/sidecar/observer/warmup.ts
+  10:7   error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`  @typescript-eslint/restrict-plus-operands
+  11:74  error  Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null | undefined`  @typescript-eslint/restrict-plus-operands
+  14:3   error  Method 'scheduleWarmup' has a complexity of 17. Maximum allowed is 10                                           complexity
+  39:23  error  Unnecessary optional chain on a non-nullish value                                                               @typescript-eslint/no-unnecessary-condition
+  40:23  error  Unnecessary optional chain on a non-nullish value                                                               @typescript-eslint/no-unnecessary-condition
+  41:23  error  Unnecessary optional chain on a non-nullish value                                                               @typescript-eslint/no-unnecessary-condition
+  47:7   error  Avoid mutating parameter 'sweep' as an output argument; return a value or create a local copy instead           clean-code/no-output-argument-mutation
+  63:66  error  Boolean literal arguments hide intent at the call site; prefer a named operation or options object              clean-code/no-boolean-flag-arguments
+
+✖ 348 problems (348 errors, 0 warnings)
+

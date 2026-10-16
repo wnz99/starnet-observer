@@ -1,0 +1,338 @@
+$ eslint . --max-warnings 0
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/data-shim.js
+  2:7   error  'DATA' is assigned a value but never used  no-unused-vars
+  4:40  error  'ThemePack' is not defined                 no-undef
+  4:52  error  'require' is not defined                   no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-arrange-ui.test.js
+  16:7  error  'created' is assigned a value but never used         no-unused-vars
+  17:5  error  'listenersAdded' is assigned a value but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-inspector.js
+    8:44  error  'ObserverModel' is not defined  no-undef
+    8:60  error  'require' is not defined        no-undef
+  792:38  error  'module' is not defined         no-undef
+  792:54  error  'module' is not defined         no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-mail-inspector.js
+  103:5   error  'document' is defined but never used  no-unused-vars
+  290:38  error  'module' is not defined               no-undef
+  290:54  error  'module' is not defined               no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-mail-inspector.test.js
+  290:53  error  'name' is defined but never used  no-unused-vars
+  290:59  error  'fn' is defined but never used    no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-mail.js
+   14:38  error  'module' is not defined     no-undef
+   14:55  error  'require' is not defined    no-undef
+   14:84  error  'ThemePack' is not defined  no-undef
+  205:38  error  'module' is not defined     no-undef
+  205:54  error  'module' is not defined     no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-mail.test.js
+  329:43  error  'color' is defined but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-model.js
+    8:38  error  'module' is not defined     no-undef
+    8:55  error  'require' is not defined    no-undef
+    8:84  error  'ThemePack' is not defined  no-undef
+  535:38  error  'module' is not defined     no-undef
+  535:54  error  'module' is not defined     no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-office-art.js
+    7:38  error  'module' is not defined           no-undef
+    8:9   error  'require' is not defined          no-undef
+    9:9   error  'SCENE_ART_ROLES' is not defined  no-undef
+   46:14  error  '_' is defined but never used     no-unused-vars
+  195:38  error  'module' is not defined           no-undef
+  195:54  error  'module' is not defined           no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-office-art.test.js
+  290:53  error  'args' is defined but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-prefs-ui.test.js
+  16:7  error  'created' is assigned a value but never used         no-unused-vars
+  17:5  error  'listenersAdded' is assigned a value but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-scene.js
+     5:38  error  'module' is not defined                     no-undef
+     6:9   error  'require' is not defined                    no-undef
+     7:9   error  'ObserverModel' is not defined              no-undef
+   933:7   error  'own' is assigned a value but never used    no-unused-vars
+  1192:38  error  'stale' is assigned a value but never used  no-unused-vars
+  1612:38  error  'module' is not defined                     no-undef
+  1612:54  error  'module' is not defined                     no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-scene.test.js
+  1164:49  error  The value assigned to 'previous' is not used in subsequent statements  no-useless-assignment
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-ui.test.js
+  2964:58  error  'identity' is defined but never used               no-unused-vars
+  3021:11  error  'viewOptions5' is assigned a value but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-view.js
+     8:38  error  'module' is not defined                 no-undef
+     9:9   error  'require' is not defined                no-undef
+    10:9   error  'ObserverScene' is not defined          no-undef
+    12:38  error  'module' is not defined                 no-undef
+    13:9   error  'require' is not defined                no-undef
+    14:9   error  'ObserverModel' is not defined          no-undef
+    16:38  error  'module' is not defined                 no-undef
+    16:55  error  'require' is not defined                no-undef
+    16:84  error  'ThemePack' is not defined              no-undef
+    18:38  error  'module' is not defined                 no-undef
+    19:9   error  'require' is not defined                no-undef
+    20:9   error  'ObserverOfficeArt' is not defined      no-undef
+    22:38  error  'module' is not defined                 no-undef
+    23:9   error  'require' is not defined                no-undef
+    24:9   error  'SCENE_ART_ROLES' is not defined        no-undef
+  1430:82  error  'SPRITES' is not defined                no-undef
+  2511:21  error  'a' is assigned a value but never used  no-unused-vars
+  2725:18  error  '_' is defined but never used           no-unused-vars
+  2895:16  error  '_' is defined but never used           no-unused-vars
+  2895:19  error  Empty block statement                   no-empty
+  2905:18  error  '_' is defined but never used           no-unused-vars
+  2983:16  error  '_' is defined but never used           no-unused-vars
+  2994:16  error  '_' is defined but never used           no-unused-vars
+  3803:18  error  '_' is defined but never used           no-unused-vars
+  3803:21  error  Empty block statement                   no-empty
+  4070:38  error  'module' is not defined                 no-undef
+  4070:54  error  'module' is not defined                 no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer-view.test.js
+  722:53  error  '_' is defined but never used       no-unused-vars
+  722:56  error  'i' is defined but never used       no-unused-vars
+  933:9   error  'settle' is defined but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/observer.js
+     8:16  error  'ThemePack' is not defined              no-undef
+     8:76  error  'ThemePack' is not defined              no-undef
+    10:16  error  'ObserverModel' is not defined          no-undef
+    11:19  error  'ObserverMail' is not defined           no-undef
+    24:16  error  '_' is defined but never used           no-unused-vars
+    31:16  error  '_' is defined but never used           no-unused-vars
+   124:14  error  '_' is defined but never used           no-unused-vars
+   132:14  error  '_' is defined but never used           no-unused-vars
+   145:16  error  'ObserverView' is not defined           no-undef
+   170:11  error  'ObserverModel' is not defined          no-undef
+   180:52  error  'ObserverModel' is not defined          no-undef
+   186:20  error  'ObserverModel' is not defined          no-undef
+   190:20  error  'ObserverModel' is not defined          no-undef
+   211:32  error  'ObserverMail' is not defined           no-undef
+   229:28  error  'ObserverScene' is not defined          no-undef
+   276:65  error  'ObserverInspector' is not defined      no-undef
+   290:5   error  'ObserverMailInspector' is not defined  no-undef
+   360:21  error  'ObserverInspector' is not defined      no-undef
+   362:15  error  'ObserverInspector' is not defined      no-undef
+   365:11  error  'QuerySpine' is not defined             no-undef
+   383:21  error  'ObserverMailInspector' is not defined  no-undef
+   385:15  error  'ObserverMailInspector' is not defined  no-undef
+   388:41  error  'Harness' is not defined                no-undef
+   542:16  error  'ObserverModel' is not defined          no-undef
+   671:11  error  'ObserverModel' is not defined          no-undef
+   674:12  error  'ObserverModel' is not defined          no-undef
+   755:58  error  'ObserverModel' is not defined          no-undef
+   766:8   error  'ObserverModel' is not defined          no-undef
+   887:58  error  'ObserverModel' is not defined          no-undef
+   955:28  error  'Harness' is not defined                no-undef
+  1027:32  error  'ObserverModel' is not defined          no-undef
+  1424:7   error  'ObserverModel' is not defined          no-undef
+  1461:29  error  'ObserverModel' is not defined          no-undef
+  1461:62  error  'ObserverModel' is not defined          no-undef
+  1469:46  error  'ObserverModel' is not defined          no-undef
+  1487:50  error  'ObserverModel' is not defined          no-undef
+  1539:11  error  'ObserverModel' is not defined          no-undef
+  1556:35  error  'ObserverModel' is not defined          no-undef
+  1558:19  error  'ObserverModel' is not defined          no-undef
+  1568:19  error  'ObserverModel' is not defined          no-undef
+  1592:9   error  'ObserverModel' is not defined          no-undef
+  1630:26  error  'ObserverModel' is not defined          no-undef
+  1647:19  error  'ObserverModel' is not defined          no-undef
+  1650:13  error  'ObserverModel' is not defined          no-undef
+  1650:49  error  'ObserverModel' is not defined          no-undef
+  1651:13  error  'ObserverModel' is not defined          no-undef
+  1660:17  error  'ObserverModel' is not defined          no-undef
+  1751:40  error  'ObserverModel' is not defined          no-undef
+  1962:71  error  'ObserverModel' is not defined          no-undef
+  1974:14  error  'ObserverModel' is not defined          no-undef
+  2085:20  error  'ObserverScene' is not defined          no-undef
+  2086:16  error  'ObserverScene' is not defined          no-undef
+  2186:15  error  'ObserverScene' is not defined          no-undef
+  2217:29  error  'ObserverScene' is not defined          no-undef
+  2220:20  error  'ObserverScene' is not defined          no-undef
+  2236:31  error  'ObserverScene' is not defined          no-undef
+  2238:29  error  'ObserverScene' is not defined          no-undef
+  2247:39  error  'ObserverModel' is not defined          no-undef
+  2296:5   error  'ThemePack' is not defined              no-undef
+  2312:17  error  'SPRITES' is not defined                no-undef
+  2315:3   error  'QuerySpine' is not defined             no-undef
+  2339:19  error  'QuerySpine' is not defined             no-undef
+  2343:21  error  'QuerySpine' is not defined             no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/queryspine.js
+   12:44  error  'Harness' is not defined       no-undef
+   12:66  error  'Harness' is not defined       no-undef
+   15:12  error  'Harness' is not defined       no-undef
+   86:16  error  '_' is defined but never used  no-unused-vars
+  200:16  error  '_' is defined but never used  no-unused-vars
+  200:19  error  Empty block statement          no-empty
+  279:38  error  'module' is not defined        no-undef
+  279:54  error  'module' is not defined        no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/queryspine.test.js
+  13:14  error  '_' is defined but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/scene-art-roles.js
+  288:38  error  'module' is not defined  no-undef
+  288:54  error  'module' is not defined  no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/theme-pack.js
+   36:38  error  'module' is not defined   no-undef
+   37:24  error  'require' is not defined  no-undef
+  263:38  error  'module' is not defined   no-undef
+  263:54  error  'module' is not defined   no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/app/theme-pack.test.js
+  435:30  error  Unnecessary escape character: \"  no-useless-escape
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/js/assets.js
+     4:7   error  'SPRITES' is assigned a value but never used                      no-unused-vars
+    20:7   error  'meta' is assigned a value but never used                         no-unused-vars
+    26:12  error  'hexToHsl' is defined but never used                              no-unused-vars
+    45:9   error  'BASE_HUE' is assigned a value but never used                     no-unused-vars
+    46:5   error  'BASE_SAT' is assigned a value but never used                     no-unused-vars
+    47:22  error  'agentId' is defined but never used                               no-unused-vars
+    70:69  error  'SkinStudy' is not defined                                        no-undef
+    73:9   error  'DATA' is not defined                                             no-undef
+    74:10  error  'DATA' is not defined                                             no-undef
+    74:37  error  'DATA' is not defined                                             no-undef
+    74:64  error  'DATA' is not defined                                             no-undef
+    74:75  error  'DATA' is not defined                                             no-undef
+    85:7   error  'DATA' is not defined                                             no-undef
+    86:21  error  'DATA' is not defined                                             no-undef
+   124:14  error  'e' is defined but never used                                     no-unused-vars
+   177:14  error  'e' is defined but never used                                     no-unused-vars
+   344:14  error  '_' is defined but never used                                     no-unused-vars
+   344:17  error  Empty block statement                                             no-empty
+   445:14  error  'e' is defined but never used                                     no-unused-vars
+   720:9   error  The value assigned to 'key' is not used in subsequent statements  no-useless-assignment
+  1155:18  error  '_' is defined but never used                                     no-unused-vars
+  1192:53  error  'DATA' is not defined                                             no-undef
+  1193:52  error  'DATA' is not defined                                             no-undef
+  1262:18  error  '_' is defined but never used                                     no-unused-vars
+  1281:51  error  'SkinStudy' is not defined                                        no-undef
+  1282:21  error  'SpriteLoadPlan' is not defined                                   no-undef
+  1289:11  error  'DATA' is not defined                                             no-undef
+  1290:11  error  'DATA' is not defined                                             no-undef
+  1291:11  error  'DATA' is not defined                                             no-undef
+  1291:22  error  'DATA' is not defined                                             no-undef
+  1292:11  error  'DATA' is not defined                                             no-undef
+  1292:22  error  'DATA' is not defined                                             no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/frontend/js/sprite-load-plan.js
+  6:40  error  'module' is not defined  no-undef
+  6:56  error  'module' is not defined  no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/server.js
+  111:16  error  '_' is defined but never used  no-unused-vars
+  117:16  error  '_' is defined but never used  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/control.js
+   33:32  error  Unnecessary escape character: \/                                         no-useless-escape
+  147:26  error  Unnecessary escape character: \/                                         no-useless-escape
+  164:14  error  '_' is defined but never used                                            no-unused-vars
+  165:7   error  There is no `cause` attached to the symptom error being thrown           preserve-caught-error
+  253:25  error  Unnecessary escape character: \"                                         no-useless-escape
+  253:35  error  Unnecessary escape character: \"                                         no-useless-escape
+  331:9   error  The value assigned to 'workspaces' is not used in subsequent statements  no-useless-assignment
+  334:14  error  '_' is defined but never used                                            no-unused-vars
+  386:14  error  '_' is defined but never used                                            no-unused-vars
+  411:30  error  There is no `cause` attached to the symptom error being thrown           preserve-caught-error
+  413:18  error  '_' is defined but never used                                            no-unused-vars
+  491:18  error  '_' is defined but never used                                            no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-arrangement.js
+   21:14  error  Unexpected control character(s) in regular expression: \x00, \x1f    no-control-regex
+   54:5   error  Unexpected control character(s) in regular expression: \x00, \x1f    no-control-regex
+   61:22  error  Unexpected control character(s) in regular expression: \x00, \x1f    no-control-regex
+  142:14  error  '_' is defined but never used                                        no-unused-vars
+  148:9   error  The value assigned to 'rules' is not used in subsequent statements   no-useless-assignment
+  218:18  error  '_' is defined but never used                                        no-unused-vars
+  222:14  error  '_' is defined but never used                                        no-unused-vars
+  262:9   error  The value assigned to 'remote' is not used in subsequent statements  no-useless-assignment
+  266:14  error  '_' is defined but never used                                        no-unused-vars
+  286:14  error  '_' is defined but never used                                        no-unused-vars
+  311:16  error  '_' is defined but never used                                        no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-identity.js
+   66:18  error  '_' is defined but never used                                                  no-unused-vars
+  148:5   error  Unexpected control character(s) in regular expression: \x00, \x08, \x0b, \x1f  no-control-regex
+  278:14  error  '_' is defined but never used                                                  no-unused-vars
+  424:14  error  '_' is defined but never used                                                  no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-inspector.js
+   98:12  error  '_' is defined but never used                                      no-unused-vars
+  106:70  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+  282:16  error  '_' is defined but never used                                      no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-projects.js
+   11:40  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+   82:14  error  '_' is defined but never used                                      no-unused-vars
+   87:14  error  '_' is defined but never used                                      no-unused-vars
+  122:18  error  '_' is defined but never used                                      no-unused-vars
+  143:14  error  '_' is defined but never used                                      no-unused-vars
+  207:14  error  '_' is defined but never used                                      no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-remotes.js
+   30:45  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+  198:4   error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+  445:14  error  '_' is defined but never used                                      no-unused-vars
+  486:18  error  '_' is defined but never used                                      no-unused-vars
+  573:18  error  '_' is defined but never used                                      no-unused-vars
+  573:21  error  Empty block statement                                              no-empty
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-remotes.test.js
+  245:7  error  Duplicate key 'health'  no-dupe-keys
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer-transcripts.js
+   17:45  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+  205:16  error  '_' is defined but never used                                      no-unused-vars
+  306:20  error  '_' is defined but never used                                      no-unused-vars
+  330:20  error  '_' is defined but never used                                      no-unused-vars
+  371:14  error  '_' is defined but never used                                      no-unused-vars
+  406:14  error  '_' is defined but never used                                      no-unused-vars
+  490:18  error  '_' is defined but never used                                      no-unused-vars
+  529:14  error  '_' is defined but never used                                      no-unused-vars
+  642:14  error  '_' is defined but never used                                      no-unused-vars
+  801:18  error  '_' is defined but never used                                      no-unused-vars
+  852:18  error  '_' is defined but never used                                      no-unused-vars
+  873:14  error  '_' is defined but never used                                      no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer.js
+   21:14  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+  330:14  error  '_' is defined but never used                                      no-unused-vars
+  356:14  error  '_' is defined but never used                                      no-unused-vars
+  597:20  error  '_' is defined but never used                                      no-unused-vars
+  638:16  error  '_' is defined but never used                                      no-unused-vars
+  673:18  error  '_' is defined but never used                                      no-unused-vars
+  857:13  error  'available' is assigned a value but never used                     no-unused-vars
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/observer.test.js
+  2567:45  error  'Harness' is not defined  no-undef
+  2568:15  error  'Harness' is not defined  no-undef
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/sidecar/theme-packs.js
+  181:9  error  Unexpected control character(s) in regular expression: \x00, \x1f  no-control-regex
+
+/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/tools/acceptance.ts
+  14:1   error  Remove commented-out code; version history should preserve old implementations                     clean-code/no-commented-out-code
+  15:8   error  Function 'runTestProbes' has too many lines (75). Maximum allowed is 50                            max-lines-per-function
+  63:18  error  Policy literal '10000' should usually be a named constant or enum value so the rule is searchable  clean-code/no-business-policy-literals
+  92:39  error  Policy literal '2' should usually be a named constant or enum value so the rule is searchable      clean-code/no-business-policy-literals
+  94:59  error  Invalid type "number" of template literal expression                                               @typescript-eslint/restrict-template-expressions
+
+✖ 259 problems (259 errors, 0 warnings)
+
+error: script "lint" exited with code 1

@@ -1,0 +1,20 @@
+from pathlib import Path
+import tempfile,shutil,subprocess,json
+root=Path('/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare')
+results=[]
+for name,relative,before,after in [
+ ('foot-anchor','src/browser/sprites/placement.ts','sourceHeight ? -0.25 : -3','sourceHeight ? -3 : -3'),
+ ('pre-manifest-memo','src/browser/sprites/loading.ts','if (!key || !tracks || tracks.length === 0) return Promise.resolve(missingSet);','if (!key || !tracks || tracks.length === 0) return this.setJobs[key] ??= Promise.resolve(missingSet);'),
+]:
+ with tempfile.TemporaryDirectory(prefix='starnet-sprite-mutation-') as temporary:
+  stage=Path(temporary)
+  for owner in ['src/browser','src/shared']:shutil.copytree(root/owner,stage/owner)
+  canonical=Path('frontend/assets/themes/starnet/theme.json');(stage/canonical).parent.mkdir(parents=True);shutil.copy2(root/canonical,stage/canonical)
+  (stage/'node_modules').symlink_to(root/'node_modules',target_is_directory=True)
+  target=stage/relative;source=target.read_text();assert before in source;target.write_text(source.replace(before,after,1))
+  run=subprocess.run(['bun','--no-env-file','test','src/browser/sprites/assets.test.ts','src/browser/sprites/drawing.test.ts'],cwd=stage,capture_output=True,text=True)
+  log=Path('/tmp/starnet-sprite-mutation-'+name+'.log');log.write_text(run.stdout+run.stderr)
+  results.append({'mutation':name,'exit':run.returncode,'log':str(log)})
+  assert run.returncode !=0,'Mutation escaped tests: '+name
+Path('/tmp/starnet-sprite-mutations.json').write_text(json.dumps(results,indent=2)+'\n')
+print(json.dumps(results))

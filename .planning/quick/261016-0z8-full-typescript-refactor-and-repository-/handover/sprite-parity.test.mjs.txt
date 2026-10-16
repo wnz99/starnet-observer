@@ -1,0 +1,36 @@
+import {test} from 'bun:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createRequire}from'node:module';
+import {createSprites}from'/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare/src/browser/sprites/assets.ts';
+const root='/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare';
+const fixture=root+'/frontend/js/sprite-runtime.fixture.js';
+const module={exports:{}};
+const source=fs.readFileSync(fixture,'utf8').replace('const sandbox = vm.createContext({','const sandbox = vm.createContext({createSprites,');
+new Function('require','module','__dirname','createSprites',source)(createRequire(fixture),module,root+'/frontend/js',createSprites);
+const load=module.exports.load;
+const typed=`const SPRITES = createSprites({data:DATA,createCanvas:()=>document.createElement('canvas'),fetch,loadImage(path){return new Promise(resolve=>{const img=new Image();img.onload=async()=>{try{if(typeof img.decode==='function')await img.decode();resolve(img);}catch{resolve(null);}};img.onerror=()=>resolve(null);img.src=path;});}});`;
+const stable=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&v.__id?v.__id:v);
+test('original recorder pixel-call/state parity through poses, lighting, culling and re-entry',async()=>{
+ const classic=await load(),ported=await load({source:typed});
+ const bodies=Array.from({length:8},(_,i)=>({id:'worker'+i,skin:'tester',px:30+i*40.2,py:100+i*9.7,dir:'south',state:'idle',aph:i*.38}));
+ const old=bodies.map(b=>({...b})),next=bodies.map(b=>({...b}));
+ const destinations=[{width:800,height:600},{width:800,height:600}];
+ for(let tick=0;tick<180;tick++){
+  for(let i=0;i<bodies.length;i++){
+   const updates={dir:['south','north','east','west'][Math.floor(tick/15)%4],state:tick%60<30?'walk':'idle',odo:tick*.53,px:30+i*40.2+tick*.23,speaking:tick%40>20,sitting:tick%75>65,working:tick%75>65};
+   Object.assign(old[i],updates);Object.assign(next[i],updates);
+   const logs=[[],[]];const bounds=[[],[]];
+   for(const [j,rt,body]of [[0,classic,old[i]],[1,ported,next[i]]]){
+    const ctx=rt.context(logs[j],undefined,destinations[j]);ctx.setTransform(2,0,0,2,.3,.7);
+    const result=rt.SPRITES.drawBody(ctx,body,tick*16,{reducedMotion:i===7,light:{color:[80+tick%20,150,220],strength:.67,dx:1,dy:-1},shouldPaint:b=>{bounds[j].push(b);return !(tick%32>8&&tick%32<24);}});
+    if(j===0)bounds[j].push(result);else bounds[j].push(result);
+   }
+   assert.equal(stable(next[i]),stable(old[i]),'render state tick '+tick+' body '+i);
+   assert.deepEqual(bounds[1],bounds[0],'geometry tick '+tick+' body '+i);
+   assert.deepEqual(logs[1],logs[0],'drawing calls tick '+tick+' body '+i);
+  }
+ }
+ assert.deepEqual(ported.offscreen,classic.offscreen,'offscreen pixel readback, blends, lighting composition');
+ assert.deepEqual(ported.SPRITES.bodyAppearanceStats(),classic.SPRITES.bodyAppearanceStats());
+});

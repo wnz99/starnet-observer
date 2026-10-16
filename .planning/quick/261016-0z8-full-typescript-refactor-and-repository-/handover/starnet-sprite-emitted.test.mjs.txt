@@ -1,0 +1,26 @@
+import {test}from'bun:test';
+import assert from'node:assert/strict';
+import {mkdtemp,rm,readFile}from'node:fs/promises';
+import {tmpdir}from'node:os';
+import {join}from'node:path';
+import {pathToFileURL}from'node:url';
+import fs from'node:fs';
+import {createRequire}from'node:module';
+const root='/Users/davidfava/Projects/Personal/starnet-observer-typescript-5-prepare';
+test('real assets/native browser ESM entries emit and the emitted factory paints through the original recorder',async()=>{
+ const output=await mkdtemp(join(tmpdir(),'starnet-sprites-emit-'));
+ try{
+  const result=await Bun.build({entrypoints:[root+'/src/browser/sprites/assets.ts',root+'/src/browser/sprites/native.ts'],target:'browser',format:'esm',splitting:true,outdir:output,minify:false});
+  assert.equal(result.success,true);assert.ok(result.outputs.length>=2);
+  for(const artifact of result.outputs){const text=await readFile(artifact.path,'utf8');assert.ok(!/from\s*["'](?:node:|bun:)/.test(text));}
+  const generated=await import(pathToFileURL(join(output,'assets.js')).href);
+  const native=await import(pathToFileURL(join(output,'native.js')).href);assert.equal(typeof native.browserSpriteDependencies,'function');
+  const fixture=root+'/frontend/js/sprite-runtime.fixture.js',module={exports:{}};
+  const source=fs.readFileSync(fixture,'utf8').replace('const sandbox = vm.createContext({','const sandbox = vm.createContext({createSprites,');
+  new Function('require','module','__dirname','createSprites',source)(createRequire(fixture),module,root+'/frontend/js',generated.createSprites);
+  const runtime=await module.exports.load({source:`const SPRITES=createSprites({data:DATA,createCanvas:()=>document.createElement('canvas'),fetch,loadImage(path){return new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>resolve(null);image.src=path;});}});`});
+  const log=[],body={id:'emitted',skin:'tester',px:100,py:100,dir:'south',state:'idle',noShadow:true};
+  runtime.SPRITES.drawBody(runtime.context(log),body,1000,{reducedMotion:true});
+  assert.equal(runtime.SPRITES.ready,true);assert.equal(log.filter(row=>row[0]==='drawImage').at(-1)[1],'img:assets/sprites/tester/rot_south.png');assert.equal(body._renderStandingHeight,64*(2/3));
+ }finally{await rm(output,{recursive:true,force:true});}
+});

@@ -1,0 +1,99 @@
+bun test v1.3.13 (bf2e2cec)
+
+src/browser/mail-inspector.test.ts:
+(pass) message panels keep unique accessible parts and only valid identity-bound payloads show [16.13ms]
+(pass) cover, close and ledger replacement cancel reads and discard late body responses [12.86ms]
+(pass) body validation rejects wrong identities, unavailable text shape and invalid message IDs [0.14ms]
+(pass) unavailable responses retain explicit reasons even when their timestamp is null [6.19ms]
+
+src/browser/model.test.ts:
+(pass) layout preserves desks across reorder/removal/growth and annex color identity [17.28ms]
+(pass) project hues remain unique per deck; remote ships keep independent room slots [24.62ms]
+(pass) helper chains resolve exact roots, bounded stations never manufacture rooms [0.70ms]
+(pass) checkout proof and observed activity retain labels and unavailable evidence [4.59ms]
+
+src/browser/mail.test.ts:
+(pass) couriers rebase history, batch routes, queue busy routes, and preserve the flight clock [1.06ms]
+(pass) stale bus and inventory ground flights; recovery, deck changes and visibility never replay history [0.44ms]
+(pass) bounded queue, ACK fade, reduced motion and theme colors preserve rendering inputs [0.78ms]
+
+src/browser/data-shim.test.ts:
+(pass) application skin labels retain canonical crew metadata [0.39ms]
+
+src/browser/queryspine.test.ts:
+(pass) shared request, exact TTL boundary, validated mutation and honest last-good failures [1.92ms]
+(pass) new generations recover without waiting; obsolete responses never publish [0.41ms]
+(pass) subscribers own one timer and ephemeral reads cannot restore a discarded body [1.02ms]
+(pass) timeouts abort and cannot poison a recovered generation [6.50ms]
+
+src/browser/prepaint.test.ts:
+(pass) emitted prepaint IIFE applies bootstrapped interface before body mount [19.40ms]
+
+src/browser/harness.test.ts:
+(pass) authentication headers, abort and one reload for a rejected launch token [0.89ms]
+(pass) non-token failures never schedule reload and malformed errors use status [0.16ms]
+
+src/browser/bootstrap.test.ts:
+(pass) canonical manifest and resolved snapshot remain distinct, immutable bootstrap values [2.72ms]
+(pass) missing token and optional invalid pack fall back without a new startup failure [3.42ms]
+(pass) missing or structurally invalid canonical default fails before theme use [0.44ms]
+
+src/browser/theme.test.ts:
+(pass) theme applies interface synchronously, mounts status later and bounds plain warning text [4.81ms]
+(pass) local font and logo decoding failures restore fallbacks and deduplicate warnings [1.12ms]
+(pass) font and logo URLs cannot load remote resources or mismatched font files [0.41ms]
+
+src/browser/inspector.test.ts:
+(pass) inspector stats and turns state missing evidence and never expose undocumented fields [0.45ms]
+(pass) polls name exact identity and pause preserves transcript state until resumed [4.35ms]
+(pass) foreign proof and roster replacement lock content across hide/show cycles [2.36ms]
+(pass) loaded window snapshots withdraw before refresh and cannot be held by Pause [0.62ms]
+
+src/browser/sprites/drawing.test.ts:
+[SPRITES] startup sets loaded: canonical_blank — 21 animation tracks
+[SPRITES] startup sets loaded: canonical_blank — 21 animation tracks
+(pass) changed canonical bootstrap drives default startup, inherited tracks and portrait scale [21.31ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) pre-manifest skin requests recover; default south unlocks paint before a delayed animation [1.96ms]
+[SPRITES] startup sets loaded:  — 0 animation tracks
+[SPRITES] startup sets loaded:  — 0 animation tracks
+(pass) missing or malformed manifests settle to procedural fallback [2.05ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) native master geometry, device snapping, pose dissolve and premultiplied walk tween stay distinct [3.58ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) per-frame alpha packing and genuine stride separation govern walking feet [9.02ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) culling advances identical render state without warm-frame paint or light work; destination re-entry warms before shadows [10.19ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) light cache promotes stable frames, recycles probation and rebuilds after context restoration [26.70ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) kept light pixels stay within budget and context failures still paint the original master [20.19ms]
+[SPRITES] startup sets loaded: tester — 35 animation tracks
+(pass) failed prime pose still starts from other canonical tracks [0.51ms]
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+(pass) replacement decode rejection and a throwing degradation listener settle on canonical frames [1.43ms]
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+(pass) conservative visibility bounds cover transformed speech, master pixels and contact rings [0.93ms]
+
+src/browser/sprites/assets.test.ts:
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: approved_android, @replacement:blank — 42 animation tracks
+[SPRITES] startup sets loaded: approved_android — 21 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+[SPRITES] startup sets loaded: tester — 36 animation tracks
+sprite-theme: atomic success, delay, load/dimension failure, canonical drawing and metadata passed
+(pass) sprite-theme atomic replacement contracts [47.20ms]
+
+src/browser/sprites/load-plan.test.ts:
+(pass) startup planning copies valid tracks, deduplicates sets and counts only selected frames [0.22ms]
+
+ 42 pass
+ 0 fail
+ 351 expect() calls
+Ran 42 tests across 13 files. [576.00ms]
