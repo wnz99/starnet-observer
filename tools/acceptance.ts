@@ -10,40 +10,43 @@ export type TestProbe = {
   diagnostic: string;
 };
 
+const PROBE_TIMEOUT_MS = 10000;
+const CASES = [
+  {
+    name: "wrong expectation",
+    diagnostic: "WRONG_EXPECTATION",
+    source: `import {test, expect} from 'bun:test';
+      test('WRONG_EXPECTATION', () => { expect(1 + 1).toBe(3); });`,
+  },
+  { name: "empty discovery", diagnostic: "No tests found", source: null },
+  {
+    name: "awaited rejection",
+    diagnostic: "AWAITED_REJECTION",
+    source: `import {test} from 'bun:test';
+      test('AWAITED_REJECTION', async () => { await Promise.reject(new Error('AWAITED_REJECTION')); });`,
+  },
+  {
+    name: "early exit",
+    diagnostic: "MISSING_COMPLETION",
+    source: `import {test, expect} from 'bun:test';
+      import {spawnSync} from 'node:child_process';
+      import {existsSync} from 'node:fs';
+      test('MISSING_COMPLETION', () => {
+        const result = spawnSync(process.execPath, ['--no-env-file', './exit.fixture.js'], {cwd: import.meta.dir});
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(0);
+        expect(existsSync(import.meta.dir + '/completed')).toBe(true);
+      });`,
+  },
+];
+
 // Each defect lives outside repository discovery. This checks Bun's real runner,
-// including the parent-side completion check required for intentional exit fixtures.
+// including the parent-side completion check required by intentional exit fixtures.
 export function runTestProbes(): TestProbe[] {
   const root = mkdtempSync(join(tmpdir(), "starnet-test-acceptance-"));
-  const cases = [
-    {
-      name: "wrong expectation",
-      diagnostic: "WRONG_EXPECTATION",
-      source: `import {test, expect} from 'bun:test';
-        test('WRONG_EXPECTATION', () => { expect(1 + 1).toBe(3); });`,
-    },
-    { name: "empty discovery", diagnostic: "No tests found", source: null },
-    {
-      name: "awaited rejection",
-      diagnostic: "AWAITED_REJECTION",
-      source: `import {test} from 'bun:test';
-        test('AWAITED_REJECTION', async () => { await Promise.reject(new Error('AWAITED_REJECTION')); });`,
-    },
-    {
-      name: "early exit",
-      diagnostic: "MISSING_COMPLETION",
-      source: `import {test, expect} from 'bun:test';
-        import {spawnSync} from 'node:child_process';
-        import {existsSync} from 'node:fs';
-        test('MISSING_COMPLETION', () => {
-          const result = spawnSync(process.execPath, ['--no-env-file', './exit.fixture.js'], {cwd: import.meta.dir});
-          expect(result.error).toBeUndefined();
-          expect(result.status).toBe(0);
-          expect(existsSync(import.meta.dir + '/completed')).toBe(true);
-        });`,
-    },
-  ];
+
   try {
-    return cases.map((probe, index) => {
+    return CASES.map((probe, index) => {
       const cwd = join(root, String(index));
       mkdirSync(cwd);
       if (probe.source !== null) writeFileSync(join(cwd, "probe.test.js"), probe.source);
@@ -60,7 +63,7 @@ export function runTestProbes(): TestProbe[] {
       const result = spawnSync(process.execPath, ["--no-env-file", "test"], {
         cwd,
         encoding: "utf8",
-        timeout: 10000,
+        timeout: PROBE_TIMEOUT_MS,
         env: { ...process.env, FORCE_COLOR: "0" },
       });
       const diagnostic = result.stdout + result.stderr;
@@ -89,7 +92,8 @@ export function runTestProbes(): TestProbe[] {
 }
 
 if (import.meta.main) {
-  assert.deepEqual(process.argv.slice(2), ["tests"], "usage: bun run verify:acceptance -- tests");
+  const [, , ...arguments_] = process.argv;
+  assert.deepEqual(arguments_, ["tests"], "usage: bun run verify:acceptance -- tests");
   for (const probe of runTestProbes())
-    console.log(`PASS ${probe.name}: rejected with exit ${probe.status}`);
+    console.log(`PASS ${probe.name}: rejected with exit ${String(probe.status)}`);
 }
