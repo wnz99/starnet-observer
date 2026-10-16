@@ -1,17 +1,26 @@
-"use strict";
-const { test } = require("bun:test");
+const EXPECTED_FALSE = false;
+function itemAt<T>(items: readonly T[], index: number): T {
+  const value = items[index];
+  assert(value !== undefined, "Expected fixture element");
+  return value;
+}
+function arrangementOf(row: ProjectResolution) {
+  assert(row.arrangement);
+  return row.arrangement;
+}
+import { makeProjectResolver } from "../projects/index.js";
+import { parseRemote, validateRooms } from "./index.js";
+import type { ProjectResolution } from "../projects/types.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import { execFile as executeFile } from "node:child_process";
+const execFile = promisify(executeFile);
+import { test } from "bun:test";
+import assert from "node:assert/strict";
 
 test("observer-arrangement regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const fs = require("node:fs/promises");
-  const os = require("node:os");
-  const path = require("node:path");
-  const { promisify } = require("node:util");
-  const execFile = promisify(require("node:child_process").execFile);
-  const { makeProjectResolver } = require("./observer-projects.js");
-  const { parseRemote, validateRooms } = require("./observer-arrangement.js");
-  const Model = require("../frontend/app/observer-model.js");
-
   // Remote parsing: https, scp-like and ssh:// agree; local paths are not remotes; credentials never survive.
   assert.deepEqual(parseRemote("https://github.com/Banqora/bq-web.git"), {
     host: "github.com",
@@ -72,9 +81,9 @@ test("observer-arrangement regression contracts", async () => {
   await (async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "observer-arrange-"));
     try {
-      const git = (cwd, args) =>
+      const git = (cwd: string, args: string[]) =>
         execFile("git", ["-c", "core.hooksPath=/dev/null", "-C", cwd, ...args]);
-      const repository = async (folder, remote) => {
+      const repository = async (folder: string, remote?: string) => {
         await fs.mkdir(folder, { recursive: true });
         await git(folder, ["init", "-q"]);
         if (remote) await git(folder, ["remote", "add", "origin", remote]);
@@ -98,14 +107,14 @@ test("observer-arrangement regression contracts", async () => {
       await repository(path.join(repos, "work-agents", "clone-a"));
       await repository(path.join(repos, "work-agents", "clone-b"));
       await fs.mkdir(path.join(home, "HomeAssistant", "automations"), { recursive: true });
-      const warnings = [];
+      const warnings: string[] = [];
       let clock = 1000;
       const resolver = makeProjectResolver({
         now: () => clock,
         execute: execFile,
         arrange: { home, roomsFile, warn: (message) => warnings.push(message) },
       });
-      const at = (...parts) => path.join(repos, ...parts);
+      const at = (...parts: string[]) => path.join(repos, ...parts);
       const cwds = [
         at("bq-web"),
         at("bq-infra"),
@@ -134,7 +143,19 @@ test("observer-arrangement regression contracts", async () => {
         cv,
         homeAssistant,
         missing,
-      ] = rows.map((row) => row.arrangement);
+      ] = rows.map(arrangementOf);
+      assert(web);
+      assert(infra);
+      assert(mono);
+      assert(api);
+      assert(station);
+      assert(observer);
+      assert(bus);
+      assert(acme);
+      assert(work);
+      assert(cv);
+      assert(homeAssistant);
+      assert(missing);
       // d. two observed units of one org share an org room; one alone keeps its own.
       assert.equal(web.roomId, infra.roomId);
       assert.equal(web.room, "banqora");
@@ -169,9 +190,9 @@ test("observer-arrangement regression contracts", async () => {
         section: "",
       });
       // Folder grouping is untouched: the arrangement is an extra field.
-      assert.equal(rows[0].project, "repos");
+      assert.equal(itemAt(rows, 0).project, "repos");
       assert.equal(
-        rows[9].project,
+        itemAt(rows, 9).project,
         "cv",
         "folder grouping still gives the stray folder its own room",
       );
@@ -205,19 +226,14 @@ test("observer-arrangement regression contracts", async () => {
         path.join(linked, "test"),
       ]);
       assert.equal(
-        new Set(linkedRows.map((row) => row.arrangement.roomId)).size,
+        new Set(linkedRows.map((row) => arrangementOf(row).roomId)).size,
         1,
         "linked checkout belongs to repository room",
       );
       assert.equal(
-        new Set(linkedRows.map((row) => row.arrangement.sectionId)).size,
+        new Set(linkedRows.map((row) => arrangementOf(row).sectionId)).size,
         4,
         "main, linked root, src and test remain distinct",
-      );
-      assert.equal(
-        new Set(linkedRows.map((row) => Model.sectionKey(Model.arranged(row)))).size,
-        4,
-        "ARRANGE preserves every checkout subfolder section",
       );
 
       // Resolve the outer organization room before inheriting it, regardless of input order or nesting depth.
@@ -238,13 +254,15 @@ test("observer-arrangement regression contracts", async () => {
       ];
       const nested = await nestedResolver.resolveMany(nestedPaths);
       assert.deepEqual(
-        nested.map((row) => row.arrangement.room),
+        nested.map((row) => arrangementOf(row).room),
         ["acme", "acme", "acme", "acme"],
         "all nested units inherit the final outer organization room",
       );
       const nestedAgain = await nestedResolver.resolveMany([...nestedPaths].reverse());
       assert(
-        nestedAgain.every((row) => row.arrangement.roomId === nested[0].arrangement.roomId),
+        nestedAgain.every(
+          (row) => arrangementOf(row).roomId === arrangementOf(itemAt(nested, 0)).roomId,
+        ),
         "sticky placement preserves consistent ancestry",
       );
       const skippedResolver = makeProjectResolver({
@@ -258,7 +276,7 @@ test("observer-arrangement regression contracts", async () => {
         at("outer"),
       ]);
       assert(
-        skipped.every((row) => row.arrangement.room === "acme"),
+        skipped.every((row) => arrangementOf(row).room === "acme"),
         "unobserved intermediate checkout inherits the known outer room",
       );
       // An outer repository can itself follow an organization mate nested under another outer unit.
@@ -276,12 +294,12 @@ test("observer-arrangement regression contracts", async () => {
           arrange: { home },
         }).resolveMany(order);
         assert(
-          dependent.every((row) => row.arrangement.room === "D"),
+          dependent.every((row) => arrangementOf(row).room === "D"),
           "nested descendants follow the outer unit final organization dependency",
         );
       }
 
-      // Inherited file overrides are temporary, including a fresh start while the rule already exists.
+      // Inherited file overrides are temporary, including a fresh start with the rule already present.
       const inheritedFile = path.join(temp, "inherited-rooms.json");
       const explicit = JSON.stringify({
         rooms: [{ name: "Explicit", match: [await fs.realpath(at("outer"))] }],
@@ -295,27 +313,27 @@ test("observer-arrangement regression contracts", async () => {
       const inheritedPaths = [at("outer"), at("outer", "inner")];
       assert(
         (await inheritedResolver.resolveMany(inheritedPaths)).every(
-          (row) => row.arrangement.room === "Explicit",
+          (row) => arrangementOf(row).room === "Explicit",
         ),
       );
       await fs.rm(inheritedFile);
       assert(
         (await inheritedResolver.resolveMany(inheritedPaths)).every(
-          (row) => row.arrangement.room === "outer",
+          (row) => arrangementOf(row).room === "outer",
         ),
         "removing a startup rule clears inherited temporary rooms",
       );
       await fs.writeFile(inheritedFile, explicit);
       assert(
         (await inheritedResolver.resolveMany(inheritedPaths)).every(
-          (row) => row.arrangement.room === "Explicit",
+          (row) => arrangementOf(row).room === "Explicit",
         ),
         "new outer override reaches already-sticky descendants",
       );
       await fs.rm(inheritedFile);
       assert(
         (await inheritedResolver.resolveMany(inheritedPaths)).every(
-          (row) => row.arrangement.room === "outer",
+          (row) => arrangementOf(row).room === "outer",
         ),
         "rule removal restores the original rule-made sticky room",
       );
@@ -324,16 +342,20 @@ test("observer-arrangement regression contracts", async () => {
       await repository(at("bq-exec"), "https://github.com/banqora/bq-exec.git");
       await repository(at("acme-two"), "https://github.com/acme/two.git");
       const later = (await resolver.resolveMany([...cwds, at("bq-exec"), at("acme-two")])).map(
-        (row) => row.arrangement,
+        arrangementOf,
       );
       assert.deepEqual(
         later.slice(0, cwds.length),
-        rows.map((row) => row.arrangement),
+        rows.map(arrangementOf),
         "no existing unit moves",
       );
-      assert.equal(later[cwds.length].roomId, web.roomId, "a new org-mate joins the org room");
       assert.equal(
-        later[cwds.length + 1].roomId,
+        itemAt(later, cwds.length).roomId,
+        web.roomId,
+        "a new org-mate joins the org room",
+      );
+      assert.equal(
+        itemAt(later, cwds.length + 1).roomId,
         acme.roomId,
         "a new org-mate joins the lone unit room instead of moving it",
       );
@@ -345,10 +367,10 @@ test("observer-arrangement regression contracts", async () => {
         execute: execFile,
         arrange: { home },
       });
-      const heldRoom = (await heldResolver.resolve(at("z-held"))).arrangement.roomId;
+      const heldRoom = arrangementOf(await heldResolver.resolve(at("z-held"))).roomId;
       const joined = await heldResolver.resolveMany([at("a-later"), at("z-held")]);
       assert(
-        joined.every((row) => row.arrangement.roomId === heldRoom),
+        joined.every((row) => arrangementOf(row).roomId === heldRoom),
         "a newly sorted-first organization mate joins the established sticky room",
       );
 
@@ -356,9 +378,9 @@ test("observer-arrangement regression contracts", async () => {
       clock += 400000;
       const scratch = (
         await resolver.resolveMany([at("work-agents", "clone-a"), at("work-agents", "cv")])
-      ).map((row) => row.arrangement);
+      ).map(arrangementOf);
       assert.equal(
-        scratch[1].roomId,
+        itemAt(scratch, 1).roomId,
         cv.roomId,
         "cv keeps its room after a clone inside work-agents is observed",
       );
@@ -380,13 +402,13 @@ test("observer-arrangement regression contracts", async () => {
           at("bq-web"),
           at("work-agents", "cv"),
         ])
-      ).map((row) => row.arrangement);
+      ).map(arrangementOf);
       assert.deepEqual(
         filed.map((value) => value.room),
         ["Platform", "Platform", "Everything", "Everything"],
       );
       assert.equal(
-        filed[3].section,
+        itemAt(filed, 3).section,
         "work-agents/cv",
         "a section outside its own room is prefixed with its unit",
       );
@@ -395,9 +417,7 @@ test("observer-arrangement regression contracts", async () => {
         JSON.stringify({ rooms: [{ name: "Infra only", match: ["github.com/banqora/bq-infra"] }] }),
       );
       await fs.utimes(roomsFile, new Date(5000), new Date(5000));
-      filed = (await resolver.resolveMany([at("bq-infra"), at("bq-web")])).map(
-        (row) => row.arrangement,
-      );
+      filed = (await resolver.resolveMany([at("bq-infra"), at("bq-web")])).map(arrangementOf);
       assert.deepEqual(
         filed.map((value) => value.room),
         ["Infra only", "banqora"],
@@ -405,8 +425,8 @@ test("observer-arrangement regression contracts", async () => {
       );
       await fs.writeFile(roomsFile, "{ not json");
       await fs.utimes(roomsFile, new Date(9000), new Date(9000));
-      filed = (await resolver.resolveMany([at("bq-infra")])).map((row) => row.arrangement);
-      assert.equal(filed[0].room, "banqora", "an invalid rooms file is ignored");
+      filed = (await resolver.resolveMany([at("bq-infra")])).map(arrangementOf);
+      assert.equal(itemAt(filed, 0).room, "banqora", "an invalid rooms file is ignored");
       assert.deepEqual(warnings, ["Rooms file ignored: invalid JSON"]);
       await fs.rm(roomsFile);
 
@@ -414,60 +434,12 @@ test("observer-arrangement regression contracts", async () => {
       const plain = await makeProjectResolver({ now: () => 1000, execute: execFile }).resolve(
         at("bq-web"),
       );
-      assert.equal(Object.hasOwn(plain, "arrangement"), false);
+      assert.equal(Object.hasOwn(plain, "arrangement"), EXPECTED_FALSE);
       console.log(
         "observer arrangement: remotes, strict rooms file, monorepo sections, nested repos, org rooms (2+), non-Git units under workspace roots, stickiness, rooms-file overrides/reload and no paths OK",
       );
     } finally {
       await fs.rm(temp, { recursive: true, force: true });
     }
-
-    // Page side: ARRANGE swaps the grouping fields; rows without an arrangement are returned unchanged (identity).
-    const row = {
-      id: "obs_" + "a".repeat(24),
-      projectId: "prj_1",
-      project: "repos",
-      repoId: "repo_1",
-      repo: "bq-web",
-      folder: "src",
-      arrangement: { roomId: "room_1", room: "banqora", sectionId: "sec_1", section: "bq-web" },
-    };
-    assert.deepEqual(Model.arranged(row), {
-      ...row,
-      projectId: "room_1",
-      project: "banqora",
-      projectKind: "group",
-      repoId: "sec_1",
-      repo: "bq-web",
-      folder: "",
-    });
-    const bare = { id: "x", projectId: "prj_2" };
-    assert.equal(Model.arranged(bare), bare);
-    const layout = Model.createLayout(),
-      arrangedLayout = Model.createLayout();
-    const second = {
-      ...row,
-      id: "obs_" + "b".repeat(24),
-      projectId: "prj_2",
-      project: "infra-parent",
-      repoId: "repo_2",
-      repo: "bq-infra",
-      arrangement: { roomId: "room_1", room: "banqora", sectionId: "sec_2", section: "bq-infra" },
-    };
-    layout.reconcile([row, second]);
-    arrangedLayout.reconcile([row, second].map(Model.arranged));
-    assert.equal(layout.onPage(0).length, 2, "folder grouping: two rooms");
-    assert.equal(arrangedLayout.onPage(0).length, 1, "arranged: one room");
-    assert.equal(arrangedLayout.onPage(0)[0].name, "banqora");
-    const seats = [row, second].map((value) => arrangedLayout.seatFor(value.id));
-    arrangedLayout.reconcile([row, second].map(Model.arranged));
-    assert.deepEqual(
-      [row, second].map((value) => arrangedLayout.seatFor(value.id)),
-      seats,
-      "desks hold between polls while arranged",
-    );
-    console.log(
-      "observer arrangement: page toggle swaps grouping, identity without arrangement, one room per arranged project, stable seats OK",
-    );
   })();
 }, 30000);

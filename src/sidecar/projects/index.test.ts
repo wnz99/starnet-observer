@@ -1,19 +1,30 @@
-"use strict";
-const { test } = require("bun:test");
+const EXPECTED_TRUE = true;
+const EXPECTED_FALSE = false;
+function at<T>(items: readonly T[], index: number): T {
+  const value = items[index];
+  assert(value !== undefined, "Expected fixture element");
+  return value;
+}
+import { makeProjectResolver } from "./index.js";
+import type { Execute } from "./types.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import { execFile as executeFile } from "node:child_process";
+const execFile = promisify(executeFile);
+import { test } from "bun:test";
+import assert from "node:assert/strict";
 
 test("observer-projects regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const fs = require("node:fs/promises");
-  const os = require("node:os");
-  const path = require("node:path");
-  const { promisify } = require("node:util");
-  const execFile = promisify(require("node:child_process").execFile);
-  const { makeProjectResolver } = require("./observer-projects.js");
-  assert.throws(() => makeProjectResolver({ execute: execFile }), /requires an injected now clock/);
+  assert.throws(
+    () => Reflect.apply(makeProjectResolver, undefined, [{ execute: execFile }]),
+    /requires an injected now clock/,
+  );
   await (async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "observer-projects-"));
     try {
-      const git = (cwd, args) =>
+      const git = (cwd: string, args: string[]) =>
         execFile("git", [
           "-c",
           "core.hooksPath=/dev/null",
@@ -23,7 +34,7 @@ test("observer-projects regression contracts", async () => {
           cwd,
           ...args,
         ]);
-      const repository = async (folder, commit = false) => {
+      const repository = async (folder: string, commit = false) => {
         await fs.mkdir(folder, { recursive: true });
         await git(folder, ["init", "-q"]);
         if (commit)
@@ -40,7 +51,7 @@ test("observer-projects regression contracts", async () => {
       };
       const root = path.join(temp, "a", "same name"),
         other = path.join(temp, "b", "same name");
-      await repository(root, true);
+      await repository(root, EXPECTED_TRUE);
       await fs.mkdir(path.join(root, "nested"));
       await repository(other);
       const worktree = path.join(temp, "linked checkout");
@@ -49,13 +60,13 @@ test("observer-projects regression contracts", async () => {
       const batch = makeProjectResolver({ now: () => 1000, execute: execFile });
       const batchRows = await batch.resolveMany([worktree, root, worktree]);
       assert.equal(
-        batchRows[0].repoId,
-        batchRows[1].repoId,
+        at(batchRows, 0).repoId,
+        at(batchRows, 1).repoId,
         "linked-first batch uses observed main proof",
       );
-      assert.deepEqual(batchRows[0], batchRows[2], "duplicate cwd keeps input alignment");
-      assert.equal(batchRows[0].worktree, "linked checkout");
-      assert.equal(batchRows[0].folder, "", "linked checkout root has no subfolder");
+      assert.deepEqual(at(batchRows, 0), at(batchRows, 2), "duplicate cwd keeps input alignment");
+      assert.equal(at(batchRows, 0).worktree, "linked checkout");
+      assert.equal(at(batchRows, 0).folder, "", "linked checkout root has no subfolder");
       assert.equal(
         (await batch.resolve(path.join(worktree, "nested", "child"))).folder,
         "nested/child",
@@ -64,7 +75,7 @@ test("observer-projects regression contracts", async () => {
       await git(root, ["worktree", "add", "-q", "--detach", sameLinked]);
       await fs.mkdir(path.join(sameLinked, "nested"));
       const sameLinkedRow = await batch.resolve(path.join(sameLinked, "nested"));
-      assert.equal(sameLinkedRow.repoId, batchRows[1].repoId);
+      assert.equal(sameLinkedRow.repoId, at(batchRows, 1).repoId);
       assert.equal(
         sameLinkedRow.folder,
         "nested",
@@ -77,12 +88,12 @@ test("observer-projects regression contracts", async () => {
       assert.equal(twinRow.repoId, sameLinkedRow.repoId);
       assert.notEqual(twinRow.checkoutId, sameLinkedRow.checkoutId);
       assert.equal(twinRow.checkoutKind, "worktree");
-      assert.equal(batchRows[1].checkoutKind, "main");
-      assert.notEqual(batchRows[0].checkoutId, batchRows[1].checkoutId);
+      assert.equal(at(batchRows, 1).checkoutKind, "main");
+      assert.notEqual(at(batchRows, 0).checkoutId, at(batchRows, 1).checkoutId);
       const linkedAlias = path.join(temp, "linked-alias");
       await fs.symlink(worktree, linkedAlias);
       assert.equal((await batch.resolve(path.join(linkedAlias, "nested"))).folder, "nested");
-      assert.equal((await batch.resolve(linkedAlias)).checkoutId, batchRows[0].checkoutId);
+      assert.equal((await batch.resolve(linkedAlias)).checkoutId, at(batchRows, 0).checkoutId);
       assert.equal((await batch.resolve(path.join(root, "nested"))).folder, "nested");
       await fs.mkdir(path.join(root, "..drafts"));
       const dotDrafts = await batch.resolve(path.join(root, "..drafts"));
@@ -91,15 +102,15 @@ test("observer-projects regression contracts", async () => {
         "..drafts",
         "a child beginning with two dots stays inside its checkout",
       );
-      assert.equal(dotDrafts.repoId, batchRows[1].repoId);
-      assert.equal(dotDrafts.projectId, batchRows[1].projectId);
+      assert.equal(dotDrafts.repoId, at(batchRows, 1).repoId);
+      assert.equal(dotDrafts.projectId, at(batchRows, 1).projectId);
       const cachePressure = Array.from(
         { length: 257 },
         (_, index) => temp + "/.".repeat(index + 1),
       );
       const pressured = makeProjectResolver({
         now: () => 1000,
-        execute: async (...args) => {
+        execute: async (...args: Parameters<Execute>) => {
           if (args[1][1] === (await fs.realpath(temp)))
             throw new Error("Fixture folder is not a checkout");
           return execFile(...args);
@@ -107,20 +118,20 @@ test("observer-projects regression contracts", async () => {
       });
       const pressuredRows = await pressured.resolveMany([worktree, root, ...cachePressure]);
       assert.equal(
-        pressuredRows[0].repoId,
-        pressuredRows[1].repoId,
+        at(pressuredRows, 0).repoId,
+        at(pressuredRows, 1).repoId,
         "current main proof survives bounded-cache eviction within batch",
       );
       let active = 0,
         maximum = 0,
         calls = 0;
-      const gates = [];
+      const gates: (() => void)[] = [];
       const bounded = makeProjectResolver({
         now: () => 1000,
-        execute: async (...args) => {
+        execute: async (...args: Parameters<Execute>) => {
           calls++;
           maximum = Math.max(maximum, ++active);
-          await new Promise((resolve) => gates.push(resolve));
+          await new Promise<void>((resolve) => gates.push(resolve));
           try {
             return await execFile(...args);
           } finally {
@@ -128,33 +139,37 @@ test("observer-projects regression contracts", async () => {
           }
         },
       });
-      const folders = Array.from({ length: 9 }, (_, index) => path.join(temp, "batch-" + index));
+      const folders = Array.from({ length: 9 }, (_, index) =>
+        path.join(temp, "batch-" + String(index)),
+      );
       for (const folder of folders) await fs.mkdir(folder);
-      let complete = false;
-      const resolving = bounded.resolveMany([...folders, folders[0]]).then((value) => {
-        complete = true;
+      const complete = { value: false };
+      const resolving = bounded.resolveMany([...folders, at(folders, 0)]).then((value) => {
+        complete.value = true;
         return value;
       });
-      while (!complete) {
+      while (!complete.value) {
         await new Promise((resolve) => setImmediate(resolve));
-        if (gates.length)
+        if (gates.length > 0)
           gates
             .splice(0)
             .reverse()
-            .forEach((release) => release());
+            .forEach((release) => {
+              release();
+            });
       }
       const boundedRows = await resolving;
       assert.equal(maximum, 4, "discovery runs concurrently with four active operations");
       assert.equal(calls, folders.length, "batch deduplicates cwd discovery");
       assert.deepEqual(
         boundedRows.map((row) => row.repo),
-        [...folders, folders[0]].map((folder) => path.basename(folder)),
+        [...folders, at(folders, 0)].map((folder) => path.basename(folder)),
       );
 
       // A projects root reached through a symlink, holding a two-repository group, Personal and direct repositories.
       const projects = path.join(temp, "Projects"),
         alias = path.join(temp, "ProjectsAlias");
-      await repository(path.join(projects, "Mama", "ma-ai"), true);
+      await repository(path.join(projects, "Mama", "ma-ai"), EXPECTED_TRUE);
       await repository(path.join(projects, "Mama", "ma-web-app"));
       await repository(path.join(projects, "Personal", "starnet"));
       await repository(path.join(projects, "Personal", "tools"));
@@ -193,7 +208,7 @@ test("observer-projects regression contracts", async () => {
         clock = 1000;
       const resolver = makeProjectResolver({
         now: () => clock,
-        execute: async (...args) => {
+        execute: async (...args: Parameters<Execute>) => {
           executions++;
           return execFile(...args);
         },
@@ -331,15 +346,20 @@ test("observer-projects regression contracts", async () => {
         path.join(homeDir, "repo"),
         elsewhere,
       ]);
-      assert.equal(atHome.projectHome, true);
+      assert(atHome && inRepo && below);
+      assert.equal(atHome.projectHome, EXPECTED_TRUE);
       assert.equal(atHome.project, "home-user", "the label change is the page’s; the name stays");
       assert.equal(
         inRepo.projectHome,
-        true,
+        EXPECTED_TRUE,
         "a repository directly in home groups under the home room",
       );
-      assert.equal("projectHome" in below, false, "a folder below home is its own room, not home");
-      assert.equal("projectHome" in main, false, "no flag outside home");
+      assert.equal(
+        "projectHome" in below,
+        EXPECTED_FALSE,
+        "a folder below home is its own room, not home",
+      );
+      assert.equal("projectHome" in main, EXPECTED_FALSE, "no flag outside home");
       console.log(
         "observer projects: home-folder flag, Git roots, worktrees inside and outside Projects, canonical parent/direct/Personal roots, symlinked root, same names and no full paths OK",
       );

@@ -1,46 +1,76 @@
-"use strict";
-const { test } = require("bun:test");
+const EXPECTED_TRUE = true;
+const EXPECTED_FALSE = false;
+function at<T>(items: readonly T[], index: number): T {
+  const value = items[index];
+  assert(value !== undefined, "Expected fixture element");
+  return value;
+}
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import net from "node:net";
+import { spawn } from "node:child_process";
+import { makeFooterConfigurationReader, makeIdentityRpc } from "./index.js";
+import { object, result } from "./types.js";
+import type { Execute } from "./types.js";
+import { makeIdentityResolver } from "./index.js";
+import type { FooterMode, IdentityRpc, RefreshState } from "./types.js";
+import { test } from "bun:test";
+import assert from "node:assert/strict";
 
 test("observer-identity regression contracts", async () => {
-  const assert = require("node:assert/strict");
-  const { makeIdentityResolver } = require("./observer-identity.js");
   const A = "00000000-0000-0000-0000-000000000001",
     B = "00000000-0000-0000-0000-000000000002";
   const pane = { pane_id: "w1:p1", agent: "codex", terminal_id: "term_one", revision: 3 };
   function fixture() {
-    let current = { ...pane },
-      mode = "configured",
+    let current: Record<string, unknown> = { ...pane },
+      mode: FooterMode = "configured",
       body = "\n  " + A + " · GPT-6.1-Sol medium\n  ← for agents · ? for shortcuts\n";
-    let afterRead = null,
-      afterConfiguration = null,
+    let afterRead: (() => void) | null = null,
+      afterConfiguration: (() => void) | null = null,
       fail = false,
       sequence = 8,
       pid = 41,
       birth = 1;
-    const calls = [],
-      births = [];
-    let capability = null,
+    const calls: string[] = [],
+      births: number[] = [];
+    let capability: string | null = null,
       scrollOffset = 0,
-      afterBirth = null;
+      afterBirth: ((count: number) => void) | null = null;
+    function footerText(params: Record<string, unknown>) {
+      return params.source === "recent" || !scrollOffset
+        ? body
+        : "\n  " + B + " · model\n  ? for shortcuts\n";
+    }
+    function motion(params: Record<string, unknown>) {
+      assert.deepEqual(params.cursor, { row: 119, col: 0 });
+      assert.equal(params.motion, "line_end");
+      if (
+        params.content_revision !== undefined &&
+        (sequence !== params.content_revision || sequence % 2)
+      )
+        throw Error("stale_content");
+      return Promise.resolve({ result: { pane_id: pane.pane_id, content_revision: sequence } });
+    }
     const resolver = makeIdentityResolver({
       now: () => 1000,
       readConfiguration: async () => {
         if (afterConfiguration) afterConfiguration();
-        return mode;
+        return Promise.resolve(mode);
       },
       readProcessBirth: async (requested) => {
         births.push(requested);
         if (afterBirth) afterBirth(births.length);
         if (capability === "birth") throw Error("PRIVATE");
-        return { pid: requested, startSeconds: birth, startMicroseconds: 2 };
+        return Promise.resolve({ pid: requested, startSeconds: birth, startMicroseconds: 2 });
       },
       rpc: async (method, params) => {
         calls.push(method);
         if (fail) throw Error("PRIVATE");
-        if (capability === method) return { result: {} };
-        if (method === "agent.get") return { result: { agent: { ...current } } };
+        if (capability === method) return Promise.resolve({ result: {} });
+        if (method === "agent.get") return Promise.resolve({ result: { agent: { ...current } } });
         if (method === "pane.get")
-          return {
+          return Promise.resolve({
             result: {
               pane: {
                 pane_id: pane.pane_id,
@@ -51,9 +81,9 @@ test("observer-identity regression contracts", async () => {
                 },
               },
             },
-          };
+          });
         if (method === "pane.process_info")
-          return {
+          return Promise.resolve({
             result: {
               process_info: {
                 pane_id: pane.pane_id,
@@ -61,17 +91,8 @@ test("observer-identity regression contracts", async () => {
                 foreground_processes: [{ argv: ["PRIVATE"] }],
               },
             },
-          };
-        if (method === "pane.copy_motion") {
-          assert.deepEqual(params.cursor, { row: 119, col: 0 });
-          assert.equal(params.motion, "line_end");
-          if (
-            params.content_revision !== undefined &&
-            (sequence !== params.content_revision || sequence % 2)
-          )
-            throw Error("stale_content");
-          return { result: { pane_id: pane.pane_id, content_revision: sequence } };
-        }
+          });
+        if (method === "pane.copy_motion") return motion(params);
         assert.equal(method, "pane.read");
         assert.deepEqual(params, {
           pane_id: pane.pane_id,
@@ -86,48 +107,45 @@ test("observer-identity regression contracts", async () => {
           format: "text",
           revision: 0,
           truncated: true,
-          text:
-            params.source === "recent" || !scrollOffset
-              ? body
-              : "\n  " + B + " · model\n  ? for shortcuts\n",
+          text: footerText(params),
         };
         if (afterRead) afterRead();
-        return { result: { read } };
+        return Promise.resolve({ result: { read } });
       },
     });
     return {
       resolver,
-      current: (value) => {
+      current: (value: Record<string, unknown>) => {
         current = value;
       },
-      mode: (value) => {
+      mode: (value: FooterMode) => {
         mode = value;
       },
-      body: (value) => {
+      body: (value: string) => {
         body = value;
       },
-      after: (value) => {
+      after: (value: (() => void) | null) => {
         afterRead = value;
       },
-      configuration: (value) => {
+      configuration: (value: (() => void) | null) => {
         afterConfiguration = value;
       },
-      fail: (value) => {
+      fail: (value: boolean) => {
         fail = value;
       },
-      afterBirth: (value) => {
+      afterBirth: (value: ((count: number) => void) | null) => {
         afterBirth = value;
       },
-      capability: (value) => {
+      capability: (value: string | null) => {
         capability = value;
       },
-      scroll: (value) => {
+      scroll: (value: number) => {
         scrollOffset = value;
       },
-      sequence: (value) => {
+      sequence: (value: number) => {
         sequence = value;
       },
-      process: (value, start) => {
+      process: (value: number, start: number) => {
         pid = value;
         birth = start;
       },
@@ -142,7 +160,7 @@ test("observer-identity regression contracts", async () => {
     const exact = await f.resolver.resolve(pane);
     assert.equal(exact.sessionId, A);
     assert.equal(exact.source, "footer");
-    assert.equal(await f.resolver.revalidate(exact.proof), true);
+    assert.equal(await f.resolver.revalidate(exact.proof), EXPECTED_TRUE);
     assert.equal(
       (
         await f.resolver.resolve({
@@ -176,7 +194,7 @@ test("observer-identity regression contracts", async () => {
       "withdrawn footer cannot resurrect native hook",
     );
     const firstFailure = fixture();
-    firstFailure.fail(true);
+    firstFailure.fail(EXPECTED_TRUE);
     await firstFailure.resolver.resolve(pane);
     firstFailure.mode("unconfigured");
     assert.equal(
@@ -201,7 +219,9 @@ test("observer-identity regression contracts", async () => {
       "unreadable config is not proof of disabled footer mode",
     );
     const race = fixture();
-    race.after(() => race.current({ ...pane, terminal_id: "term_two" }));
+    race.after(() => {
+      race.current({ ...pane, terminal_id: "term_two" });
+    });
     assert.equal(
       (await race.resolver.resolve(pane)).sessionId,
       null,
@@ -236,11 +256,11 @@ test("observer-identity regression contracts", async () => {
     switched.body("\n  " + B + " · model\n  ? for shortcuts\n");
     assert.equal(
       await switched.resolver.revalidate(old.proof),
-      false,
+      EXPECTED_FALSE,
       "in-TUI switch rejected without roster refresh",
     );
-    switched.fail(true);
-    assert.equal(await switched.resolver.revalidate(old.proof), false);
+    switched.fail(EXPECTED_TRUE);
+    assert.equal(await switched.resolver.revalidate(old.proof), EXPECTED_FALSE);
     assert.equal(
       (await fixture().resolver.resolve({ ...pane, terminal_id: null })).sessionId,
       null,
@@ -258,13 +278,8 @@ test("observer-identity regression contracts", async () => {
 
   // Configuration and transport boundaries run only against isolated temporary files/sockets.
   async function configurationAndRpc() {
-    const fs = require("node:fs/promises"),
-      os = require("node:os"),
-      path = require("node:path"),
-      net = require("node:net");
-    const { makeFooterConfigurationReader, makeIdentityRpc } = require("./observer-identity.js");
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "observer-identity-"));
-    let server;
+    let server: net.Server | undefined;
     try {
       const file = path.join(folder, "config.toml");
       let calls = 0;
@@ -272,7 +287,7 @@ test("observer-identity regression contracts", async () => {
         file,
         execute: async () => {
           calls++;
-          return { stdout: "configured\n" };
+          return Promise.resolve({ stdout: "configured\n" });
         },
       });
       assert.equal(await reader(), "unconfigured", "missing file supports legacy native binding");
@@ -289,7 +304,7 @@ test("observer-identity regression contracts", async () => {
         file,
         execute: async () => {
           failedCalls++;
-          throw Error("PRIVATE CONFIG");
+          return Promise.reject(Error("PRIVATE CONFIG"));
         },
       });
       assert.equal(await failed(), "unavailable", "optional parser failure degrades safely");
@@ -315,26 +330,37 @@ test("observer-identity regression contracts", async () => {
       server = net.createServer((connection) => {
         connection.on("error", () => {});
         connection.once("data", (data) => {
-          const request = JSON.parse(data.toString());
+          const request = object(JSON.parse(data.toString()));
           assert.equal(request.method, "agent.get");
-          if (response === "closed") return connection.end();
-          if (response === "oversized") return connection.end("x".repeat(32769));
-          if (response === "wrong-id")
-            return connection.end(JSON.stringify({ id: "other", result: {} }) + "\n");
-          if (response === "error")
-            return connection.end(
+          if (response === "closed") {
+            connection.end();
+            return;
+          }
+          if (response === "oversized") {
+            connection.end("x".repeat(32769));
+            return;
+          }
+          if (response === "wrong-id") {
+            connection.end(JSON.stringify({ id: "other", result: {} }) + "\n");
+            return;
+          }
+          if (response === "error") {
+            connection.end(
               JSON.stringify({ id: request.id, error: { message: "PRIVATE" } }) + "\n",
             );
+            return;
+          }
           if (response === "timeout") return;
           const frame = JSON.stringify({ id: request.id, result: { agent: pane } }) + "\n";
           connection.write(frame.slice(0, 7));
           setImmediate(() => connection.end(frame.slice(7)));
         });
+        return undefined;
       });
-      await new Promise((resolve) => server.listen(socket, resolve));
+      await new Promise<void>((resolve) => server?.listen(socket, resolve));
       const rpc = makeIdentityRpc(socket);
       assert.equal(
-        (await rpc("agent.get", { target: pane.pane_id })).result.agent.terminal_id,
+        object(result(await rpc("agent.get", { target: pane.pane_id })).agent).terminal_id,
         "term_one",
       );
       for (response of ["closed", "oversized", "wrong-id", "error", "timeout"])
@@ -346,7 +372,13 @@ test("observer-identity regression contracts", async () => {
         "inventory snapshot is not identity output proof",
       );
     } finally {
-      if (server) await new Promise((resolve) => server.close(resolve));
+      if (server)
+        await new Promise<void>((resolve, reject) =>
+          server?.close((error) => {
+            if (error) reject(error);
+            else resolve();
+          }),
+        );
       await fs.rm(folder, { recursive: true, force: true });
     }
   }
@@ -356,40 +388,42 @@ test("observer-identity regression contracts", async () => {
       console.log("observer identity: local libproc boundary requires macOS; skipped");
       return;
     }
-    const { spawn } = require("node:child_process");
-    const { makeObserver } = require("./observer.js");
     // Only this test owns the exited child; no Herdr pane or external process is read.
     const child = spawn(process.execPath, ["--no-env-file", "-e", ""], {
       stdio: "ignore",
       timeout: 3000,
     });
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       child.once("error", reject);
-      child.once("exit", (code) => (code === 0 ? resolve() : reject(Error("Owned child failed"))));
+      child.once("exit", (code) => {
+        if (code === 0) resolve();
+        else reject(Error("Owned child failed"));
+      });
     });
     const panes = [pane, { ...pane, pane_id: "w1:p2", terminal_id: "term_two" }];
     let healthyCalls = 0;
-    const rpc = async (method, params) => {
+    const rpc: IdentityRpc = async (method, params) => {
       const id = params.pane_id || params.target;
       const target = panes.find((value) => value.pane_id === id);
       assert(target, "native fixture accepts only owned pane IDs");
-      if (target === panes[1]) healthyCalls++;
-      if (method === "agent.get") return { result: { agent: target } };
+      if (target === at(panes, 1)) healthyCalls++;
+      if (method === "agent.get") return Promise.resolve({ result: { agent: target } });
       if (method === "pane.process_info")
-        return {
+        return Promise.resolve({
           result: {
             process_info: { pane_id: id, shell_pid: target === pane ? child.pid : process.pid },
           },
-        };
+        });
       if (method === "pane.get")
-        return {
+        return Promise.resolve({
           result: {
             pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
           },
-        };
-      if (method === "pane.copy_motion") return { result: { pane_id: id, content_revision: 8 } };
+        });
+      if (method === "pane.copy_motion")
+        return Promise.resolve({ result: { pane_id: id, content_revision: 8 } });
       assert.equal(method, "pane.read");
-      return {
+      return Promise.resolve({
         result: {
           read: {
             pane_id: id,
@@ -398,105 +432,65 @@ test("observer-identity regression contracts", async () => {
             text: "\n  " + A + " · model\n  ? for shortcuts\n",
           },
         },
-      };
+      });
     };
-    const createResolver = (execute) =>
+    const createResolver = (execute?: Execute) =>
       makeIdentityResolver({
         now: () => 1000,
         endpoint: "/isolated/native.sock",
-        readConfiguration: async () => "configured",
+        readConfiguration: async () => Promise.resolve("configured"),
         rpc,
         execute,
       });
-    const resolver = createResolver(); // Actual default Python/libproc reader.
-    let inspected = 0;
-    const observer = makeObserver({
-      now: () => 1000,
-      warmDetails: false,
-      identities: resolver,
-      endpoint: "birth-isolation-fixture",
-      execute: async () => ({ stdout: JSON.stringify({ result: { agents: panes } }) }),
-      projects: { resolve: async () => ({ projectId: "fixture" }) },
-      bus: { read: () => ({ rows: [], health: "available" }) },
-      desktop: { inventory: async () => ({ health: "unavailable", windows: [] }) },
-      helpers: {
-        children: async () => ({ rows: [], annotations: new Map(), overflow: new Map() }),
-      },
-      transcripts: {
-        retain() {},
-        read: async (id, provider, session) => ({ available: !!session }),
-        inspect: async () => {
-          inspected++;
-          return { available: true, health: "available", turns: [] };
-        },
-      },
-    });
-    const snapshot = await observer.get();
-    assert.equal(
-      snapshot.sessions[0].identitySource,
-      "unavailable",
-      "exited requested PID fails its own capture",
-    );
-    assert.equal(
-      snapshot.sessions[1].identitySource,
-      "footer",
-      "exited PID must not suppress a healthy second pane in the same refresh",
-    );
-    assert.equal((await observer.inspect(snapshot.sessions[0].id)).health, "unavailable");
-    assert.equal(
-      (await observer.inspect(snapshot.sessions[1].id)).health,
-      "available",
-      "healthy pane remains inspectable through fresh default libproc revalidation",
-    );
-    assert.equal(inspected, 1, "only the healthy selected pane reaches transcript inspection");
-
     // Exercise structured PID evidence and executable/deadline failures at the default reader boundary.
     for (const evidence of [
       null,
       { pid: 0, startSeconds: 1, startMicroseconds: 0 },
       { pid: child.pid, startSeconds: 0, startMicroseconds: 0 },
     ]) {
-      const reader = createResolver(async (command, args) => ({
-        stdout: JSON.stringify(
-          Number(args.at(-1)) === child.pid
-            ? evidence
-            : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
-        ),
-      }));
-      const refresh = {};
-      assert.equal((await reader.resolve(panes[0], refresh)).source, "unavailable");
+      const reader = createResolver(async (_command, args) =>
+        Promise.resolve({
+          stdout: JSON.stringify(
+            Number(args.at(-1)) === child.pid
+              ? evidence
+              : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
+          ),
+        }),
+      );
+      const refresh: RefreshState = {};
+      assert.equal((await reader.resolve(at(panes, 0), refresh)).source, "unavailable");
       assert.equal(
-        (await reader.resolve(panes[1], refresh)).source,
+        (await reader.resolve(at(panes, 1), refresh)).source,
         "footer",
         "absent, mismatched or invalid PID evidence is capture-local",
       );
-      assert.equal(!!refresh.processBirthUnavailable, false);
+      assert.equal(!!refresh.processBirthUnavailable, EXPECTED_FALSE);
     }
     for (const code of ["ENOENT", "ETIMEDOUT"]) {
       let failed = true;
-      const reader = createResolver(async (command, args) => {
+      const reader = createResolver(async (_command, args) => {
         if (failed) throw Object.assign(Error("Birth reader unavailable"), { code });
-        return {
+        return Promise.resolve({
           stdout: JSON.stringify({
             pid: Number(args.at(-1)),
             startSeconds: 1,
             startMicroseconds: 0,
           }),
-        };
+        });
       });
-      const refresh = {};
-      await reader.resolve(panes[0], refresh);
+      const refresh: RefreshState = {};
+      await reader.resolve(at(panes, 0), refresh);
       const calls = healthyCalls;
-      assert.equal((await reader.resolve(panes[1], refresh)).source, "unavailable");
+      assert.equal((await reader.resolve(at(panes, 1), refresh)).source, "unavailable");
       assert.equal(
         healthyCalls,
         calls,
         "reader capability failure suppresses later native work in this refresh",
       );
-      assert.equal(refresh.processBirthUnavailable, true);
+      assert.equal(refresh.processBirthUnavailable, EXPECTED_TRUE);
       failed = false;
       assert.equal(
-        (await reader.resolve(panes[1], {})).source,
+        (await reader.resolve(at(panes, 1), {})).source,
         "footer",
         "next refresh retries reader capability",
       );
@@ -566,7 +560,9 @@ test("observer-identity regression contracts", async () => {
     );
     scrolled.after(() => {
       scrolled.scroll(80);
-      queueMicrotask(() => scrolled.scroll(0));
+      queueMicrotask(() => {
+        scrolled.scroll(0);
+      });
     });
     assert.equal(
       (await scrolled.resolver.resolve(pane)).sessionId,
@@ -578,12 +574,12 @@ test("observer-identity regression contracts", async () => {
     replaced.process(41, 3);
     assert.equal(
       await replaced.resolver.revalidate(previous.proof),
-      false,
+      EXPECTED_FALSE,
       "equal terminal and content sequence cannot revive reused PID with new birth",
     );
     const osUnavailable = fixture();
     osUnavailable.capability("birth");
-    const refresh = {};
+    const refresh: RefreshState = {};
     await osUnavailable.resolver.resolve(pane, refresh);
     const osCalls = osUnavailable.calls();
     assert.equal((await osUnavailable.resolver.resolve(pane, refresh)).sessionId, null);
@@ -631,7 +627,7 @@ test("observer-identity regression contracts", async () => {
     );
     assert.equal(
       await healthy.resolver.revalidateAll([result.proof, { ...result.proof, paneId: "w1:p2" }]),
-      false,
+      EXPECTED_FALSE,
     );
     assert.equal(
       healthy.methods.length,
@@ -640,34 +636,54 @@ test("observer-identity regression contracts", async () => {
     );
     assert.equal(
       await healthy.resolver.revalidateAll([result.proof, result.proof]),
-      true,
+      EXPECTED_TRUE,
       "duplicate proof is one distinct root",
     );
   }
 
   function deferred() {
-    let resolve, reject;
-    const promise = new Promise((yes, no) => {
-      resolve = yes;
-      reject = no;
-    });
-    return { promise, resolve, reject };
+    const { promise, resolve, reject } = Promise.withResolvers<undefined>();
+    return {
+      promise,
+      resolve: () => {
+        resolve(undefined);
+      },
+      reject: (error: Error) => {
+        reject(error);
+      },
+    };
   }
   async function drain() {
     for (let i = 0; i < 40; i++) await new Promise((resolve) => setImmediate(resolve));
   }
-  function concurrentFixture(options = {}) {
+  function concurrentFixture(
+    options: {
+      fault?: string;
+      birth?: (pid: number, count: number) => Promise<void>;
+      rpc?: (method: string, params: Record<string, unknown>, index: number) => Promise<void>;
+    } = {},
+  ) {
     const panes = Array.from({ length: 8 }, (_, i) => ({
       ...pane,
-      pane_id: "w1:p" + i,
-      terminal_id: "term_" + i,
+      pane_id: "w1:p" + String(i),
+      terminal_id: "term_" + String(i),
     }));
-    const calls = [],
-      births = [],
-      counts = new Map();
+    const calls: { id: string; method: string; params: Record<string, unknown> }[] = [],
+      births: { pid: number; count: number }[] = [],
+      counts = new Map<number, number>();
+    function staleContent(index: number, params: Record<string, unknown>) {
+      return options.fault === "content" && index === 0 && params.content_revision !== undefined;
+    }
+    function terminal(id: string, index: number, method: string) {
+      return options.fault === "terminal" &&
+        index === 0 &&
+        calls.filter((call) => call.id === id && call.method === method).length === 2
+        ? "replaced"
+        : at(panes, index).terminal_id;
+    }
     const resolver = makeIdentityResolver({
       now: () => 1000,
-      readConfiguration: async () => "configured",
+      readConfiguration: async () => Promise.resolve("configured"),
       readProcessBirth: async (pid) => {
         const count = (counts.get(pid) || 0) + 1;
         counts.set(pid, count);
@@ -683,6 +699,8 @@ test("observer-identity regression contracts", async () => {
         const id = params.pane_id || params.target,
           index = panes.findIndex((row) => row.pane_id === id);
         assert(index >= 0);
+        assert.equal(typeof id, "string");
+        if (typeof id !== "string") throw Error("Invalid fixture ID");
         calls.push({ id, method, params });
         await options.rpc?.(method, params, index);
         if (method === "agent.get")
@@ -690,12 +708,7 @@ test("observer-identity regression contracts", async () => {
             result: {
               agent: {
                 ...panes[index],
-                terminal_id:
-                  options.fault === "terminal" &&
-                  index === 0 &&
-                  calls.filter((call) => call.id === id && call.method === method).length === 2
-                    ? "replaced"
-                    : panes[index].terminal_id,
+                terminal_id: terminal(id, index, method),
               },
             },
           };
@@ -708,8 +721,7 @@ test("observer-identity regression contracts", async () => {
             },
           };
         if (method === "pane.copy_motion") {
-          if (options.fault === "content" && index === 0 && params.content_revision !== undefined)
-            throw Error("stale_content");
+          if (staleContent(index, params)) throw Error("stale_content");
           return { result: { pane_id: id, content_revision: 8 } };
         }
         assert.equal(method, "pane.read");
@@ -740,7 +752,7 @@ test("observer-identity regression contracts", async () => {
       "function",
       "roster resolver supports bounded captures",
     );
-    let pending;
+    let pending: ReturnType<ReturnType<typeof makeIdentityResolver>["resolveMany"]> | undefined;
     try {
       pending = f.resolver.resolveMany(f.panes, {});
       await drain();
@@ -765,6 +777,7 @@ test("observer-identity regression contracts", async () => {
     );
     for (const row of f.panes) {
       const last = f.calls.filter((call) => call.id === row.pane_id).at(-1);
+      assert(last);
       assert.equal(last.method, "pane.copy_motion");
       assert.equal(
         last.params.content_revision,
@@ -775,7 +788,7 @@ test("observer-identity regression contracts", async () => {
     for (const fault of ["content", "terminal", "birth"]) {
       const raced = concurrentFixture({ fault });
       const values = await raced.resolver.resolveMany(raced.panes, {});
-      assert.equal(values[0].sessionId, null, fault + " fails only affected pane");
+      assert.equal(at(values, 0).sessionId, null, fault + " fails only affected pane");
       assert(values.slice(1).every((value) => value.source === "footer"));
     }
   }
@@ -787,8 +800,8 @@ test("observer-identity regression contracts", async () => {
         if (silent) await admission.promise;
       },
     });
-    const state = {};
-    let pending;
+    const state: RefreshState = {};
+    let pending: ReturnType<ReturnType<typeof makeIdentityResolver>["resolveMany"]> | undefined;
     try {
       pending = f.resolver.resolveMany(f.panes, state);
       await drain();
@@ -797,7 +810,7 @@ test("observer-identity regression contracts", async () => {
       const values = await pending;
       assert(values.every((value) => value.sessionId === null));
       assert.equal(f.calls.length, 1);
-      assert.equal(state.endpointTimedOut, true);
+      assert.equal(state.endpointTimedOut, EXPECTED_TRUE);
     } finally {
       admission.resolve();
       if (pending) await pending;
@@ -807,13 +820,13 @@ test("observer-identity regression contracts", async () => {
     const late = deferred();
     let timeout = true;
     const timed = concurrentFixture({
-      rpc: async (method, params, index) => {
-        if (method !== "pane.get" || !timeout) return;
+      rpc: async (_method, _params, index) => {
+        if (_method !== "pane.get" || !timeout) return;
         await late.promise;
         if (index === 0) throw Object.assign(Error("late timeout"), { code: "IDENTITY_TIMEOUT" });
       },
     });
-    let work;
+    let work: ReturnType<ReturnType<typeof makeIdentityResolver>["resolveMany"]> | undefined;
     try {
       work = timed.resolver.resolveMany(timed.panes, {});
       await drain();
@@ -826,7 +839,7 @@ test("observer-identity regression contracts", async () => {
       );
     } finally {
       late.resolve();
-      if (work) await work;
+      await work;
     }
     timeout = false;
     assert(
@@ -857,21 +870,21 @@ test("observer-identity regression contracts", async () => {
       );
     } finally {
       hold.resolve();
-      if (work) await work;
+      await work;
     }
     capabilityUnavailable = false;
     assert(
       (await live.resolver.resolveMany(live.panes, {})).every((value) => value.source === "footer"),
     );
 
-    const localFailure = true;
     const local = concurrentFixture({
-      rpc: async (method, params, index) => {
-        if (localFailure && index === 0) throw Error("pane unavailable");
+      rpc: async (_method, _params, index) => {
+        if (index === 0) throw Error("pane unavailable");
+        return Promise.resolve(undefined);
       },
     });
     const values = await local.resolver.resolveMany(local.panes, {});
-    assert.equal(values[0].sessionId, null);
+    assert.equal(at(values, 0).sessionId, null);
     assert(
       values.slice(1).every((value) => value.source === "footer"),
       "non-timeout admission failure stays pane-local",

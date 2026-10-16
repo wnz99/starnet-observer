@@ -4,7 +4,7 @@ const childProcess = require("../src/sidecar/child-env.ts").guardChildProcess(
   require("node:child_process"),
 );
 const { makeDesktopObserver } = require("../src/sidecar/desktop/index.ts");
-const { makeProjectResolver } = require("./observer-projects.js");
+const { makeProjectResolver } = require("../src/sidecar/projects/index.ts");
 const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
 const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
 const { grouping } = require("../src/sidecar/helpers/evidence.ts");
@@ -13,7 +13,7 @@ const { makeSqliteClient } = require("../src/sidecar/sqlite/client.ts");
 const { unavailable, redactText } = require("../src/sidecar/inspector/fields.ts");
 const { stationChildEnv } = require("../src/sidecar/child-env.ts");
 const { makeOverseerState, resolveEndpoint } = require("../src/sidecar/overseer-state/index.ts");
-const { makeIdentityResolver } = require("./observer-identity.js");
+const { makeIdentityResolver } = require("../src/sidecar/identity/index.ts");
 
 const STATUSES = new Set(["working", "blocked", "idle", "done", "unknown"]);
 const text = (value, length) =>

@@ -1162,7 +1162,7 @@ test("observer regression contracts", async () => {
   }
 
   async function footerInspection() {
-    const { makeIdentityResolver } = require("./observer-identity.js");
+    const { makeIdentityResolver } = require("../src/sidecar/identity/index.ts");
     let clock = 1000,
       displayed = ID,
       terminal = "term_original",
@@ -1369,7 +1369,7 @@ test("observer regression contracts", async () => {
   }
 
   async function footerConfigurationRace() {
-    const { makeIdentityResolver } = require("./observer-identity.js");
+    const { makeIdentityResolver } = require("../src/sidecar/identity/index.ts");
     for (const helper of [false, true]) {
       let sequence = 8,
         terminal = "term_original",
@@ -1589,7 +1589,7 @@ test("observer regression contracts", async () => {
   // Real transcript lineage can involve independent footer runtimes. Neither the
   // observed child nor its synthetic descendant has a supported atomic proofset.
   async function footerAncestryProofSet() {
-    const { makeIdentityResolver } = require("./observer-identity.js");
+    const { makeIdentityResolver } = require("../src/sidecar/identity/index.ts");
     const { makeTranscriptObserver } = require("../src/sidecar/transcripts/index.ts");
     const { makeHelperObserver } = require("../src/sidecar/helpers/index.ts");
     const child = "00000000-0000-0000-0000-000000000002",
@@ -2322,7 +2322,7 @@ test("observer regression contracts", async () => {
 
   async function pollingFreshness() {
     const Q = require("../frontend/app/queryspine.fixture.js").loadQuerySpine();
-    const { makeIdentityResolver } = require("./observer-identity.js");
+    const { makeIdentityResolver } = require("../src/sidecar/identity/index.ts");
     let clock = 0,
       serial = 0,
       inventoryMode = "healthy",
