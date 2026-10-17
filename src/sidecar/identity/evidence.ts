@@ -51,7 +51,9 @@ function footerRows(rows: string[]) {
   return (
     rows.length === FOOTER_LINES &&
     !(rows[0] ?? "").trim() &&
-    /^\s*(?:← for agents · )?\? for shortcuts(?:\s|$)/.test(rows[FOOTER_LINES - 1] ?? "")
+    /^\s*(?:(?:← for agents · )?\? for shortcuts|New activity · (?:enter\/esc|esc) latest · \? shortcuts)(?:\s|$)/.test(
+      rows[FOOTER_LINES - 1] ?? "",
+    )
   );
 }
 export function footerSession(value: unknown, paneId: string) {

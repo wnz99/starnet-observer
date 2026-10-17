@@ -171,6 +171,53 @@ test("observer-identity regression contracts", async () => {
       A,
       "current footer overrides stale hook",
     );
+    for (const footer of [
+      "? for shortcuts",
+      "← for agents · ? for shortcuts",
+      "? for shortcuts                 90% context left",
+      "New activity · enter/esc latest · ? shortcuts",
+      "New activity · esc latest · ? shortcuts",
+      "New activity · enter/esc latest · ? shortcuts                 90% context left",
+      "New activity · esc latest · ? shortcuts                 90% context left",
+    ]) {
+      const navigation = fixture();
+      navigation.body("\n  " + A + " · model\n  " + footer + "\n");
+      const resolved = await navigation.resolver.resolve(pane);
+      assert.equal(resolved.sessionId, A, footer);
+      assert.equal(resolved.source, "footer", footer);
+      assert.equal(await navigation.resolver.revalidate(resolved.proof), EXPECTED_TRUE, footer);
+      assert.equal(navigation.methods.at(-1), "pane.copy_motion", footer);
+    }
+    for (const footer of [
+      "New activity · enter latest · ? shortcuts",
+      "New activity · esc/enter latest · ? shortcuts",
+      "New activity · esc newest · ? shortcuts",
+      "New activity · esc latest · ? for shortcuts",
+      "New activity · esc latest · ? shortcutsCopied",
+      "New activity · esc latest · ? shortcut",
+      "New activity · esc latest - ? shortcuts",
+      "New activities · esc latest · ? shortcuts",
+      "Answer: New activity · esc latest · ? shortcuts",
+      "Search: New activity · esc latest · ? shortcuts",
+      "Copy: New activity · esc latest · ? shortcuts",
+      "New activity · esc latest · ? shortcuts " + B,
+      "New activity · esc latest · ? shortcuts\u001b[0m",
+      "New activity · esc latest · ? shortcuts\r",
+      "New activity · esc latest · ? shortcuts\u0000",
+      "New activity · esc latest · ? shortcuts\u007f",
+    ]) {
+      f.body("\n  " + A + " · model\n  " + footer + "\n");
+      assert.equal((await f.resolver.resolve(pane)).sessionId, null, footer);
+    }
+    for (const mode of ["unconfigured", "unavailable"] as const) {
+      const absentConfiguration = fixture();
+      absentConfiguration.mode(mode);
+      absentConfiguration.body(
+        "\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
+      );
+      assert.equal((await absentConfiguration.resolver.resolve(pane)).sessionId, null, mode);
+      assert.equal(absentConfiguration.calls(), 0, mode);
+    }
     for (const body of [
       "\n  " + A.slice(0, 32) + "\n  ? for shortcuts\n",
       "\n  answer " + A + "\n  ? for shortcuts\n",
@@ -178,6 +225,12 @@ test("observer-identity regression contracts", async () => {
       "\n  " + A + " · model\n  Choose a model\n",
       A + "\n\n  ? for shortcuts\n",
       "overlay\n  " + A + " · model\n  ? for shortcuts\n",
+      "\n  " + A + " · " + B + "\n  New activity · esc latest · ? shortcuts\n",
+      "\n  answer " + A + "\n  New activity · esc latest · ? shortcuts\n",
+      A + "\n\n  New activity · esc latest · ? shortcuts\n",
+      "overlay\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
+      "\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\nextra\n",
+      "  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
     ]) {
       f.body(body);
       assert.equal((await f.resolver.resolve(pane)).sessionId, null, body);
