@@ -31,6 +31,12 @@ Plan: None
 Status: Essential-tools implementation verified; independent review clean; Ubuntu CI passed. Delivery: PR #17.
 Last activity: 2026-10-16 — Simplification removed bootstrap/migration scaffolding and redundant tools; 238 tests passed in Ubuntu CI.
 
+## Registered Work
+
+| # | Description | Status | Directory |
+| --- | --- | --- | --- |
+| 261018-3am | Codex identity performance and redraw availability | Approved; implementing sequential tasks | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
+
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
