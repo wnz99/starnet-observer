@@ -2,7 +2,7 @@ import type { ObserverInputRow } from "./contracts.js";
 import { settled } from "./testing.fixture.js";
 import { spawn } from "node:child_process";
 import { makeIdentityResolver } from "../identity/index.js";
-import type { IdentityExecute, IdentityRpc } from "../identity/types.js";
+import type { IdentityRpc } from "../identity/types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makeObserver } from "./index.js";
@@ -62,15 +62,12 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         };
       });
     };
-    const createResolver = (execute?: IdentityExecute) =>
-      makeIdentityResolver({
-        now: () => 1000,
-        endpoint: "/isolated/native.sock",
-        readConfiguration: () => settled(() => "configured"),
-        rpc,
-        execute,
-      });
-    const resolver = createResolver(); // Actual default Python/libproc reader.
+    const resolver = makeIdentityResolver({
+      now: () => 1000,
+      endpoint: "/isolated/native.sock",
+      readConfiguration: () => settled(() => "configured"),
+      rpc,
+    });
     let inspected = 0;
     const observer = makeObserver({
       now: () => 1000,
@@ -100,23 +97,32 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         },
       },
     });
-    const snapshot = await observer.get();
+    try {
+      const snapshot = await observer.get();
+      assert.equal(
+        must(must(snapshot.sessions[0])).identitySource,
+        "unavailable",
+        "exited requested PID fails its own capture",
+      );
+      assert.equal(
+        must(must(snapshot.sessions[1])).identitySource,
+        "footer",
+        "exited PID must not suppress a healthy second pane in the same refresh",
+      );
+      assert.equal((await observer.inspect(must(snapshot.sessions[0]).id)).health, "unavailable");
+      assert.equal(
+        (await observer.inspect(must(snapshot.sessions[1]).id)).health,
+        "available",
+        "healthy pane remains inspectable through fresh default libproc revalidation",
+      );
+      assert.equal(inspected, 1, "only the healthy selected pane reaches transcript inspection");
+    } finally {
+      await observer.close();
+    }
     assert.equal(
-      must(must(snapshot.sessions[0])).identitySource,
+      (await resolver.resolve(pane)).source,
       "unavailable",
-      "exited requested PID fails its own capture",
+      "observer closes actual identity adapter",
     );
-    assert.equal(
-      must(must(snapshot.sessions[1])).identitySource,
-      "footer",
-      "exited PID must not suppress a healthy second pane in the same refresh",
-    );
-    assert.equal((await observer.inspect(must(snapshot.sessions[0]).id)).health, "unavailable");
-    assert.equal(
-      (await observer.inspect(must(snapshot.sessions[1]).id)).health,
-      "available",
-      "healthy pane remains inspectable through fresh default libproc revalidation",
-    );
-    assert.equal(inspected, 1, "only the healthy selected pane reaches transcript inspection");
   }
 }, 30000);

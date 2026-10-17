@@ -12,11 +12,34 @@ import net from "node:net";
 import { spawn } from "node:child_process";
 import { makeFooterConfigurationReader, makeIdentityRpc } from "./index.js";
 import { object, result } from "./types.js";
-import type { IdentityExecute } from "./types.js";
+import type { IdentityOptions } from "./types.js";
 import { makeIdentityResolver } from "./index.js";
 import type { FooterMode, IdentityRpc, RefreshState } from "./types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
+
+test("closed resolver rejects capture entry before socket or configuration work", async () => {
+  let calls = 0;
+  const resolver = makeIdentityResolver({
+    now: () => 1,
+    readConfiguration: async () => {
+      calls++;
+      return Promise.resolve("configured");
+    },
+    readProcessBirth: () => {
+      return Promise.reject(Error("must not read"));
+    },
+    rpc: async () => {
+      calls++;
+      return Promise.resolve({});
+    },
+  });
+  await resolver.close();
+  await resolver.close();
+  assert.equal((await resolver.resolve({ agent: "codex" })).source, "unavailable");
+  assert.equal(await resolver.revalidate({}), false);
+  assert.equal(calls, 0);
+});
 
 test("observer-identity regression contracts", async () => {
   const A = "00000000-0000-0000-0000-000000000001",
@@ -487,28 +510,26 @@ test("observer-identity regression contracts", async () => {
         },
       });
     };
-    const createResolver = (execute?: IdentityExecute) =>
+    const createResolver = (readProcessBirth: IdentityOptions["readProcessBirth"]) =>
       makeIdentityResolver({
         now: () => 1000,
         endpoint: "/isolated/native.sock",
         readConfiguration: async () => Promise.resolve("configured"),
         rpc,
-        execute,
+        readProcessBirth,
       });
-    // Exercise structured PID evidence and executable/deadline failures at the default reader boundary.
+    // Exercise capture-local evidence and refresh-wide capability failure through the injected reader.
     for (const evidence of [
       null,
       { pid: 0, startSeconds: 1, startMicroseconds: 0 },
       { pid: child.pid, startSeconds: 0, startMicroseconds: 0 },
     ]) {
-      const reader = createResolver(async (_command, args) =>
-        Promise.resolve({
-          stdout: JSON.stringify(
-            Number(args.at(-1)) === child.pid
-              ? evidence
-              : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
-          ),
-        }),
+      const reader = createResolver(async (pid) =>
+        Promise.resolve(
+          pid === child.pid
+            ? evidence
+            : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
+        ),
       );
       const refresh: RefreshState = {};
       assert.equal((await reader.resolve(at(panes, 0), refresh)).source, "unavailable");
@@ -521,14 +542,12 @@ test("observer-identity regression contracts", async () => {
     }
     for (const code of ["ENOENT", "ETIMEDOUT"]) {
       let failed = true;
-      const reader = createResolver(async (_command, args) => {
+      const reader = createResolver(async (pid) => {
         if (failed) throw Object.assign(Error("Birth reader unavailable"), { code });
         return Promise.resolve({
-          stdout: JSON.stringify({
-            pid: Number(args.at(-1)),
-            startSeconds: 1,
-            startMicroseconds: 0,
-          }),
+          pid,
+          startSeconds: 1,
+          startMicroseconds: 0,
         });
       });
       const refresh: RefreshState = {};

@@ -34,7 +34,12 @@ export class Lifecycle {
   }
   private closeAdapters() {
     const { bus, helpers } = this.state.options;
-    return Promise.all([this.state.sqlite?.close(), bus?.close?.(), helpers?.close?.()]);
+    return Promise.all([
+      this.state.sqlite?.close(),
+      bus?.close?.(),
+      helpers?.close?.(),
+      this.state.identities.close?.(),
+    ]);
   }
   controlTarget(paneId: string) {
     const proof = this.state.controlTargets.get(paneId);

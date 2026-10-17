@@ -20,6 +20,8 @@ function native(pane: Record<string, unknown>): IdentityResolution {
     : unavailable("native-unavailable");
 }
 class IdentityResolver {
+  private closed = false;
+  private readonly birthClient;
   private readonly footerOwned = new Set<unknown>();
   private readonly capture: Capture["capture"];
   private readonly readConfiguration: () => Promise<FooterMode>;
@@ -35,14 +37,19 @@ class IdentityResolver {
     const rpc = options.rpc || makeIdentityRpc(endpoint);
     this.readConfiguration =
       options.readConfiguration || makeFooterConfigurationReader({ execute: options.execute });
+    this.birthClient = options.readProcessBirth ? null : makeProcessBirthReader({ endpoint });
     const readProcessBirth =
-      options.readProcessBirth || makeProcessBirthReader({ execute: options.execute, endpoint });
-    this.capture = new Capture({
+      options.readProcessBirth ??
+      ((pid: number) =>
+        this.birthClient?.read(pid) ?? Promise.reject(new Error("Process birth unavailable")));
+    const capture = new Capture({
       rpc,
       readConfiguration: this.readConfiguration,
       readProcessBirth,
       now,
     }).capture;
+    this.capture = (terminal, state) =>
+      this.closed ? Promise.resolve(unavailable("footer-unavailable")) : capture(terminal, state);
     this.revalidateAll = makeRevalidation(this.capture);
   }
   private async footer(pane: Record<string, unknown>, refresh: Refresh) {
@@ -58,6 +65,7 @@ class IdentityResolver {
     return terminal ? this.capture(terminal, refresh.state) : unavailable("terminal-unavailable");
   }
   resolve = async (value: unknown, refreshState?: RefreshState): Promise<IdentityResolution> => {
+    if (this.closed) return unavailable("footer-unavailable");
     const pane = object(value),
       refresh = new Refresh(refreshState);
     if (pane.agent !== "codex") return native(pane);
@@ -86,6 +94,10 @@ class IdentityResolver {
     for (const id of this.footerOwned)
       if (typeof id !== "string" || !panes.has(id)) this.footerOwned.delete(id);
   };
+  close = () => {
+    this.closed = true;
+    return this.birthClient?.close() ?? Promise.resolve();
+  };
 }
 export function makeIdentityResolver(options: IdentityOptions = {}) {
   const resolver = new IdentityResolver(options);
@@ -95,5 +107,6 @@ export function makeIdentityResolver(options: IdentityOptions = {}) {
     revalidate: resolver.revalidate,
     revalidateAll: resolver.revalidateAll,
     retain: resolver.retain,
+    close: resolver.close,
   };
 }
