@@ -652,35 +652,44 @@ test("helpers joining a resting parent consume their lag and regroup in a clear 
   }
   const ordered = helpers.map((actor) => ({ actor, depth: 1 })),
     admitted = present(parent.formation).targets;
-  let searches = 0;
-  const values = graph.cells.values.bind(graph.cells);
-  graph.cells.values = () => {
-    searches++;
-    return values();
+  let cellScans = 0;
+  const iterator = graph.cells[Symbol.iterator];
+  graph.cells[Symbol.iterator] = () => {
+    cellScans++;
+    return iterator.call(graph.cells);
   };
-  for (let now = 30100; now <= 34000; now += 100) {
-    const assignments = new FormationPlanner(parent, ordered, graph, stale).plan();
-    assert.equal(
-      present(parent.formation).targets,
-      admitted,
-      "unchanged held footprint reuses one bounded proposal",
+  try {
+    assert(
+      pathTo(graph, present(helpers[0]).point, present(helpers[1]).point).length > 0,
+      "positive control finds a route between settled helpers",
     );
-    for (const actor of helpers)
-      actor.animate({
-        now,
-        elapsed: 100,
-        graph,
-        parent,
-        assignment: present(assignments.find((a) => a.actor === actor)),
-        following: true,
-      });
+    assert(cellScans > 0, "positive control observes grid route work");
+    cellScans = 0;
+    for (let now = 30100; now <= 34000; now += 100) {
+      const assignments = new FormationPlanner(parent, ordered, graph, stale).plan();
+      assert.equal(
+        present(parent.formation).targets,
+        admitted,
+        "unchanged held footprint reuses one bounded proposal",
+      );
+      for (const actor of helpers)
+        actor.animate({
+          now,
+          elapsed: 100,
+          graph,
+          parent,
+          assignment: present(assignments.find((a) => a.actor === actor)),
+          following: true,
+        });
+    }
+    assert.equal(
+      cellScans,
+      0,
+      "held proposal and completed paths perform no repeated grid route search",
+    );
+  } finally {
+    graph.cells[Symbol.iterator] = iterator;
   }
-  assert.equal(
-    searches,
-    0,
-    "held proposal and completed paths perform no repeated grid route search",
-  );
-  graph.cells.values = values;
   const first = present(helpers[0]),
     before = { ...first.point },
     arc = parent.arc;
