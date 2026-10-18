@@ -68,11 +68,7 @@ async function hoverTitle(page: Page) {
   assert.ok(title);
   return title;
 }
-test("native canvas clicks toggle immediately and double-click retains the first target", async () => {
-  const root = consumerRoot();
-  const http = (await import(
-    pathToFileURL(path.join(root, "dist/runtime/src/server/http.js")).href
-  )) as HttpModule;
+async function nativeCanvas(browser: Browser, root: string, http: HttpModule) {
   const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
   const marker = "framePaint = new FramePaint(this);";
   assert.equal(
@@ -84,7 +80,6 @@ test("native canvas clicks toggle immediately and double-click retains the first
     marker,
     "framePaint = (window.__view = this, new FramePaint(this));",
   );
-  const browser = await chromium.launch({ headless: true });
   const fixture = await listen(http, {
     token: TOKEN,
     observer: {
@@ -105,12 +100,14 @@ test("native canvas clicks toggle immediately and double-click retains the first
       inspect: () => ({ health: "unavailable", turns: [] }),
     },
   });
+  let canvasPage: Page | undefined;
   try {
     assert.equal(browser.version(), "156.0.8078.4");
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
       reducedMotion: "reduce",
     });
+    canvasPage = page;
     const errors = observeErrors(page);
     await page.route("**/app/main.js", (route) =>
       route.fulfill({ body: injected, contentType: "text/javascript" }),
@@ -220,7 +217,7 @@ test("native canvas clicks toggle immediately and double-click retains the first
     );
     assert.deepEqual(errors, []);
   } finally {
-    await browser.close();
+    await canvasPage?.close();
     fixture.server.closeAllConnections();
     await new Promise<void>((resolve) =>
       fixture.server.close(() => {
@@ -228,7 +225,7 @@ test("native canvas clicks toggle immediately and double-click retains the first
       }),
     );
   }
-}, 30000);
+}
 function signBodyOverlap(targets: Awaited<ReturnType<typeof paintedTargets>>) {
   for (const sign of targets.signs)
     for (const body of targets.bodies) {
@@ -353,6 +350,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
+    await nativeCanvas(browser, root, http);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -370,6 +368,7 @@ async function runBrowserConsumer(root: string) {
     await expect(page.locator("#counts")).toContainText("Last known", { timeout: 10000 });
     stale = false;
     await packAndControls(browser, http, root, artifacts);
+    await hostTabs(browser, http);
     assert.equal((await page.request.get(fixture.url + "/api/observer/sessions")).status(), 403);
     assert.equal(
       await page.evaluate(() =>
@@ -385,10 +384,12 @@ async function runBrowserConsumer(root: string) {
       playwright: "1.64.1",
       chromium: browser.version(),
       canvas: true,
+      nativeCanvasClicks: true,
       prepaint: ["starnet", "synthetic-private"],
       fixtureControls: true,
       staleProof: true,
       panelsAndFocus: true,
+      hostTabs: true,
       screenshotContext:
         "Fresh 1440x1000 contexts, reduced motion, no stored preferences; capture before interactions after fonts and paint. Fixture adds empty remote dock; old baseline differs in geometry and FX, so no exact pixel-parity claim.",
       ui: true,
@@ -417,19 +418,14 @@ test("installed emitted application operates in real Chromium", async () => {
   await runBrowserConsumer(consumerRoot());
 }, 60000);
 
-test("host tabs retain native focus and activation across polls", async () => {
-  const root = consumerRoot();
-  const http = (await import(
-    pathToFileURL(path.join(root, "dist/runtime/src/server/http.js")).href
-  )) as HttpModule;
-  const browser = await chromium.launch({ headless: true });
+async function hostTabs(browser: Browser, http: HttpModule) {
   const fixture = await listen(http, {
     token: TOKEN,
     observer: { get: snapshot, inspect: () => ({ health: "unavailable", turns: [] }) },
   });
+  let page: Page | undefined;
   try {
-    assert.equal(browser.version(), "156.0.8078.4");
-    const page = await browser.newPage({ reducedMotion: "reduce" });
+    page = await browser.newPage({ reducedMotion: "reduce" });
     await page.goto(fixture.url);
     const remote = page.locator('#host-tabs [data-host="remote"]');
     await expect(remote).toBeVisible();
@@ -481,7 +477,7 @@ test("host tabs retain native focus and activation across polls", async () => {
     await expect(remote).toHaveAttribute("aria-selected", "true");
     assert.equal(await page.locator("html").getAttribute("data-host-writes"), "2");
   } finally {
-    await browser.close();
+    await page?.close();
     fixture.server.closeAllConnections();
     await new Promise<void>((resolve) =>
       fixture.server.close(() => {
@@ -489,7 +485,7 @@ test("host tabs retain native focus and activation across polls", async () => {
       }),
     );
   }
-}, 15000);
+}
 
 async function panel(page: Page) {
   await page.locator(".row-inspect").first().click();

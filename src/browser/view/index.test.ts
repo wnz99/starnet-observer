@@ -2630,8 +2630,8 @@ test("observer-view regression contracts", async () => {
         .digest("hex");
     // Characterization of the pre-theme literal painter (HEAD 196d86d), recorded with this exact scenario set, plus two
     // additive passes only (no upstream entry changed or removed): the blocked-agent "!" marker and idle resting sparks.
-    // T4 adds all-zoom dots after plates and per-agent repository colors.
-    const HEAD_DEFAULT = "303b70007236327f3cbce87dc3d5ed8155674d6f72156df4130be69dbc2928c3";
+    // T4 adds all-zoom dots after plates and computed per-agent repository colors.
+    const HEAD_DEFAULT = "4319e56232bd650ad4e3c958de401080a40ac0ff73d5652ff06c51e3315ba59a";
     const omitted = record(undefined).result;
     assert.equal(
       digest(omitted),

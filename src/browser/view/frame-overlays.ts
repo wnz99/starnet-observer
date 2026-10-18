@@ -7,24 +7,6 @@ const REPOSITORY_RING = { glowRadius: 40, glowAlpha: 0.4, workingWidth: 3, width
 const FOCUS_RING = { period: 450, radius: 0.55, width: 2 };
 const PLATFORM_RING = { height: 0.02 };
 const HOST_RING = { minimumZoom: 0.25, period: 700, height: 2.4 };
-const AGENT_COLORS = [
-  "#ff7979",
-  "#78d5ff",
-  "#ffe477",
-  "#bf9aff",
-  "#7de29b",
-  "#ffae70",
-  "#ed97d8",
-  "#70e0d4",
-  "#b5c6ff",
-  "#d3e878",
-  "#f58eaa",
-  "#b9ddd0",
-  "#c9a97e",
-  "#91b875",
-  "#d6b6e7",
-  "#e8d1a3",
-];
 
 export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   private readonly agentColors = new Map<string, string>();
@@ -34,9 +16,7 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
     const existing = this.agentColors.get(id);
     if (existing) return existing;
     const index = this.agentColors.size,
-      color =
-        AGENT_COLORS[index] ??
-        `hsl(${String(((index - AGENT_COLORS.length) * 137.507764 + 7.5) % 360)} 70% 65%)`;
+      color = `hsl(${String((index * 137.507764 + 7.5) % 360)} 70% 65%)`;
     this.agentColors.set(id, color);
     return color;
   }
