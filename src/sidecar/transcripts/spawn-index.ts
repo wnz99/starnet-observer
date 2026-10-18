@@ -52,9 +52,11 @@ export class SpawnIndices {
     if (this.indices.size >= MAX_INDICES) {
       // Pending scans must remain tracked to support deduplication and shutdown. Never
       // detach work merely to admit another cold parent when all slots are busy.
-      const settled = [...this.indices].find(([, value]) => !value.promise);
-      if (!settled) return null;
-      this.indices.delete(settled[0]);
+      const settled = [...this.indices].filter(([, value]) => !value.promise);
+      const candidate =
+        settled.find(([, value]) => value.projection?.helperSpawns.size === 0) ?? settled[0];
+      if (!candidate) return null;
+      this.indices.delete(candidate[0]);
     }
     const state: IndexState = {
       projection: null,
@@ -79,7 +81,9 @@ export class SpawnIndices {
     binding?: ChildBinding | null,
   ): Promise<Projection | null> {
     const key = JSON.stringify([file, sessionId, binding?.parentSessionId || null]);
-    const state = this.indices.get(key) ?? this.admit(key);
+    const cached = this.indices.get(key);
+    const replacing = !cached && this.indices.size >= MAX_INDICES;
+    const state = cached ?? this.admit(key);
     if (!state) return unavailable();
     state.usedAt = this.now();
     const wasReady = state.ready;
@@ -88,7 +92,9 @@ export class SpawnIndices {
       .finally(() => {
         state.promise = null;
       });
-    if (wasReady) await state.promise;
+    // A cache replacement is not a new cold parent: returning bounded metadata
+    // here would repeatedly shrink and regrow the same discovered helper tree.
+    if (wasReady || replacing) await state.promise;
     return state.ready ? state.projection : null;
   }
   retain() {
