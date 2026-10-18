@@ -133,6 +133,9 @@ class ObserverMount<N extends AppNode, R extends SpriteResource, B extends R>
       refresh: () => {
         this.renderer?.refresh();
       },
+      refreshRoster: (options) => {
+        this.renderer?.refreshRoster(options);
+      },
       arrangeChanged: () => {
         this.renderer?.arrangeChanged();
       },
@@ -209,6 +212,7 @@ class ObserverMount<N extends AppNode, R extends SpriteResource, B extends R>
     const renderOwner = new AppRenderer({
       ui,
       state,
+      view: this.view,
       enabled: bootstrap.control,
       hosts: owners.hosts,
       floor: owners.floor,

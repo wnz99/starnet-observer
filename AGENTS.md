@@ -10,5 +10,6 @@
 - Preserve `--no-env-file`, `bunfig.toml` environment restrictions and child/worker environment filtering. Exported variables remain supported.
 - Package through `bun run package`; clean tracked staging excludes private packs, local configuration and generated dist. Keep production-first installed-package verification.
 - Browser checks use pinned Playwright and synthetic data. Real controls, inventories, provider calls and MCP stay outside deterministic CI.
+- Optimize UI/UX code for speed and responsiveness: give immediate input feedback, keep expensive work out of input handlers, scope updates to affected views, and profile before adding further optimization machinery.
 - Keep credentials, local MCP configuration and machine-specific state outside version control. Do not alter shared tools, optional integrations or account settings without authorization.
 - Preserve MIT LICENSE, NOTICE and bundled resource licenses. No paid/live runs, deployment, Co-Authored-By trailers or timeline estimates.

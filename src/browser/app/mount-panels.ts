@@ -134,6 +134,7 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
       now: () => options.clock.now(),
       select: (id, settings) => {
         navigationOwner.select(id, settings);
+        this.links.renderer?.refresh();
       },
       render: () => {
         this.links.renderer?.refresh();

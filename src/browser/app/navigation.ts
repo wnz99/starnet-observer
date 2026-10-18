@@ -19,6 +19,7 @@ interface NavigationOptions<N extends AppNode, R extends SpriteResource> {
   resetFloor(): void;
   scrollTo(id: string): void;
   refresh(): void;
+  refreshRoster(options: { canvas: boolean }): void;
   arrangeChanged(): void;
 }
 export class Navigation<N extends AppNode, R extends SpriteResource> {
@@ -52,12 +53,12 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     };
     on("overview", () => {
       this.overview();
-      this.options.refresh();
+      this.options.refreshRoster({ canvas: true });
     });
     // A removable chip names the zoomed platform; it and Escape both restore the overview.
     on("zoom-chip", () => {
       this.overview();
-      this.options.refresh();
+      this.options.refreshRoster({ canvas: true });
       ui.get("world").focus();
     });
     this.bindFx();
@@ -79,7 +80,7 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
         this.applyArrange({ arrangeOn: !state.arrangeOn });
       });
     this.events.on(ui.get("search"), "input", () => {
-      this.options.refresh();
+      this.options.refreshRoster({ canvas: false });
     });
     const filters = ui.document.querySelectorAll(ui.get("filters"), "button");
     for (const button of filters) {
@@ -89,7 +90,7 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
         prefs.set("filter", state.filter);
         for (const option of filters)
           option.setAttribute("aria-pressed", String(option === button));
-        this.options.refresh();
+        this.options.refreshRoster({ canvas: false });
       });
     }
   }
@@ -132,13 +133,20 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     if (state.disposed) return;
     const row = state.byId.get(id);
     if (!row) return;
+    const page = state.page;
+    const host = state.selectedHost;
     state.selected = id;
     this.selectHost(row.host || null);
     const target = state.layout.pageFor(id);
     if ((row.role !== "overseer" || row.host) && Number.isInteger(target)) this.setPage(target); // the local overseer sits on every page
-    this.options.refresh();
+    this.refreshSelection(page, host);
     view.focus(id);
     if (options.scroll) this.options.scrollTo(id);
+  }
+  private refreshSelection(page: number, host: string | null) {
+    const { state } = this.options;
+    if (state.page !== page || state.selectedHost !== host) this.options.refresh();
+    else this.options.refreshRoster({ canvas: true });
   }
   private selectHost(host: string | null) {
     const { state, prefs } = this.options;
@@ -192,7 +200,7 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     const data = state.latest?.data;
     if (!data?.sessions.some((row) => row.repoId === repoId)) return;
     state.selectedRepoId = state.selectedRepoId === repoId ? null : repoId;
-    this.options.refresh();
+    this.options.refreshRoster({ canvas: true });
   }
   dispose() {
     this.events.dispose();
