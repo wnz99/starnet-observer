@@ -38,12 +38,10 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
     const size = this.view.plates.signSize(
       options.tier === "overview" ? PLATFORM_SIGN.overviewSize : PLATFORM_SIGN.size,
     );
-    const listed = this.view.overflowByPlatform.get(platform.key);
     const label = this.view.plates.clipText(
       (platform.name || "Unassigned").toUpperCase() +
         (platform.annex ? ` +${String(platform.annex)}` : "") +
         ` · ${String(this.view.platformCounts.get(platform.key) || 0)}` +
-        (listed ? ` · +${String(listed)} listed` : "") +
         (platform.relay ? " · ⇄ relay" : ""),
       this.view.viewport.width * PLATFORM_SIGN.widthRatio,
       size,

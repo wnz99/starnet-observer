@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: UI responsiveness
-status: "Implementation and review complete; PR #19 pending final tracking-head verification and merge."
-last_updated: "2026-10-18T18:58:00+00:00"
-last_activity: 2026-10-18
-last_activity_desc: "UI responsiveness reviewed clean; 256 native tests, installed/browser consumers and source Ubuntu CI passed."
-state_head: 422a3230737052bb9d6b4e49b2ea1bbbb3c94f5d
-stopped_at: "PR #19 implementation reviewed; final tracking-head checks and merge pending"
+current_phase_name: Helper crew consistency
+status: "Implementation and review complete; PR #20 pending final tracking-head verification and merge."
+last_updated: "2026-10-18T21:44:40+00:00"
+last_activity: 2026-10-19
+last_activity_desc: "Helper crew consistency reviewed clean; 269 native tests, installed/browser consumers and source Ubuntu CI passed."
+state_head: 9f46b378271338e53ae8e77c5705e7d015406383
+stopped_at: "PR #20 implementation reviewed; final tracking-head checks and merge pending"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** UI responsiveness, native clicks and agent indicators, quick task 261018-q7j.
+**Current focus:** Helper visibility, formation, quarters and truthful crew statistics, quick task 261018-wb7.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: UI responsiveness implementation and independent aggregate/initial PR review complete; plan conformance CONFORMANT. PR #19 awaits final tracking-head verification and merge.
-Last activity: 2026-10-18 — Native click grouping, retained host controls, visible status dots, stable identity rings and narrower local refresh. Source gate passed 256 native tests plus installed/browser consumers; source Ubuntu CI passed.
+Status: Helper crew consistency implementation and independent aggregate/initial PR review complete; plan conformance found no gaps. PR #20 awaits final tracking-head verification and merge.
+Last activity: 2026-10-19 — Displayed-crew parity, sustained formation, per-room quarters, evidence-based lifecycle and truthful history/usage labels. Source gate passed 269 native tests plus production-first installed/browser consumers; source Ubuntu CI 39168106447 passed.
 
 ## Registered Work
 
@@ -56,6 +56,7 @@ Last activity: 2026-10-18 — Native click grouping, retained host controls, vis
 | 261015-vnn | Sync PR 9 and fix arrangement preferences and courier bugs | 2026-10-15 | [PR #9](https://github.com/wnz99/starnet-observer/pull/9) | Complete; merged | [261015-vnn-sync-pr-9-with-main-preserving-existing-](./quick/261015-vnn-sync-pr-9-with-main-preserving-existing-/) |
 | 261015-vtr | Sync PR 10 and fix helper index lineage proof bugs | 2026-10-15 | [PR #10](https://github.com/wnz99/starnet-observer/pull/10) | Complete; merged | [261015-vtr-sync-pr-10-and-fix-helper-index-lineage-](./quick/261015-vtr-sync-pr-10-and-fix-helper-index-lineage-/) |
 | 261015-vno | Sync PR 11 and fix host, relay and mail defects | 2026-10-15 | [PR #11](https://github.com/wnz99/starnet-observer/pull/11) | Complete; verified; independent final review clean | [261015-vno](./quick/261015-vno-sync-pr-11-with-main-preserving-existing/) |
+| 261018-wb7 | Helper visibility, formation, quarters and truthful crew statistics | 2026-10-19 | [PR #20](https://github.com/wnz99/starnet-observer/pull/20) | Implementation/review complete; 269 native tests, production-first installed/browser consumers and source Ubuntu CI passed; final tracking-head checks and merge pending | [261018-wb7](./quick/261018-wb7-helper-visibility-formation-quarters-and/) |
 
 ## Accumulated Context
 
@@ -76,10 +77,10 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 
 ## Session Continuity
 
-Last session: 2026-10-18
-Current work: UI responsiveness implementation and review complete; PR #19 records delivery progress.
-Resume file: [UI responsiveness summary](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/261018-q7j-SUMMARY.md)
-Next action: Verify the final tracking head locally and in configured CI, review the tracking delta, then merge PR #19 after all gates pass. No paid/live runs or optional external settings.
+Last session: 2026-10-19
+Current work: Helper crew consistency implementation and review complete; PR #20 records delivery progress.
+Resume file: [Helper crew consistency summary](./quick/261018-wb7-helper-visibility-formation-quarters-and/261018-wb7-SUMMARY.md)
+Next action: Verify the final tracking head locally and in configured CI, review the tracking delta, then merge PR #20 after all gates pass. Original live snapshot remains unavailable; no paid/live runs or optional external settings.
 
 ### Registered Work
 

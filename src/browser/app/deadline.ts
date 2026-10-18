@@ -8,6 +8,7 @@ function observationTimes(data: AppSnapshot) {
     data.observedAt,
     sources?.herdr?.observedAt,
     sources?.desktop?.observedAt,
+    ...Object.values(sources?.hosts ?? {}).map((source) => source.observedAt),
     ...data.sessions.flatMap((row) => [row.observedAt, row.tool?.observedAt]),
     data.aggregate?.usageObservedAt,
   ];

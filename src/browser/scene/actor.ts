@@ -57,12 +57,18 @@ export class ActorState implements Actor {
   targetKey?: string | null;
   assignment?: string | null;
   formation?: Formation | null;
+  settled: "entering" | "returning" | undefined;
+  setLifecycle(path: Point[], settled: ActorFrame["settled"]) {
+    this.path = path;
+    this.settled = settled;
+  }
   constructor(
     public worker: Worker,
     now: number,
     hash: number,
   ) {
-    this.point = { ...worker.chair };
+    const start = worker.helperPhase === "entering" ? worker.quartersEntry : worker.chair;
+    this.point = { ...(start ?? worker.chair) };
     this.due = now + MOTION.delay + (hash % MOTION.initialJitter);
   }
   clearFollow() {
@@ -140,10 +146,12 @@ export class ActorState implements Actor {
     return target !== null && target.arc > (this.cursor ?? -Infinity) && this.targetKey !== key;
   }
   observeFreeze(stale: Stale, parent: Actor | undefined) {
+    const transient =
+      this.worker.helperPhase === "entering" || this.worker.helperPhase === "returning";
     this.frozen =
       isStale(this.worker, stale) ||
-      (Number.isFinite(this.depth) && !!parent?.frozen) ||
-      closed(this.worker);
+      (!transient && Number.isFinite(this.depth) && !!parent?.frozen) ||
+      (this.worker.helperPhase !== "returning" && closed(this.worker));
   }
   private followPath(
     parent: Actor,
@@ -181,14 +189,16 @@ export class ActorState implements Actor {
   }
   reconcileWorker(worker: Worker, options: { geometryChanged: boolean; reduced: boolean }) {
     const reparented = this.worker.parentId !== worker.parentId;
+    const changedPhase = this.worker.helperPhase !== worker.helperPhase;
     this.worker = worker;
-    if (options.geometryChanged || reparented) {
+    if (options.geometryChanged || reparented || changedPhase) {
+      this.settled = undefined;
       this.path = [];
       this.trail = [];
       this.arc = 0;
       this.clearFollow();
     }
-    if (options.reduced) {
+    if (options.reduced && !worker.helperPhase) {
       this.point = { ...worker.chair };
       this.path = [];
       this.trail = [];
@@ -241,12 +251,14 @@ export class ActorState implements Actor {
   }
   private chooseIntent(input: ActorMotionFrame) {
     const { now, graph, parent, assignment, following } = input;
+    if (this.worker.helperPhase === "entering" || this.worker.helperPhase === "returning") return;
     if (atDesk(this.worker) || (this.worker.kind === "helper" && !following))
       this.returnHome(graph);
     else if (following && parent && assignment) this.follow(parent, graph, assignment);
     else if (graph) this.roam(graph, now);
   }
   private continueFollow(input: ActorMotionFrame) {
+    if (this.worker.helperPhase === "entering" || this.worker.helperPhase === "returning") return;
     const { following, parent, graph, assignment } = input;
     if (following && parent && assignment) this.follow(parent, graph, assignment);
   }
@@ -268,18 +280,21 @@ export class ActorState implements Actor {
     };
     return 0;
   }
+  private pose(reduced: boolean) {
+    if (this.frozen) return "idle";
+    if (!reduced && this.path.length > 0) return "walk";
+    if (this.worker.helperPhase === "returning") return "idle";
+    if (this.worker.row.status === "working") return "working";
+    return this.worker.row.status === "blocked" ? "waiting" : "idle";
+  }
   frame(reduced: boolean): ActorFrame {
-    let pose = "idle";
-    if (!this.frozen) {
-      if (!reduced && this.path.length > 0) pose = "walk";
-      else if (this.worker.row.status === "working") pose = "working";
-      else if (this.worker.row.status === "blocked") pose = "waiting";
-    }
+    const pose = this.pose(reduced);
     return {
       id: this.worker.id,
       point: { ...this.point },
       pose,
       direction: pose === "working" || pose === "waiting" ? "south" : this.direction,
+      ...(!this.frozen && this.settled ? { settled: this.settled } : {}),
     };
   }
 }

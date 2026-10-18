@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "bun:test";
 import { createRowFormat } from "./format.js";
+import { hoverLabel } from "../model/description.js";
 import type { DisplayRow, LayoutRow } from "../model/types.js";
 
 const row = (id: string, fields: DisplayRow = {}): LayoutRow => ({ id, ...fields });
@@ -137,12 +138,30 @@ test("helper status and closure require their own positive evidence", () => {
     format.sourceNote({ source: "desktop", parentId: null }),
     "App window · loaded UI only",
   );
-  assert.equal(format.sourceNote(helper), "Helper · link unknown");
+  assert.equal(format.sourceNote(helper), "Helper · relationship unknown · native pane observed");
   assert.equal(
     format.sourceNote({ ...helper, lineageState: "verified" }),
-    "Helper · link verified",
+    "Helper · relationship verified · native pane observed",
   );
   assert.equal(format.sourceNote({}), "");
+});
+
+test("helper relationship evidence never implies confirmed running presence", () => {
+  const { format } = setup();
+  const helper: DisplayRow = { source: "helper", lineageState: "verified", status: "idle" };
+  assert.equal(
+    format.sourceNote(helper),
+    "Helper · relationship verified · running presence unconfirmed",
+  );
+  assert.match(hoverLabel(helper), /relationship verified · running presence unconfirmed/);
+  assert.match(
+    hoverLabel({ ...helper, lifecycleEvidence: { state: "closed", reason: "killed" } }),
+    /relationship verified · killed/,
+  );
+  assert.match(
+    hoverLabel({ ...helper, source: "herdr", parentId: "parent" }),
+    /relationship verified · native pane observed/,
+  );
 });
 
 test("lineage order follows exact parents before orphan and cycle fallback", () => {

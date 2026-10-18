@@ -37,6 +37,7 @@ const HULL = {
 };
 const DEPTH = { connector: 40, hub: 0.01 };
 const TETHER = { alpha: 0.6, width: 1.5, dash: [4, 4] };
+const QUARTERS = { alpha: 0.18, middle: 2, font: "9px monospace", label: "QUARTERS" };
 interface StaticPiece {
   key: number;
   paint: () => void;
@@ -108,6 +109,7 @@ class StationFloor<R extends SpriteResource> {
         key: center(platform.rect).x + center(platform.rect).y,
         paint: () => {
           this.art.deck(this.context, platform);
+          this.quarters(platform);
         },
       })),
       ...this.scene.walkways.map((walkway) => this.walkway(walkway)),
@@ -136,6 +138,24 @@ class StationFloor<R extends SpriteResource> {
       },
     ];
     return pieces;
+  }
+  private quarters(platform: Platform) {
+    const quarters = platform.quarters.rect;
+    this.geometry.poly(
+      rectPoly(quarters, 0),
+      withAlpha(platform.accent, QUARTERS.alpha),
+      platform.accent,
+    );
+    const label = project({
+      x: quarters.x + quarters.w / QUARTERS.middle,
+      y: quarters.y + quarters.h / QUARTERS.middle,
+    });
+    this.context.save();
+    this.context.fillStyle = platform.accent;
+    this.context.font = QUARTERS.font;
+    this.context.textAlign = "center";
+    this.context.fillText(QUARTERS.label, label.x, label.y);
+    this.context.restore();
   }
   private walkway(walkway: Walkway): StaticPiece {
     const r = walkway.rect,

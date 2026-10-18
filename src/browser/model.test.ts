@@ -111,7 +111,7 @@ test("original model source-aware desktop and helper labels", () => {
       fresh,
       4000,
     ),
-    "Codex — Ada · task unavailable · unknown · last observed 3s ago",
+    "Codex — Ada · task unavailable · unknown · relationship unknown · running presence unconfirmed · last observed 3s ago",
   );
 });
 test("original model authoritative group-only root", () => {
@@ -304,11 +304,14 @@ test("partial helper evidence keeps observed names, task fallback and optional t
     lifecycleEvidence: { state: "closed" },
     tool: { available: true, last: { name: "Read", phase: "running", at: 1 } },
   };
-  assert.equal(Model.hoverLabel(row, fresh, 1000), "Codex — Helper · Fix tests · idle");
+  assert.equal(
+    Model.hoverLabel(row, fresh, 1000),
+    "Codex — Helper · Fix tests · idle · relationship unknown · closed",
+  );
   assert.equal(Model.activity(row), "Last observed: reading files · result not yet observed");
   const unavailable: LayoutRow = { ...row, taskEvidence: null, lifecycleEvidence: null };
   assert.equal(
     Model.hoverLabel(unavailable, fresh, 1000),
-    "Codex — Helper · task unavailable · idle",
+    "Codex — Helper · task unavailable · idle · relationship unknown · running presence unconfirmed",
   );
 });

@@ -64,11 +64,15 @@ export interface Platform {
   entry: { point: Point; edge: string };
   sign: Point;
   helperStations?: Rect[];
+  quarters: { rect: Rect; entry: Point };
 }
+export type HelperPhase = "entering" | "present" | "returning";
 export interface Worker {
   id: string;
   row: LayoutRow & { shadow?: boolean };
   kind: "session" | "helper";
+  helperPhase?: HelperPhase;
+  quartersEntry?: Point;
   parentId: string | null | undefined;
   rootId?: string | undefined;
   helperSlot?: number | null | undefined;

@@ -36,7 +36,15 @@ const sourceNote = (row: DisplayRow) =>
   row.source === "desktop"
     ? "App window · loaded UI only"
     : isHelper(row)
-      ? "Helper · link " + (row.lineageState || "unknown")
+      ? "Helper · relationship " +
+        (row.lineageState || "unknown") +
+        (row.source === "helper"
+          ? row.lifecycleEvidence?.state === "closed" || row.lineageState === "closed"
+            ? row.lifecycleEvidence?.reason === "killed"
+              ? " · killed"
+              : " · closed"
+            : " · running presence unconfirmed"
+          : " · native pane observed")
       : "";
 // Rows whose task line is composed here rather than the Herdr title as published.
 const composedTask = (row: DisplayRow): boolean => isHelper(row) || row.source === "desktop";

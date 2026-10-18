@@ -167,6 +167,7 @@ class ObserverMount<N extends AppNode, R extends SpriteResource, B extends R>
     const floorOwner = new Floor({
       state,
       view,
+      refresh: () => this.renderer?.refresh(),
       now: () => options.clock.now(),
       frame: () => options.clock.frame(),
       mailFrame: (now) => couriers.frame(now),

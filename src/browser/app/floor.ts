@@ -1,10 +1,11 @@
-import { build, relayNetworks, shadowRows } from "../scene/index.js";
+import { build, relayNetworks, shadowRows, representedRows } from "../scene/index.js";
 import type { RemoteHost, Scene, RelayNetwork } from "../scene/types.js";
 import { record } from "../theme/validation.js";
 import type { MailFrame } from "../view/types.js";
 import type { AppView } from "./contracts.js";
 import type { AppBus, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppState } from "./state.js";
+import { HelperPresentation } from "./helper-presentation.js";
 
 interface FloorOptions {
   state: AppState;
@@ -17,6 +18,7 @@ interface FloorOptions {
   showZoom(key: string): void;
   overview(): void;
   setPage(page: number): void;
+  refresh(): void;
 }
 const MINUTE_MS = 60000;
 type ShadowRow = ReturnType<typeof shadowRows>[number];
@@ -39,13 +41,39 @@ function geometryField(name: string, value: unknown) {
 /* llm-bus relays come from each observed bus's own binding. Each unobserved machine on a relay becomes a shadow ship
    of ghost crew from the relay roster: on the floor only, never in byId, so nothing selects, inspects or controls it. */
 export class Floor {
+  displayedRows: AppRow[] = [];
   readonly shadows = new Map<string, ShadowRow>();
   readonly relayMembers = new Map<string, RelayMember>();
   private sceneKey: string | null = null;
   private contentKey: string | null = null;
-  constructor(private readonly options: FloorOptions) {}
+  private readonly presentation: HelperPresentation;
+  private candidates: AppRow[] = [];
+  private presentationKey = "";
+  private generation = 0;
+  private resumedAt: number | null = null;
+  constructor(private readonly options: FloorOptions) {
+    this.presentation = new HelperPresentation(options.state);
+  }
+  observe(snapshot: AppQuerySnapshot) {
+    if (this.resumedAt !== this.options.state.resumedAt) {
+      this.resumedAt = this.options.state.resumedAt;
+      this.reset();
+    }
+    this.candidates = this.presentation.reconcile(snapshot.data?.sessions ?? [], {
+      snapshot,
+      now: this.options.now(),
+    });
+    const key = JSON.stringify(
+      this.candidates.map((row) => [row.id, this.presentation.phase(row.id)]),
+    );
+    const changed = key !== this.presentationKey;
+    this.presentationKey = key;
+    return changed;
+  }
   reset() {
     this.sceneKey = null;
+    this.generation++;
+    this.presentation.reset();
   }
   private relays(buses: [string | null, AppBus | null][]) {
     const nets = relayNetworks(buses, this.options.now());
@@ -106,7 +134,6 @@ export class Floor {
   ) {
     const { state } = this.options;
     state.layout.reconcile([...rows.filter((row) => row !== overseer), ...ghosts]);
-    if (state.selected && !state.byId.has(state.selected)) this.options.overview();
     if (hasData && state.page >= state.layout.pages())
       this.options.setPage(state.layout.pages() - 1);
     const first = rows[0];
@@ -138,10 +165,23 @@ export class Floor {
   }
   private update(scene: Scene) {
     const { state, view } = this.options;
+    const generation = ++this.generation;
+    const rowStale = (id: string) => {
+      const raw = state.byId.get(id);
+      return raw
+        ? state.rowStale(raw)
+        : !state.latest ||
+            (this.presentation.returnStale(id, state.latest, this.options.now()) ?? true);
+    };
     // Row freshness is read from the current roster by id: the cached scene's row objects can be older.
     view.update(scene, {
       stale: () => state.isStale(),
-      rowStale: (worker) => state.rowStale(state.byId.get(worker.id)),
+      rowStale: (worker) => rowStale(worker.id),
+      onHelperSettled: (id, phase) => {
+        if (generation !== this.generation || state.disposed || !state.active || rowStale(id))
+          return;
+        if (this.presentation.settle(id, phase)) this.options.refresh();
+      },
       mailFrame: (now) => this.options.mailFrame(now),
       inspected: () => this.options.inspected(),
       repositorySelection: () => state.selectedRepoId,
@@ -196,31 +236,73 @@ export class Floor {
     ];
     return this.relays(buses);
   }
+  private crew(rows: AppRow[], overseer: AppRow | null) {
+    const { state } = this.options;
+    const observed = (ids: readonly string[]) => {
+      const represented = new Set(ids);
+      return rows.filter((row) => represented.has(row.id));
+    };
+    this.displayedRows = observed([
+      ...representedRows(state.layout.allRooms()).map((row) => row.id),
+      ...(overseer ? [overseer.id] : []),
+    ]);
+    if (state.selected && !this.displayedRows.some((row) => row.id === state.selected))
+      this.options.overview();
+    return observed(state.scene?.workers.map((worker) => worker.id) ?? []);
+  }
+  private settleOffPage(snapshot: AppQuerySnapshot) {
+    const { state } = this.options;
+    const onPage = new Set(representedRows(state.layout.onPage(state.page)).map((row) => row.id));
+    const changed = this.presentation.settleOffPage(onPage);
+    if (changed) this.observe(snapshot);
+    return changed;
+  }
+  private phases(scene: Scene) {
+    for (const worker of scene.workers) {
+      const phase = this.presentation.phase(worker.id);
+      if (phase && worker.kind === "helper" && worker.row.source === "helper") {
+        worker.helperPhase = phase;
+        const platform = scene.platforms.find((value) => value.key === worker.platformKey);
+        if (platform) worker.quartersEntry = platform.quarters.entry;
+      }
+    }
+  }
   render(snapshot: AppQuerySnapshot, hosts: RemoteHost[], refresh: boolean) {
     const { state, view } = this.options;
-    const data = snapshot.data;
-    const rows = data?.sessions ?? [];
+    let rows = this.candidates;
     const overseer =
       rows.find((row) => row.role === "overseer" && row.source === "herdr" && !row.host) ?? null;
     const { nets, ghosts } = this.observedRelays(snapshot, hosts);
     const sceneHosts = this.sceneHosts(hosts, nets, ghosts);
-    this.reconcile(rows, ghosts, overseer, !!data);
-    const key = this.geometryKey(hosts, overseer) + this.relayKey(sceneHosts, nets);
+    this.reconcile(rows, ghosts, overseer, !!snapshot.data);
+    if (this.settleOffPage(snapshot)) {
+      rows = this.candidates;
+      this.reconcile(rows, ghosts, overseer, !!snapshot.data);
+    }
+    const key =
+      this.geometryKey(hosts, overseer) +
+      this.relayKey(sceneHosts, nets) +
+      JSON.stringify(rows.map((row) => [row.id, this.presentation.phase(row.id)]));
     const content = this.content(snapshot);
     if (key !== this.sceneKey || !state.scene) {
       this.sceneKey = key;
       state.scene = this.buildScene(snapshot, sceneHosts, nets, overseer);
+      this.phases(state.scene);
       this.update(state.scene);
     } else if (refresh || content !== this.contentKey) view.invalidate();
     this.contentKey = content;
-    const rooms = state.layout.onPage(state.page);
-    const onFloor = rooms
-      .flatMap((room) => room.rows.map((value) => value.row))
-      .filter((row) => !("shadow" in row && row.shadow));
-    return { onFloor, floorRows: [...rows, ...ghosts] };
+    const onFloor = this.crew(rows, overseer);
+    return {
+      displayedRows: this.displayedRows,
+      onFloor,
+      floorRows: [...(snapshot.data?.sessions ?? []), ...ghosts],
+    };
   }
   dispose() {
-    this.shadows.clear();
-    this.relayMembers.clear();
+    this.generation++;
+    this.presentation.dispose();
+    this.candidates = [];
+    this.displayedRows = [];
+    for (const map of [this.shadows, this.relayMembers]) map.clear();
   }
 }

@@ -133,9 +133,30 @@ export class FormationPlanner {
       ),
     };
   }
-  private advanceGroup(proposed: Proposal[], signature: string) {
+  private settledGroup(proposed: Proposal[]) {
     const group = this.parent.formation;
-    if (group && group.signature !== signature) {
+    // A resting leader cannot advance another arc bucket. Finish the ordered lag
+    // before treating settled followers as the second clear regroup observation.
+    return (
+      group?.mode === "single" &&
+      group.streak > 0 &&
+      this.parent.path.length === 0 &&
+      proposed.every((p, i) => {
+        const target = trailTarget(this.parent, (i + 1) * FORMATION.firstLag);
+        return (
+          target &&
+          p.actor.path.length === 0 &&
+          p.actor.cursor !== null &&
+          p.actor.cursor !== undefined &&
+          p.actor.cursor >= target.arc
+        );
+      })
+    );
+  }
+  private advanceGroup(proposed: Proposal[], signature: string) {
+    const group = this.parent.formation,
+      settled = this.settledGroup(proposed);
+    if (group && (group.signature !== signature || settled)) {
       // The centre stripe fills the space between pair feet, proving the full squad envelope.
       const clear = proposed.every(
         (p) =>
@@ -161,7 +182,7 @@ export class FormationPlanner {
         group.streak = 0;
       } else if (
         group.mode === "single" &&
-        group.advance !== advance &&
+        (group.advance !== advance || settled) &&
         ++group.streak >= FORMATION.clearStreak
       )
         group.mode = "pairs";

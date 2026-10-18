@@ -15,6 +15,7 @@ export interface ActorFrame {
   point: Point;
   pose: string;
   direction: string;
+  settled?: "entering" | "returning";
 }
 export interface HistoryTarget {
   arc: number;

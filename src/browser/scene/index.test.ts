@@ -14,6 +14,367 @@ import { createModel } from "../model.js";
 import { canonicalTheme } from "../theme.fixture.js";
 import { test } from "bun:test";
 import * as Scene from "./index.js";
+import { ActorState } from "./actor.js";
+import { FormationPlanner } from "./formation.js";
+import { graphFor, safeSegment, pathTo } from "./navigation.js";
+import { revisionFor } from "./revision.js";
+
+test("each room has unobstructed reachable quarters, independent of status and lifecycle phase", () => {
+  for (const count of [1, 5, 9, 12, 20]) {
+    const layout = createModel(canonicalTheme()).createLayout();
+    layout.reconcile(
+      Array.from({ length: count }, (_, i) => ({
+        id: "quarters-root-" + String(i),
+        source: "herdr",
+        projectId: "quarters",
+        repoId: "repo-" + String(i),
+      })),
+    );
+    for (let page = 0; page < layout.pages(); page++) {
+      const scene = Scene.build(layout.onPage(page), page);
+      assert.equal(scene.platforms.length, layout.onPage(page).length);
+      for (const platform of scene.platforms) {
+        const graph = graphFor(platform),
+          quarters = platform.quarters;
+        assert(
+          [...graph.cells.values()].some(
+            (point) => point.x === quarters.entry.x && point.y === quarters.entry.y,
+          ),
+        );
+        assert(
+          graph.obstacles.every(
+            (rect) =>
+              !(
+                rect.x < quarters.rect.x + quarters.rect.w &&
+                rect.x + rect.w > quarters.rect.x &&
+                rect.y < quarters.rect.y + quarters.rect.h &&
+                rect.y + rect.h > quarters.rect.y
+              ),
+          ),
+        );
+        for (const worker of scene.workers.filter((value) => value.platformKey === platform.key)) {
+          const path = pathTo(graph, worker.chair, quarters.entry, worker);
+          assert(path.length > 0);
+          path.forEach((to, index) => {
+            assert(safeSegment(graph, index ? present(path[index - 1]) : worker.chair, to, worker));
+          });
+        }
+      }
+      const inputs = {
+        page,
+        rooms: layout.onPage(page),
+        platforms: scene.platforms,
+        observatory: scene.observatory,
+        ships: scene.ships ?? [],
+        relays: scene.relays ?? [],
+        walkways: scene.walkways,
+        workers: scene.workers,
+      };
+      assert.equal(revisionFor(inputs), scene.revision);
+      assert.notEqual(
+        revisionFor({
+          ...inputs,
+          platforms: scene.platforms.map((platform) => ({
+            ...platform,
+            quarters: { ...platform.quarters, rect: { ...platform.quarters.rect, w: 4 } },
+          })),
+        }),
+        scene.revision,
+      );
+      assert.equal(
+        revisionFor({
+          ...inputs,
+          workers: scene.workers.map((worker) => ({ ...worker, helperPhase: "returning" })),
+        }),
+        scene.revision,
+      );
+    }
+  }
+});
+
+test("helper lifecycle routes from quarters, freezes stale returns, and settles safe arrivals or impossible routes", () => {
+  const layout = createModel(canonicalTheme()).createLayout();
+  layout.reconcile([
+    { id: "lifecycle-root", source: "herdr", status: "working" },
+    {
+      id: "lifecycle-helper",
+      source: "helper",
+      parentId: "lifecycle-root",
+      lineageState: "verified",
+      status: "working",
+    },
+  ]);
+  const scene = Scene.build(layout.onPage(0), 0),
+    worker = present(scene.workers.find((value) => value.kind === "helper")),
+    platform = present(scene.platforms.find((value) => value.key === worker.platformKey)),
+    graph = graphFor(platform);
+  worker.helperPhase = "entering";
+  worker.quartersEntry = platform.quarters.entry;
+  const motion = Scene.createMovement();
+  motion.reconcile(scene, { now: 0 });
+  assert.deepEqual(
+    present(motion.step(0).find((value) => value.id === worker.id)).point,
+    platform.quarters.entry,
+  );
+  let enteringSettled = false;
+  for (let now = 100; now < 20000; now += 100) {
+    const frame = present(motion.step(now).find((value) => value.id === worker.id));
+    if (frame.settled) {
+      assert.equal(frame.settled, "entering");
+      enteringSettled = true;
+      break;
+    }
+  }
+  assert(enteringSettled);
+  const returning = {
+    ...worker,
+    helperPhase: "returning" as const,
+    row: { ...worker.row, lifecycleEvidence: { state: "closed" } },
+  };
+  scene.workers = scene.workers.map((value) => (value.id === worker.id ? returning : value));
+  motion.reconcile(scene, { now: 20000 });
+  const frozen = present(
+    motion.step(20100, { stale: true }).find((value) => value.id === worker.id),
+  );
+  assert.equal(frozen.settled, undefined);
+  assert.deepEqual(
+    present(motion.step(21100, { stale: true }).find((value) => value.id === worker.id)).point,
+    frozen.point,
+  );
+  let from = frozen.point,
+    returned = false;
+  for (let now = 21200; now <= 50000; now += 100) {
+    const frame = present(motion.step(now).find((value) => value.id === worker.id));
+    assert(safeSegment(graph, from, frame.point, returning));
+    from = frame.point;
+    if (frame.settled) {
+      assert.equal(frame.settled, "returning");
+      assert.deepEqual(frame.point, platform.quarters.entry);
+      returned = true;
+      break;
+    }
+  }
+  assert(returned);
+  // A room extended behind the canonical banks gives a real safe path longer than 30 seconds.
+  const extended = { ...platform, rect: { ...platform.rect, h: 110 } },
+    long = {
+      ...returning,
+      chair: { x: platform.rect.x + 15.5, y: platform.rect.y + 95.5, z: 0 },
+    };
+  const longScene = { ...scene, revision: "extended", platforms: [extended], workers: [long] },
+    longMotion = Scene.createMovement();
+  longMotion.reconcile(longScene, { now: 0 });
+  let previous = long.chair,
+    settledAt = 0;
+  const longGraph = graphFor(extended);
+  for (let now = 100; now <= 90000; now += 100) {
+    const frame = present(longMotion.step(now)[0]);
+    assert(safeSegment(longGraph, previous, frame.point, long));
+    previous = { ...frame.point, z: 0 };
+    if (now <= 30000) assert.equal(frame.settled, undefined);
+    if (frame.settled) {
+      settledAt = now;
+      break;
+    }
+  }
+  assert(settledAt > 30000);
+  const blocked = {
+    ...scene,
+    revision: "blocked",
+    platforms: [
+      {
+        ...platform,
+        decorationRegions: [
+          ...platform.decorationRegions,
+          {
+            kind: "wall",
+            rect: {
+              x: platform.quarters.entry.x - 0.4,
+              y: platform.quarters.entry.y - 0.4,
+              w: 0.8,
+              h: 0.8,
+            },
+          },
+        ],
+      },
+    ],
+    workers: [returning],
+  };
+  const impossible = Scene.createMovement();
+  impossible.reconcile(blocked, { now: 0 });
+  const frame = present(impossible.step(100)[0]);
+  assert.equal(frame.settled, "returning");
+  assert.deepEqual(frame.point, returning.chair);
+  const changedRoute = Scene.createMovement();
+  changedRoute.reconcile(longScene, { now: 0 });
+  const lastSafe = present(changedRoute.step(100)[0]).point;
+  changedRoute.reconcile(
+    {
+      ...longScene,
+      revision: "new-obstruction",
+      platforms: [
+        { ...extended, decorationRegions: blocked.platforms[0]?.decorationRegions ?? [] },
+      ],
+    },
+    { now: 100 },
+  );
+  const stopped = present(changedRoute.step(200)[0]);
+  assert.equal(stopped.settled, "returning");
+  assert.deepEqual(
+    stopped.point,
+    lastSafe,
+    "a geometry-induced failure settles without jumping across obstacles",
+  );
+  const reduced = Scene.createMovement();
+  reduced.reconcile(scene, { now: 0 });
+  assert.equal(
+    present(reduced.step(0, { reduced: true, stale: true }).find((value) => value.id === worker.id))
+      .settled,
+    undefined,
+  );
+  assert.equal(
+    present(reduced.step(1, { reduced: true }).find((value) => value.id === worker.id)).settled,
+    "returning",
+  );
+});
+
+test("helpers joining a resting parent consume their lag and regroup in a clear room", () => {
+  const layout = createModel(canonicalTheme()).createLayout(),
+    root: LayoutRow = { id: "resting-parent", status: "idle" },
+    rows: LayoutRow[] = Array.from({ length: 8 }, (_, i) => ({
+      id: "resting-helper-" + String(i),
+      source: "helper",
+      parentId: root.id,
+      status: "idle",
+      lineageState: "verified",
+    }));
+  layout.reconcile([root, ...rows]);
+  const scene = Scene.build(layout.onPage(0), 0),
+    worker = present(scene.workers.find((value) => value.id === root.id)),
+    platform = present(scene.platforms.find((value) => value.key === worker.platformKey)),
+    graph = graphFor(platform),
+    parent = new ActorState(worker, 0, 0),
+    reduced = false,
+    stale = false,
+    helpers = scene.workers
+      .filter((value) => value.kind === "helper")
+      .map((value) => {
+        const actor = new ActorState(value, 0, 0);
+        actor.depth = 1;
+        return actor;
+      });
+  // A completed safe walk in the real room's open aisle; membership arrives during its rest.
+  parent.record({ x: platform.rect.x + 2.5, y: platform.rect.y + 4.5 });
+  parent.point = { x: platform.rect.x + 17.5, y: platform.rect.y + 4.5 };
+  parent.record(parent.point);
+  assert.equal(helpers.length, 8);
+  for (let now = 0; now <= 30000; now += 100) {
+    const assignments = new FormationPlanner(
+      parent,
+      helpers.map((actor) => ({ actor, depth: 1 })),
+      graph,
+      stale,
+    ).plan();
+    for (const actor of helpers) {
+      const assignment = present(assignments.find((value) => value.actor === actor)),
+        before = actor.frame(reduced);
+      actor.animate({ now, elapsed: 100, graph, parent, assignment, following: true });
+      assert(safeSegment(graph, before.point, actor.point, actor.worker));
+    }
+    if (now >= 20000)
+      for (let i = 0; i < helpers.length; i += 2) {
+        const a = present(helpers[i]).point,
+          b = present(helpers[i + 1]).point;
+        assert(Math.abs(Math.hypot(a.x - b.x, a.y - b.y) - 1.2) < 0.2);
+        assert(Math.hypot(a.x - parent.point.x, a.y - parent.point.y) < 7);
+        assert(Math.hypot(b.x - parent.point.x, b.y - parent.point.y) < 7);
+        assert.equal(present(helpers[i]).frame(reduced).pose, "idle");
+        assert.equal(present(helpers[i + 1]).frame(reduced).pose, "idle");
+      }
+  }
+});
+
+test("crew projection matches scene placement, parent admission and native pane fallback across decks", () => {
+  const layout = createModel(canonicalTheme()).createLayout();
+  const root: LayoutRow = { id: "root", projectId: "project", repoId: "repo" };
+  const helpers: LayoutRow[] = Array.from({ length: 10 }, (_, index) => ({
+    id: "helper" + String(index),
+    source: "helper",
+    parentId: root.id,
+  }));
+  const native: LayoutRow = {
+    ...root,
+    id: "native",
+    source: "herdr",
+    paneId: "p2",
+    parentId: root.id,
+  };
+  const otherRooms: LayoutRow[] = Array.from({ length: 9 }, (_, index) => ({
+    id: "other" + String(index),
+    projectId: "project" + String(index),
+    ...(index === 8 ? { host: "remote" } : {}),
+  }));
+  layout.reconcile([root, ...helpers, native, ...otherRooms]);
+  const projected = Scene.representedRows(layout.allRooms())
+    .map((row) => row.id)
+    .sort();
+  const workers = Array.from(
+    { length: layout.pages() },
+    (_, page) => Scene.build(layout.onPage(page), page).workers,
+  ).flat();
+  assert(layout.pages() > 1);
+  assert.deepEqual(projected, workers.map((worker) => worker.id).sort());
+  assert.equal(workers.filter((worker) => worker.id === native.id).length, 1);
+  assert.equal(present(workers.find((worker) => worker.id === native.id)).kind, "session");
+  const seat = layout.seatFor(native.id);
+  layout.reconcile([root, native, ...otherRooms]);
+  assert.equal(
+    layout.seatFor(native.id),
+    seat,
+    "helper visibility preserves authoritative pane allocation",
+  );
+  assert.equal(
+    Scene.representedRows(layout.allRooms()).filter((row) => row.id === native.id).length,
+    1,
+  );
+  const room = present(
+    layout.allRooms().find((room) => room.rows.some((value) => value.row.id === root.id)),
+  );
+  const unsafe = {
+    ...room,
+    rows: [
+      ...room.rows,
+      {
+        row: { id: "unsafe", source: "helper", parentId: root.id },
+        kind: "helper" as const,
+        parentId: root.id,
+        rootId: root.id,
+        block: 0,
+        helperSlot: 999,
+      },
+      {
+        row: { id: "nested", source: "helper", parentId: "unsafe" },
+        kind: "helper" as const,
+        parentId: "unsafe",
+        rootId: root.id,
+        block: 0,
+        helperSlot: 1,
+      },
+    ],
+  };
+  const unsafeScene = Scene.build([unsafe], 0);
+  assert(!unsafeScene.workers.some((worker) => ["unsafe", "nested"].includes(worker.id)));
+  assert.deepEqual(
+    Scene.representedRows([unsafe])
+      .map((row) => row.id)
+      .sort(),
+    unsafeScene.workers.map((worker) => worker.id).sort(),
+  );
+  assert(
+    unsafeScene.helperOverflow.some((entry) => entry.id === "unsafe"),
+    "unsafe station diagnostics remain available",
+  );
+});
 
 test("observer-scene regression contracts", () => {
   function advanceUntil(
@@ -1021,6 +1382,126 @@ test("observer-scene regression contracts", () => {
   );
 
   // This oracle derives axes and lag from public leader travel, not movement internals.
+  function assertRestingPairs(
+    actors: ActorFrame[],
+    leader: ActorFrame,
+    count: number,
+    now: number,
+  ) {
+    const helpers = actors.filter((actor) => actor.id.startsWith("follower-"));
+    assert.equal(helpers.length, count, "resting crew retains every admitted helper");
+    helpers.forEach((helper, i) => {
+      assert(
+        Math.hypot(helper.point.x - leader.point.x, helper.point.y - leader.point.y) <
+          3.2 + 1.2 * Math.floor(i / 2),
+        `resting group includes singleton/odd tail: count ${String(count)}, time ${String(now)}`,
+      );
+    });
+    for (let i = 0; i + 1 < helpers.length; i += 2) {
+      const a = present(helpers[i]).point,
+        b = present(helpers[i + 1]).point;
+      assert(
+        Math.abs(Math.hypot(a.x - b.x, a.y - b.y) - 1.2) < 0.2,
+        `resting parent holds compact pairs: count ${String(count)}, time ${String(now)}, ${JSON.stringify(helpers)}`,
+      );
+    }
+  }
+  function assertWalkingPairs(
+    actors: ActorFrame[],
+    leader: ActorFrame,
+    axis: Point,
+    count: number,
+  ) {
+    const offsets = actors
+      .filter((actor) => actor.id.startsWith("follower-"))
+      .map((actor) => {
+        const dx = actor.point.x - leader.point.x,
+          dy = actor.point.y - leader.point.y;
+        return { lag: -(dx * axis.x + dy * axis.y), side: -dx * axis.y + dy * axis.x };
+      });
+    assert.equal(offsets.length, count, "walking crew retains every admitted helper");
+    offsets.forEach((offset, i) => {
+      const row = Math.floor(i / 2),
+        depth = 1.6 + row * 1.2,
+        side = i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6;
+      assert(
+        // Keep the established public-coordinate lag allowance, including quantized targets.
+        offset.lag >= depth - 0.1 && offset.lag <= depth + 3.2,
+        `walking row lag includes every helper: ${JSON.stringify({ count, i, offsets })}`,
+      );
+      assert(Math.abs(offset.side - side) < 0.2, "walking pair axis and centered odd tail");
+      if (i % 2)
+        assert(
+          Math.abs(offset.lag - present(offsets[i - 1]).lag) < 0.4,
+          "walking pair stays side by side",
+        );
+    });
+  }
+  function recordStraightTravel(
+    run: { axis: Point; distance: number },
+    before: Point,
+    point: Point,
+  ) {
+    const dx = point.x - before.x,
+      dy = point.y - before.y,
+      distance = Math.hypot(dx, dy);
+    if (distance < 1e-8) return run;
+    const axis = { x: dx / distance, y: dy / distance, z: 0 };
+    return {
+      axis,
+      distance:
+        run.axis.x * axis.x + run.axis.y * axis.y > 0.999 ? run.distance + distance : distance,
+    };
+  }
+  function verifySustainedRoomRest(count: number) {
+    const fixture = formationFixture(count),
+      scene = fixture.build(),
+      parent = present(scene.workers.find((worker) => worker.id === fixture.parent.id)),
+      platform = present(scene.platforms.find((value) => value.key === parent.platformKey)),
+      motion = Scene.createMovement();
+    // The first room's open cross-aisle, with all real furniture and collision checks intact.
+    parent.home = { x: platform.rect.x + 2, y: platform.rect.y + 4, w: 16, h: 1 };
+    motion.reconcile(scene, { now: 0 });
+    let restingSince = 0,
+      settledRests = 0,
+      run: { axis: Point; distance: number } = { axis: { x: 0, y: 0, z: 0 }, distance: 0 },
+      walkingSamples = 0,
+      walkingCycles = 0,
+      walkingCycleSamples = 0,
+      previous = new Map(motion.step(0).map((actor) => [actor.id, actor]));
+    function checkWalking(actors: ActorFrame[], leader: ActorFrame, now: number) {
+      if (leader.pose !== "walk") {
+        walkingCycleSamples = 0;
+        return;
+      }
+      restingSince = now;
+      // Allow the 5.2-unit deepest row, quantization, and turn acquisition.
+      // Eligibility depends only on leader travel, never on successful helper formation.
+      if (now > 30000 && run.distance >= 8 && Math.abs(run.axis.y) < 0.01) {
+        assertWalkingPairs(actors, leader, run.axis, count);
+        walkingSamples++;
+        if (++walkingCycleSamples === 5) walkingCycles++;
+      }
+    }
+    for (let now = 100; now <= 180000; now += 100) {
+      if (now % 5000 === 0) motion.reconcile(scene, { now });
+      const actors = motion.step(now),
+        leader = present(actors.find((actor) => actor.id === parent.id));
+      for (const actor of actors) assertSafeTravel(scene, present(previous.get(actor.id)), actor);
+      run = recordStraightTravel(run, present(previous.get(parent.id)).point, leader.point);
+      checkWalking(actors, leader, now);
+      if (now > 30000 && now - restingSince >= 4000) {
+        assertRestingPairs(actors, leader, count, now);
+        settledRests++;
+      }
+      previous = new Map(actors.map((actor) => [actor.id, actor]));
+    }
+    assert(settledRests > 20, "repeated settled rests are exercised");
+    assert(walkingSamples > 20, "sustained open walking samples are exercised");
+    assert(walkingCycles >= 3, "sustained walking is checked across repeated stroll/rest cycles");
+    console.log("Sustained room coverage", { count, walkingSamples, walkingCycles, settledRests });
+  }
+  for (const count of [1, 2, 3, 8]) verifySustainedRoomRest(count);
   const observeCompactSquad = (
     count: number,
     leaderId: string | null = null,
@@ -1310,7 +1791,7 @@ test("observer-scene regression contracts", () => {
       );
       if (count === 8) {
         assert(
-          coverage.some((c) => c.traversed === 8 && c.regroupFrames >= 10 && c.lineFrames >= 10),
+          coverage.every((c) => c.traversed === 8 && c.regroupFrames >= 10 && c.lineFrames >= 10),
           "all eight traverse independently unsafe pair doors in ordered distinct single file, then sustain pairs again",
         );
         assert(

@@ -162,10 +162,6 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
 
   anchors: Anchor[] = [];
 
-  overflowByWorker: Map<string, number> = new Map();
-
-  overflowByPlatform: Map<string, number> = new Map();
-
   titleRegions: TitleBox[] = [];
 
   signRegions: SignBox[] = [];
@@ -223,6 +219,29 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   stationArt;
 
   actors: ActorFrame[] = [];
+  private settlementGeneration = 0;
+  private settlements = new Set<string>();
+  private onHelperSettled: UpdateOptions["onHelperSettled"];
+  clearSettlements() {
+    this.settlementGeneration++;
+    this.settlements.clear();
+    this.onHelperSettled = undefined;
+  }
+  dispatchSettlements() {
+    const generation = this.settlementGeneration;
+    const callback = this.onHelperSettled;
+    for (const actor of this.actors) {
+      if (!actor.settled) continue;
+      const phase = actor.settled,
+        id = actor.id,
+        key = JSON.stringify([id, phase]);
+      if (this.settlements.has(key)) continue;
+      this.settlements.add(key);
+      void Promise.resolve().then(() => {
+        if (this.running && generation === this.settlementGeneration) callback?.(id, phase);
+      });
+    }
+  }
 
   clock;
 
@@ -247,13 +266,14 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   visibleArea: { left: number; top: number; right: number; bottom: number } | null = null;
 
   update = (next: SceneGeometry, options: UpdateOptions = {}) => {
+    this.clearSettlements();
+    this.onHelperSettled = options.onHelperSettled;
     const revised = !this.scene || this.activeScene.revision !== next.revision;
     this.scene = next;
     this.indexWorkers();
     this.cameraControl.measure();
     this.setUpdateOptions(options);
     this.indexRepositories();
-    this.indexOverflow();
     this.movement.reconcile(this.activeScene, {
       now: this.clock(),
       stale: this.workerStale,
@@ -290,21 +310,6 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
         .map((worker) => worker.row.repoId)
         .filter((id): id is string => typeof id === "string" && id.length > 0),
     );
-  }
-  private indexOverflow() {
-    this.overflowByWorker = new Map();
-    this.overflowByPlatform = new Map();
-    for (const entry of this.activeScene.helperOverflow) {
-      const owner = [entry.parentId, entry.rootId].find(
-        (id): id is string => typeof id === "string" && this.workerIndex.has(id),
-      );
-      if (owner) this.overflowByWorker.set(owner, (this.overflowByWorker.get(owner) || 0) + 1);
-      else
-        this.overflowByPlatform.set(
-          entry.platformKey,
-          (this.overflowByPlatform.get(entry.platformKey) || 0) + 1,
-        );
-    }
   }
   private reconcileSelection() {
     for (const id of this.bodies.keys())
