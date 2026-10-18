@@ -1162,8 +1162,21 @@ test("observer-scene regression contracts", () => {
   );
 
   // This oracle derives axes and lag from public leader travel, not movement internals.
-  function assertRestingPairs(actors: ActorFrame[], count: number, now: number) {
+  function assertRestingPairs(
+    actors: ActorFrame[],
+    leader: ActorFrame,
+    count: number,
+    now: number,
+  ) {
     const helpers = actors.filter((actor) => actor.id.startsWith("follower-"));
+    assert.equal(helpers.length, count, "resting crew retains every admitted helper");
+    helpers.forEach((helper, i) => {
+      assert(
+        Math.hypot(helper.point.x - leader.point.x, helper.point.y - leader.point.y) <
+          3.2 + 1.2 * Math.floor(i / 2),
+        `resting group includes singleton/odd tail: count ${String(count)}, time ${String(now)}`,
+      );
+    });
     for (let i = 0; i + 1 < helpers.length; i += 2) {
       const a = present(helpers[i]).point,
         b = present(helpers[i + 1]).point;
@@ -1172,6 +1185,53 @@ test("observer-scene regression contracts", () => {
         `resting parent holds compact pairs: count ${String(count)}, time ${String(now)}, ${JSON.stringify(helpers)}`,
       );
     }
+  }
+  function assertWalkingPairs(
+    actors: ActorFrame[],
+    leader: ActorFrame,
+    axis: Point,
+    count: number,
+  ) {
+    const offsets = actors
+      .filter((actor) => actor.id.startsWith("follower-"))
+      .map((actor) => {
+        const dx = actor.point.x - leader.point.x,
+          dy = actor.point.y - leader.point.y;
+        return { lag: -(dx * axis.x + dy * axis.y), side: -dx * axis.y + dy * axis.x };
+      });
+    assert.equal(offsets.length, count, "walking crew retains every admitted helper");
+    offsets.forEach((offset, i) => {
+      const row = Math.floor(i / 2),
+        depth = 1.6 + row * 1.2,
+        side = i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6;
+      assert(
+        // Keep the established public-coordinate lag allowance, including quantized targets.
+        offset.lag >= depth - 0.1 && offset.lag <= depth + 3.2,
+        `walking row lag includes every helper: ${JSON.stringify({ count, i, offsets })}`,
+      );
+      assert(Math.abs(offset.side - side) < 0.2, "walking pair axis and centered odd tail");
+      if (i % 2)
+        assert(
+          Math.abs(offset.lag - present(offsets[i - 1]).lag) < 0.4,
+          "walking pair stays side by side",
+        );
+    });
+  }
+  function recordStraightTravel(
+    run: { axis: Point; distance: number },
+    before: Point,
+    point: Point,
+  ) {
+    const dx = point.x - before.x,
+      dy = point.y - before.y,
+      distance = Math.hypot(dx, dy);
+    if (distance < 1e-8) return run;
+    const axis = { x: dx / distance, y: dy / distance, z: 0 };
+    return {
+      axis,
+      distance:
+        run.axis.x * axis.x + run.axis.y * axis.y > 0.999 ? run.distance + distance : distance,
+    };
   }
   function verifySustainedRoomRest(count: number) {
     const fixture = formationFixture(count),
@@ -1184,20 +1244,42 @@ test("observer-scene regression contracts", () => {
     motion.reconcile(scene, { now: 0 });
     let restingSince = 0,
       settledRests = 0,
+      run: { axis: Point; distance: number } = { axis: { x: 0, y: 0, z: 0 }, distance: 0 },
+      walkingSamples = 0,
+      walkingCycles = 0,
+      walkingCycleSamples = 0,
       previous = new Map(motion.step(0).map((actor) => [actor.id, actor]));
+    function checkWalking(actors: ActorFrame[], leader: ActorFrame, now: number) {
+      if (leader.pose !== "walk") {
+        walkingCycleSamples = 0;
+        return;
+      }
+      restingSince = now;
+      // Allow the 5.2-unit deepest row, quantization, and turn acquisition.
+      // Eligibility depends only on leader travel, never on successful helper formation.
+      if (now > 30000 && run.distance >= 8 && Math.abs(run.axis.y) < 0.01) {
+        assertWalkingPairs(actors, leader, run.axis, count);
+        walkingSamples++;
+        if (++walkingCycleSamples === 5) walkingCycles++;
+      }
+    }
     for (let now = 100; now <= 180000; now += 100) {
       if (now % 5000 === 0) motion.reconcile(scene, { now });
       const actors = motion.step(now),
         leader = present(actors.find((actor) => actor.id === parent.id));
       for (const actor of actors) assertSafeTravel(scene, present(previous.get(actor.id)), actor);
-      if (leader.pose === "walk") restingSince = now;
+      run = recordStraightTravel(run, present(previous.get(parent.id)).point, leader.point);
+      checkWalking(actors, leader, now);
       if (now > 30000 && now - restingSince >= 4000) {
-        assertRestingPairs(actors, count, now);
+        assertRestingPairs(actors, leader, count, now);
         settledRests++;
       }
       previous = new Map(actors.map((actor) => [actor.id, actor]));
     }
     assert(settledRests > 20, "repeated settled rests are exercised");
+    assert(walkingSamples > 20, "sustained open walking samples are exercised");
+    assert(walkingCycles >= 3, "sustained walking is checked across repeated stroll/rest cycles");
+    console.log("Sustained room coverage", { count, walkingSamples, walkingCycles, settledRests });
   }
   for (const count of [1, 2, 3, 8]) verifySustainedRoomRest(count);
   const observeCompactSquad = (
