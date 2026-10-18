@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 ---
 
 # Codex identity performance
@@ -14,4 +14,8 @@ Matched temporary harness: three alternating baseline/candidate pairs of fifty f
 
 Task 3 committed as 9a994b9: eight-RPC captures, complete bounded content-only retries, initial ownership/geometry consolidation and safe exhausted-content diagnostics. Five focused/integration tests, lint, types, Knip and Fallow passed; independent requirements and quality review approved without findings. Malformed final probes remain nonretryable.
 
-Task 4 is verifying inspector/load/shutdown/package behavior and updating operator documentation. No Herdr core, installed integration or Mama theme changes.
+Task 4 implementation and local gates completed: navigation plus initial conflict resolves; both inspector revalidations query fresh births, and session/terminal/birth changes withdraw content. Observer shutdown rejects one active plus seven queued native reads and reaps the owned child. Healthy twenty-pane fixture publishes in 1392.5 ms with 160 RPCs; original unchanged fixture measured 1530 ms/180 RPCs. Plan predictions of 1630/1492.5 ms incorrectly counted concurrent optional enrichment as blocking; acceptance remains 1500 ms. Intermittent conflicts publish in 1662.5 ms with 192 RPCs/48 births; perpetual conflicts in 1932.5 ms with 224/56, twenty exhausted diagnostics and healthy later first-attempt admission preserved.
+
+Local build/full suite: 254 pass/0 fail across 95 files with command-local physical TMPDIR. The initial default-TMPDIR run had one unchanged macOS hook-test logical/physical-path assertion; canonical TMPDIR resolves it without source changes. Lint, five compiler projects, Knip, Fallow and production-first installed-server/Chromium consumers passed. Birth implementation hash still matches the primary resource receipt.
+
+Delivery: [PR #18](https://github.com/wnz99/starnet-observer/pull/18). Independent aggregate review approved requirements and quality across all twenty changed files without findings. Ubuntu CI passed on source head 8525d60: 241 tests passed, thirteen macOS-only cases skipped, zero failed; installed/browser consumers passed. The final tracking head must also pass configured CI before merge. No Herdr core, installed integration or Mama theme changes.
