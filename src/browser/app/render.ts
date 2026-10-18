@@ -52,10 +52,10 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     if (latest) this.render(latest, { refresh: true });
   }
   refreshRoster(options: { canvas: boolean }) {
-    const { state, hosts, roster, view } = this.options;
+    const { state, hosts, roster, view, floor } = this.options;
     const snapshot = state.latest;
     if (!this.active() || !snapshot) return;
-    const rows = snapshot.data?.sessions ?? [];
+    const rows = floor.displayedRows;
     const hasHosts = hosts.list().length > 0;
     const panelRows = hasHosts
       ? rows.filter((row) => (row.host || null) === state.selectedHost)
@@ -192,17 +192,17 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
       setText(ui.get("empty"), "No sessions on " + (state.selectedHost || "this machine") + ".");
   }
   private content(snapshot: AppQuerySnapshot, refresh: boolean) {
-    const { state, hosts, floor, couriers, roster } = this.options;
-    const rows = snapshot.data?.sessions ?? [];
+    const { state, hosts, floor, couriers, roster, totals } = this.options;
     this.presentation(snapshot);
-    // A repository whose last row left clears its highlight.
-    this.reconcileRepository(rows);
     const hostSources = snapshot.data?.sources?.hosts;
     const hostList = hosts.update(hostSources);
     this.selectSpawned(snapshot);
+    const { displayedRows: rows, onFloor, floorRows } = floor.render(snapshot, hostList, refresh);
+    // A repository whose last displayed row left clears its highlight.
+    this.reconcileRepository(rows);
+    totals.render(snapshot, rows);
     const panelRows =
       hostList.length > 0 ? rows.filter((row) => (row.host || null) === state.selectedHost) : rows;
-    const { onFloor, floorRows } = floor.render(snapshot, hostList, refresh);
     couriers.update(snapshot, floorRows);
     this.deckCounts(rows, onFloor.length);
     this.counts(snapshot, panelRows);
@@ -237,13 +237,15 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     state.latest = snapshot;
     state.byId = new Map((snapshot.data?.sessions ?? []).map((row) => [row.id, row]));
     renderHeader(ui, state, snapshot, this.options.now());
-    totals.render(snapshot);
     deadline.arm(snapshot);
     if (!this.active()) return;
     /* Mail eligibility is its own transport proof, independent of agent staleness. QuerySpine keeps the same data
        object on a failed request, so a change in that proof must reach the mail panels even when nothing else did. */
     const proof = state.busLive(snapshot);
-    if (!options.refresh && this.sameContent(previous, snapshot, stale, proof)) return;
+    if (!options.refresh && this.sameContent(previous, snapshot, stale, proof)) {
+      totals.render(snapshot, this.options.floor.displayedRows);
+      return;
+    }
     this.mailProof = proof;
     this.inventoryStale = stale;
     this.proveResume(snapshot, stale);

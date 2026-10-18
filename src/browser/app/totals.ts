@@ -1,11 +1,16 @@
 import type { SpriteResource } from "../sprites/types.js";
-import type { AppAggregate, AppQuerySnapshot } from "./data.js";
+import type { AppAggregate, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppNode } from "./dom.js";
 import type { AppState } from "./state.js";
 import { setText, type AppUi } from "./ui.js";
 
 type CounterKey = keyof NonNullable<AppAggregate["usage"]>;
 type StatusKey = keyof NonNullable<NonNullable<AppAggregate["agents"]>["statuses"]>;
+interface CrewCounts {
+  observed: number;
+  statuses: Record<StatusKey, number>;
+  stale: number;
+}
 const STATUS_TOTALS: readonly [StatusKey, string][] = [
   ["working", "working"],
   ["blocked", "waiting"],
@@ -77,9 +82,9 @@ interface TotalsNodes<N> {
   coverage: N;
   counters: Map<CounterKey, N>;
 }
-/* Station totals: the sidecar's one aggregate per refresh, shown as published and never re-added here. A counter
-   without evidence is unavailable, never zero. Herdr owns status freshness; counted usage contributors own the
-   separate token deadline. Both use the existing deadline render without deriving new counts in the browser. */
+/* Station usage: the sidecar's one aggregate per refresh, shown as published and never re-added here. A counter
+   without evidence is unavailable, never zero. Each row owns status freshness; counted usage contributors own the
+   separate token deadline. Crew and status counts use displayed rows and their own freshness. */
 export class Totals<N extends AppNode, R extends SpriteResource> {
   private nodes: TotalsNodes<N> | null = null;
   constructor(
@@ -148,9 +153,8 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       " stale";
     if (node.title !== hint) node.title = hint;
   }
-  private summary(aggregate: AppAggregate, live: boolean, usageLive: boolean) {
+  private summary(aggregate: AppAggregate, agents: CrewCounts, live: boolean, usageLive: boolean) {
     const nodes = this.getNodes();
-    const agents = aggregate.agents ?? {};
     const coverage = aggregate.coverage ?? {};
     const partial = partialCoverage(coverage);
     setText(
@@ -158,7 +162,7 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       summaryPrefix(live, usageLive) +
         tally(agents.observed) +
         " crew · " +
-        tally(agents.statuses?.working) +
+        tally(agents.statuses.working) +
         " working · In " +
         shortCounter(aggregate, "inputTokens") +
         " / Out " +
@@ -182,31 +186,20 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
           : ""),
     );
   }
-  private agents(aggregate: AppAggregate, live: boolean) {
+  private agents(agents: CrewCounts, live: boolean) {
     const nodes = this.getNodes();
-    const agents = aggregate.agents ?? {};
-    setText(
-      nodes.crew,
-      tally(agents.observed) +
-        " observed · " +
-        tally(agents.verifiedSessions) +
-        " verified · " +
-        tally(agents.presenceOnly) +
-        " presence only",
-    );
+    setText(nodes.crew, tally(agents.observed) + " displayed");
     setText(
       nodes.status,
       (live ? "" : "last known · ") +
-        STATUS_TOTALS.map(([key, label]) => tally(agents.statuses?.[key]) + " " + label).join(
-          " · ",
-        ) +
+        STATUS_TOTALS.map(([key, label]) => tally(agents.statuses[key]) + " " + label).join(" · ") +
         (agents.stale ? " · " + tally(agents.stale) + " stale" : ""),
     );
   }
-  render(snapshot: AppQuerySnapshot) {
+  render(snapshot: AppQuerySnapshot, displayedRows: readonly AppRow[]) {
     const aggregate = snapshot.data?.aggregate;
     const nodes = this.getNodes();
-    // A sidecar that publishes no aggregate gets no totals: nothing is inferred from the roster.
+    // Preserve the optional aggregate disclosure contract; crew membership still comes from placement.
     nodes.list.hidden = !aggregate;
     nodes.disclosure.hidden = !aggregate;
     if (!aggregate) return;
@@ -216,8 +209,24 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       (!Number.isFinite(aggregate.usageObservedAt) || this.state.fresh(aggregate.usageObservedAt));
     nodes.list.dataset.freshness = live ? "live" : "stale";
     nodes.disclosure.dataset.freshness = usageLive ? "live" : "stale";
-    this.agents(aggregate, live);
+    const agents = this.crew(snapshot, displayedRows);
+    this.agents(agents, live);
     for (const [key, label] of COUNTER_TOTALS) this.counter(key, label, aggregate, usageLive);
-    this.summary(aggregate, live, usageLive);
+    this.summary(aggregate, agents, live, usageLive);
+  }
+  private crew(snapshot: AppQuerySnapshot, rows: readonly AppRow[]): CrewCounts {
+    const counts: CrewCounts = {
+      observed: rows.length,
+      statuses: { working: 0, blocked: 0, idle: 0, done: 0, unknown: 0 },
+      stale: 0,
+    };
+    for (const row of rows) {
+      if (this.state.rowStale(row, snapshot)) counts.stale++;
+      else {
+        const key = STATUS_TOTALS.find(([status]) => status === row.status)?.[0] ?? "unknown";
+        counts.statuses[key]++;
+      }
+    }
+    return counts;
   }
 }

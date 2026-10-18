@@ -3,7 +3,7 @@ import { element, required } from "../model/types.js";
 import { roomY, remoteRoomRect } from "./site.js";
 import { rootWorkers, helperWorkers } from "./room-workers.js";
 import type { ShipLocations } from "./site.js";
-import type { Room } from "../model/types.js";
+import type { Room, LayoutRow } from "../model/types.js";
 import type {
   SceneRooms,
   Host,
@@ -75,6 +75,42 @@ function sectionsFor(room: Room, rect: Rect) {
   }
   return sections;
 }
+function roomCrew(room: Room, rect: Rect, sections: Section[]) {
+  const helpers = helperWorkers(room, rect, sections);
+  const represented = new Set(
+    room.rows.filter((value) => value.kind !== "helper").map((value) => value.row.id),
+  );
+  const pending = [...helpers.workers];
+  const workers: Worker[] = [];
+  while (pending.length > 0) {
+    const index = pending.findIndex(
+      (worker) => !!worker.parentId && represented.has(worker.parentId),
+    );
+    if (index < 0) break;
+    const worker = element(pending.splice(index, 1), 0);
+    represented.add(worker.id);
+    workers.push(worker);
+  }
+  const helperIds = new Set(workers.map((worker) => worker.id));
+  return {
+    ...helpers,
+    workers,
+    roots: {
+      ...room,
+      rows: room.rows.filter((value) => value.kind !== "helper" && !helperIds.has(value.row.id)),
+    },
+  };
+}
+export function representedRows(rooms: SceneRooms): LayoutRow[] {
+  return rooms.flatMap((room) => {
+    const rect = { x: 0, y: 0, w: ROOM.width, h: ROOM.height };
+    const crew = roomCrew(room, rect, sectionsFor(room, rect));
+    return [
+      ...crew.roots.rows.map((value) => value.row),
+      ...crew.workers.map((worker) => worker.row),
+    ];
+  });
+}
 const DECORATION = [
   { kind: "wall", edge: "rear-y", rect: { x: 2, y: 0.5, w: 16, h: 2 } },
   { kind: "wall", edge: "rear-x", rect: { x: 0.2, y: 4, w: 0.6, h: 18 } },
@@ -113,7 +149,7 @@ function buildRoom(input: {
   // the relay's colour all the way to its mailroom: those agents' mail can continue onto the relay highway.
   const relayRoom = room.rows.some((value) => relayMembers.has(value.row.id));
   const sections = sectionsFor(room, rect),
-    helpers = helperWorkers(room, rect, sections);
+    helpers = roomCrew(room, rect, sections);
   const platform: Platform = {
     key: room.key,
     projectId: room.projectId,
@@ -140,7 +176,7 @@ function buildRoom(input: {
   );
   return {
     platform,
-    workers: rootWorkers(room, rect, sections, route).concat(helpers.workers),
+    workers: rootWorkers(helpers.roots, rect, sections, route).concat(helpers.workers),
     helperOverflow: helpers.helperOverflow,
     walkways,
     route,

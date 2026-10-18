@@ -1307,7 +1307,7 @@ test("observer-view regression contracts", async () => {
     );
   }
   verifyFurnitureCulling();
-  // Task 4: helpers at their reviewed scale and footprint, list-only overflow, the Observatory and platform zoom.
+  // Task 4: helpers at their reviewed scale and footprint, overflow diagnostics, the Observatory and platform zoom.
   function verifyHelpersAndObservatory() {
     const layout = Model.createLayout(),
       base = {
@@ -1331,7 +1331,7 @@ test("observer-view regression contracts", async () => {
     const scene = Scene.build(layout.onPage(0), 0),
       fitted = scene.workers.filter((worker) => worker.kind === "helper");
     assert.equal(fitted.length, 8);
-    assert.equal(scene.helperOverflow.length, 2, "fixture: two listed helpers have no station");
+    assert.equal(scene.helperOverflow.length, 2, "fixture: two retained helpers have no station");
     const node = canvas(),
       sprite = sprites(),
       frames: ((now: number) => void)[] = [],
@@ -1372,10 +1372,6 @@ test("observer-view regression contracts", async () => {
     assert(
       sprite.appearances.some((value) => value.id === helperRegion.id),
       "helpers go through the stateful sprite call",
-    );
-    assert(
-      recordedCalls(node).fillText.includes("+2 helpers in list"),
-      "listed helpers without a station are counted beside their parent",
     );
     // The jump seat stays inside the reviewed w1 × h0.72 footprint; the root console would overhang it.
     const points: [number, number][] = [],

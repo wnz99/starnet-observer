@@ -22,8 +22,6 @@ const DETAILS = {
   lift: 18,
   shade: -0.35,
   priority: 10,
-  overflowLift: 34,
-  overflowPriority: 8,
 };
 const INSPECTION = { lift: 38, size: 13, priority: 95 };
 export class WorkerLabels<R extends SpriteResource, B extends R = R> {
@@ -37,8 +35,6 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       const title = this.title(worker, region, options);
       if (title) plates.push(title);
       if (region.id === inspectedId) plates.push(this.inspection(region));
-      const overflow = this.overflow(worker, region, options);
-      if (overflow) plates.push(overflow);
     }
     return plates;
   }
@@ -124,16 +120,5 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
         priority: INSPECTION.priority,
       },
     );
-  }
-  private overflow(worker: Worker, region: Anchor, options: LabelContext) {
-    const listed = this.view.overflowByWorker.get(region.id);
-    if (!listed || options.tier === "overview") return null;
-    const label = `+${String(listed)} helper${listed > 1 ? "s" : ""} in list`;
-    return this.view.plates.textPlate(label, region.head.x, region.foot + DETAILS.overflowLift, {
-      accent: shade(worker.accent, DETAILS.shade),
-      size: DETAILS.size,
-      color: this.view.C.dim,
-      priority: DETAILS.overflowPriority,
-    });
   }
 }

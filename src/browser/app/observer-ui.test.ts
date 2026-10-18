@@ -33,6 +33,161 @@ import type { UiViewOptions, UiFrame } from "./ui-test.fixture.js";
 import type { UpdateOptions } from "../view/types.js";
 const sessionItems = (node: AppFixtureNode): AppFixtureNode[] =>
   node.className.split(" ").includes("session-item") ? [node] : node.children.flatMap(sessionItems);
+test("displayed crew excludes retained helpers without an avatar and preserves history usage", async () => {
+  const page = uiFixture();
+  let live: Deliver | null = null;
+  let scene!: Scene;
+  let overviews = 0;
+  const app = page.mount({
+    createView: () =>
+      viewSpy({
+        update: (next) => {
+          scene = next;
+        },
+        start() {},
+        stop() {},
+        overview() {
+          overviews++;
+        },
+        focus() {},
+        invalidate() {},
+      }),
+    query: {
+      ...querySpy({
+        define() {},
+        invalidate: () => Promise.resolve(),
+        subscribe: (_key, listener) => {
+          live = listener;
+          return () => {};
+        },
+      }),
+      dispose() {},
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const now = Date.now();
+    const panes: AppRow[] = Array.from({ length: 12 }, (_, index) => ({
+      id: "pane" + String(index),
+      title: "pane" + String(index),
+      source: "herdr",
+      paneId: "p" + String(index),
+      projectId: "crew",
+      project: "Crew",
+      repoId: "crew",
+      status: index === 8 ? "done" : index === 9 ? "unknown" : index === 10 ? "idle" : "working",
+      observedAt: index === 11 ? now - 60000 : now,
+    }));
+    const helpers: AppRow[] = Array.from({ length: 64 }, (_, index) => ({
+      id: "helper" + String(index).padStart(2, "0"),
+      source: "helper",
+      parentId: "pane0",
+      status: index < 2 ? "blocked" : "idle",
+      observedAt: now,
+    }));
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions: [...panes, ...helpers],
+        aggregate: {
+          agents: { observed: 76, statuses: { working: 12, blocked: 2, idle: 62 } },
+          usage: { inputTokens: { value: 76000, state: "available" } },
+          coverage: { eligible: 76, available: 76 },
+        },
+      },
+    });
+    const rosterIds = () =>
+      page.document
+        .querySelectorAll(page.get("sessions"), ".session-row")
+        .map((node) => node.dataset.sessionId)
+        .sort();
+    const crewIds = scene.workers.map((worker) => worker.id).sort();
+    assert.equal(crewIds.length, 20);
+    assert.deepEqual(rosterIds(), crewIds);
+    assert.match(page.get("counts").textContent, /8 working · 2 waiting · 20 total · 1 last known/);
+    assert.match(page.get("room-count").textContent, /20 workers on this deck/);
+    const totals = page.get("station-totals");
+    assert.match(child(totals, 1).textContent, /^20 displayed/);
+    assert.equal(
+      child(totals, 3).textContent,
+      "8 working · 2 waiting · 7 idle · 1 done · 1 unknown · 1 stale",
+    );
+    assert.equal(child(child(totals, 5), 0).textContent, "in 76K");
+    page.get("search").value = "pane0";
+    page.get("search").emit("input");
+    assert.equal(rosterIds().length, 1);
+    assert.match(child(totals, 1).textContent, /^20 displayed/);
+    page.get("search").value = "";
+    page.get("search").emit("input");
+    const extra: AppRow[] = [
+      { id: "overseer", source: "herdr", role: "overseer", status: "idle" },
+      { id: "remote", host: "remote", source: "herdr", projectId: "remote", status: "idle" },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        id: "deck" + String(index),
+        projectId: "deck" + String(index),
+      })),
+    ];
+    const expanded: AppSnapshot = {
+      sessions: [...panes, ...helpers, ...extra],
+      health: "available",
+      observedAt: now,
+      aggregate: {},
+      sources: {
+        hosts: {
+          local: { health: "available", observedAt: now },
+          remote: { health: "available", observedAt: now },
+        },
+      },
+    };
+    notify(live, { hasData: true, updatedAt: now, data: expanded });
+    assert.equal(rosterIds().length, 30, "local roster covers every deck");
+    assert.equal(rosterIds().filter((id) => id === "overseer").length, 1);
+    assert.match(child(totals, 1).textContent, /^31 displayed/);
+    assert.match(
+      page.get("room-count").textContent,
+      new RegExp(String(scene.workers.length) + " workers on this deck$"),
+    );
+    page.get("next-page").emit("click");
+    assert.equal(rosterIds().length, 30);
+    assert.match(
+      page.get("room-count").textContent,
+      new RegExp(String(scene.workers.length) + " workers on this deck$"),
+    );
+    const tabs = page.get("host-tabs").children;
+    assert.equal(
+      present(tabs.find((tab) => tab.dataset.host === "")).dataset.label,
+      "This machine · 30",
+    );
+    present(tabs.find((tab) => tab.dataset.host === "remote")).emit("click");
+    assert.deepEqual(rosterIds(), ["remote"]);
+    assert.match(child(totals, 1).textContent, /^31 displayed/);
+    present(tabs.find((tab) => tab.dataset.host === "")).emit("click");
+    present(
+      page.document
+        .querySelectorAll(page.get("sessions"), ".session-row")
+        .find((node) => node.dataset.sessionId === "helper00"),
+    ).emit("click");
+    const previousOverviews = overviews;
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        ...expanded,
+        sessions: expanded.sessions.filter((row) => row.id !== "pane0"),
+      },
+    });
+    assert(
+      !rosterIds().includes("helper00"),
+      "a retained helper without a represented parent leaves crew",
+    );
+    assert(overviews > previousOverviews, "selection clears when its avatar leaves displayed crew");
+  } finally {
+    app.dispose();
+  }
+});
 test("local roster actions preserve the floor and mail without unrelated reconciliation", async () => {
   const page = uiFixture();
   const filters = ["all", "working"].map((value) => {
@@ -3444,12 +3599,12 @@ test("observer-ui regression contracts", async () => {
         notify(live, inventory());
         const totals = own["station-totals"],
           dd = (index: number) => present(totals).children[index * 2 + 1];
-        // Totals: the aggregate as published. Null is unavailable, zero is a value, partial and coverage are stated.
+        // Crew follows displayed rows; usage stays published. Null is unavailable, zero is a value, coverage is stated.
         assert.equal(present(totals).hidden, false);
         assert.equal(present(own["station-stats"]).hidden, false);
         assert.equal(
           present(own["station-stats-summary"]).textContent,
-          "6 crew · 2 working · In unavailable / Out 1.6K · partial",
+          "7 crew · 2 working · In unavailable / Out 1.6K · partial",
         );
         present(own["station-stats"]).open = true;
         notify(live, inventory());
@@ -3464,10 +3619,10 @@ test("observer-ui regression contracts", async () => {
             .map((node) => node.textContent),
           ["Crew", "Status", "Tokens", "Coverage"],
         );
-        assert.equal(present(dd(0)).textContent, "6 observed · 5 verified · 1 presence only");
+        assert.equal(present(dd(0)).textContent, "7 displayed");
         assert.equal(
           present(dd(1)).textContent,
-          "2 working · 0 waiting · 0 idle · 2 done · 1 unknown · 1 stale",
+          "2 working · 0 waiting · 1 idle · 2 done · 1 unknown · 1 stale",
         );
         assert.deepEqual(
           present(dd(2)).children.map((node) => [node.textContent, node.className]),
@@ -3488,7 +3643,7 @@ test("observer-ui regression contracts", async () => {
           "2 of 5 sessions complete · 1 partial · 1 unavailable · 1 stale · 1 conflicting, not counted",
         );
         assert.equal(present(totals).dataset.freshness, "live");
-        // Herdr stale during Desktop is fresh: the aggregate's claims are last known, on the same render path.
+        // Desktop stays fresh when Herdr expires. Station freshness becomes last known; rows retain their own deadlines.
         notify(live, inventory({ herdrAt: Date.now() - 7000 }));
         assert.equal(present(totals).dataset.freshness, "stale");
         assert.match(present(own["station-stats-summary"]).textContent, /^Last known/);

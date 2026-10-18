@@ -15,6 +15,88 @@ import { canonicalTheme } from "../theme.fixture.js";
 import { test } from "bun:test";
 import * as Scene from "./index.js";
 
+test("crew projection matches scene placement, parent admission and native pane fallback across decks", () => {
+  const layout = createModel(canonicalTheme()).createLayout();
+  const root: LayoutRow = { id: "root", projectId: "project", repoId: "repo" };
+  const helpers: LayoutRow[] = Array.from({ length: 10 }, (_, index) => ({
+    id: "helper" + String(index),
+    source: "helper",
+    parentId: root.id,
+  }));
+  const native: LayoutRow = {
+    ...root,
+    id: "native",
+    source: "herdr",
+    paneId: "p2",
+    parentId: root.id,
+  };
+  const otherRooms: LayoutRow[] = Array.from({ length: 9 }, (_, index) => ({
+    id: "other" + String(index),
+    projectId: "project" + String(index),
+    ...(index === 8 ? { host: "remote" } : {}),
+  }));
+  layout.reconcile([root, ...helpers, native, ...otherRooms]);
+  const projected = Scene.representedRows(layout.allRooms())
+    .map((row) => row.id)
+    .sort();
+  const workers = Array.from(
+    { length: layout.pages() },
+    (_, page) => Scene.build(layout.onPage(page), page).workers,
+  ).flat();
+  assert(layout.pages() > 1);
+  assert.deepEqual(projected, workers.map((worker) => worker.id).sort());
+  assert.equal(workers.filter((worker) => worker.id === native.id).length, 1);
+  assert.equal(present(workers.find((worker) => worker.id === native.id)).kind, "session");
+  const seat = layout.seatFor(native.id);
+  layout.reconcile([root, native, ...otherRooms]);
+  assert.equal(
+    layout.seatFor(native.id),
+    seat,
+    "helper visibility preserves authoritative pane allocation",
+  );
+  assert.equal(
+    Scene.representedRows(layout.allRooms()).filter((row) => row.id === native.id).length,
+    1,
+  );
+  const room = present(
+    layout.allRooms().find((room) => room.rows.some((value) => value.row.id === root.id)),
+  );
+  const unsafe = {
+    ...room,
+    rows: [
+      ...room.rows,
+      {
+        row: { id: "unsafe", source: "helper", parentId: root.id },
+        kind: "helper" as const,
+        parentId: root.id,
+        rootId: root.id,
+        block: 0,
+        helperSlot: 999,
+      },
+      {
+        row: { id: "nested", source: "helper", parentId: "unsafe" },
+        kind: "helper" as const,
+        parentId: "unsafe",
+        rootId: root.id,
+        block: 0,
+        helperSlot: 1,
+      },
+    ],
+  };
+  const unsafeScene = Scene.build([unsafe], 0);
+  assert(!unsafeScene.workers.some((worker) => ["unsafe", "nested"].includes(worker.id)));
+  assert.deepEqual(
+    Scene.representedRows([unsafe])
+      .map((row) => row.id)
+      .sort(),
+    unsafeScene.workers.map((worker) => worker.id).sort(),
+  );
+  assert(
+    unsafeScene.helperOverflow.some((entry) => entry.id === "unsafe"),
+    "unsafe station diagnostics remain available",
+  );
+});
+
 test("observer-scene regression contracts", () => {
   function advanceUntil(
     movement: ReturnType<typeof Scene.createMovement>,

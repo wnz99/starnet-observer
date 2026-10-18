@@ -1,4 +1,5 @@
 export { build } from "./build.js";
+export { representedRows } from "./rooms.js";
 export { relayNetworks, shadowRows } from "./relay.js";
 export { project, unproject } from "./geometry.js";
 export {

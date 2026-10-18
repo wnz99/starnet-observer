@@ -1,4 +1,4 @@
-import { build, relayNetworks, shadowRows } from "../scene/index.js";
+import { build, relayNetworks, shadowRows, representedRows } from "../scene/index.js";
 import type { RemoteHost, Scene, RelayNetwork } from "../scene/types.js";
 import { record } from "../theme/validation.js";
 import type { MailFrame } from "../view/types.js";
@@ -39,6 +39,7 @@ function geometryField(name: string, value: unknown) {
 /* llm-bus relays come from each observed bus's own binding. Each unobserved machine on a relay becomes a shadow ship
    of ghost crew from the relay roster: on the floor only, never in byId, so nothing selects, inspects or controls it. */
 export class Floor {
+  displayedRows: AppRow[] = [];
   readonly shadows = new Map<string, ShadowRow>();
   readonly relayMembers = new Map<string, RelayMember>();
   private sceneKey: string | null = null;
@@ -196,6 +197,20 @@ export class Floor {
     ];
     return this.relays(buses);
   }
+  private crew(rows: AppRow[], overseer: AppRow | null) {
+    const { state } = this.options;
+    const observed = (ids: readonly string[]) => {
+      const represented = new Set(ids);
+      return rows.filter((row) => represented.has(row.id));
+    };
+    this.displayedRows = observed([
+      ...representedRows(state.layout.allRooms()).map((row) => row.id),
+      ...(overseer ? [overseer.id] : []),
+    ]);
+    if (state.selected && !this.displayedRows.some((row) => row.id === state.selected))
+      this.options.overview();
+    return observed(state.scene?.workers.map((worker) => worker.id) ?? []);
+  }
   render(snapshot: AppQuerySnapshot, hosts: RemoteHost[], refresh: boolean) {
     const { state, view } = this.options;
     const data = snapshot.data;
@@ -213,11 +228,8 @@ export class Floor {
       this.update(state.scene);
     } else if (refresh || content !== this.contentKey) view.invalidate();
     this.contentKey = content;
-    const rooms = state.layout.onPage(state.page);
-    const onFloor = rooms
-      .flatMap((room) => room.rows.map((value) => value.row))
-      .filter((row) => !("shadow" in row && row.shadow));
-    return { onFloor, floorRows: [...rows, ...ghosts] };
+    const onFloor = this.crew(rows, overseer);
+    return { displayedRows: this.displayedRows, onFloor, floorRows: [...rows, ...ghosts] };
   }
   dispose() {
     this.shadows.clear();

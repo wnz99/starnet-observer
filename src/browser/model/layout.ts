@@ -142,18 +142,19 @@ export class Layout {
       const seen = new Set([row.id]);
       let parent: LayoutRow | undefined = row,
         depth = 0;
-      while (parent && isHelper(parent) && parent.parentId && !seen.has(parent.parentId)) {
+      while (parent && parent.parentId && !seen.has(parent.parentId)) {
         seen.add(parent.parentId);
         parent = byId.get(parent.parentId);
         depth++;
+        if (parent && this.panes.has(parent.id)) break;
       }
-      if (parent && !isHelper(parent) && this.panes.has(parent.id))
+      if (parent && parent.id !== row.id && this.panes.has(parent.id))
         valid.set(row.id, { row, rootId: parent.id, depth });
     }
     return valid;
   }
   private helperMatches(allocation: Helper, value: ValidHelper | undefined) {
-    const root = value && this.panes.get(value.rootId);
+    const root = value && (this.panes.get(value.row.id) ?? this.panes.get(value.rootId));
     return (
       value &&
       root &&
@@ -205,7 +206,7 @@ export class Layout {
     for (const { row, rootId } of Array.from(valid.values()).sort(
       (a, b) => a.depth - b.depth || a.row.id.localeCompare(b.row.id),
     )) {
-      const root = required(this.panes, rootId),
+      const root = this.panes.get(row.id) ?? required(this.panes, rootId),
         previous = this.helpers.get(row.id);
       if (previous && previous.helperSlot !== null) continue;
       const helperSlot = this.station(root, row);
@@ -229,7 +230,7 @@ export class Layout {
   }
   reconcile(rows: readonly LayoutRow[]) {
     const byId = new Map(rows.map((row) => [row.id, row]));
-    const roots = rows.filter((row) => !isHelper(row)),
+    const roots = rows.filter((row) => !isHelper(row) || (row.source === "herdr" && !!row.paneId)),
       live = new Set(roots.map((row) => row.id));
     const removed: string[] = [];
     for (const id of this.panes.keys())
@@ -268,6 +269,9 @@ export class Layout {
   }
   onPage(page: number) {
     return this.rooms.filter((room) => Math.floor(room.slot / ROOMS_PER_PAGE) === page);
+  }
+  allRooms(): readonly Room[] {
+    return this.rooms;
   }
   pageFor(id: string) {
     const pane = this.panes.get(id) ?? this.helpers.get(id);
