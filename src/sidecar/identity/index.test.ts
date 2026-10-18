@@ -11,12 +11,36 @@ import path from "node:path";
 import net from "node:net";
 import { spawn } from "node:child_process";
 import { makeFooterConfigurationReader, makeIdentityRpc } from "./index.js";
-import { object, result } from "./types.js";
-import type { IdentityExecute } from "./types.js";
+import { object, result, CONTENT_CHANGED_CODE } from "./types.js";
+import type { IdentityOptions } from "./types.js";
 import { makeIdentityResolver } from "./index.js";
 import type { FooterMode, IdentityRpc, RefreshState } from "./types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
+import { counts as diagnostics } from "../failopen.js";
+
+test("closed resolver rejects capture entry before socket or configuration work", async () => {
+  let calls = 0;
+  const resolver = makeIdentityResolver({
+    now: () => 1,
+    readConfiguration: async () => {
+      calls++;
+      return Promise.resolve("configured");
+    },
+    readProcessBirth: () => {
+      return Promise.reject(Error("must not read"));
+    },
+    rpc: async () => {
+      calls++;
+      return Promise.resolve({});
+    },
+  });
+  await resolver.close();
+  await resolver.close();
+  assert.equal((await resolver.resolve({ agent: "codex" })).source, "unavailable");
+  assert.equal(await resolver.revalidate({}), false);
+  assert.equal(calls, 0);
+});
 
 test("observer-identity regression contracts", async () => {
   const A = "00000000-0000-0000-0000-000000000001",
@@ -32,6 +56,11 @@ test("observer-identity regression contracts", async () => {
       sequence = 8,
       pid = 41,
       birth = 1;
+    let clock = 1000,
+      conflict: "once" | "always" | "mismatch" | null = null,
+      conflicts = 0;
+    let afterInitial: (() => void) | null = null,
+      rows = 20;
     const calls: string[] = [],
       births: number[] = [];
     let capability: string | null = null,
@@ -43,17 +72,42 @@ test("observer-identity regression contracts", async () => {
         : "\n  " + B + " · model\n  ? for shortcuts\n";
     }
     function motion(params: Record<string, unknown>) {
-      assert.deepEqual(params.cursor, { row: 119, col: 0 });
+      const cursor = object(params.cursor);
+      assert.equal(cursor.col, 0);
+      assert(
+        typeof cursor.row === "number" && cursor.row < 100 + rows,
+        "probe coordinate stays valid",
+      );
       assert.equal(params.motion, "line_end");
-      if (
-        params.content_revision !== undefined &&
-        (sequence !== params.content_revision || sequence % 2)
-      )
-        throw Error("stale_content");
-      return Promise.resolve({ result: { pane_id: pane.pane_id, content_revision: sequence } });
+      return Promise.resolve(
+        params.content_revision === undefined
+          ? { result: { pane_id: pane.pane_id, content_revision: sequence } }
+          : conditionalMotion(params.content_revision),
+      );
+    }
+    function conditionalMotion(revision: unknown) {
+      const invalid: Record<string, { pane_id: string; content_revision: unknown }> = {
+        "final-pane": { pane_id: "other", content_revision: 8 },
+        "final-odd": { pane_id: pane.pane_id, content_revision: 9 },
+        "final-malformed": { pane_id: pane.pane_id, content_revision: "8" },
+      };
+      const result = invalid[capability || ""];
+      if (result) return { result };
+      if (conflict && (conflict !== "once" || conflicts++ === 0)) {
+        if (conflict === "mismatch")
+          return {
+            result: { pane_id: pane.pane_id, content_revision: sequence + 2 },
+          };
+        throw Object.assign(Error("PRIVATE CONTENT"), { code: CONTENT_CHANGED_CODE });
+      }
+      if (sequence !== revision || sequence % 2)
+        throw Object.assign(Error("Live footer changed during capture"), {
+          code: CONTENT_CHANGED_CODE,
+        });
+      return { result: { pane_id: pane.pane_id, content_revision: sequence } };
     }
     const resolver = makeIdentityResolver({
-      now: () => 1000,
+      now: () => clock,
       readConfiguration: async () => {
         if (afterConfiguration) afterConfiguration();
         return Promise.resolve(mode);
@@ -69,19 +123,22 @@ test("observer-identity regression contracts", async () => {
         if (fail) throw Error("PRIVATE");
         if (capability === method) return Promise.resolve({ result: {} });
         if (method === "agent.get") return Promise.resolve({ result: { agent: { ...current } } });
-        if (method === "pane.get")
-          return Promise.resolve({
+        if (method === "pane.get") {
+          const response = {
             result: {
               pane: {
-                pane_id: pane.pane_id,
+                ...current,
                 scroll: {
                   max_offset_from_bottom: 100,
-                  viewport_rows: capability === "geometry" ? 0 : 20,
+                  viewport_rows: capability === "geometry" ? 0 : rows,
                   offset_from_bottom: scrollOffset,
                 },
               },
             },
-          });
+          };
+          afterInitial?.();
+          return Promise.resolve(response);
+        }
         if (method === "pane.process_info")
           return Promise.resolve({
             result: {
@@ -115,6 +172,18 @@ test("observer-identity regression contracts", async () => {
     });
     return {
       resolver,
+      afterInitial: (value: () => void) => {
+        afterInitial = value;
+      },
+      rows: (value: number) => {
+        rows = value;
+      },
+      clock: (value: number) => {
+        clock = value;
+      },
+      conflict: (value: typeof conflict) => {
+        conflict = value;
+      },
       current: (value: Record<string, unknown>) => {
         current = value;
       },
@@ -159,6 +228,16 @@ test("observer-identity regression contracts", async () => {
     const f = fixture();
     const exact = await f.resolver.resolve(pane);
     assert.equal(exact.sessionId, A);
+    assert.deepEqual(f.methods, [
+      "pane.read",
+      "pane.get",
+      "pane.process_info",
+      "pane.copy_motion",
+      "pane.read",
+      "agent.get",
+      "pane.process_info",
+      "pane.copy_motion",
+    ]);
     assert.equal(exact.source, "footer");
     assert.equal(await f.resolver.revalidate(exact.proof), EXPECTED_TRUE);
     assert.equal(
@@ -171,6 +250,53 @@ test("observer-identity regression contracts", async () => {
       A,
       "current footer overrides stale hook",
     );
+    for (const footer of [
+      "? for shortcuts",
+      "← for agents · ? for shortcuts",
+      "? for shortcuts                 90% context left",
+      "New activity · enter/esc latest · ? shortcuts",
+      "New activity · esc latest · ? shortcuts",
+      "New activity · enter/esc latest · ? shortcuts                 90% context left",
+      "New activity · esc latest · ? shortcuts                 90% context left",
+    ]) {
+      const navigation = fixture();
+      navigation.body("\n  " + A + " · model\n  " + footer + "\n");
+      const resolved = await navigation.resolver.resolve(pane);
+      assert.equal(resolved.sessionId, A, footer);
+      assert.equal(resolved.source, "footer", footer);
+      assert.equal(await navigation.resolver.revalidate(resolved.proof), EXPECTED_TRUE, footer);
+      assert.equal(navigation.methods.at(-1), "pane.copy_motion", footer);
+    }
+    for (const footer of [
+      "New activity · enter latest · ? shortcuts",
+      "New activity · esc/enter latest · ? shortcuts",
+      "New activity · esc newest · ? shortcuts",
+      "New activity · esc latest · ? for shortcuts",
+      "New activity · esc latest · ? shortcutsCopied",
+      "New activity · esc latest · ? shortcut",
+      "New activity · esc latest - ? shortcuts",
+      "New activities · esc latest · ? shortcuts",
+      "Answer: New activity · esc latest · ? shortcuts",
+      "Search: New activity · esc latest · ? shortcuts",
+      "Copy: New activity · esc latest · ? shortcuts",
+      "New activity · esc latest · ? shortcuts " + B,
+      "New activity · esc latest · ? shortcuts\u001b[0m",
+      "New activity · esc latest · ? shortcuts\r",
+      "New activity · esc latest · ? shortcuts\u0000",
+      "New activity · esc latest · ? shortcuts\u007f",
+    ]) {
+      f.body("\n  " + A + " · model\n  " + footer + "\n");
+      assert.equal((await f.resolver.resolve(pane)).sessionId, null, footer);
+    }
+    for (const mode of ["unconfigured", "unavailable"] as const) {
+      const absentConfiguration = fixture();
+      absentConfiguration.mode(mode);
+      absentConfiguration.body(
+        "\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
+      );
+      assert.equal((await absentConfiguration.resolver.resolve(pane)).sessionId, null, mode);
+      assert.equal(absentConfiguration.calls(), 0, mode);
+    }
     for (const body of [
       "\n  " + A.slice(0, 32) + "\n  ? for shortcuts\n",
       "\n  answer " + A + "\n  ? for shortcuts\n",
@@ -178,6 +304,12 @@ test("observer-identity regression contracts", async () => {
       "\n  " + A + " · model\n  Choose a model\n",
       A + "\n\n  ? for shortcuts\n",
       "overlay\n  " + A + " · model\n  ? for shortcuts\n",
+      "\n  " + A + " · " + B + "\n  New activity · esc latest · ? shortcuts\n",
+      "\n  answer " + A + "\n  New activity · esc latest · ? shortcuts\n",
+      A + "\n\n  New activity · esc latest · ? shortcuts\n",
+      "overlay\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
+      "\n  " + A + " · model\n  New activity · esc latest · ? shortcuts\nextra\n",
+      "  " + A + " · model\n  New activity · esc latest · ? shortcuts\n",
     ]) {
       f.body(body);
       assert.equal((await f.resolver.resolve(pane)).sessionId, null, body);
@@ -234,8 +366,8 @@ test("observer-identity regression contracts", async () => {
     });
     assert.equal(
       (await race.resolver.resolve(pane)).sessionId,
-      null,
-      "changed screen around read rejected",
+      A,
+      "one-shot changed screen recovers with fresh evidence",
     );
     const provider = fixture();
     provider.current({ ...pane, agent: "claude" });
@@ -270,11 +402,164 @@ test("observer-identity regression contracts", async () => {
     await concurrentSuppression();
     await configurationAndRpc();
     await sampledRaces();
+    await retryPolicy();
+    await initialProofBoundaries();
+    await mutableProofBoundaries();
     await processBirthBoundary();
     console.log(
       "observer identity: exact footer, native compatibility, withdrawal and terminal/thread races OK",
     );
   })();
+
+  async function retryPolicy() {
+    const before = diagnostics()["observer.identity.content"] || 0;
+    const recovered = fixture();
+    recovered.conflict("once");
+    assert.equal((await recovered.resolver.resolve(pane)).sessionId, A);
+    assert.equal(recovered.calls(), 16);
+    assert.equal(recovered.births.length, 4);
+    assert.deepEqual(
+      recovered.methods.slice(8),
+      recovered.methods.slice(0, 8),
+      "retry recomputes every RPC input",
+    );
+    assert.equal(diagnostics()["observer.identity.content"] || 0, before, "recovery stays silent");
+    for (const conflict of ["always", "mismatch"] as const) {
+      const busy = fixture();
+      busy.conflict(conflict);
+      const count = diagnostics()["observer.identity.content"] || 0;
+      assert.equal((await busy.resolver.resolve(pane)).reason, "content-changed");
+      assert.equal(busy.calls(), 24);
+      assert.equal(busy.births.length, 6);
+      assert.equal(diagnostics()["observer.identity.content"], count + 1);
+    }
+    for (const remaining of [0, 1]) {
+      const busy = fixture();
+      busy.conflict("always");
+      const state = { identityRetriesRemaining: remaining };
+      await busy.resolver.resolve(pane, state);
+      assert.equal(busy.calls(), 8 * (remaining + 1));
+      assert.equal(state.identityRetriesRemaining, 0);
+    }
+    const timed = fixture();
+    timed.conflict("always");
+    timed.afterBirth((count) => {
+      if (count === 2) timed.clock(2500);
+    });
+    assert.equal((await timed.resolver.resolve(pane)).reason, "content-changed");
+    assert.equal(timed.calls(), 8, "retry is not admitted at the 1500ms boundary");
+    const admitted = fixture();
+    admitted.conflict("once");
+    admitted.afterBirth((count) => {
+      admitted.clock(count <= 2 ? 2499 : 5000);
+    });
+    assert.equal(
+      (await admitted.resolver.resolve(pane)).sessionId,
+      A,
+      "admitted attempt can finish beyond budget",
+    );
+    assert.equal(admitted.calls(), 16);
+    const switched = fixture();
+    const original = await switched.resolver.resolve(pane);
+    switched.conflict("once");
+    switched.afterBirth((count) => {
+      if (count === 4) switched.body("\n  " + B + " · model\n  ? for shortcuts\n");
+    });
+    assert.equal(
+      await switched.resolver.revalidate(original.proof),
+      false,
+      "retries cannot authorize original A with fresh B",
+    );
+    assert.equal((await switched.resolver.resolve(pane)).sessionId, B);
+  }
+  async function initialProofBoundaries() {
+    for (const current of [
+      { ...pane, pane_id: "other" },
+      { ...pane, agent: "claude" },
+      { ...pane, terminal_id: "other" },
+      { pane_id: pane.pane_id },
+    ]) {
+      const invalid = fixture();
+      invalid.current(current);
+      assert.equal((await invalid.resolver.resolve(pane)).reason, "terminal-unavailable");
+      assert.equal(invalid.births.length, 0);
+      assert.equal(invalid.calls(), 2);
+    }
+    const geometry = fixture();
+    geometry.capability("geometry");
+    assert.equal((await geometry.resolver.resolve(pane)).reason, "geometry-unavailable");
+    assert.equal(geometry.births.length, 0);
+    const replacement = fixture();
+    replacement.afterBirth(() => {
+      replacement.current({ ...pane, terminal_id: "replacement" });
+    });
+    assert.equal((await replacement.resolver.resolve(pane)).reason, "terminal-changed");
+    assert.equal(replacement.births.length, 1);
+    for (const capability of ["final-malformed", "final-odd", "final-pane"]) {
+      const invalid = fixture();
+      invalid.capability(capability);
+      assert.equal(
+        (await invalid.resolver.resolve(pane)).reason,
+        "content-unavailable",
+        capability,
+      );
+      assert.equal(invalid.calls(), 8, capability + " never retries");
+      assert.equal(invalid.births.length, 2);
+    }
+  }
+  async function mutableProofBoundaries() {
+    for (const rows of [10, 40]) {
+      const resized = fixture();
+      resized.afterInitial(() => {
+        resized.rows(rows);
+        resized.sequence(10);
+      });
+      assert.equal(
+        (await resized.resolver.resolve(pane)).sessionId,
+        rows === 40 ? A : null,
+        "pre-bracket resize accepts only still-valid coordinates",
+      );
+      assert.equal(resized.calls(), rows === 40 ? 8 : 4);
+    }
+    for (const phase of ["initial", "accepted", "final-birth"]) {
+      const replaced = fixture();
+      const replace = () => {
+        replaced.current({ ...pane, terminal_id: "new" });
+        if (phase === "final-birth") replaced.sequence(10);
+      };
+      if (phase === "initial") replaced.afterInitial(replace);
+      else if (phase === "accepted") {
+        let reads = 0;
+        replaced.after(() => {
+          if (++reads === 2) replace();
+        });
+      } else
+        replaced.afterBirth((count) => {
+          if (count === 2) replace();
+        });
+      assert.equal(
+        (await replaced.resolver.resolve(pane)).sessionId,
+        null,
+        "terminal replacement sampled at " + phase,
+      );
+    }
+    for (const mutation of ["resize", "scroll-aba"]) {
+      const moving = fixture();
+      let reads = 0,
+        sequence = 8;
+      moving.after(() => {
+        if (++reads % 2 !== 0) return;
+        moving.sequence((sequence += 2));
+        if (mutation === "resize") moving.rows(40);
+        else {
+          moving.scroll(80);
+          moving.scroll(0);
+        }
+      });
+      assert.equal((await moving.resolver.resolve(pane)).reason, "content-changed", mutation);
+      assert.equal(moving.calls(), 24);
+    }
+  }
 
   // Configuration and transport boundaries run only against isolated temporary files/sockets.
   async function configurationAndRpc() {
@@ -327,6 +612,20 @@ test("observer-identity regression contracts", async () => {
       }
       const socket = path.join(folder, "native.sock");
       let response = "valid";
+      function errorFrame(id: unknown) {
+        const codes: Record<string, string | undefined> = {
+          stale: "stale_content",
+          "stale-wrong-id": "stale_content",
+          unknown: "unknown",
+        };
+        return {
+          id: response === "stale-wrong-id" ? "other" : id,
+          error:
+            response === "malformed"
+              ? "stale_content"
+              : { message: "PRIVATE", code: codes[response] },
+        };
+      }
       server = net.createServer((connection) => {
         connection.on("error", () => {});
         connection.once("data", (data) => {
@@ -344,10 +643,8 @@ test("observer-identity regression contracts", async () => {
             connection.end(JSON.stringify({ id: "other", result: {} }) + "\n");
             return;
           }
-          if (response === "error") {
-            connection.end(
-              JSON.stringify({ id: request.id, error: { message: "PRIVATE" } }) + "\n",
-            );
+          if (["error", "stale", "unknown", "stale-wrong-id", "malformed"].includes(response)) {
+            connection.end(JSON.stringify(errorFrame(request.id)) + "\n");
             return;
           }
           if (response === "timeout") return;
@@ -365,6 +662,20 @@ test("observer-identity regression contracts", async () => {
       );
       for (response of ["closed", "oversized", "wrong-id", "error", "timeout"])
         await assert.rejects(rpc("agent.get", { target: pane.pane_id }));
+      for (response of ["stale", "unknown", "stale-wrong-id", "malformed", "error"]) {
+        await assert.rejects(rpc("agent.get", { target: pane.pane_id }), (error: unknown) => {
+          assert(error instanceof Error);
+          assert.equal(object(error).code, response === "stale" ? CONTENT_CHANGED_CODE : undefined);
+          assert.equal(
+            error.message,
+            response === "stale"
+              ? "Live footer changed during capture"
+              : "Invalid identity response",
+          );
+          assert(!error.message.includes("PRIVATE"));
+          return true;
+        });
+      }
       await assert.rejects(rpc("pane.send_text", {}), /Unsupported/);
       await assert.rejects(
         rpc("agent.list", {}),
@@ -417,7 +728,7 @@ test("observer-identity regression contracts", async () => {
       if (method === "pane.get")
         return Promise.resolve({
           result: {
-            pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
+            pane: { ...target, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
           },
         });
       if (method === "pane.copy_motion")
@@ -434,28 +745,26 @@ test("observer-identity regression contracts", async () => {
         },
       });
     };
-    const createResolver = (execute?: IdentityExecute) =>
+    const createResolver = (readProcessBirth: IdentityOptions["readProcessBirth"]) =>
       makeIdentityResolver({
         now: () => 1000,
         endpoint: "/isolated/native.sock",
         readConfiguration: async () => Promise.resolve("configured"),
         rpc,
-        execute,
+        readProcessBirth,
       });
-    // Exercise structured PID evidence and executable/deadline failures at the default reader boundary.
+    // Exercise capture-local evidence and refresh-wide capability failure through the injected reader.
     for (const evidence of [
       null,
       { pid: 0, startSeconds: 1, startMicroseconds: 0 },
       { pid: child.pid, startSeconds: 0, startMicroseconds: 0 },
     ]) {
-      const reader = createResolver(async (_command, args) =>
-        Promise.resolve({
-          stdout: JSON.stringify(
-            Number(args.at(-1)) === child.pid
-              ? evidence
-              : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
-          ),
-        }),
+      const reader = createResolver(async (pid) =>
+        Promise.resolve(
+          pid === child.pid
+            ? evidence
+            : { pid: process.pid, startSeconds: 1, startMicroseconds: 0 },
+        ),
       );
       const refresh: RefreshState = {};
       assert.equal((await reader.resolve(at(panes, 0), refresh)).source, "unavailable");
@@ -468,14 +777,12 @@ test("observer-identity regression contracts", async () => {
     }
     for (const code of ["ENOENT", "ETIMEDOUT"]) {
       let failed = true;
-      const reader = createResolver(async (_command, args) => {
+      const reader = createResolver(async (pid) => {
         if (failed) throw Object.assign(Error("Birth reader unavailable"), { code });
         return Promise.resolve({
-          stdout: JSON.stringify({
-            pid: Number(args.at(-1)),
-            startSeconds: 1,
-            startMicroseconds: 0,
-          }),
+          pid,
+          startSeconds: 1,
+          startMicroseconds: 0,
         });
       });
       const refresh: RefreshState = {};
@@ -532,8 +839,8 @@ test("observer-identity regression contracts", async () => {
         });
       assert.equal(
         (await f.resolver.resolve(pane)).sessionId,
-        null,
-        fault + " with unchanged metadata must withdraw identity",
+        ["pty", "resize", "configuration", "final-birth-await"].includes(fault) ? A : null,
+        fault + " preserves proof checks across complete retries",
       );
     }
     for (const capability of [
@@ -614,7 +921,7 @@ test("observer-identity regression contracts", async () => {
     );
     assert.deepEqual(counts, {
       "pane.read": 2,
-      "agent.get": 2,
+      "agent.get": 1,
       "pane.process_info": 2,
       "pane.get": 1,
       "pane.copy_motion": 2,
@@ -631,7 +938,7 @@ test("observer-identity regression contracts", async () => {
     );
     assert.equal(
       healthy.methods.length,
-      9,
+      8,
       "multiple roots rejected before additional native work",
     );
     assert.equal(
@@ -659,11 +966,12 @@ test("observer-identity regression contracts", async () => {
   function concurrentFixture(
     options: {
       fault?: string;
+      paneCount?: number;
       birth?: (pid: number, count: number) => Promise<void>;
       rpc?: (method: string, params: Record<string, unknown>, index: number) => Promise<void>;
     } = {},
   ) {
-    const panes = Array.from({ length: 8 }, (_, i) => ({
+    const panes = Array.from({ length: options.paneCount ?? 8 }, (_, i) => ({
       ...pane,
       pane_id: "w1:p" + String(i),
       terminal_id: "term_" + String(i),
@@ -672,12 +980,13 @@ test("observer-identity regression contracts", async () => {
       births: { pid: number; count: number }[] = [],
       counts = new Map<number, number>();
     function staleContent(index: number, params: Record<string, unknown>) {
-      return options.fault === "content" && index === 0 && params.content_revision !== undefined;
+      return (
+        (options.fault === "all-content" || (options.fault === "content" && index === 0)) &&
+        params.content_revision !== undefined
+      );
     }
-    function terminal(id: string, index: number, method: string) {
-      return options.fault === "terminal" &&
-        index === 0 &&
-        calls.filter((call) => call.id === id && call.method === method).length === 2
+    function terminal(index: number, method: string) {
+      return options.fault === "terminal" && index === 0 && method === "agent.get"
         ? "replaced"
         : at(panes, index).terminal_id;
     }
@@ -708,7 +1017,7 @@ test("observer-identity regression contracts", async () => {
             result: {
               agent: {
                 ...panes[index],
-                terminal_id: terminal(id, index, method),
+                terminal_id: terminal(index, method),
               },
             },
           };
@@ -717,11 +1026,12 @@ test("observer-identity regression contracts", async () => {
         if (method === "pane.get")
           return {
             result: {
-              pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
+              pane: { ...panes[index], scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
             },
           };
         if (method === "pane.copy_motion") {
-          if (staleContent(index, params)) throw Error("stale_content");
+          if (staleContent(index, params))
+            throw Object.assign(Error("conflict"), { code: CONTENT_CHANGED_CODE });
           return { result: { pane_id: id, content_revision: 8 } };
         }
         assert.equal(method, "pane.read");
@@ -741,6 +1051,23 @@ test("observer-identity regression contracts", async () => {
     return { panes, resolver, calls, births };
   }
   async function boundedIdentityRefresh() {
+    const busy = concurrentFixture({ fault: "all-content", paneCount: 20 });
+    const state: RefreshState = {};
+    const busyResults = await busy.resolver.resolveMany(busy.panes, state);
+    assert(busyResults.every((value) => value.reason === "content-changed"));
+    assert.equal(
+      busy.calls.length,
+      224,
+      "twenty first attempts plus eight extra complete attempts",
+    );
+    assert.equal(busy.births.length, 56);
+    assert.equal(state.identityRetriesRemaining, 0);
+    await busy.resolver.resolveMany(busy.panes, state);
+    assert.equal(busy.calls.length, 384, "shared zero remains zero on reuse");
+    assert(
+      busy.panes.every((row) => busy.calls.some((call) => call.id === row.pane_id)),
+      "every healthy admission retains its first attempt",
+    );
     const hold = deferred(),
       f = concurrentFixture({
         birth: async (_, count) => {
@@ -864,7 +1191,7 @@ test("observer-identity regression contracts", async () => {
       assert((await work).every((value) => value.sessionId === null));
       assert.equal(live.births.length, 4);
       assert.equal(
-        live.calls.filter((call) => call.method === "pane.get").length,
+        live.calls.filter((call) => call.method === "pane.copy_motion").length,
         0,
         "capability suppression publishes before outstanding births continue",
       );

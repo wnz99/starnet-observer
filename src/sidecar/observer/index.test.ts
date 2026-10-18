@@ -30,6 +30,7 @@ import { makeHelperObserver } from "../helpers/index.js";
 import { makeDesktopObserver } from "../desktop/index.js";
 import { makeTranscriptObserver } from "../transcripts/index.js";
 import { makeIdentityResolver } from "../identity/index.js";
+import { CONTENT_CHANGED_CODE } from "../identity/types.js";
 import { makeOverseerState } from "../overseer-state/index.js";
 import type { ObserverOptions, Inventory, ObserverInputRow } from "./contracts.js";
 
@@ -1318,6 +1319,9 @@ test("observer regression contracts", async () => {
       displayed = ID,
       terminal = "term_original",
       revision = 1,
+      sequence = 8,
+      startSeconds = 1,
+      birthCalls = 0,
       readCalls = 0,
       detailCalls = 0,
       release: (() => void) | true | null | undefined = null;
@@ -1325,14 +1329,28 @@ test("observer regression contracts", async () => {
     const resolver = makeIdentityResolver({
       now: () => clock,
       readConfiguration: () => settled(() => "configured"),
-      readProcessBirth: (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
+      readProcessBirth: (pid) =>
+        settled(() => {
+          birthCalls++;
+          return { pid, startSeconds, startMicroseconds: 0 };
+        }),
       rpc: (method, params) => {
         return settled(() => {
-          const native = nativeIdentityResult(method, params);
+          // First complete capture conflicts after the bracketed footer read.
+          const native = nativeIdentityResult(
+            method,
+            params,
+            {
+              ...original,
+              terminal_id: terminal,
+            },
+            sequence,
+          );
           if (native) return native;
           if (method === "agent.get")
             return { result: { agent: { ...original, terminal_id: terminal, revision } } };
           readCalls++;
+          if (readCalls === 2) sequence = 10;
           return {
             result: {
               read: {
@@ -1341,7 +1359,10 @@ test("observer regression contracts", async () => {
                 format: "text",
                 revision: 0,
                 truncated: true,
-                text: "\n  " + displayed + " · model\n  ? for shortcuts\n",
+                text:
+                  "\n  " +
+                  displayed +
+                  " · model\n  New activity · enter/esc latest · ? shortcuts\n",
               },
             },
           };
@@ -1410,6 +1431,8 @@ test("observer regression contracts", async () => {
       root = first.sessions[0];
     assert.equal(must(root).identitySource, "footer");
     assert.equal(must(root).identityHealth, "available");
+    assert.equal(readCalls, 4, "initial content conflict retries one complete capture");
+    assert.equal(birthCalls, 4, "both failed and successful captures use fresh births");
     assert(
       !JSON.stringify(first).includes("term_original"),
       "terminal incarnation proof stays private",
@@ -1418,12 +1441,18 @@ test("observer regression contracts", async () => {
     await observer.get();
     assert.equal(readCalls, captured, "footer capture shares cached refresh");
     revision++;
+    const birthsBeforeInspection = birthCalls;
     assert.equal(
       (await observer.inspect(must(root).id)).health,
       "available",
       "normal output revision changes do not invalidate same current footer",
     );
     assert.equal(readCalls, captured + 4, "selected read revalidates footer before and after");
+    assert.equal(
+      birthCalls,
+      birthsBeforeInspection + 4,
+      "both inspector validations query both births freshly",
+    );
     displayed = "00000000-0000-0000-0000-000000000002";
     const before = detailCalls;
     const reject = (
@@ -1446,16 +1475,21 @@ test("observer regression contracts", async () => {
       "cached inventory cannot authorize old root or helper content after in-TUI switch",
     );
     displayed = ID;
-    for (const target of [must(root).id, helperId]) {
-      release = true;
-      const pending = observer.inspect(target);
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      displayed = "00000000-0000-0000-0000-000000000002";
-      fixtureRelease(release);
-      release = null;
-      reject(await pending);
-      displayed = ID;
-    }
+    for (const kind of ["session", "terminal", "birth"])
+      for (const target of [must(root).id, helperId]) {
+        release = true;
+        const pending = observer.inspect(target);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (kind === "session") displayed = "00000000-0000-0000-0000-000000000002";
+        else if (kind === "terminal") terminal = "term_replaced";
+        else startSeconds = 2;
+        fixtureRelease(release);
+        release = null;
+        reject(await pending);
+        displayed = ID;
+        terminal = "term_original";
+        startSeconds = 1;
+      }
     terminal = "term_replaced";
     reject(await observer.inspect(must(root).id));
     clock += 3000;
@@ -1562,11 +1596,12 @@ test("observer regression contracts", async () => {
               release = resolve;
             });
           }
+          if (contentRead) sequence += 2;
           return "configured";
         },
         rpc: (method, params) => {
           return settled(() => {
-            const native = nativeIdentityResult(method, params, sequence);
+            const native = nativeIdentityResult(method, params, original, sequence);
             if (native) return native;
             return method === "agent.get"
               ? { result: { agent: { ...original, terminal_id: terminal } } }
@@ -1695,7 +1730,11 @@ test("observer regression contracts", async () => {
         if (!responsive) return;
         const { request, parameters } = readFixtureRequest(data);
         const result =
-          nativeIdentityResult(request.method, parameters)?.result ||
+          nativeIdentityResult(
+            request.method,
+            parameters,
+            agents.find((agent) => agent.pane_id === parameters.pane_id) || {},
+          )?.result ||
           (request.method === "agent.get"
             ? { agent: agents.find((agent) => agent.pane_id === parameters.target) }
             : {
@@ -1851,11 +1890,11 @@ test("observer regression contracts", async () => {
             settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
           rpc: (method, params) => {
             return settled(() => {
-              const native = nativeIdentityResult(method, params);
-              if (native) return native;
               const agent = agents.find(
                 (agent) => agent.pane_id === (params.target || params.pane_id),
               );
+              const native = nativeIdentityResult(method, params, agent || {});
+              if (native) return native;
               if (method === "agent.get") return { result: { agent: { ...agent } } };
               assert.equal(method, "pane.read");
               return {
@@ -1932,12 +1971,17 @@ test("observer regression contracts", async () => {
   }
 
   // Faithful native wrappers: metadata revision is independent of content sequence.
-  function nativeIdentityResult(method: string, params: Record<string, unknown>, sequence = 8) {
+  function nativeIdentityResult(
+    method: string,
+    params: Record<string, unknown>,
+    agent: Record<string, unknown>,
+    sequence = 8,
+  ) {
     if (method === "pane.get")
       return {
         result: {
           pane: {
-            pane_id: params.pane_id,
+            ...agent,
             scroll: { max_offset_from_bottom: 0, viewport_rows: 20 },
           },
         },
@@ -1946,7 +1990,9 @@ test("observer regression contracts", async () => {
       return { result: { process_info: { pane_id: params.pane_id, shell_pid: 41 } } };
     if (method === "pane.copy_motion") {
       if (params.content_revision !== undefined && params.content_revision !== sequence)
-        throw Error("stale_content");
+        throw Object.assign(Error("Live footer changed during capture"), {
+          code: CONTENT_CHANGED_CODE,
+        });
       return { result: { pane_id: params.pane_id, content_revision: sequence } };
     }
     return null;

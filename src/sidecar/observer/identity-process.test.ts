@@ -2,7 +2,8 @@ import type { ObserverInputRow } from "./contracts.js";
 import { settled } from "./testing.fixture.js";
 import { spawn } from "node:child_process";
 import { makeIdentityResolver } from "../identity/index.js";
-import type { IdentityExecute, IdentityRpc } from "../identity/types.js";
+import { makeProcessBirthReader } from "../identity/birth.js";
+import type { IdentityRpc } from "../identity/types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makeObserver } from "./index.js";
@@ -45,7 +46,7 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         if (method === "pane.get")
           return {
             result: {
-              pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
+              pane: { ...target, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
             },
           };
         if (method === "pane.copy_motion") return { result: { pane_id: id, content_revision: 8 } };
@@ -62,15 +63,12 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         };
       });
     };
-    const createResolver = (execute?: IdentityExecute) =>
-      makeIdentityResolver({
-        now: () => 1000,
-        endpoint: "/isolated/native.sock",
-        readConfiguration: () => settled(() => "configured"),
-        rpc,
-        execute,
-      });
-    const resolver = createResolver(); // Actual default Python/libproc reader.
+    const resolver = makeIdentityResolver({
+      now: () => 1000,
+      endpoint: "/isolated/native.sock",
+      readConfiguration: () => settled(() => "configured"),
+      rpc,
+    });
     let inspected = 0;
     const observer = makeObserver({
       now: () => 1000,
@@ -100,23 +98,95 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         },
       },
     });
-    const snapshot = await observer.get();
+    try {
+      const snapshot = await observer.get();
+      assert.equal(
+        must(must(snapshot.sessions[0])).identitySource,
+        "unavailable",
+        "exited requested PID fails its own capture",
+      );
+      assert.equal(
+        must(must(snapshot.sessions[1])).identitySource,
+        "footer",
+        "exited PID must not suppress a healthy second pane in the same refresh",
+      );
+      assert.equal((await observer.inspect(must(snapshot.sessions[0]).id)).health, "unavailable");
+      assert.equal(
+        (await observer.inspect(must(snapshot.sessions[1]).id)).health,
+        "available",
+        "healthy pane remains inspectable through fresh default libproc revalidation",
+      );
+      assert.equal(inspected, 1, "only the healthy selected pane reaches transcript inspection");
+    } finally {
+      await observer.close();
+    }
     assert.equal(
-      must(must(snapshot.sessions[0])).identitySource,
+      (await resolver.resolve(pane)).source,
       "unavailable",
-      "exited requested PID fails its own capture",
+      "observer closes actual identity adapter",
     );
-    assert.equal(
-      must(must(snapshot.sessions[1])).identitySource,
-      "footer",
-      "exited PID must not suppress a healthy second pane in the same refresh",
-    );
-    assert.equal((await observer.inspect(must(snapshot.sessions[0]).id)).health, "unavailable");
-    assert.equal(
-      (await observer.inspect(must(snapshot.sessions[1]).id)).health,
-      "available",
-      "healthy pane remains inspectable through fresh default libproc revalidation",
-    );
-    assert.equal(inspected, 1, "only the healthy selected pane reaches transcript inspection");
   }
 }, 30000);
+
+test("observer close drains active and queued native-client reads and reaps its child", async () => {
+  if (process.platform !== "darwin") return;
+  const children: ReturnType<typeof spawn>[] = [];
+  const client = makeProcessBirthReader({
+    endpoint: "/isolated/shutdown.sock",
+    spawn: (() => {
+      // Owned child deliberately never replies, leaving one active and seven queued reads.
+      const child = spawn(
+        process.execPath,
+        ["--no-env-file", "-e", "setInterval(() => {}, 1000)"],
+        {
+          stdio: ["pipe", "pipe", "ignore"],
+        },
+      );
+      children.push(child);
+      return child;
+    }) as unknown as typeof spawn,
+  });
+  const resolver = makeIdentityResolver({
+    now: () => 1000,
+    readProcessBirth: client.read,
+    readConfiguration: () => settled(() => "configured"),
+    rpc: () => {
+      throw Error("closed resolver must not request transport");
+    },
+  });
+  const observer = makeObserver({
+    now: () => 1000,
+    identities: {
+      ...resolver,
+      close: async () => {
+        await resolver.close();
+        await client.close();
+      },
+    },
+    bus: { read: () => busFixture() },
+    desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
+  });
+  const reads = Array.from({ length: 8 }, (_, i) =>
+    assert.rejects(client.read(i + 1), /unavailable/),
+  );
+  const child = children[0];
+  assert(child);
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => {
+      resolve();
+    });
+  });
+  try {
+    await assert.rejects(client.read(9), /unavailable/);
+    const close = observer.close();
+    assert.equal(observer.close(), close);
+    await Promise.all([...reads, close, exited]);
+    assert(child.exitCode !== null || child.signalCode !== null, "owned helper is reaped");
+    await assert.rejects(client.read(1), /unavailable/);
+    assert.equal((await resolver.resolve(pane)).source, "unavailable");
+    assert.equal(children.length, 1, "closed entry cannot spawn another helper");
+  } finally {
+    await observer.close();
+    child.kill();
+  }
+}, 10000);

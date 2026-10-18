@@ -35,6 +35,15 @@ function roots(proofs: unknown[]) {
   }
   return roots;
 }
+function matchesCapture(current: IdentityResolution, proof: FooterProof) {
+  if (current.reason === "content-changed")
+    failNote("observer.identity.content", new Error("Live footer changed during capture"));
+  return (
+    current.source === "footer" &&
+    current.sessionId === proof.sessionId &&
+    sameBirth(current.proof.birth, proof.birth)
+  );
+}
 export function makeRevalidation(capture: (expected: Terminal) => Promise<IdentityResolution>) {
   return async (proofs: unknown): Promise<boolean> => {
     if (!Array.isArray(proofs) || proofs.length > MAX_PROOFS) return false;
@@ -47,11 +56,7 @@ export function makeRevalidation(capture: (expected: Terminal) => Promise<Identi
     if (!proof) return false;
     try {
       const current = await capture(proof);
-      return (
-        current.source === "footer" &&
-        current.sessionId === proof.sessionId &&
-        sameBirth(current.proof.birth, proof.birth)
-      );
+      return matchesCapture(current, proof);
     } catch {
       failNote(
         "observer.identity.revalidate",

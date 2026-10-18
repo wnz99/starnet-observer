@@ -32,6 +32,7 @@ export type InjectedIdentity = Pick<IdentityResolution, "sessionId"> & {
   reason?: string | null;
 };
 export interface Identities {
+  close?: () => Awaitable<void>;
   resolveMany?: (panes: Pane[], refresh: RefreshState) => Awaitable<InjectedIdentity[]>;
   resolve?: (pane: Pane, refresh: RefreshState) => Awaitable<InjectedIdentity>;
   revalidateAll?: (proofs: FooterProof[]) => Awaitable<boolean>;

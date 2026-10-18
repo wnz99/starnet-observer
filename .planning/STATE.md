@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: Repository simplification
-status: Essential-tools implementation verified; delivery recorded in PR 17.
-last_updated: "2026-10-16T21:35:08.082344+00:00"
-last_activity: 2026-10-16
-last_activity_desc: Essential tools reviewed clean; Ubuntu CI passed 238 tests and installed/browser checks.
-state_head: ed9469bb2aeb1398bd5e442ad0c123a3321d0bea
-stopped_at: Implementation and CI verified; final delivery and merge outcome on PR 17
+current_phase_name: Codex identity performance
+status: "Implementation reviewed and verified; delivery recorded in PR #18."
+last_updated: "2026-10-18T08:14:41.349400+00:00"
+last_activity: 2026-10-18
+last_activity_desc: "Codex identity reviewed clean; 254 local tests and Ubuntu CI passed."
+state_head: 8525d60d45b00af70298f6c773cb0879bb71228e
+stopped_at: "Implementation and source CI verified; final delivery tracked by PR #18"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,19 +22,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** Remove agent-created repository overengineering, quick task 261016-srp.
+**Current focus:** Codex identity performance and redraw availability, quick task 261018-3am.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: Essential-tools implementation verified; independent review clean; Ubuntu CI passed. Delivery: PR #17.
-Last activity: 2026-10-16 — Simplification removed bootstrap/migration scaffolding and redundant tools; 238 tests passed in Ubuntu CI.
+Status: Codex identity implementation verified; independent aggregate review clean; source Ubuntu CI passed. Delivery: PR #18.
+Last activity: 2026-10-18 — Fewer capture requests and reusable fresh native queries; 254 local tests passed. Ubuntu passed 241 tests with 13 macOS-only skips, plus installed/browser consumers.
+
+## Registered Work
+
+None registered.
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261018-3am | Codex identity performance and redraw availability | 2026-10-18 | [PR #18](https://github.com/wnz99/starnet-observer/pull/18) | Complete; independent review clean; 254 local tests and Ubuntu CI passed | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
 | 261016-srp | Repository simplification | 2026-10-16 | [PR #16](https://github.com/wnz99/starnet-observer/pull/16) | Reviewed; Ubuntu CI 238/238; builds/installed/browser passed | [261016-srp](./quick/261016-srp-simplify-agent-created-repository-toolin/) |
 | 261016-0z8 | Full TypeScript refactor | 2026-10-16 | [PR #15](https://github.com/wnz99/starnet-observer/pull/15) | Merged; independent R1–R5 review clean; pre-push passed | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
 | 261015-r34 | Pixel typography and panel styling for local theme packs | 2026-10-15 | [PR #14](https://github.com/wnz99/starnet-observer/pull/14) | Complete; merge ready | [261015-r34](./quick/261015-r34-pixel-art-mama-interface-variant/) |
