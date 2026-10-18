@@ -298,10 +298,12 @@ function verifyClearTurn(count: number) {
   parent.due = Infinity;
   let heading = "",
     deadline = Infinity,
-    acquired = 0,
     cachedBucket = -1;
   let cachedTargets: unknown;
-  const headings = new Set<string>();
+  const headingFrames = new Map([
+    [JSON.stringify({ x: 1, y: 0 }), 0],
+    [JSON.stringify({ x: 0, y: 1 }), 0],
+  ]);
   for (let now = 100; now <= 27000; now += 100) {
     const before = { ...parent.point };
     parent.animate({
@@ -362,16 +364,22 @@ function verifyClearTurn(count: number) {
       assert(Math.hypot(actor.point.x - previous.x, actor.point.y - previous.y) <= 0.240001);
     }
     if (now < deadline) continue;
-    headings.add(key);
-    acquired++;
     const offsets = helpers.map((a) => ({
       lag: -(a.point.x - parent.point.x) * axis.x - (a.point.y - parent.point.y) * axis.y,
       side: -(a.point.x - parent.point.x) * axis.y + (a.point.y - parent.point.y) * axis.x,
     }));
     assertTurnRows(offsets, count);
+    headingFrames.set(key, present(headingFrames.get(key)) + 1);
   }
-  assert.equal(headings.size, 2, "both pre-turn and post-turn walking windows acquire all rows");
-  assert(acquired >= 20, "geometry-deadline walking assertions have nonzero sustained coverage");
+  assert(
+    present(headingFrames.get(JSON.stringify({ x: 1, y: 0 }))) > 0,
+    "pre-turn geometry-deadline all-row assertions have nonzero coverage",
+  );
+  assert(
+    present(headingFrames.get(JSON.stringify({ x: 0, y: 1 }))) >= 20,
+    "post-turn geometry-deadline all-row assertions have sustained coverage",
+  );
+  console.log("Clear turn coverage", count, JSON.stringify([...headingFrames]));
 }
 test("compact crews reacquire every row through a clear short right-angle turn", () => {
   for (const count of [1, 2, 3, 7, 8]) verifyClearTurn(count);
@@ -2074,7 +2082,7 @@ test("observer-scene regression contracts", () => {
     function compactAxis(actors: ActorFrame[], leader: ActorFrame, now: number): Point | null {
       const last = history.at(-1),
         start = history.at(-2);
-      if (!start || now < 90000 || leader.pose !== "walk") {
+      if (!start || (exclusion && now < 90000) || leader.pose !== "walk") {
         acquisition = null;
         return null;
       }
@@ -2083,9 +2091,6 @@ test("observer-scene regression contracts", () => {
           x: (present(last).point.x - start.point.x) / length,
           y: (present(last).point.y - start.point.y) / length,
         };
-      if (Math.min(Math.abs(axis.x), Math.abs(axis.y)) > 0.01) {
-        return null;
-      }
       const radius = 0.3016,
         at = (lag: number, side: number) => ({
           x: leader.point.x - axis.x * lag - axis.y * side,
@@ -2120,7 +2125,7 @@ test("observer-scene regression contracts", () => {
         acquisition = null;
         return null;
       }
-      const heading = JSON.stringify(axis);
+      const heading = JSON.stringify([Math.round(axis.x * 1e8), Math.round(axis.y * 1e8)]);
       if (acquisition?.heading !== heading) {
         const joins = helpers.map((w, i) => {
           let from = present(actors.find((a) => a.id === w.id)).point,
@@ -2193,7 +2198,7 @@ test("observer-scene regression contracts", () => {
       compactFrames++;
       if (streak === 10) windows++;
       if (count === 8 && traversed.size === 8) regroupFrames++;
-      headings.add(String(Math.round(axis.x)) + "," + String(Math.round(axis.y)));
+      headings.add(JSON.stringify([Math.round(axis.x * 1e8), Math.round(axis.y * 1e8)]));
       rowFrames.forEach((_, i) => (rowFrames[i] = present(rowFrames[i]) + 1));
     }
     for (let now = 0; now <= 600000; now += 100) {
@@ -2234,9 +2239,15 @@ test("observer-scene regression contracts", () => {
       );
       const windows = coverage.reduce((n, c) => n + c.windows, 0),
         compactFrames = coverage.reduce((n, c) => n + c.compactFrames, 0);
-      const headings = new Set(coverage.flatMap((c) => c.headings));
+      const headings = new Set(coverage.flatMap((c) => c.headings)),
+        rowFrames = Array.from({ length: Math.ceil(count / 2) }, (_, row) =>
+          coverage.reduce((n, c) => n + present(c.rowFrames[row]), 0),
+        );
       assert(
-        windows > 1 && compactFrames >= 20,
+        windows >= 3 &&
+          compactFrames >= 20 &&
+          rowFrames.every((frames) => frames >= 20) &&
+          headings.size > 0,
         `sustained historical compact squad, count ${String(count)}: ${JSON.stringify(coverage)}`,
       );
       if (count === 8) {
@@ -2249,7 +2260,13 @@ test("observer-scene regression contracts", () => {
       console.log(
         "Compact public coverage",
         count,
-        JSON.stringify({ windows, compactFrames, headings: [...headings], runs: coverage }),
+        JSON.stringify({
+          windows,
+          compactFrames,
+          rowFrames,
+          headings: [...headings],
+          runs: coverage,
+        }),
       );
     }
   }
