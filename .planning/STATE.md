@@ -35,6 +35,7 @@ Last activity: 2026-10-18 — Native click grouping, retained host controls, vis
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
+| 261018-wb7 | Helper visibility, formation, quarters and truthful crew statistics | Approved revision 3; registered; Tasks 1–4 pending, sequential execution | [261018-wb7](./quick/261018-wb7-helper-visibility-formation-quarters-and/) |
 
 ## Quick Tasks Completed
 
