@@ -179,7 +179,7 @@ export class Hosts<N extends AppNode, R extends SpriteResource> {
     );
     const tabs = ui.document.getElementById("host-tabs");
     if (tabs) {
-      ui.document.replaceChildren(tabs, ...nodes);
+      ui.arrange(tabs, nodes);
       tabs.hidden = false;
     }
     const title = ui.document.getElementById("crew-title");

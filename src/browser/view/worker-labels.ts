@@ -7,7 +7,7 @@ import type { ViewRuntime } from "./runtime.js";
 import type { Anchor, TextPlate } from "./types.js";
 const STATUS_DOT = { lift: 5, radius: 2.5, turn: Math.PI * 2 };
 const TITLE = {
-  lift: 6,
+  lift: 12,
   margin: 24,
   hoverSize: 15,
   focusSize: 14,
@@ -25,7 +25,7 @@ const DETAILS = {
   overflowLift: 34,
   overflowPriority: 8,
 };
-const INSPECTION = { lift: 30, size: 13, priority: 95 };
+const INSPECTION = { lift: 38, size: 13, priority: 95 };
 export class WorkerLabels<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
   collect(options: LabelContext): TextPlate[] {
@@ -34,7 +34,6 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
     for (const region of this.view.anchors) {
       const worker = this.view.workerIndex.get(region.id);
       if (!worker) continue;
-      if (options.tier === "overview") this.statusDot(worker, region);
       const title = this.title(worker, region, options);
       if (title) plates.push(title);
       if (region.id === inspectedId) plates.push(this.inspection(region));
@@ -42,6 +41,12 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       if (overflow) plates.push(overflow);
     }
     return plates;
+  }
+  paintStatusDots() {
+    for (const region of this.view.anchors) {
+      const worker = this.view.workerIndex.get(region.id);
+      if (worker) this.statusDot(worker, region);
+    }
   }
   private statusDot(worker: Worker, region: Anchor) {
     const ctx = this.view.ctx;

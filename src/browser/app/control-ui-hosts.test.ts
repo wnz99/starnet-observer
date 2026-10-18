@@ -44,7 +44,7 @@ test("control-ui-hosts regression contracts", async () => {
       confirms.push(message);
       return confirmAnswer;
     };
-    page.mount({
+    const app = page.mount({
       frame: () => animationClock(),
       createView(options) {
         viewOptions = options;
@@ -76,14 +76,17 @@ test("control-ui-hosts regression contracts", async () => {
           json: () => Promise.resolve({ ok: true, paneId: "w1:pX", name: "spawned" }),
         };
       },
-      query: querySpy({
-        define() {},
-        invalidate: () => Promise.resolve(),
-        subscribe(key, fn) {
-          if (key === "observer.sessions") listener = fn;
-          return () => {};
-        },
-      }),
+      query: {
+        ...querySpy({
+          define() {},
+          invalidate: () => Promise.resolve(),
+          subscribe(key, fn) {
+            if (key === "observer.sessions") listener = fn;
+            return () => {};
+          },
+        }),
+        dispose() {},
+      },
     });
     await new Promise((resolve) => setImmediate(resolve));
     const sessions = [
@@ -215,6 +218,27 @@ test("control-ui-hosts regression contracts", async () => {
       "one tab per host, this machine first",
     );
     assert.equal(child(present(tabs), 0).attributes.get("aria-selected"), "true");
+    const remoteTab = present(tabs).children.find((tab) => tab.dataset.host === "herdr-dev-2");
+    present(remoteTab).focus();
+    multi();
+    assert.equal(document.activeElement, remoteTab, "unchanged inventory keeps host focus");
+    listener({
+      data: {
+        sessions: [sessions[0], blocked, { ...blocked, id: "obs_" + "d".repeat(24) }],
+        health: "available",
+        observedAt: Date.now(),
+        sources: {
+          hosts: { ...hosts, "herdr-dev-2": { ...hosts["herdr-dev-2"], health: "stale" } },
+        },
+      },
+    });
+    assert.equal(document.activeElement, remoteTab, "count and health updates keep host focus");
+    assert.equal(present(remoteTab).dataset.label, "herdr-dev-2 · 2");
+    assert.equal(present(remoteTab).className.includes(" live"), false);
+    multi();
+    assert.equal(present(remoteTab).dataset.label, "herdr-dev-2 · 1");
+    assert.equal(present(remoteTab).className.includes(" live"), true);
+    assert.equal(present(remoteTab).count("click"), 1, "rerenders keep one tab listener");
     assert.equal(present(elements["crew-title"]).textContent, "This machine crew");
     const listed = () =>
       sessionItems(present(elements.sessions)).map((item) => child(item, 0).dataset.sessionId);
@@ -526,7 +550,10 @@ test("control-ui-hosts regression contracts", async () => {
       false,
       "choosing this machine forgets the remote tab",
     );
-    present(present(tabs).children.find((tab) => tab.dataset.host === "empty")).emit("click");
+    const departingTab = present(
+      present(tabs).children.find((tab) => tab.dataset.host === "empty"),
+    );
+    departingTab.emit("click");
     // A host that disappears falls back to this machine.
     listener({
       data: {
@@ -537,6 +564,17 @@ test("control-ui-hosts regression contracts", async () => {
       },
     });
     assert.equal(present(elements["crew-title"]).textContent, "This machine crew");
+    assert.equal(departingTab.count("click"), 0, "departed host listener is released");
+    departingTab.emit("click");
+    assert.equal(present(elements["crew-title"]).textContent, "This machine crew");
+    multi();
+    const returningTab = present(
+      present(tabs).children.find((tab) => tab.dataset.host === "empty"),
+    );
+    assert.notEqual(returningTab, departingTab, "a departed host releases its cached tab");
+    assert.equal(returningTab.count("click"), 1);
+    returningTab.emit("click");
+    assert.equal(present(elements["crew-title"]).textContent, "empty crew");
     // Selecting a remote agent on the canvas switches the panel to its host.
     listener({
       data: {
@@ -830,6 +868,10 @@ test("control-ui-hosts regression contracts", async () => {
         }),
       });
     }
+    const mountedTabs = [...present(tabs).children];
+    app.dispose();
+    for (const tab of mountedTabs)
+      assert.equal(tab.count("click"), 0, "dispose releases host tabs");
     console.log(
       "control UI hosts: remote rows, host tabs/ship selection, blocked hint, New agent in ~, spawn-then-select, per-host mail panel and remembered host tab OK",
     );

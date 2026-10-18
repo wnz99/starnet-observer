@@ -13,7 +13,6 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   readonly gestures;
   tap: Tap | null = null;
   readonly TAP_SLOP = 10;
-  readonly TAP_MS = 800;
   constructor(readonly view: ViewRuntime<R, B>) {
     this.gestures = new PointerGestures(view, this);
   }
@@ -83,7 +82,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     );
   };
 
-  sameTap = (point: Point) => {
+  nearTap = (point: Point) => {
     const tap = this.tap;
     return !!tap && Math.hypot(point.x - tap.point.x, point.y - tap.point.y) <= this.TAP_SLOP;
   };
@@ -91,19 +90,25 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   private targetsAt(point: Point) {
     const title = this.titleAt(point);
     if (title) return { id: null, title, sign: null, obs: false, ship: null };
+    const sign = this.signAt(point);
+    if (sign) return { id: null, title, sign, obs: false, ship: null };
     const id = Scene.hitTest(point, this.view.regions);
     if (id) return { id, title, sign: null, obs: false, ship: null };
-    const sign = this.signAt(point);
-    if (sign) return { id, title, sign, obs: false, ship: null };
     const obs = this.observatoryAt(point);
     return { id, title, sign, obs, ship: obs ? null : this.shipAt(point) };
   }
-  select(point: Point) {
-    const repeat = this.sameTap(point) && this.view.clock() - required(this.tap).at <= this.TAP_MS;
+  click = (event: ViewEvent) => {
+    const point = this.gestures.completedClick;
+    this.gestures.completedClick = null;
+    if (point) this.select(point, (event.detail ?? 1) > 1);
+  };
+
+  select(point: Point, continuation = false) {
+    const repeat = continuation && this.nearTap(point);
     const target = repeat ? required(this.tap) : this.targetsAt(point);
     const { id, title, sign, obs, ship } = target;
     if (!repeat) this.toggleTargets(target);
-    this.tap = { id, title, sign, obs, ship, point, at: this.view.clock() };
+    if (!repeat) this.tap = { id, title, sign, obs, ship, point };
     if (id && this.view.workerIndex.has(id)) this.view.callbacks.onSelect(id);
   }
 
@@ -123,7 +128,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
       return;
     event.preventDefault?.();
     const point = this.gestures.local(event),
-      known = this.sameTap(point) ? this.tap : null;
+      known = this.nearTap(point) ? this.tap : null;
     this.tap = null;
     if (this.handledDoubleClick(known)) return; // a title, sign or observatory double-click already acted once; it never zooms
     // The clicks' own target decides; only a double-click with no recorded click hit-tests the current view.
@@ -197,6 +202,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
       ["pointerup", this.gestures.pointerUp],
       ["pointercancel", this.gestures.pointerCancel],
       ["pointerleave", this.gestures.pointerLeave],
+      ["click", this.click],
       ["wheel", this.wheel, { passive: false }],
       ["keydown", this.keyDown],
       ["dblclick", this.doubleClick],

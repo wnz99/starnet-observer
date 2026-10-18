@@ -5,6 +5,7 @@ import { isAppSnapshot } from "./admission.js";
 import type { AppQuerySnapshot } from "./data.js";
 import type { PendingSpawn } from "./controls.js";
 import type { AppNode } from "./dom.js";
+import type { AppView } from "./contracts.js";
 import type { Couriers } from "./couriers.js";
 import type { FreshnessDeadline } from "./deadline.js";
 import type { Floor } from "./floor.js";
@@ -19,6 +20,7 @@ import { setText, type AppUi } from "./ui.js";
 interface RenderOptions<N extends AppNode, R extends SpriteResource> {
   ui: AppUi<N, R>;
   state: AppState;
+  view: Pick<AppView, "invalidate">;
   enabled: boolean;
   hosts: Hosts<N, R>;
   floor: Floor;
@@ -48,6 +50,20 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
   refresh() {
     const latest = this.options.state.latest;
     if (latest) this.render(latest, { refresh: true });
+  }
+  refreshRoster(options: { canvas: boolean }) {
+    const { state, hosts, roster, view } = this.options;
+    const snapshot = state.latest;
+    if (!this.active() || !snapshot) return;
+    const rows = snapshot.data?.sessions ?? [];
+    const hasHosts = hosts.list().length > 0;
+    const panelRows = hasHosts
+      ? rows.filter((row) => (row.host || null) === state.selectedHost)
+      : rows;
+    const bus = this.busFor(snapshot, hasHosts ? state.selectedHost : null);
+    roster.render(panelRows, state.isStale(snapshot), bus?.messages ?? [], bus);
+    this.emptyHost(snapshot, hosts.list().length, panelRows.length);
+    if (options.canvas) view.invalidate();
   }
   arrangeChanged() {
     const { state } = this.options;

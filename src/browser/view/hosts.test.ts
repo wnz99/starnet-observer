@@ -337,6 +337,7 @@ test("observer-hosts-view regression contracts", () => {
       };
     node.handlers.get("pointerdown")(event);
     node.handlers.get("pointerup")(event);
+    node.handlers.get("click")({ ...event, detail: 1 });
     now += 400;
     view.paint(now);
   };

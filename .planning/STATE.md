@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: Codex identity performance
-status: "Implementation reviewed and verified; delivery recorded in PR #18."
-last_updated: "2026-10-18T08:14:41.349400+00:00"
+current_phase_name: UI responsiveness
+status: "Implementation and review complete; PR #19 pending final tracking-head verification and merge."
+last_updated: "2026-10-18T18:58:00+00:00"
 last_activity: 2026-10-18
-last_activity_desc: "Codex identity reviewed clean; 254 local tests and Ubuntu CI passed."
-state_head: 8525d60d45b00af70298f6c773cb0879bb71228e
-stopped_at: "Implementation and source CI verified; final delivery tracked by PR #18"
+last_activity_desc: "UI responsiveness reviewed clean; 256 native tests, installed/browser consumers and source Ubuntu CI passed."
+state_head: 422a3230737052bb9d6b4e49b2ea1bbbb3c94f5d
+stopped_at: "PR #19 implementation reviewed; final tracking-head checks and merge pending"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,23 +22,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** Codex identity performance and redraw availability, quick task 261018-3am.
+**Current focus:** UI responsiveness, native clicks and agent indicators, quick task 261018-q7j.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: Codex identity implementation verified; independent aggregate review clean; source Ubuntu CI passed. Delivery: PR #18.
-Last activity: 2026-10-18 — Fewer capture requests and reusable fresh native queries; 254 local tests passed. Ubuntu passed 241 tests with 13 macOS-only skips, plus installed/browser consumers.
+Status: UI responsiveness implementation and independent aggregate/initial PR review complete; plan conformance CONFORMANT. PR #19 awaits final tracking-head verification and merge.
+Last activity: 2026-10-18 — Native click grouping, retained host controls, visible status dots, stable identity rings and narrower local refresh. Source gate passed 256 native tests plus installed/browser consumers; source Ubuntu CI passed.
 
 ## Registered Work
 
-None registered.
+| # | Description | Status | Directory |
+| --- | --- | --- | --- |
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261018-q7j | UI responsiveness, native clicks and agent indicators | 2026-10-18 | [PR #19](https://github.com/wnz99/starnet-observer/pull/19) | Implementation/review complete; 256 native tests and installed/browser consumers passed; final tracking-head checks and merge pending | [261018-q7j](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/) |
 | 261018-3am | Codex identity performance and redraw availability | 2026-10-18 | [PR #18](https://github.com/wnz99/starnet-observer/pull/18) | Complete; independent review clean; 254 local tests and Ubuntu CI passed | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
 | 261016-srp | Repository simplification | 2026-10-16 | [PR #16](https://github.com/wnz99/starnet-observer/pull/16) | Reviewed; Ubuntu CI 238/238; builds/installed/browser passed | [261016-srp](./quick/261016-srp-simplify-agent-created-repository-toolin/) |
 | 261016-0z8 | Full TypeScript refactor | 2026-10-16 | [PR #15](https://github.com/wnz99/starnet-observer/pull/15) | Merged; independent R1–R5 review clean; pre-push passed | [261016-0z8](./quick/261016-0z8-full-typescript-refactor-and-repository-/) |
@@ -74,10 +76,10 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 
 ## Session Continuity
 
-Last session: 2026-10-16
-Current work: Essential-tools consolidation verified; five executable owners and colocated behavior tests retained. PR #17 records final review and merge.
-Resume file: [Simplification summary](./quick/261016-srp-simplify-agent-created-repository-toolin/261016-srp-SUMMARY.md)
-Next action: Delivery and merge outcome are recorded in PR #17. No local tests/builds, paid/live runs or optional external settings.
+Last session: 2026-10-18
+Current work: UI responsiveness implementation and review complete; PR #19 records delivery progress.
+Resume file: [UI responsiveness summary](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/261018-q7j-SUMMARY.md)
+Next action: Verify the final tracking head locally and in configured CI, review the tracking delta, then merge PR #19 after all gates pass. No paid/live runs or optional external settings.
 
 ### Registered Work
 

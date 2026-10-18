@@ -131,6 +131,7 @@ export class Plates<R extends SpriteResource, B extends R = R> {
     for (const plate of accepted) this.drawPlate(plate);
     this.recordTargets(accepted);
     this.paintBadges(tier, now, animate);
+    this.workerLabels.paintStatusDots();
 
     const obsPlate = accepted.find((plate) => plate.observatory);
 

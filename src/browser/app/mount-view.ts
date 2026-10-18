@@ -62,7 +62,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
     onPlatform: () => {
       if (!state.disposed) {
         state.selected = null;
-        links.renderer?.refresh();
+        links.renderer?.refreshRoster({ canvas: true });
       }
     },
     onMode: ({ mode, platform }) => {

@@ -22,6 +22,7 @@ import { createThemePack } from "../theme.js";
 import type { Resource } from "./drawing.fixture.js";
 import { drawing, Handlers, present } from "./drawing.fixture.js";
 import { createViewFactory } from "./index.js";
+import { ViewRuntime } from "./runtime.js";
 import { CORNER_KINDS, WALL_KINDS, wallUnits } from "./furnishing.js";
 import {
   cacheResolution,
@@ -352,6 +353,169 @@ test("observer-view regression contracts", async () => {
   const regionOf = (view: ViewInstance, id: string) =>
     present(view.hitRegions().find((region) => region.id === id));
 
+  function verifyAgentIndicators() {
+    const node = canvas(1440, 1000),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => true,
+          env: {
+            raf: () => 1,
+            caf() {},
+            dpr: () => 2,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout(),
+      statuses = ["working", "blocked", "idle", "done", "unknown"] as const,
+      rows: LayoutRow[] = Array.from({ length: 40 }, (_, index) => ({
+        id: "indicator-" + String(index),
+        project: "Indicators",
+        projectId: "indicators",
+        projectKind: "group",
+        repo: "web",
+        repoId: "web",
+        provider: "codex",
+        status: present(statuses[index % statuses.length]),
+      }));
+    let selected: string | null = "web";
+    const stale = new Set<string>();
+    layout.reconcile(rows);
+    const scene = Scene.build(layout.onPage(0), 0);
+    runtime.lifecycle.start();
+    runtime.update(scene, {
+      repositorySelection: () => selected,
+      rowStale: (worker) => stale.has(worker.id),
+      inspected: () => "indicator-0",
+    });
+    stale.add("indicator-0");
+    const dots: { x: number; y: number; radius: number; color: unknown }[] = [];
+    node.ctx.arc = (x, y, radius) => dots.push({ x, y, radius, color: node.ctx.fillStyle });
+    const expected = [
+      canonicalLook.status.working,
+      canonicalLook.status.blocked,
+      canonicalLook.status.idle,
+      canonicalLook.status.done,
+      canonicalLook.status.unknown,
+    ];
+    for (const [index, row] of rows.slice(0, 5).entries()) {
+      runtime.cameraControl.focus(row.id);
+      runtime.framePaint.paint(0);
+      runtime.cameraControl.zoomBy(1);
+      for (const zoom of [0.3, 0.8, 1.5, 3]) {
+        const point = Scene.project(present(runtime.cameraControl.pointOf(row.id)));
+        runtime.cameraControl.setCamera({
+          zoom,
+          tx: 720 - point.x * zoom,
+          ty: 800 - point.y * zoom,
+        });
+        dots.length = 0;
+        runtime.framePaint.paint(0);
+        const anchor = present(runtime.anchors.find((value) => value.id === row.id));
+        assert.deepEqual(
+          dots.filter((dot) => dot.x === anchor.head.x && dot.y === anchor.head.y - 5),
+          [{ x: anchor.head.x, y: anchor.head.y - 5, radius: 2.5, color: expected[index] }],
+          String(row.status) + " has one constant screen-size overhead dot at zoom " + String(zoom),
+        );
+        for (const box of [...runtime.titleRegions, ...runtime.attentionRegions])
+          if (box.id === row.id)
+            assert(
+              box.top + box.height < anchor.head.y - 7.5,
+              "own plates clear the dot lane: " +
+                JSON.stringify({ id: row.id, zoom, box, head: anchor.head }),
+            );
+      }
+    }
+    runtime.cameraControl.overview();
+    const rings = new Map<
+        string,
+        { color: string | null | undefined; width: number | undefined }[]
+      >(),
+      glows: string[] = [],
+      ellipse = runtime.geometry.isoEllipse.bind(runtime.geometry),
+      glow = runtime.geometry.glow.bind(runtime.geometry);
+    runtime.geometry.isoEllipse = (point, radius, style) => {
+      const worker = runtime.activeScene.workers.find((value) => {
+        const at = runtime.cameraControl.pointOf(value.id);
+        return (
+          at === point && (radius === 0.62 * value.scale || radius === 0.62 * value.scale + 0.16)
+        );
+      });
+      if (worker) {
+        const strokes = rings.get(worker.id) ?? [];
+        strokes.push({ color: style.stroke, width: style.width });
+        rings.set(worker.id, strokes);
+      }
+      ellipse(point, radius, style);
+    };
+    runtime.geometry.glow = (point, radius, style) => {
+      if (radius === 40) glows.push(style.color);
+      glow(point, radius, style);
+    };
+    runtime.framePaint.paint(0);
+    const initial = new Map([...rings].map(([id, values]) => [id, present(values[0]).color]));
+    assert(initial.size > 16, "fixture crosses the initial color sequence");
+    assert.equal(new Set(initial.values()).size, initial.size, "each agent has a distinct ring");
+    assert.equal(present(rings.get("indicator-0"))[0]?.width, 1.5, "stale working stays thin");
+    assert.equal(present(rings.get("indicator-5"))[0]?.width, 3, "own fresh working stays thick");
+    assert.deepEqual(
+      present(rings.get("indicator-5")).map((stroke) => stroke.width),
+      [3, 1],
+      "fresh working has a double ring",
+    );
+    assert(
+      present(rings.get("indicator-5")).every(
+        (stroke) => stroke.color === initial.get("indicator-5"),
+      ),
+      "both strokes use its agent color",
+    );
+    assert(glows.includes(present(initial.get("indicator-5"))), "working glow matches its ring");
+    assert(!glows.includes(present(initial.get("indicator-0"))), "stale working has no glow");
+    const repaint = () => {
+      rings.clear();
+      runtime.framePaint.paint(0);
+      for (const [id, values] of rings)
+        if (initial.has(id))
+          assert.equal(present(values[0]).color, initial.get(id), id + " keeps color");
+    };
+    scene.workers.reverse();
+    repaint();
+    selected = null;
+    rings.clear();
+    runtime.framePaint.paint(0);
+    assert.equal(rings.size, 0, "deselection removes agent rings");
+    selected = "web";
+    runtime.cameraControl.zoomBy(1.5);
+    repaint();
+    const helper = {
+      ...present(rows[0]),
+      id: "indicator-helper",
+      parentId: "indicator-0",
+      source: "helper",
+    };
+    layout.reconcile([...rows, helper]);
+    runtime.update(Scene.build(layout.onPage(0), 0), {});
+    repaint();
+    assert(rings.has(helper.id), "new helper receives a ring");
+    assert(
+      !new Set(initial.values()).has(present(rings.get(helper.id))[0]?.color),
+      "helper gets a new color",
+    );
+    runtime.update(Scene.build([], 1), {});
+    runtime.framePaint.paint(0);
+    runtime.update(scene, {});
+    repaint();
+    runtime.lifecycle.stop();
+    runtime.lifecycle.start();
+    repaint();
+    runtime.lifecycle.stop();
+  }
+  verifyAgentIndicators();
+
   // DPR changes only the backing store: camera, hit regions and pointer math are identical at DPR 1 and 2.
   function verifyDprAndResize() {
     const one = setup({ dpr: 1 }),
@@ -395,15 +559,20 @@ test("observer-view regression contracts", async () => {
     node.handlers.get("pointerdown")(at);
     node.handlers.get("pointermove")({ ...at, clientX: at.clientX + 2 });
     node.handlers.get("pointerup")({ ...at, clientX: at.clientX + 2 });
+    assert.deepEqual(selected, [], "pointerup alone does not dispatch a selection");
+    node.handlers.get("click")({ ...at, clientX: at.clientX + 2, detail: 1 });
+    node.handlers.get("click")({ ...at, clientX: at.clientX + 2, detail: 1 });
     assert.deepEqual(selected, ["obs_0"]);
     const before = view.camera();
     node.handlers.get("pointerdown")(at);
     node.handlers.get("pointermove")({ ...at, clientX: at.clientX - 60 });
     node.handlers.get("pointerup")({ ...at, clientX: at.clientX - 60 });
+    node.handlers.get("click")({ ...at, clientX: at.clientX - 60, detail: 1 });
     assert.deepEqual(selected, ["obs_0"], "a drag never selects");
     node.handlers.get("pointerdown")({ ...at, pointerId: 3 });
     node.handlers.get("pointercancel")({ ...at, pointerId: 3 });
     node.handlers.get("pointerup")({ ...at, pointerId: 3 });
+    node.handlers.get("click")({ ...at, pointerId: 3, detail: 1 });
     assert.deepEqual(selected, ["obs_0"], "a cancelled tap never selects");
     assert.notEqual(view.camera().tx, before.tx);
     assert.equal(view.mode(), "manual");
@@ -1396,9 +1565,10 @@ test("observer-view regression contracts", async () => {
           preventDefault() {},
         };
       };
-      const click = (event: ViewEvent) => {
+      const click = (event: ViewEvent, detail = 1) => {
         node.handlers.get("pointerdown")(event);
         node.handlers.get("pointerup")(event);
+        node.handlers.get("click")({ ...event, detail });
       };
       const between = () => {
         now += 16;
@@ -1426,7 +1596,7 @@ test("observer-view regression contracts", async () => {
           event = h.start(target);
         h.click(event);
         h.between();
-        h.click(event);
+        h.click(event, 2);
         h.between();
         h.node.handlers.get("dblclick")({ ...event, detail: 2 });
         assert.deepEqual(
@@ -1471,7 +1641,7 @@ test("observer-view regression contracts", async () => {
       );
       h.view.update(Scene.build(rest.onPage(0), 0), {});
       h.between();
-      h.click(event);
+      h.click(event, 2);
       h.between();
       h.node.handlers.get("dblclick")({ ...event, detail: 2 });
       assert.equal(h.log.length, 1, "removal: a departed worker is never selected again");
@@ -1501,6 +1671,8 @@ test("observer-view regression contracts", async () => {
         up(event);
         up({ ...event, pointerId: 2, clientX: event.clientX + 40 });
       }
+      h.node.handlers.get("click")({ ...event, detail: 1 });
+      assert.deepEqual(h.log, ["w23"], "generated clicks after " + gesture + " never select");
       h.between();
       const now = Scene.hitTest({ x: event.clientX, y: event.clientY }, h.view.hitRegions());
       assert.notEqual(
@@ -1534,7 +1706,7 @@ test("observer-view regression contracts", async () => {
       );
       // Immediately: only the distance separates it from the worker click.
       h.click(away);
-      h.click(away);
+      h.click(away, 2);
       h.node.handlers.get("dblclick")({ ...away, detail: 2 });
       assert.deepEqual(h.log, ["w7"], "an unrelated click never reuses the earlier worker");
       assert.deepEqual(
@@ -1616,16 +1788,35 @@ test("observer-view regression contracts", async () => {
       pointerType: "mouse",
       preventDefault() {},
     };
-    const click = (event: ViewEvent) => {
+    const click = (event: ViewEvent, detail = 1) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
+      node.handlers.get("click")({ ...event, detail });
     };
     click(at);
     assert.deepEqual(toggles, ["w0"], "a title click toggles that worker");
     assert.deepEqual(selected, [], "and focuses nobody");
+    now += 600;
+    click(at);
+    now += 600;
+    click(at);
+    assert.deepEqual(
+      toggles,
+      ["w0", "w0", "w0"],
+      "independent clicks at 0/600/1200 ms each toggle",
+    );
+    toggles.length = 1;
+    node.handlers.get("pointerdown")({ ...at, pointerType: "touch" });
+    now += 300;
+    node.handlers.get("pointerup")({ ...at, pointerType: "touch" });
+    node.handlers.get("click")({ ...at, detail: 1 });
+    assert.equal(toggles.length, 1, "a slow touch cannot act through its generated click");
+    click(at);
+    assert.equal(toggles.length, 2, "a new click after slow touch acts immediately");
+    toggles.length = 1;
     now += 16;
     view.paint(now);
-    click(at);
+    click(at, 2);
     now += 16;
     view.paint(now);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
@@ -1677,7 +1868,6 @@ test("observer-view regression contracts", async () => {
     view.paint(now);
     assert.equal(view.hovered(), "w2");
     // Camera and scene changes retire old title targets until repaint, like repository signs.
-    now += 1000;
     const oldTitle = view.titleRegions().find((region) => region.id === "w2");
     const oldPoint = {
       ...at,
@@ -1703,8 +1893,27 @@ test("observer-view regression contracts", async () => {
     view.update(Scene.build(layout.onPage(0), 0), {});
     click({ ...at, clientX: newTitle.left + 2, clientY: newTitle.top + 2 });
     assert.equal(toggles.length, before + 1, "new scene cannot reuse old title boxes");
+    now += 16;
+    view.paint(now);
+    const resumedTitle = present(view.titleRegions().find((region) => region.id === "w2"));
+    const touch = {
+      ...at,
+      clientX: resumedTitle.left + 2,
+      clientY: resumedTitle.top + 2,
+      pointerType: "touch",
+    };
+    click(touch);
+    assert.equal(toggles.length, before + 2, "a short touch tap acts exactly once through click");
+    node.handlers.get("pointerdown")(touch);
+    node.handlers.get("pointerup")(touch);
     view.stop();
     assert.deepEqual(view.titleRegions(), [], "stop clears title targets");
+    assert(!node.handlers.has("click"), "stop removes the native click listener");
+    view.start();
+    view.paint(now + 16);
+    node.handlers.get("click")({ ...touch, detail: 1 });
+    assert.equal(toggles.length, before + 2, "stop/start clears pending click eligibility");
+    view.stop();
   }
   verifyTitleTargets();
   // Task 5: drawn repository section signs toggle exact repository highlighting. Only accepted signs of sections that hold
@@ -1804,16 +2013,17 @@ test("observer-view regression contracts", async () => {
     const signA = signs.find((sign) => sign.repo === "repo_a"),
       at = clear(present(signA));
     assert(at, "fixture: the repo_a sign is not under a worker body or title");
-    const click = (event: ViewEvent) => {
+    const click = (event: ViewEvent, detail = 1) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
+      node.handlers.get("click")({ ...event, detail });
     };
     const camera = view.camera(),
       mode = view.mode();
     click(at);
     assert.deepEqual(repoToggles, ["repo_a"], "a drawn sign toggles its exact repository");
     assert.deepEqual([selected, toggles], [[], []], "and neither focuses nor opens a worker");
-    click(at);
+    click(at, 2);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
     assert.deepEqual(repoToggles, ["repo_a"], "a sign double-click toggles once");
     assert.deepEqual([view.camera(), view.mode()], [camera, mode], "and never zooms or pans");
@@ -1821,14 +2031,20 @@ test("observer-view regression contracts", async () => {
     // selected sign recoloured without moving.
     const strokes: [ViewContext<Resource>["strokeStyle"], number][] = [],
       texts: [string, ViewContext<Resource>["fillStyle"]][] = [];
-    node.ctx.stroke = () => strokes.push([node.ctx.strokeStyle, node.ctx.lineWidth]);
+    let ringPath = false;
+    node.ctx.beginPath = () => {
+      ringPath = false;
+    };
+    node.ctx.ellipse = (_x, _y, rx) => {
+      ringPath = rx === 0.62 * 34 || rx === (0.62 + 0.16) * 34;
+    };
+    node.ctx.stroke = () => {
+      if (ringPath) strokes.push([node.ctx.strokeStyle, node.ctx.lineWidth]);
+    };
     node.ctx.fillText = (text) => texts.push([text, node.ctx.fillStyle]);
     now += 16;
     view.paint(now);
-    const rings = strokes
-      .filter(([style]) => style === canonicalPalette.repo)
-      .map(([, width]) => width)
-      .sort();
+    const rings = strokes.map(([, width]) => width).sort();
     assert.deepEqual(
       rings,
       [1, 1.5, 3],
@@ -1844,10 +2060,7 @@ test("observer-view regression contracts", async () => {
     now += 16;
     view.paint(now);
     assert.deepEqual(
-      strokes
-        .filter(([style]) => style === canonicalPalette.repo)
-        .map(([, width]) => width)
-        .sort(),
+      strokes.map(([, width]) => width).sort(),
       [1.5, 1.5],
       'a stale "working" row is highlighted but never emphasised',
     );
@@ -1873,6 +2086,70 @@ test("observer-view regression contracts", async () => {
     assert.deepEqual(view.signRegions(), [], "stop clears sign targets");
   }
   verifyRepositorySigns();
+  function verifyPaintedSignPriority() {
+    const layout = Model.createLayout();
+    layout.reconcile(
+      Array.from({ length: 16 }, (_, index) => ({
+        id: "w" + String(index),
+        projectId: "p",
+        project: "P",
+        repoId: "r",
+        repo: "R",
+        provider: "codex",
+        status: "working",
+      })),
+    );
+    const node = canvas(1440, 1000),
+      selected: string[] = [],
+      repositories: string[] = [];
+    const view = View.create({
+      canvas: node,
+      onSelect: (id) => selected.push(id),
+      env: {
+        raf: () => 1,
+        caf() {},
+        dpr: () => 1,
+        createCanvas: () => canvas(),
+        sprites: {
+          drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+            top: body.py - 19,
+            w: 10,
+            h: 19,
+          }),
+        },
+      },
+    });
+    view.start();
+    view.update(Scene.build(layout.onPage(0), 0), {
+      onRepositoryToggle: (repo) => repositories.push(repo),
+    });
+    let overlap: Point | null = null;
+    for (let step = 0; step < 22 && !overlap; step++) {
+      view.zoomBy(step < 12 ? 1.2 : 1 / 1.2);
+      view.paint(step * 16);
+      for (const sign of view.signRegions())
+        for (const body of view.hitRegions()) {
+          const left = Math.max(sign.left, body.left),
+            top = Math.max(sign.top, body.top),
+            right = Math.min(sign.left + sign.width, body.left + body.width),
+            bottom = Math.min(sign.top + sign.height, body.top + body.height);
+          if (right > left && bottom > top)
+            overlap = { x: (left + right) / 2, y: (top + bottom) / 2 };
+        }
+    }
+    assert(overlap, "fixture: an accepted painted sign overlaps a padded worker body");
+    const event = { clientX: overlap.x, clientY: overlap.y, pointerId: 1, pointerType: "mouse" };
+    node.handlers.get("pointermove")(event);
+    view.paint(400);
+    assert.equal(view.hovered(), null, "sign hover does not highlight the padded body beneath it");
+    node.handlers.get("pointerdown")(event);
+    node.handlers.get("pointerup")(event);
+    node.handlers.get("click")({ ...event, detail: 1 });
+    assert.deepEqual(repositories, ["r"], "the visible sign wins over padded worker bodies");
+    assert.deepEqual(selected, [], "the overlapping body does not receive selection");
+    view.stop();
+  }
+  verifyPaintedSignPriority();
   // Task 4: each worker animates on its own row freshness; a fresh source never animates a stale row's sprite or desk.
   function verifyOwnRowFreshness() {
     const layout = Model.createLayout(),
@@ -2353,12 +2630,13 @@ test("observer-view regression contracts", async () => {
         .digest("hex");
     // Characterization of the pre-theme literal painter (HEAD 196d86d), recorded with this exact scenario set, plus two
     // additive passes only (no upstream entry changed or removed): the blocked-agent "!" marker and idle resting sparks.
-    const HEAD_DEFAULT = "34af845124c658b747ab067c08f736f20dc396362025095406cefc32e3782953";
+    // T4 adds all-zoom dots after plates and computed per-agent repository colors.
+    const HEAD_DEFAULT = "4319e56232bd650ad4e3c958de401080a40ac0ff73d5652ff06c51e3315ba59a";
     const omitted = record(undefined).result;
     assert.equal(
       digest(omitted),
       HEAD_DEFAULT,
-      "default paint colours, order and count match the idle-aging baseline",
+      "default paint colours, order and count match the agent-indicator baseline",
     );
     assert.equal(
       digest(record(createThemePack(canonicalTheme()).getDefault()).result),
@@ -2563,8 +2841,8 @@ test("observer-view regression contracts", async () => {
       .flatMap((value) => value.firstStops)
       .map((stops) => attribute(present(stops[0])));
     assert.deepEqual(
-      [...new Set(halos)].sort(),
-      ["blocked", "repo", "working"],
+      [...new Set(halos.filter(Boolean))].sort(),
+      ["blocked", "working"],
       "only status-lamp and selection glows remain",
     );
     const tethers = (scene: SceneGeometry) =>
@@ -3540,7 +3818,6 @@ test("observer-view regression contracts", async () => {
         "drone-shadow",
         "envelope-outline",
         "focus",
-        "repo",
         "working",
         "blocked",
         "idle",

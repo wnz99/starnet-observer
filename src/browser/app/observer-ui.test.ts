@@ -6,7 +6,10 @@ import type { AppBus } from "./data.js";
 import type { Delivery } from "./ui-test.fixture.js";
 import { child } from "./ui-test.fixture.js";
 import { present } from "../view/drawing.fixture.js";
-import { test } from "bun:test";
+import { spyOn, test } from "bun:test";
+import { Floor } from "./floor.js";
+import { Couriers } from "./couriers.js";
+import { uiFixture, querySpy, viewSpy } from "./ui-test.fixture.js";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import { createModel } from "../model.js";
@@ -30,6 +33,155 @@ import type { UiViewOptions, UiFrame } from "./ui-test.fixture.js";
 import type { UpdateOptions } from "../view/types.js";
 const sessionItems = (node: AppFixtureNode): AppFixtureNode[] =>
   node.className.split(" ").includes("session-item") ? [node] : node.children.flatMap(sessionItems);
+test("local roster actions preserve the floor and mail without unrelated reconciliation", async () => {
+  const page = uiFixture();
+  const filters = ["all", "working"].map((value) => {
+    const button = page.document.createElement("button");
+    button.dataset.filter = value;
+    page.document.attach(page.get("filters"), button);
+    return button;
+  });
+  let live: Deliver | null = null;
+  let frame!: UiFrame;
+  let invalidated = 0;
+  let reads = 0;
+  const focused: string[] = [];
+  const floor = spyOn(Floor.prototype, "render");
+  const couriers = spyOn(Couriers.prototype, "update");
+  const app = page.mount({
+    createView: () =>
+      viewSpy({
+        update: (scene, options) => {
+          frame = { scene, options };
+        },
+        start() {},
+        stop() {},
+        overview() {},
+        focus: (id) => {
+          focused.push(id);
+        },
+        invalidate: () => {
+          invalidated++;
+        },
+      }),
+    query: {
+      ...querySpy({
+        define() {},
+        invalidate: () => {
+          reads++;
+          return Promise.resolve();
+        },
+        subscribe: (_key, listener) => {
+          live = listener;
+          return () => {};
+        },
+      }),
+      dispose() {},
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const now = Date.now();
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions: ["first", "second"].map((id, index) => ({
+          id,
+          project: "Fixture",
+          projectId: "fixture",
+          repo: "Repo",
+          repoId: "repo_fixture",
+          provider: "codex",
+          status: index ? "idle" : "working",
+          title: id,
+          observedAt: now,
+        })),
+      },
+    });
+    const scene = frame.scene;
+    const original = {
+      floor: floor.mock.calls.length,
+      couriers: couriers.mock.calls.length,
+      reads,
+      invalidated,
+    };
+    assert(original.floor > 0 && original.couriers > 0, "ingestion exercises both full owners");
+    const rows = () => page.document.querySelectorAll(page.get("sessions"), ".session-row");
+    const first = present(rows()[0]);
+    first.focus();
+    page.get("sessions").scrollTop = 37;
+    page.get("search").value = "first";
+    page.get("search").emit("input");
+    assert.deepEqual(
+      rows().map((row) => row.dataset.sessionId),
+      ["first"],
+    );
+    assert.equal(invalidated, original.invalidated, "search leaves canvas untouched");
+    page.get("search").value = "";
+    page.get("search").emit("input");
+    present(filters[1]).emit("click");
+    assert.deepEqual(
+      rows().map((row) => row.dataset.sessionId),
+      ["first"],
+    );
+    assert.equal(invalidated, original.invalidated, "filter leaves canvas untouched");
+    present(filters[0]).emit("click");
+    assert.equal(rows()[0], first);
+    assert.equal(page.document.activeElement, first);
+    assert.equal(page.get("sessions").scrollTop, 37);
+    present(frame.options.onRepositoryToggle)("repo_fixture");
+    assert.equal(present(frame.options.repositorySelection)(), "repo_fixture");
+    assert.equal(invalidated, original.invalidated + 1, "repository selection repaints canvas");
+    first.emit("click");
+    assert.equal(first.attributes.get("aria-pressed"), "true");
+    assert.deepEqual(focused, ["first"]);
+    assert.equal(invalidated, original.invalidated + 2, "same-page selection repaints canvas");
+    assert.equal(frame.scene, scene);
+    assert.equal(
+      floor.mock.calls.length,
+      original.floor,
+      "local actions never reconcile or serialize floor",
+    );
+    assert.equal(
+      couriers.mock.calls.length,
+      original.couriers,
+      "local actions never rebuild courier state",
+    );
+    assert.equal(reads, original.reads, "local actions never request inventory");
+
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions: [],
+        sources: {
+          hosts: {
+            local: { health: "available", observedAt: now, reason: null, agents: 0 },
+            remote: { health: "available", observedAt: now, reason: null, agents: 0 },
+          },
+        },
+      },
+    });
+    present(page.get("host-tabs").children.find((tab) => tab.dataset.host === "remote")).emit(
+      "click",
+    );
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
+    page.get("search").value = "missing";
+    page.get("search").emit("input");
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
+    present(filters[1]).emit("click");
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
+  } finally {
+    app.dispose();
+    floor.mockRestore();
+    couriers.mockRestore();
+  }
+});
 test("observer-ui regression contracts", async () => {
   const defaults = canonicalTheme();
   const ObserverModel = createModel(defaults);

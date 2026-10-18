@@ -10,7 +10,6 @@ export interface Tap {
   obs: boolean | null;
   ship: { host: string | null } | null;
   point: Point;
-  at: number;
 }
 export interface Drag {
   start: Point;
