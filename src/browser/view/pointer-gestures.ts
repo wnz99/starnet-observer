@@ -10,6 +10,7 @@ import { present as required } from "./values.js";
 const GESTURE = { touchSlop: 6, mouseSlop: 4, touchMs: 300 };
 export class PointerGestures<R extends SpriteResource, B extends R = R> {
   pointer: Point | null = null;
+  completedClick: Point | null = null;
   pointers = new Map<number, Point>();
   drag: Drag | null = null;
   pinch: { distance: number } | null = null;
@@ -23,6 +24,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     return { x: (event.clientX ?? 0) - rect.left, y: (event.clientY ?? 0) - rect.top };
   };
   pointerDown = (event: ViewEvent) => {
+    this.completedClick = null;
     const point = this.local(event);
     this.pointers.set(event.pointerId ?? 0, point);
     this.capture(event.pointerId ?? 0);
@@ -33,6 +35,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
       ];
       this.pinch = { distance: Math.hypot(a.x - b.x, a.y - b.y) };
       this.drag = null;
+      this.selection.tap = null;
       this.lastMovedAt = this.view.clock();
     } else
       this.drag = {
@@ -71,6 +74,8 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
       )
         this.drag.moved = true;
       if (this.drag.moved) {
+        this.completedClick = null;
+        this.selection.tap = null;
         this.view.cameraControl.panBy({
           x: point.x - this.drag.last.x,
           y: point.y - this.drag.last.y,
@@ -81,11 +86,13 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     }
   }
   pointerUp = (event: ViewEvent) => {
+    this.completedClick = null;
     const point = this.local(event);
     this.pointers.delete(event.pointerId ?? 0);
     if (this.pinch) {
       if (this.pointers.size < 2) this.pinch = null;
       this.drag = null;
+      this.selection.tap = null;
       return;
     }
     if (
@@ -93,7 +100,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
       !this.drag.moved &&
       (!this.drag.touch || this.view.clock() - this.drag.at < GESTURE.touchMs)
     ) {
-      this.selection.select(point);
+      this.completedClick = point;
     } else this.selection.tap = null; // a drag, pinch or slow touch ends any remembered gesture
     this.drag = null;
   };
@@ -105,6 +112,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     }
   }
   pointerCancel = (event: ViewEvent) => {
+    this.completedClick = null;
     this.pointers.delete(event.pointerId ?? 0);
     if (this.pointers.size < 2) this.pinch = null;
     this.drag = null;
@@ -119,7 +127,10 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     // Hovering a worker's own name plate keeps it hovered, so the plate stays put to be clicked.
     if (this.pointer) {
       this.view.hovered =
-        Scene.hitTest(this.pointer, this.view.regions) || this.selection.titleAt(this.pointer);
+        this.selection.titleAt(this.pointer) ||
+        (this.selection.signAt(this.pointer)
+          ? null
+          : Scene.hitTest(this.pointer, this.view.regions));
       const style = this.view.canvas.style;
       style.cursor =
         this.drag && this.drag.moved
@@ -130,6 +141,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     }
   };
   reset() {
+    this.completedClick = null;
     this.pointers.clear();
     this.drag = null;
     this.pinch = null;

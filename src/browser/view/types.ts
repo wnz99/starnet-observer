@@ -83,6 +83,7 @@ export type InputName =
   | "pointerup"
   | "pointercancel"
   | "pointerleave"
+  | "click"
   | "wheel"
   | "keydown"
   | "dblclick";

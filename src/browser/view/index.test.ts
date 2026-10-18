@@ -395,15 +395,20 @@ test("observer-view regression contracts", async () => {
     node.handlers.get("pointerdown")(at);
     node.handlers.get("pointermove")({ ...at, clientX: at.clientX + 2 });
     node.handlers.get("pointerup")({ ...at, clientX: at.clientX + 2 });
+    assert.deepEqual(selected, [], "pointerup alone does not dispatch a selection");
+    node.handlers.get("click")({ ...at, clientX: at.clientX + 2, detail: 1 });
+    node.handlers.get("click")({ ...at, clientX: at.clientX + 2, detail: 1 });
     assert.deepEqual(selected, ["obs_0"]);
     const before = view.camera();
     node.handlers.get("pointerdown")(at);
     node.handlers.get("pointermove")({ ...at, clientX: at.clientX - 60 });
     node.handlers.get("pointerup")({ ...at, clientX: at.clientX - 60 });
+    node.handlers.get("click")({ ...at, clientX: at.clientX - 60, detail: 1 });
     assert.deepEqual(selected, ["obs_0"], "a drag never selects");
     node.handlers.get("pointerdown")({ ...at, pointerId: 3 });
     node.handlers.get("pointercancel")({ ...at, pointerId: 3 });
     node.handlers.get("pointerup")({ ...at, pointerId: 3 });
+    node.handlers.get("click")({ ...at, pointerId: 3, detail: 1 });
     assert.deepEqual(selected, ["obs_0"], "a cancelled tap never selects");
     assert.notEqual(view.camera().tx, before.tx);
     assert.equal(view.mode(), "manual");
@@ -1396,9 +1401,10 @@ test("observer-view regression contracts", async () => {
           preventDefault() {},
         };
       };
-      const click = (event: ViewEvent) => {
+      const click = (event: ViewEvent, detail = 1) => {
         node.handlers.get("pointerdown")(event);
         node.handlers.get("pointerup")(event);
+        node.handlers.get("click")({ ...event, detail });
       };
       const between = () => {
         now += 16;
@@ -1426,7 +1432,7 @@ test("observer-view regression contracts", async () => {
           event = h.start(target);
         h.click(event);
         h.between();
-        h.click(event);
+        h.click(event, 2);
         h.between();
         h.node.handlers.get("dblclick")({ ...event, detail: 2 });
         assert.deepEqual(
@@ -1471,7 +1477,7 @@ test("observer-view regression contracts", async () => {
       );
       h.view.update(Scene.build(rest.onPage(0), 0), {});
       h.between();
-      h.click(event);
+      h.click(event, 2);
       h.between();
       h.node.handlers.get("dblclick")({ ...event, detail: 2 });
       assert.equal(h.log.length, 1, "removal: a departed worker is never selected again");
@@ -1501,6 +1507,8 @@ test("observer-view regression contracts", async () => {
         up(event);
         up({ ...event, pointerId: 2, clientX: event.clientX + 40 });
       }
+      h.node.handlers.get("click")({ ...event, detail: 1 });
+      assert.deepEqual(h.log, ["w23"], "generated clicks after " + gesture + " never select");
       h.between();
       const now = Scene.hitTest({ x: event.clientX, y: event.clientY }, h.view.hitRegions());
       assert.notEqual(
@@ -1534,7 +1542,7 @@ test("observer-view regression contracts", async () => {
       );
       // Immediately: only the distance separates it from the worker click.
       h.click(away);
-      h.click(away);
+      h.click(away, 2);
       h.node.handlers.get("dblclick")({ ...away, detail: 2 });
       assert.deepEqual(h.log, ["w7"], "an unrelated click never reuses the earlier worker");
       assert.deepEqual(
@@ -1616,16 +1624,35 @@ test("observer-view regression contracts", async () => {
       pointerType: "mouse",
       preventDefault() {},
     };
-    const click = (event: ViewEvent) => {
+    const click = (event: ViewEvent, detail = 1) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
+      node.handlers.get("click")({ ...event, detail });
     };
     click(at);
     assert.deepEqual(toggles, ["w0"], "a title click toggles that worker");
     assert.deepEqual(selected, [], "and focuses nobody");
+    now += 600;
+    click(at);
+    now += 600;
+    click(at);
+    assert.deepEqual(
+      toggles,
+      ["w0", "w0", "w0"],
+      "independent clicks at 0/600/1200 ms each toggle",
+    );
+    toggles.length = 1;
+    node.handlers.get("pointerdown")({ ...at, pointerType: "touch" });
+    now += 300;
+    node.handlers.get("pointerup")({ ...at, pointerType: "touch" });
+    node.handlers.get("click")({ ...at, detail: 1 });
+    assert.equal(toggles.length, 1, "a slow touch cannot act through its generated click");
+    click(at);
+    assert.equal(toggles.length, 2, "a new click after slow touch acts immediately");
+    toggles.length = 1;
     now += 16;
     view.paint(now);
-    click(at);
+    click(at, 2);
     now += 16;
     view.paint(now);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
@@ -1677,7 +1704,6 @@ test("observer-view regression contracts", async () => {
     view.paint(now);
     assert.equal(view.hovered(), "w2");
     // Camera and scene changes retire old title targets until repaint, like repository signs.
-    now += 1000;
     const oldTitle = view.titleRegions().find((region) => region.id === "w2");
     const oldPoint = {
       ...at,
@@ -1703,8 +1729,27 @@ test("observer-view regression contracts", async () => {
     view.update(Scene.build(layout.onPage(0), 0), {});
     click({ ...at, clientX: newTitle.left + 2, clientY: newTitle.top + 2 });
     assert.equal(toggles.length, before + 1, "new scene cannot reuse old title boxes");
+    now += 16;
+    view.paint(now);
+    const resumedTitle = present(view.titleRegions().find((region) => region.id === "w2"));
+    const touch = {
+      ...at,
+      clientX: resumedTitle.left + 2,
+      clientY: resumedTitle.top + 2,
+      pointerType: "touch",
+    };
+    click(touch);
+    assert.equal(toggles.length, before + 2, "a short touch tap acts exactly once through click");
+    node.handlers.get("pointerdown")(touch);
+    node.handlers.get("pointerup")(touch);
     view.stop();
     assert.deepEqual(view.titleRegions(), [], "stop clears title targets");
+    assert(!node.handlers.has("click"), "stop removes the native click listener");
+    view.start();
+    view.paint(now + 16);
+    node.handlers.get("click")({ ...touch, detail: 1 });
+    assert.equal(toggles.length, before + 2, "stop/start clears pending click eligibility");
+    view.stop();
   }
   verifyTitleTargets();
   // Task 5: drawn repository section signs toggle exact repository highlighting. Only accepted signs of sections that hold
@@ -1804,16 +1849,17 @@ test("observer-view regression contracts", async () => {
     const signA = signs.find((sign) => sign.repo === "repo_a"),
       at = clear(present(signA));
     assert(at, "fixture: the repo_a sign is not under a worker body or title");
-    const click = (event: ViewEvent) => {
+    const click = (event: ViewEvent, detail = 1) => {
       node.handlers.get("pointerdown")(event);
       node.handlers.get("pointerup")(event);
+      node.handlers.get("click")({ ...event, detail });
     };
     const camera = view.camera(),
       mode = view.mode();
     click(at);
     assert.deepEqual(repoToggles, ["repo_a"], "a drawn sign toggles its exact repository");
     assert.deepEqual([selected, toggles], [[], []], "and neither focuses nor opens a worker");
-    click(at);
+    click(at, 2);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
     assert.deepEqual(repoToggles, ["repo_a"], "a sign double-click toggles once");
     assert.deepEqual([view.camera(), view.mode()], [camera, mode], "and never zooms or pans");
@@ -1873,6 +1919,70 @@ test("observer-view regression contracts", async () => {
     assert.deepEqual(view.signRegions(), [], "stop clears sign targets");
   }
   verifyRepositorySigns();
+  function verifyPaintedSignPriority() {
+    const layout = Model.createLayout();
+    layout.reconcile(
+      Array.from({ length: 16 }, (_, index) => ({
+        id: "w" + String(index),
+        projectId: "p",
+        project: "P",
+        repoId: "r",
+        repo: "R",
+        provider: "codex",
+        status: "working",
+      })),
+    );
+    const node = canvas(1440, 1000),
+      selected: string[] = [],
+      repositories: string[] = [];
+    const view = View.create({
+      canvas: node,
+      onSelect: (id) => selected.push(id),
+      env: {
+        raf: () => 1,
+        caf() {},
+        dpr: () => 1,
+        createCanvas: () => canvas(),
+        sprites: {
+          drawBody: (_ctx: ViewContext<Resource>, body: SpriteBody<Resource>) => ({
+            top: body.py - 19,
+            w: 10,
+            h: 19,
+          }),
+        },
+      },
+    });
+    view.start();
+    view.update(Scene.build(layout.onPage(0), 0), {
+      onRepositoryToggle: (repo) => repositories.push(repo),
+    });
+    let overlap: Point | null = null;
+    for (let step = 0; step < 22 && !overlap; step++) {
+      view.zoomBy(step < 12 ? 1.2 : 1 / 1.2);
+      view.paint(step * 16);
+      for (const sign of view.signRegions())
+        for (const body of view.hitRegions()) {
+          const left = Math.max(sign.left, body.left),
+            top = Math.max(sign.top, body.top),
+            right = Math.min(sign.left + sign.width, body.left + body.width),
+            bottom = Math.min(sign.top + sign.height, body.top + body.height);
+          if (right > left && bottom > top)
+            overlap = { x: (left + right) / 2, y: (top + bottom) / 2 };
+        }
+    }
+    assert(overlap, "fixture: an accepted painted sign overlaps a padded worker body");
+    const event = { clientX: overlap.x, clientY: overlap.y, pointerId: 1, pointerType: "mouse" };
+    node.handlers.get("pointermove")(event);
+    view.paint(400);
+    assert.equal(view.hovered(), null, "sign hover does not highlight the padded body beneath it");
+    node.handlers.get("pointerdown")(event);
+    node.handlers.get("pointerup")(event);
+    node.handlers.get("click")({ ...event, detail: 1 });
+    assert.deepEqual(repositories, ["r"], "the visible sign wins over padded worker bodies");
+    assert.deepEqual(selected, [], "the overlapping body does not receive selection");
+    view.stop();
+  }
+  verifyPaintedSignPriority();
   // Task 4: each worker animates on its own row freshness; a fresh source never animates a stale row's sprite or desk.
   function verifyOwnRowFreshness() {
     const layout = Model.createLayout(),
