@@ -25,6 +25,9 @@ const TOKEN = "synthetic-browser-consumer-token";
 interface CanvasProbe {
   activeScene: SceneGeometry;
   actors: ActorFrame[];
+  ctx: CanvasRenderingContext2D;
+  framePaint: { paint(now: number): unknown };
+  staticLayer: { builds: number } | null;
   plateFrame: unknown;
   callbacks: { onObservatory: () => void };
   interaction: {
@@ -354,6 +357,8 @@ async function crewMotion(page: Page, close: () => void, birth: () => void, arti
     "normal actor frame ticks and unchanged polls preserve roster nodes",
   );
   const after = await probe();
+  const links = await helperLinks(page);
+  assert(links.away > 0, "normal-motion proof includes away helper chairs");
   assert(
     after.actors.some((actor) => {
       const previous = before.actors.find((value) => value.id === actor.id);
@@ -376,6 +381,7 @@ async function crewMotion(page: Page, close: () => void, birth: () => void, arti
     .poll(async () => (await probe()).workers.find((worker) => worker.id === "helper_birth")?.phase)
     .toBe("entering");
   await capture(page, path.join(artifacts, "helper-arrival.png"));
+  await helperLinks(page);
   await expect
     .poll(
       async () => (await probe()).workers.find((worker) => worker.id === "helper_birth")?.phase,
@@ -453,6 +459,11 @@ async function crewBehavior(page: Page, close: () => void, birth: () => void, ar
   await expect(page.locator("#fx-toggle")).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("button", { name: "Zoom to the Fixture project platform" }).click();
   await capture(page, path.join(artifacts, "helper-quarters.png"));
+  assert.equal(
+    (await helperLinks(page)).occupied,
+    8,
+    "reduced motion keeps all present helpers at their chairs",
+  );
   await page.locator("#search").fill("Synthetic worker 0");
   await expect(rows).toHaveCount(1);
   await expect(page.locator("#search")).toBeFocused();
@@ -493,6 +504,94 @@ async function crewBehavior(page: Page, close: () => void, birth: () => void, ar
     .toBe("present");
   await expect(page.locator("#station-stats-summary")).toContainText("20 displayed crew");
   await expect(page.locator("#station-totals .total-counter").first()).toHaveText("in 76K");
+}
+async function helperLinks(page: Page) {
+  const project = ({ x, y, z = 0 }: { x: number; y: number; z?: number | undefined }) => ({
+    x: 24 * (x - y),
+    y: 12 * (x + y) - 24 * z,
+  });
+  const frame = await page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    const ctx = view.ctx,
+      moveTo = ctx.moveTo.bind(ctx),
+      lineTo = ctx.lineTo.bind(ctx),
+      stroke = ctx.stroke.bind(ctx);
+    let from = { x: 0, y: 0 },
+      to = from;
+    const strokes: {
+      from: { x: number; y: number };
+      to: { x: number; y: number };
+      color: unknown;
+      dash: number[];
+      alpha: number;
+      width: number;
+    }[] = [];
+    const builds = view.staticLayer?.builds;
+    try {
+      ctx.moveTo = (x, y) => {
+        from = { x, y };
+        moveTo.call(ctx, x, y);
+      };
+      ctx.lineTo = (x, y) => {
+        to = { x, y };
+        lineTo.call(ctx, x, y);
+      };
+      ctx.stroke = (path?: Path2D) => {
+        strokes.push({
+          from,
+          to,
+          color: ctx.strokeStyle,
+          dash: ctx.getLineDash(),
+          alpha: ctx.globalAlpha,
+          width: ctx.lineWidth,
+        });
+        Reflect.apply(stroke, ctx, path ? [path] : []);
+      };
+      view.framePaint.paint(performance.now());
+      return {
+        workers: view.activeScene.workers,
+        actors: view.actors,
+        strokes,
+        builds,
+        after: view.staticLayer?.builds,
+      };
+    } finally {
+      ctx.moveTo = moveTo;
+      ctx.lineTo = lineTo;
+      ctx.stroke = stroke;
+    }
+  });
+  let occupied = 0,
+    away = 0;
+  for (const worker of frame.workers) {
+    if (!worker.connector) continue;
+    const actor = frame.actors.find((value) => value.id === worker.id);
+    const atChair =
+      !!actor &&
+      Math.hypot(actor.point.x - worker.chair.x, actor.point.y - worker.chair.y) <= 0.001;
+    const from = project(worker.connector.from),
+      to = project(worker.connector.to);
+    const matches = frame.strokes.filter(
+      (value) =>
+        value.from.x === from.x &&
+        value.from.y === from.y &&
+        value.to.x === to.x &&
+        value.to.y === to.y &&
+        value.color === worker.accent &&
+        value.dash.join() === "4,4" &&
+        value.width === 1.5 &&
+        value.alpha === 0.6,
+    );
+    assert.equal(
+      matches.length,
+      atChair ? 1 : 0,
+      worker.id + ": native canvas link follows actual foot/chair occupancy",
+    );
+    if (atChair) occupied++;
+    else away++;
+  }
+  assert.equal(frame.after, frame.builds, "native motion paint reuses static canvas");
+  return { occupied, away };
 }
 async function observeRosterMutations(page: Page) {
   await page.evaluate(() => {
@@ -676,6 +775,7 @@ async function runBrowserConsumer(root: string) {
         stableRoster: true,
         filterAndSettlementFocus: true,
         reducedAndNormalLifecycle: true,
+        nativeChairOccupancyLinks: true,
         screenshots: ["helper-quarters.png", "helper-motion.png", "helper-arrival.png"],
       },
       prepaint: ["starnet", "synthetic-private"],

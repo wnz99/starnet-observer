@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Displayed-crew parity, sustained formation, per-ro
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261019-28k | Repair helper formation recovery and occupied desk links | Approved revision 1 registered; Task 1 and Task 2 pending sequential implementation and independent review | [261019-28k](./quick/261019-28k-repair-helper-formation-recovery-and-occ/) |
+| 261019-28k | Repair helper formation recovery and occupied desk links | Task 1 independently approved; Task 2 verified with full static gate, 271 native tests and installed Chromium consumers; independent Task 2 review pending | [261019-28k](./quick/261019-28k-repair-helper-formation-recovery-and-occ/) |
 
 ## Quick Tasks Completed
 
