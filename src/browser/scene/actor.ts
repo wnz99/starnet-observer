@@ -4,17 +4,7 @@ import { identityHash } from "../model/identity.js";
 import { contains } from "./geometry.js";
 import { atDesk, closed, isStale } from "./formation.js";
 import { historicalPath } from "./history.js";
-import type {
-  Actor,
-  Worker,
-  Point,
-  Graph,
-  Assignment,
-  Formation,
-  ActorFrame,
-  Stale,
-  HistoryTarget,
-} from "./types.js";
+import type { Actor, Worker, Point, Graph, Assignment, ActorFrame, Stale } from "./types.js";
 interface ActorMotionFrame {
   now: number;
   elapsed: number;
@@ -30,6 +20,7 @@ const MOTION = {
   restJitter: 7000,
   tripStride: 97,
   speed: 1.6,
+  followSpeed: 2.4,
   milliseconds: 1000,
   headingEpsilon: 0.0001,
   homeEpsilon: 0.001,
@@ -56,7 +47,7 @@ export class ActorState implements Actor {
   arrival?: number | null;
   targetKey?: string | null;
   assignment?: string | null;
-  formation?: Formation | null;
+  formation?: NonNullable<Actor["formation"]> | null;
   settled: "entering" | "returning" | undefined;
   setLifecycle(path: Point[], settled: ActorFrame["settled"]) {
     this.path = path;
@@ -110,20 +101,17 @@ export class ActorState implements Actor {
       this.followParent = parent.worker.id;
       this.assignment = assignment.assignment;
     }
-    if (this.path.length > 0) return;
-    if (this.arrival !== null) {
-      this.cursor = this.arrival ?? null;
-      this.arrival = null;
-    }
+    if (assignment.route === "history" && this.path.length > 0) return;
+    if (typeof this.arrival === "number") this.cursor = this.arrival;
+    this.arrival = null;
     const target = assignment.target,
-      side = assignment.side;
-    const key =
-      target && JSON.stringify([assignment.assignment, target.arc, target.dx, target.dy, side]);
-    if (!this.isNewTarget(target, key)) return;
+      key =
+        target &&
+        JSON.stringify([assignment.assignment, assignment.route, target, assignment.side]);
+    if (!this.isNewTarget(target, key, assignment.route)) return;
     this.targetKey = key;
-    const path = this.followPath(parent, graph, target, side);
-    this.path = path;
-    this.arrival = path.length > 0 ? target.arc : null;
+    this.path = this.followPath(parent, graph, target, assignment);
+    this.arrival = assignment.route === "history" && this.path.length > 0 ? target.arc : null;
   }
   returnHome(graph: Graph | undefined) {
     this.formation = null;
@@ -142,8 +130,16 @@ export class ActorState implements Actor {
     }
   }
 
-  private isNewTarget(target: HistoryTarget | null, key: string | null): target is HistoryTarget {
-    return target !== null && target.arc > (this.cursor ?? -Infinity) && this.targetKey !== key;
+  private isNewTarget(
+    target: Assignment["target"],
+    key: string | null,
+    route: Assignment["route"],
+  ): target is NonNullable<Assignment["target"]> {
+    return (
+      target !== null &&
+      (route === "compact" || target.arc > (this.cursor ?? -Infinity)) &&
+      this.targetKey !== key
+    );
   }
   observeFreeze(stale: Stale, parent: Actor | undefined) {
     const transient =
@@ -157,12 +153,12 @@ export class ActorState implements Actor {
     parent: Actor,
     graph: Graph | undefined,
     target: NonNullable<Assignment["target"]>,
-    side: number,
+    assignment: Assignment,
   ) {
     const historical =
-      this.cursor === null || this.cursor === undefined
+      assignment.route === "compact" || this.cursor === null || this.cursor === undefined
         ? []
-        : historicalPath(parent, this.cursor, target, side);
+        : historicalPath(parent, this.cursor, target, assignment.side);
     let from = this.point;
     const safe = historical.every((point) => {
       const valid = safeSegment(graph, from, point, this.worker);
@@ -239,13 +235,16 @@ export class ActorState implements Actor {
       this.trail = [];
       this.arc = 0;
     }
-    let remaining = (elapsed * MOTION.speed) / MOTION.milliseconds;
+    const transient = ["entering", "returning"].some((phase) => phase === this.worker.helperPhase);
+    let remaining =
+      (elapsed * (following && !transient ? MOTION.followSpeed : MOTION.speed)) /
+      MOTION.milliseconds;
     while (this.path.length > 0 && remaining > 0) {
       remaining = this.travel(remaining);
       if (ambient) this.record(this.point);
       if (this.path.length === 0) {
         this.rest(now);
-        this.continueFollow(input);
+        this.chooseIntent(input);
       }
     }
   }
@@ -256,11 +255,6 @@ export class ActorState implements Actor {
       this.returnHome(graph);
     else if (following && parent && assignment) this.follow(parent, graph, assignment);
     else if (graph) this.roam(graph, now);
-  }
-  private continueFollow(input: ActorMotionFrame) {
-    if (this.worker.helperPhase === "entering" || this.worker.helperPhase === "returning") return;
-    const { following, parent, graph, assignment } = input;
-    if (following && parent && assignment) this.follow(parent, graph, assignment);
   }
   private travel(remaining: number) {
     const target = element(this.path, 0),

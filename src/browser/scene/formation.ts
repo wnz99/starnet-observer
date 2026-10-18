@@ -1,7 +1,16 @@
 import { element } from "../model/types.js";
-import { crosses } from "./navigation.js";
-import { historicalPath, trailTarget, historyAt } from "./history.js";
-import type { Actor, Graph, Point, Stale, Assignment, Worker, HistoryTarget } from "./types.js";
+import { crosses, safeSegment, pathTo } from "./navigation.js";
+import { trailTarget, historyAt } from "./history.js";
+import type {
+  Actor,
+  Graph,
+  Point,
+  Stale,
+  Assignment,
+  Worker,
+  HistoryTarget,
+  Formation,
+} from "./types.js";
 const FORMATION = {
   bodyRadius: 0.28,
   helperScale: 0.72,
@@ -12,9 +21,8 @@ const FORMATION = {
   firstLag: 1.6,
   rowLag: 1.2,
   arcBucket: 0.8,
-  clearStreak: 2,
+  headingPrecision: 1e8,
 };
-type Proposal = { actor: Actor; side: number; target: HistoryTarget | null };
 function clearEnvelope(graph: Graph, points: readonly Point[]) {
   const radius = FORMATION.bodyRadius * FORMATION.helperScale + FORMATION.clearance,
     r = graph.rect;
@@ -89,105 +97,142 @@ export class FormationPlanner {
           actor.worker.parentId === this.parent.worker.id &&
           canFollow(actor, this.parent, this.stale),
       );
+    const moving = this.parent.path.length > 0,
+      tangent = this.tangent(),
+      anchor = moving
+        ? historyAt(
+            this.parent,
+            Math.floor(this.parent.arc / FORMATION.arcBucket) * FORMATION.arcBucket,
+          )
+        : tangent && { ...tangent, point: this.parent.point };
+    const signature = JSON.stringify([
+        moving,
+        moving ? anchor?.arc : anchor?.point,
+        tangent && [tangent.dx, tangent.dy],
+      ]),
+      group = this.updateTargets(members, { anchor, tangent, moving, signature });
+    return members.map((actor, i) => ({
+      actor,
+      route: group.targets ? "compact" : "history",
+      side: group.targets ? this.side(i, members.length) : 0,
+      target: group.targets
+        ? element(group.targets, i)
+        : trailTarget(this.parent, (i + 1) * FORMATION.firstLag),
+      assignment: JSON.stringify([this.parent.worker.id, group.membership, group.mode, i]),
+    }));
+  }
+  private groupFor(members: Actor[]): Formation {
     const memberIds = members.map((actor) => actor.worker.id),
       membership = JSON.stringify(memberIds);
-    const proposed = members.map((actor, i) => this.proposal(actor, i, members.length));
-    const signature = JSON.stringify([
-      membership,
-      proposed.map((p) => (p.target ? [p.target.arc, p.target.dx, p.target.dy] : null)),
-    ]);
     let group = this.parent.formation;
-    if (!group || group.membership !== membership)
+    if (!group || group.membership !== membership || group.graph !== this.graph)
       group = {
         membership,
         memberIds,
         mode: "single",
-        streak: 0,
         signature: null,
-        advance: null,
+        targets: null,
+        graph: this.graph,
       };
     this.parent.formation = group;
-    this.advanceGroup(proposed, signature);
-    return proposed.map((p, i) => ({
-      actor: p.actor,
-      side: group.mode === "pairs" ? p.side : 0,
-      target:
-        group.mode === "pairs" ? p.target : trailTarget(this.parent, (i + 1) * FORMATION.firstLag),
-      assignment: JSON.stringify([this.parent.worker.id, membership, group.mode, i]),
-    }));
+    return group;
   }
-  private proposal(actor: Actor, i: number, count: number): Proposal {
-    const side =
-      i === count - 1 && count % FORMATION.diameter
-        ? 0
-        : i % FORMATION.diameter
-          ? FORMATION.pairOffset
-          : -FORMATION.pairOffset;
-    return {
-      actor,
-      side,
-      target: trailTarget(
-        this.parent,
-        FORMATION.firstLag + FORMATION.rowLag * Math.floor(i / FORMATION.diameter),
-        side,
-      ),
-    };
+  private tangent() {
+    const target = historyAt(this.parent, this.parent.arc);
+    if (!target) return null;
+    const scale = FORMATION.headingPrecision / Math.hypot(target.dx, target.dy),
+      dx = Math.round(target.dx * scale) / FORMATION.headingPrecision,
+      dy = Math.round(target.dy * scale) / FORMATION.headingPrecision,
+      length = Math.hypot(dx, dy);
+    return { ...target, dx: dx / length, dy: dy / length };
   }
-  private settledGroup(proposed: Proposal[]) {
-    const group = this.parent.formation;
-    // A resting leader cannot advance another arc bucket. Finish the ordered lag
-    // before treating settled followers as the second clear regroup observation.
-    return (
-      group?.mode === "single" &&
-      group.streak > 0 &&
-      this.parent.path.length === 0 &&
-      proposed.every((p, i) => {
-        const target = trailTarget(this.parent, (i + 1) * FORMATION.firstLag);
-        return (
-          target &&
-          p.actor.path.length === 0 &&
-          p.actor.cursor !== null &&
-          p.actor.cursor !== undefined &&
-          p.actor.cursor >= target.arc
-        );
-      })
-    );
-  }
-  private advanceGroup(proposed: Proposal[], signature: string) {
-    const group = this.parent.formation,
-      settled = this.settledGroup(proposed);
-    if (group && (group.signature !== signature || settled)) {
-      // The centre stripe fills the space between pair feet, proving the full squad envelope.
-      const clear = proposed.every(
-        (p) =>
-          p.target &&
-          clearEnvelope(
-            this.graph,
-            historicalPath(this.parent, p.target.arc - FORMATION.arcBucket, p.target, p.side),
-          ) &&
-          (p.side !== -FORMATION.pairOffset ||
-            clearEnvelope(
-              this.graph,
-              historicalPath(
-                this.parent,
-                p.target.arc - FORMATION.arcBucket,
-                historyAt(this.parent, p.target.arc),
-                0,
-              ),
-            )),
-      );
-      const advance = Math.floor(this.parent.arc / FORMATION.arcBucket);
-      if (!clear) {
-        group.mode = "single";
-        group.streak = 0;
-      } else if (
-        group.mode === "single" &&
-        (group.advance !== advance || settled) &&
-        ++group.streak >= FORMATION.clearStreak
-      )
-        group.mode = "pairs";
-      group.advance = advance;
+  private updateTargets(
+    members: Actor[],
+    input: {
+      anchor: HistoryTarget | null;
+      tangent: HistoryTarget | null;
+      moving: boolean;
+      signature: string;
+    },
+  ) {
+    const { anchor, tangent, moving, signature } = input;
+    const group = this.groupFor(members);
+    if (group.signature !== signature) {
+      const retained = group.targets?.[0];
+      const heading = !moving && retained ? retained : tangent;
+      group.targets =
+        anchor && heading ? this.compactTargets(members, anchor, heading, moving) : null;
+      group.mode = group.targets ? "pairs" : "single";
       group.signature = signature;
     }
+    return group;
+  }
+  private side(i: number, count: number) {
+    return i === count - 1 && count % FORMATION.diameter
+      ? 0
+      : i % FORMATION.diameter
+        ? FORMATION.pairOffset
+        : -FORMATION.pairOffset;
+  }
+  private compactTargets(
+    members: Actor[],
+    anchor: HistoryTarget,
+    heading: HistoryTarget,
+    moving: boolean,
+  ) {
+    const directions = [{ x: heading.dx, y: heading.dy }];
+    if (!moving)
+      directions.push(
+        { x: -heading.dx, y: -heading.dy },
+        { x: -heading.dy, y: heading.dx },
+        { x: heading.dy, y: -heading.dx },
+      );
+    for (const d of directions) {
+      const at = (lag: number, side: number): Point => ({
+        x: anchor.point.x - d.x * lag - d.y * side,
+        y: anchor.point.y - d.y * lag + d.x * side,
+        z: 0,
+      });
+      const targets = members.map((_, i): HistoryTarget => ({
+        arc: anchor.arc,
+        dx: d.x,
+        dy: d.y,
+        point: at(
+          FORMATION.firstLag + FORMATION.rowLag * Math.floor(i / FORMATION.diameter),
+          this.side(i, members.length),
+        ),
+      }));
+      if (!this.clearFootprint(at, members.length)) continue;
+      const reachable = members.every((actor, i) => {
+        const target = element(targets, i).point;
+        return (
+          safeSegment(this.graph, actor.point, target, actor.worker) ||
+          pathTo(this.graph, actor.point, target, actor.worker).length > 0
+        );
+      });
+      if (reachable) return targets;
+    }
+    return null;
+  }
+  private clearFootprint(at: (lag: number, side: number) => Point, count: number) {
+    // Every lateral row and all three longitudinal stripes belong to this current footprint.
+    const rows = Math.ceil(count / FORMATION.diameter);
+    const clearRows = Array.from({ length: rows }, (_, row) => {
+      const lag = FORMATION.firstLag + FORMATION.rowLag * row,
+        tail = row * FORMATION.diameter === count - 1;
+      return clearEnvelope(
+        this.graph,
+        tail ? [at(lag, 0)] : [at(lag, -FORMATION.pairOffset), at(lag, FORMATION.pairOffset)],
+      );
+    }).every(Boolean);
+    const clearStripes = [-FORMATION.pairOffset, 0, FORMATION.pairOffset].every((side) =>
+      clearEnvelope(this.graph, [
+        at(0, 0),
+        ...Array.from({ length: rows }, (_, row) =>
+          at(FORMATION.firstLag + FORMATION.rowLag * row, side),
+        ),
+      ]),
+    );
+    return clearRows && clearStripes;
   }
 }

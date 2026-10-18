@@ -27,9 +27,9 @@ export interface Formation {
   membership: string;
   memberIds: string[];
   mode: string;
-  streak: number;
   signature: string | null;
-  advance: number | null;
+  targets: HistoryTarget[] | null;
+  graph: Graph;
 }
 export interface Actor {
   worker: Worker;
@@ -52,6 +52,7 @@ export interface Actor {
 }
 export interface Assignment {
   actor: Actor;
+  route: "history" | "compact";
   side: number;
   target: HistoryTarget | null;
   assignment: string;
