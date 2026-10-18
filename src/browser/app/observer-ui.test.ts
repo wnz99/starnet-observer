@@ -151,6 +151,31 @@ test("local roster actions preserve the floor and mail without unrelated reconci
       "local actions never rebuild courier state",
     );
     assert.equal(reads, original.reads, "local actions never request inventory");
+
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions: [],
+        sources: {
+          hosts: {
+            local: { health: "available", observedAt: now, reason: null, agents: 0 },
+            remote: { health: "available", observedAt: now, reason: null, agents: 0 },
+          },
+        },
+      },
+    });
+    present(page.get("host-tabs").children.find((tab) => tab.dataset.host === "remote")).emit(
+      "click",
+    );
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
+    page.get("search").value = "missing";
+    page.get("search").emit("input");
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
+    present(filters[1]).emit("click");
+    assert.equal(page.get("empty").textContent, "No sessions on remote.");
   } finally {
     app.dispose();
     floor.mockRestore();

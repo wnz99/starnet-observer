@@ -62,6 +62,7 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
       : rows;
     const bus = this.busFor(snapshot, hasHosts ? state.selectedHost : null);
     roster.render(panelRows, state.isStale(snapshot), bus?.messages ?? [], bus);
+    this.emptyHost(snapshot, hosts.list().length, panelRows.length);
     if (options.canvas) view.invalidate();
   }
   arrangeChanged() {
