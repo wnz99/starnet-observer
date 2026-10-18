@@ -7,13 +7,43 @@ const REPOSITORY_RING = { glowRadius: 40, glowAlpha: 0.4, workingWidth: 3, width
 const FOCUS_RING = { period: 450, radius: 0.55, width: 2 };
 const PLATFORM_RING = { height: 0.02 };
 const HOST_RING = { minimumZoom: 0.25, period: 700, height: 2.4 };
+const AGENT_COLORS = [
+  "#ff7979",
+  "#78d5ff",
+  "#ffe477",
+  "#bf9aff",
+  "#7de29b",
+  "#ffae70",
+  "#ed97d8",
+  "#70e0d4",
+  "#b5c6ff",
+  "#d3e878",
+  "#f58eaa",
+  "#b9ddd0",
+  "#c9a97e",
+  "#91b875",
+  "#d6b6e7",
+  "#e8d1a3",
+];
 
 export class FrameOverlays<R extends SpriteResource, B extends R = R> {
+  private readonly agentColors = new Map<string, string>();
   constructor(readonly view: ViewRuntime<R, B>) {}
+
+  private ringColor(id: string): string {
+    const existing = this.agentColors.get(id);
+    if (existing) return existing;
+    const index = this.agentColors.size,
+      color =
+        AGENT_COLORS[index] ??
+        `hsl(${String(((index - AGENT_COLORS.length) * 137.507764 + 7.5) % 360)} 70% 65%)`;
+    this.agentColors.set(id, color);
+    return color;
+  }
 
   repository = (stationArt: boolean) => {
     /* The selected repository's crew, roots and helpers alike, each get a ring; a worker whose own fresh status is
-         working gets a thicker double ring and a glow. Read from the controller per paint; nothing accumulates. */
+         working gets a thicker double ring and a glow. Read selection from the controller per paint. */
     const selectedRepo = this.view.repositorySelection();
 
     if (selectedRepo !== null)
@@ -24,21 +54,22 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
     const point = worker.row.repoId === selectedRepo && this.view.cameraControl.pointOf(worker.id);
     if (!point) return;
     const working = worker.row.status === "working" && !this.view.workerStale(worker),
-      radius = 0.62 * worker.scale;
+      radius = 0.62 * worker.scale,
+      color = this.ringColor(worker.id);
     if (working && stationArt)
       this.view.geometry.glow(point, REPOSITORY_RING.glowRadius * worker.scale, {
-        color: this.view.C.repo,
+        color,
         alpha: REPOSITORY_RING.glowAlpha,
         transparent: this.view.C["glow-transparent"],
       });
     this.view.geometry.isoEllipse(point, radius, {
-      stroke: this.view.C.repo,
+      stroke: color,
       fill: null,
       width: working ? REPOSITORY_RING.workingWidth : REPOSITORY_RING.width,
     });
     if (working)
       this.view.geometry.isoEllipse(point, radius + REPOSITORY_RING.gap, {
-        stroke: this.view.C.repo,
+        stroke: color,
         fill: null,
         width: 1,
       });

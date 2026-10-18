@@ -22,6 +22,7 @@ import { createThemePack } from "../theme.js";
 import type { Resource } from "./drawing.fixture.js";
 import { drawing, Handlers, present } from "./drawing.fixture.js";
 import { createViewFactory } from "./index.js";
+import { ViewRuntime } from "./runtime.js";
 import { CORNER_KINDS, WALL_KINDS, wallUnits } from "./furnishing.js";
 import {
   cacheResolution,
@@ -351,6 +352,169 @@ test("observer-view regression contracts", async () => {
   }
   const regionOf = (view: ViewInstance, id: string) =>
     present(view.hitRegions().find((region) => region.id === id));
+
+  function verifyAgentIndicators() {
+    const node = canvas(1440, 1000),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => true,
+          env: {
+            raf: () => 1,
+            caf() {},
+            dpr: () => 2,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout(),
+      statuses = ["working", "blocked", "idle", "done", "unknown"] as const,
+      rows: LayoutRow[] = Array.from({ length: 40 }, (_, index) => ({
+        id: "indicator-" + String(index),
+        project: "Indicators",
+        projectId: "indicators",
+        projectKind: "group",
+        repo: "web",
+        repoId: "web",
+        provider: "codex",
+        status: present(statuses[index % statuses.length]),
+      }));
+    let selected: string | null = "web";
+    const stale = new Set<string>();
+    layout.reconcile(rows);
+    const scene = Scene.build(layout.onPage(0), 0);
+    runtime.lifecycle.start();
+    runtime.update(scene, {
+      repositorySelection: () => selected,
+      rowStale: (worker) => stale.has(worker.id),
+      inspected: () => "indicator-0",
+    });
+    stale.add("indicator-0");
+    const dots: { x: number; y: number; radius: number; color: unknown }[] = [];
+    node.ctx.arc = (x, y, radius) => dots.push({ x, y, radius, color: node.ctx.fillStyle });
+    const expected = [
+      canonicalLook.status.working,
+      canonicalLook.status.blocked,
+      canonicalLook.status.idle,
+      canonicalLook.status.done,
+      canonicalLook.status.unknown,
+    ];
+    for (const [index, row] of rows.slice(0, 5).entries()) {
+      runtime.cameraControl.focus(row.id);
+      runtime.framePaint.paint(0);
+      runtime.cameraControl.zoomBy(1);
+      for (const zoom of [0.3, 0.8, 1.5, 3]) {
+        const point = Scene.project(present(runtime.cameraControl.pointOf(row.id)));
+        runtime.cameraControl.setCamera({
+          zoom,
+          tx: 720 - point.x * zoom,
+          ty: 800 - point.y * zoom,
+        });
+        dots.length = 0;
+        runtime.framePaint.paint(0);
+        const anchor = present(runtime.anchors.find((value) => value.id === row.id));
+        assert.deepEqual(
+          dots.filter((dot) => dot.x === anchor.head.x && dot.y === anchor.head.y - 5),
+          [{ x: anchor.head.x, y: anchor.head.y - 5, radius: 2.5, color: expected[index] }],
+          String(row.status) + " has one constant screen-size overhead dot at zoom " + String(zoom),
+        );
+        for (const box of [...runtime.titleRegions, ...runtime.attentionRegions])
+          if (box.id === row.id)
+            assert(
+              box.top + box.height < anchor.head.y - 7.5,
+              "own plates clear the dot lane: " +
+                JSON.stringify({ id: row.id, zoom, box, head: anchor.head }),
+            );
+      }
+    }
+    runtime.cameraControl.overview();
+    const rings = new Map<
+        string,
+        { color: string | null | undefined; width: number | undefined }[]
+      >(),
+      glows: string[] = [],
+      ellipse = runtime.geometry.isoEllipse.bind(runtime.geometry),
+      glow = runtime.geometry.glow.bind(runtime.geometry);
+    runtime.geometry.isoEllipse = (point, radius, style) => {
+      const worker = runtime.activeScene.workers.find((value) => {
+        const at = runtime.cameraControl.pointOf(value.id);
+        return (
+          at === point && (radius === 0.62 * value.scale || radius === 0.62 * value.scale + 0.16)
+        );
+      });
+      if (worker) {
+        const strokes = rings.get(worker.id) ?? [];
+        strokes.push({ color: style.stroke, width: style.width });
+        rings.set(worker.id, strokes);
+      }
+      ellipse(point, radius, style);
+    };
+    runtime.geometry.glow = (point, radius, style) => {
+      if (radius === 40) glows.push(style.color);
+      glow(point, radius, style);
+    };
+    runtime.framePaint.paint(0);
+    const initial = new Map([...rings].map(([id, values]) => [id, present(values[0]).color]));
+    assert(initial.size > 16, "fixture crosses the initial color sequence");
+    assert.equal(new Set(initial.values()).size, initial.size, "each agent has a distinct ring");
+    assert.equal(present(rings.get("indicator-0"))[0]?.width, 1.5, "stale working stays thin");
+    assert.equal(present(rings.get("indicator-5"))[0]?.width, 3, "own fresh working stays thick");
+    assert.deepEqual(
+      present(rings.get("indicator-5")).map((stroke) => stroke.width),
+      [3, 1],
+      "fresh working has a double ring",
+    );
+    assert(
+      present(rings.get("indicator-5")).every(
+        (stroke) => stroke.color === initial.get("indicator-5"),
+      ),
+      "both strokes use its agent color",
+    );
+    assert(glows.includes(present(initial.get("indicator-5"))), "working glow matches its ring");
+    assert(!glows.includes(present(initial.get("indicator-0"))), "stale working has no glow");
+    const repaint = () => {
+      rings.clear();
+      runtime.framePaint.paint(0);
+      for (const [id, values] of rings)
+        if (initial.has(id))
+          assert.equal(present(values[0]).color, initial.get(id), id + " keeps color");
+    };
+    scene.workers.reverse();
+    repaint();
+    selected = null;
+    rings.clear();
+    runtime.framePaint.paint(0);
+    assert.equal(rings.size, 0, "deselection removes agent rings");
+    selected = "web";
+    runtime.cameraControl.zoomBy(1.5);
+    repaint();
+    const helper = {
+      ...present(rows[0]),
+      id: "indicator-helper",
+      parentId: "indicator-0",
+      source: "helper",
+    };
+    layout.reconcile([...rows, helper]);
+    runtime.update(Scene.build(layout.onPage(0), 0), {});
+    repaint();
+    assert(rings.has(helper.id), "new helper receives a ring");
+    assert(
+      !new Set(initial.values()).has(present(rings.get(helper.id))[0]?.color),
+      "helper gets a new color",
+    );
+    runtime.update(Scene.build([], 1), {});
+    runtime.framePaint.paint(0);
+    runtime.update(scene, {});
+    repaint();
+    runtime.lifecycle.stop();
+    runtime.lifecycle.start();
+    repaint();
+    runtime.lifecycle.stop();
+  }
+  verifyAgentIndicators();
 
   // DPR changes only the backing store: camera, hit regions and pointer math are identical at DPR 1 and 2.
   function verifyDprAndResize() {
@@ -1867,14 +2031,20 @@ test("observer-view regression contracts", async () => {
     // selected sign recoloured without moving.
     const strokes: [ViewContext<Resource>["strokeStyle"], number][] = [],
       texts: [string, ViewContext<Resource>["fillStyle"]][] = [];
-    node.ctx.stroke = () => strokes.push([node.ctx.strokeStyle, node.ctx.lineWidth]);
+    let ringPath = false;
+    node.ctx.beginPath = () => {
+      ringPath = false;
+    };
+    node.ctx.ellipse = (_x, _y, rx) => {
+      ringPath = rx === 0.62 * 34 || rx === (0.62 + 0.16) * 34;
+    };
+    node.ctx.stroke = () => {
+      if (ringPath) strokes.push([node.ctx.strokeStyle, node.ctx.lineWidth]);
+    };
     node.ctx.fillText = (text) => texts.push([text, node.ctx.fillStyle]);
     now += 16;
     view.paint(now);
-    const rings = strokes
-      .filter(([style]) => style === canonicalPalette.repo)
-      .map(([, width]) => width)
-      .sort();
+    const rings = strokes.map(([, width]) => width).sort();
     assert.deepEqual(
       rings,
       [1, 1.5, 3],
@@ -1890,10 +2060,7 @@ test("observer-view regression contracts", async () => {
     now += 16;
     view.paint(now);
     assert.deepEqual(
-      strokes
-        .filter(([style]) => style === canonicalPalette.repo)
-        .map(([, width]) => width)
-        .sort(),
+      strokes.map(([, width]) => width).sort(),
       [1.5, 1.5],
       'a stale "working" row is highlighted but never emphasised',
     );
@@ -2463,12 +2630,13 @@ test("observer-view regression contracts", async () => {
         .digest("hex");
     // Characterization of the pre-theme literal painter (HEAD 196d86d), recorded with this exact scenario set, plus two
     // additive passes only (no upstream entry changed or removed): the blocked-agent "!" marker and idle resting sparks.
-    const HEAD_DEFAULT = "34af845124c658b747ab067c08f736f20dc396362025095406cefc32e3782953";
+    // T4 adds all-zoom dots after plates and per-agent repository colors.
+    const HEAD_DEFAULT = "303b70007236327f3cbce87dc3d5ed8155674d6f72156df4130be69dbc2928c3";
     const omitted = record(undefined).result;
     assert.equal(
       digest(omitted),
       HEAD_DEFAULT,
-      "default paint colours, order and count match the idle-aging baseline",
+      "default paint colours, order and count match the agent-indicator baseline",
     );
     assert.equal(
       digest(record(createThemePack(canonicalTheme()).getDefault()).result),
@@ -2673,8 +2841,8 @@ test("observer-view regression contracts", async () => {
       .flatMap((value) => value.firstStops)
       .map((stops) => attribute(present(stops[0])));
     assert.deepEqual(
-      [...new Set(halos)].sort(),
-      ["blocked", "repo", "working"],
+      [...new Set(halos.filter(Boolean))].sort(),
+      ["blocked", "working"],
       "only status-lamp and selection glows remain",
     );
     const tethers = (scene: SceneGeometry) =>
@@ -3650,7 +3818,6 @@ test("observer-view regression contracts", async () => {
         "drone-shadow",
         "envelope-outline",
         "focus",
-        "repo",
         "working",
         "blocked",
         "idle",
