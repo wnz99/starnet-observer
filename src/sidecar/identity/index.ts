@@ -58,7 +58,7 @@ class IdentityResolver {
     if (mode !== "configured") return unavailable("footer-unavailable");
     // Ownership starts when footer mode applies, including a failed first live read.
     this.footerOwned.add(pane.pane_id);
-    // All inventory panes use the same endpoint. Retry only on the next refresh,
+    // All inventory panes use the same endpoint. Retry endpoint failure on the next refresh,
     // so one unresponsive socket cannot add a full deadline across every later pane.
     if (refresh.suppressed()) return unavailable("footer-unavailable");
     const terminal = incarnation(pane);
@@ -70,7 +70,10 @@ class IdentityResolver {
       refresh = new Refresh(refreshState);
     if (pane.agent !== "codex") return native(pane);
     try {
-      return await this.footer(pane, refresh);
+      const resolution = await this.footer(pane, refresh);
+      if (resolution.reason === "content-changed")
+        failNote("observer.identity.content", new Error("Live footer changed during capture"));
+      return resolution;
     } catch (error) {
       refresh.failed(error);
       failNote("observer.identity.resolve", new Error("Live footer identity unavailable"));

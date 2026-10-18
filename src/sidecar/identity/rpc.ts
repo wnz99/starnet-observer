@@ -1,6 +1,6 @@
 import net from "node:net";
 import { StringDecoder } from "node:string_decoder";
-import { object, MAX_RESPONSE, TIMEOUT } from "./types.js";
+import { object, code, CONTENT_CHANGED_CODE, MAX_RESPONSE, TIMEOUT } from "./types.js";
 import { TIMEOUT_CODE } from "./refresh.js";
 import type { IdentityRpc } from "./types.js";
 const ALLOWED_METHODS = [
@@ -12,9 +12,18 @@ const ALLOWED_METHODS = [
 ];
 function responseFrame(text: string, id: string) {
   const response = object(JSON.parse(text));
+  if (response.id === id && object(response.error).code === "stale_content")
+    throw Object.assign(new Error("Live footer changed during capture"), {
+      code: CONTENT_CHANGED_CODE,
+    });
   if (response.id !== id || response.error || !response.result)
     throw new Error("Invalid identity response");
   return response;
+}
+function responseError(error: unknown) {
+  return code(error) === CONTENT_CHANGED_CODE && error instanceof Error
+    ? error
+    : new Error("Invalid identity response");
 }
 // Herdr protocol 22: newline-delimited request/response. Every call closes its socket.
 export function makeIdentityRpc(endpoint: string): IdentityRpc {
@@ -60,8 +69,8 @@ export function makeIdentityRpc(endpoint: string): IdentityRpc {
         if (end < 0) return;
         try {
           finish(null, responseFrame(chunks.slice(0, end), id));
-        } catch {
-          finish(new Error("Invalid identity response"));
+        } catch (error) {
+          finish(responseError(error));
         }
       });
     });

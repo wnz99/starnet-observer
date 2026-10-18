@@ -93,8 +93,8 @@ test("observer queryspine polling freshness", async () => {
           index = Number(id.split(":")[1]);
         const count = (rpcCounts.get(id) || 0) + 1;
         rpcCounts.set(id, count);
-        // Synthetic workload only: nine RPCs total 250 ms; two birth reads total 50 ms.
-        // First footer costs 30 ms; remaining eight RPCs each cost 27.5 ms.
+        // Synthetic workload only: eight RPCs plus two fresh birth reads.
+        // First footer costs 30 ms; remaining seven RPCs each cost 27.5 ms.
         await delay(count === 1 ? 30 : 27.5);
         if (method === "agent.get") return { result: { agent: panes[index] } };
         if (method === "pane.process_info")
@@ -102,7 +102,7 @@ test("observer queryspine polling freshness", async () => {
         if (method === "pane.get")
           return {
             result: {
-              pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
+              pane: { ...panes[index], scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
             },
           };
         if (method === "pane.copy_motion") return { result: { pane_id: id, content_revision: 8 } };
@@ -215,7 +215,7 @@ test("observer queryspine polling freshness", async () => {
             (row) => row.identitySource === "footer" && row.observedAt === start,
           ),
         );
-        assert.deepEqual([...rpcCounts.values()], Array(20).fill(9));
+        assert.deepEqual([...rpcCounts.values()], Array(20).fill(8));
         assert.deepEqual([...birthCounts.values()], Array(20).fill(2));
         assert.equal(publishedSources.desktop.observedAt, -7000);
         assert.equal(

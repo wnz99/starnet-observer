@@ -10,6 +10,7 @@ export type IdentityExecute = (
 export type IdentityRpc = (method: string, params: Record<string, unknown>) => Promise<unknown>;
 export type FooterMode = "configured" | "unconfigured" | "unavailable";
 export interface RefreshState {
+  identityRetriesRemaining?: number;
   endpointTimedOut?: boolean;
   processBirthUnavailable?: boolean;
 }
@@ -43,6 +44,7 @@ export interface IdentityOptions {
 }
 export const MAX_RESPONSE = 32768;
 export const TIMEOUT = 1500;
+export const CONTENT_CHANGED_CODE = "IDENTITY_CONTENT_CHANGED";
 export const UUID_TEXT = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
 export const UUID = new RegExp("^" + UUID_TEXT + "$", "i");
 export const unavailable = (reason: string): IdentityResolution => ({

@@ -6,6 +6,9 @@ import type { Terminal } from "./types.js";
 import { validBirth, evenRevision } from "./birth.js";
 const FOOTER_LINES = 3;
 const MAX_PID = 2147483647;
+type InitialProbe =
+  | { ok: true; probe: Record<string, unknown> }
+  | { ok: false; reason: "terminal-unavailable" | "geometry-unavailable" };
 function validPid(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= MAX_PID;
 }
@@ -86,11 +89,18 @@ export class CaptureRpc {
     if (!validBirth(birth, pid)) return null;
     return { pid, startSeconds: birth.startSeconds, startMicroseconds: birth.startMicroseconds };
   }
-  async probe(paneId: string, refresh: Refresh) {
+  async initial(expected: Terminal, refresh: Refresh): Promise<InitialProbe> {
+    const paneId = expected.paneId;
     const response = result(await this.request("pane.get", { pane_id: paneId }, refresh));
+    if (!sameTerminal(expected, incarnation(response.pane)))
+      return { ok: false, reason: "terminal-unavailable" };
     const position = geometry(response.pane);
-    if (!position || position.paneId !== paneId) return null;
-    return { pane_id: paneId, cursor: { row: position.row, col: 0 }, motion: "line_end" };
+    if (!position || position.paneId !== paneId)
+      return { ok: false, reason: "geometry-unavailable" };
+    return {
+      ok: true,
+      probe: { pane_id: paneId, cursor: { row: position.row, col: 0 }, motion: "line_end" },
+    };
   }
   async revision(probe: Record<string, unknown>, refresh: Refresh) {
     const response = result(await this.request("pane.copy_motion", probe, refresh));

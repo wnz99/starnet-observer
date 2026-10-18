@@ -30,6 +30,7 @@ import { makeHelperObserver } from "../helpers/index.js";
 import { makeDesktopObserver } from "../desktop/index.js";
 import { makeTranscriptObserver } from "../transcripts/index.js";
 import { makeIdentityResolver } from "../identity/index.js";
+import { CONTENT_CHANGED_CODE } from "../identity/types.js";
 import { makeOverseerState } from "../overseer-state/index.js";
 import type { ObserverOptions, Inventory, ObserverInputRow } from "./contracts.js";
 
@@ -1328,7 +1329,10 @@ test("observer regression contracts", async () => {
       readProcessBirth: (pid) => settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
       rpc: (method, params) => {
         return settled(() => {
-          const native = nativeIdentityResult(method, params);
+          const native = nativeIdentityResult(method, params, {
+            ...original,
+            terminal_id: terminal,
+          });
           if (native) return native;
           if (method === "agent.get")
             return { result: { agent: { ...original, terminal_id: terminal, revision } } };
@@ -1562,11 +1566,12 @@ test("observer regression contracts", async () => {
               release = resolve;
             });
           }
+          if (contentRead) sequence += 2;
           return "configured";
         },
         rpc: (method, params) => {
           return settled(() => {
-            const native = nativeIdentityResult(method, params, sequence);
+            const native = nativeIdentityResult(method, params, original, sequence);
             if (native) return native;
             return method === "agent.get"
               ? { result: { agent: { ...original, terminal_id: terminal } } }
@@ -1695,7 +1700,11 @@ test("observer regression contracts", async () => {
         if (!responsive) return;
         const { request, parameters } = readFixtureRequest(data);
         const result =
-          nativeIdentityResult(request.method, parameters)?.result ||
+          nativeIdentityResult(
+            request.method,
+            parameters,
+            agents.find((agent) => agent.pane_id === parameters.pane_id) || {},
+          )?.result ||
           (request.method === "agent.get"
             ? { agent: agents.find((agent) => agent.pane_id === parameters.target) }
             : {
@@ -1851,11 +1860,11 @@ test("observer regression contracts", async () => {
             settled(() => ({ pid, startSeconds: 1, startMicroseconds: 0 })),
           rpc: (method, params) => {
             return settled(() => {
-              const native = nativeIdentityResult(method, params);
-              if (native) return native;
               const agent = agents.find(
                 (agent) => agent.pane_id === (params.target || params.pane_id),
               );
+              const native = nativeIdentityResult(method, params, agent || {});
+              if (native) return native;
               if (method === "agent.get") return { result: { agent: { ...agent } } };
               assert.equal(method, "pane.read");
               return {
@@ -1932,12 +1941,17 @@ test("observer regression contracts", async () => {
   }
 
   // Faithful native wrappers: metadata revision is independent of content sequence.
-  function nativeIdentityResult(method: string, params: Record<string, unknown>, sequence = 8) {
+  function nativeIdentityResult(
+    method: string,
+    params: Record<string, unknown>,
+    agent: Record<string, unknown>,
+    sequence = 8,
+  ) {
     if (method === "pane.get")
       return {
         result: {
           pane: {
-            pane_id: params.pane_id,
+            ...agent,
             scroll: { max_offset_from_bottom: 0, viewport_rows: 20 },
           },
         },
@@ -1946,7 +1960,9 @@ test("observer regression contracts", async () => {
       return { result: { process_info: { pane_id: params.pane_id, shell_pid: 41 } } };
     if (method === "pane.copy_motion") {
       if (params.content_revision !== undefined && params.content_revision !== sequence)
-        throw Error("stale_content");
+        throw Object.assign(Error("Live footer changed during capture"), {
+          code: CONTENT_CHANGED_CODE,
+        });
       return { result: { pane_id: params.pane_id, content_revision: sequence } };
     }
     return null;

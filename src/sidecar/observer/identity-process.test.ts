@@ -45,7 +45,7 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
         if (method === "pane.get")
           return {
             result: {
-              pane: { pane_id: id, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
+              pane: { ...target, scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
             },
           };
         if (method === "pane.copy_motion") return { result: { pane_id: id, content_revision: 8 } };
