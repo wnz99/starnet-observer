@@ -195,6 +195,80 @@ test("installed emitted application operates in real Chromium", async () => {
   await runBrowserConsumer(consumerRoot());
 }, 60000);
 
+test("host tabs retain native focus and activation across polls", async () => {
+  const root = consumerRoot();
+  const http = (await import(
+    pathToFileURL(path.join(root, "dist/runtime/src/server/http.js")).href
+  )) as HttpModule;
+  const browser = await chromium.launch({ headless: true });
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: { get: snapshot, inspect: () => ({ health: "unavailable", turns: [] }) },
+  });
+  try {
+    assert.equal(browser.version(), "156.0.8078.4");
+    const page = await browser.newPage({ reducedMotion: "reduce" });
+    await page.goto(fixture.url);
+    const remote = page.locator('#host-tabs [data-host="remote"]');
+    await expect(remote).toBeVisible();
+    await page.evaluate(() => {
+      const original = localStorage.setItem.bind(localStorage);
+      document.documentElement.dataset.hostWrites = "0";
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "observer.host")
+          document.documentElement.dataset.hostWrites = String(
+            Number(document.documentElement.dataset.hostWrites) + 1,
+          );
+        original(key, value);
+      };
+    });
+    await remote.focus();
+    const bounds = await remote.boundingBox();
+    assert.ok(bounds);
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    // An attribute mutation proves the poll reached Hosts.render, beyond merely receiving HTTP.
+    await remote.evaluate(
+      (tab) =>
+        new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error("Host tab did not render during the native press"));
+          }, 5000);
+          const observer = new MutationObserver(() => {
+            clearTimeout(timeout);
+            observer.disconnect();
+            resolve();
+          });
+          observer.observe(tab, { attributes: true, attributeFilter: ["aria-selected"] });
+        }),
+    );
+    await expect(remote).toBeFocused();
+    await page.mouse.up();
+    await expect(remote).toHaveAttribute("aria-selected", "true");
+    assert.equal(await page.evaluate(() => localStorage.getItem("observer.host")), "remote");
+    assert.equal(await page.locator("html").getAttribute("data-host-writes"), "1");
+    const local = page.locator('#host-tabs [data-host=""]');
+    await local.focus();
+    await page.keyboard.press("Enter");
+    await expect(local).toHaveAttribute("aria-selected", "true");
+    assert.equal(await page.evaluate(() => localStorage.getItem("observer.host")), null);
+    await page.keyboard.press("Tab");
+    await expect(remote).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(remote).toHaveAttribute("aria-selected", "true");
+    assert.equal(await page.locator("html").getAttribute("data-host-writes"), "2");
+  } finally {
+    await browser.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}, 15000);
+
 async function panel(page: Page) {
   await page.locator(".row-inspect").first().click();
   await expect(page.getByRole("dialog").last()).toBeVisible();

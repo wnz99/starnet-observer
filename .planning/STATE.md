@@ -35,7 +35,7 @@ Last activity: 2026-10-18 — Fewer capture requests and reusable fresh native q
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261018-q7j | UI responsiveness, native clicks and agent indicators | Approved revision 3; Task 1 accepted; Task 2 implemented, independent review pending | [261018-q7j](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/) |
+| 261018-q7j | UI responsiveness, native clicks and agent indicators | Approved revision 3; Tasks 1–2 accepted; Task 3 implemented, independent review pending | [261018-q7j](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/) |
 
 ## Quick Tasks Completed
 
