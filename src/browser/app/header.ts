@@ -24,9 +24,18 @@ function sourceNotes(state: AppState, snapshot: AppQuerySnapshot) {
   notes.push(...desktopNotes(snapshot));
   return notes;
 }
+function hasDesktopObservation(snapshot: AppQuerySnapshot) {
+  const data = snapshot.data;
+  const desktop = data?.sources?.desktop;
+  return (
+    typeof desktop?.observedAt === "number" ||
+    data?.sessions.some((row) => row.source === "desktop") === true
+  );
+}
 function desktopNotes(snapshot: AppQuerySnapshot) {
   const notes: string[] = [];
   const desktop = snapshot.data?.sources?.desktop;
+  if (!hasDesktopObservation(snapshot)) return notes;
   if (desktop && desktop.health !== "available")
     notes.push(
       "Desktop apps unavailable · " + (DESKTOP_REASONS[desktop.reason ?? ""] || "reason unknown"),

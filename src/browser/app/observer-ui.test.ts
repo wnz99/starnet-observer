@@ -1895,6 +1895,34 @@ test("observer-ui regression contracts", async () => {
         updatedAt: Date.now(),
         data,
       });
+      const terminalOnly = {
+        ...inventory([herdr]),
+        sources: {
+          ...inventory([]).sources,
+          desktop: { health: "unavailable", observedAt: null, reason: "permission-denied" },
+        },
+      };
+      notify(live, settled(terminalOnly));
+      assert.doesNotMatch(
+        present(own["source-health"]).textContent,
+        /Desktop apps unavailable/,
+        "terminal-only use does not request desktop accessibility permission",
+      );
+      notify(
+        live,
+        settled({
+          ...terminalOnly,
+          sources: {
+            ...terminalOnly.sources,
+            desktop: { ...terminalOnly.sources.desktop, observedAt: old },
+          },
+        }),
+      );
+      assert.match(
+        present(own["source-health"]).textContent,
+        /Desktop apps unavailable/,
+        "a previously observed desktop source still reports lost access",
+      );
       notify(live, settled(inventory([herdr, ada, plain, app])));
       const scene4 = present(updates.at(-1)).scene,
         options4 = present(updates.at(-1)).options,
