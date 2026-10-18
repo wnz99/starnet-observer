@@ -219,6 +219,29 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   stationArt;
 
   actors: ActorFrame[] = [];
+  private settlementGeneration = 0;
+  private settlements = new Set<string>();
+  private onHelperSettled: UpdateOptions["onHelperSettled"];
+  clearSettlements() {
+    this.settlementGeneration++;
+    this.settlements.clear();
+    this.onHelperSettled = undefined;
+  }
+  dispatchSettlements() {
+    const generation = this.settlementGeneration;
+    const callback = this.onHelperSettled;
+    for (const actor of this.actors) {
+      if (!actor.settled) continue;
+      const phase = actor.settled,
+        id = actor.id,
+        key = JSON.stringify([id, phase]);
+      if (this.settlements.has(key)) continue;
+      this.settlements.add(key);
+      void Promise.resolve().then(() => {
+        if (this.running && generation === this.settlementGeneration) callback?.(id, phase);
+      });
+    }
+  }
 
   clock;
 
@@ -243,6 +266,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   visibleArea: { left: number; top: number; right: number; bottom: number } | null = null;
 
   update = (next: SceneGeometry, options: UpdateOptions = {}) => {
+    this.clearSettlements();
+    this.onHelperSettled = options.onHelperSettled;
     const revised = !this.scene || this.activeScene.revision !== next.revision;
     this.scene = next;
     this.indexWorkers();

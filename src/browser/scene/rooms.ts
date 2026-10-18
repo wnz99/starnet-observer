@@ -18,6 +18,7 @@ import type {
   BuildOptions,
 } from "./types.js";
 const ROOM = {
+  quarters: { x: 14, y: 2.6, w: 3, h: 1, entryX: 15.5, entryY: 3.5 },
   slots: 8,
   banks: 2,
   rightX: 24,
@@ -167,6 +168,10 @@ function buildRoom(input: {
     entry: { point: entry, edge: "front-y" },
     sign: pointAt(rect, ROOM.platformSignX, 0, ROOM.signHeight),
     helperStations: helpers.stations,
+    quarters: {
+      rect: { ...ROOM.quarters, x: rect.x + ROOM.quarters.x, y: rect.y + ROOM.quarters.y },
+      entry: pointAt(rect, ROOM.quarters.entryX, ROOM.quarters.entryY),
+    },
   };
   const walkways = [strip(entry, elbow, "connector"), strip(elbow, join, "connector")].map(
     (value) => {

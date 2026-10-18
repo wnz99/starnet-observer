@@ -1,6 +1,6 @@
 import { required } from "../model/types.js";
 import { identityHash } from "../model/identity.js";
-import { graphFor } from "./navigation.js";
+import { graphFor, pathTo, safeSegment } from "./navigation.js";
 import { ActorState } from "./actor.js";
 import { verified, canFollow, FormationPlanner } from "./formation.js";
 import type {
@@ -16,6 +16,44 @@ const MAX_FRAME_MS = 250;
 const MOVED_EPSILON = 0.001;
 const MAX_HELPER_DEPTH = 3;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+function arrivalTarget(
+  actor: ActorState,
+  parent: ActorState | undefined,
+  graph: Graph | undefined,
+) {
+  return parent &&
+    !parent.frozen &&
+    parent.worker.platformKey === actor.worker.platformKey &&
+    safeSegment(graph, parent.point, parent.point, actor.worker)
+    ? parent.point
+    : actor.worker.chair;
+}
+function lifecyclePath(
+  actor: ActorState,
+  graph: Graph | undefined,
+  parent: ActorState | undefined,
+) {
+  const phase = actor.worker.helperPhase;
+  if (phase !== "entering" && phase !== "returning") return null;
+  if (actor.path.length > 0 || actor.settled) return { path: actor.path, settled: actor.settled };
+  const target =
+    phase === "returning" ? actor.worker.quartersEntry : arrivalTarget(actor, parent, graph);
+  if (!target || distance(actor.point, target) <= MOVED_EPSILON) {
+    return { path: [], settled: phase };
+  }
+  const path = lifecycleRoute(actor, graph, target, phase);
+  return { path, settled: path.length === 0 ? phase : undefined };
+}
+function lifecycleRoute(actor: ActorState, graph: Graph | undefined, target: Point, phase: string) {
+  const path = pathTo(graph, actor.point, target, actor.worker);
+  return phase === "entering" && path.length === 0
+    ? pathTo(graph, actor.point, actor.worker.chair, actor.worker)
+    : path;
+}
+function settlement(worker: Worker) {
+  const phase = worker.helperPhase;
+  return phase === "entering" || phase === "returning" ? phase : undefined;
+}
 class Movement {
   private readonly actors = new Map<string, ActorState>();
   private page: number | null = null;
@@ -53,7 +91,7 @@ class Movement {
     const moved =
       !actor ||
       actor.worker.platformKey !== worker.platformKey ||
-      distance(actor.worker.chair, worker.chair) > MOVED_EPSILON;
+      (distance(actor.worker.chair, worker.chair) > MOVED_EPSILON && !settlement(worker));
     if (!actor || moved) {
       actor = new ActorState(worker, now, identityHash(worker.id));
       this.actors.set(worker.id, actor);
@@ -111,7 +149,9 @@ class Movement {
     const { now, elapsed, stale, formations } = input;
     const graph = this.graphs.get(actor.worker.platformKey),
       parent = this.actors.get(actor.worker.parentId ?? "");
-    const following = canFollow(actor, parent, stale);
+    const lifecycle = lifecyclePath(actor, graph, parent);
+    if (lifecycle) actor.setLifecycle(lifecycle.path, lifecycle.settled);
+    const following = !lifecycle && canFollow(actor, parent, stale);
     actor.recover({ following, graph, now });
     let assignment: Assignment | undefined;
     if (following && graph) {
@@ -123,6 +163,8 @@ class Movement {
       assignment = required(formations, parent.worker.id).find((entry) => entry.actor === actor);
     }
     actor.animate({ now, elapsed, graph, parent, assignment, following });
+    if (lifecycle && actor.path.length === 0)
+      actor.setLifecycle(actor.path, settlement(actor.worker));
   }
   step(now: number, { stale = false, reduced = false }: MotionOptions = {}): ActorFrame[] {
     const elapsed = this.last === null ? 0 : Math.max(0, Math.min(MAX_FRAME_MS, now - this.last));
@@ -131,9 +173,11 @@ class Movement {
     const output = this.ordered.map(({ actor }) => {
       const parent = this.actors.get(actor.worker.parentId ?? "");
       actor.observeFreeze(stale, parent);
-      if (reduced) actor.snapToChair(now);
-      else if (actor.frozen) actor.freeze();
-      else this.animateActor(actor, { now, elapsed, stale, formations });
+      if (actor.frozen) actor.freeze();
+      else if (reduced) {
+        actor.snapToChair(now);
+        actor.setLifecycle(actor.path, settlement(actor.worker));
+      } else this.animateActor(actor, { now, elapsed, stale, formations });
       return actor.frame(reduced);
     });
     for (const actor of this.actors.values())

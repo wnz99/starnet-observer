@@ -26,7 +26,16 @@ export function build(rooms: SceneRooms, page: number, extras: BuildOptions = {}
     .map((rect): Extent => ({ rect }))
     .concat(observatory.extents);
   const bounds = projectedBounds(extents);
-  const revision = revisionFor({ page, observatory, rooms, ships, relays, walkways, workers });
+  const revision = revisionFor({
+    page,
+    observatory,
+    rooms,
+    platforms,
+    ships,
+    relays,
+    walkways,
+    workers,
+  });
   return {
     page,
     revision,

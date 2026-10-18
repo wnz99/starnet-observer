@@ -16,7 +16,227 @@ import { test } from "bun:test";
 import * as Scene from "./index.js";
 import { ActorState } from "./actor.js";
 import { FormationPlanner } from "./formation.js";
-import { graphFor, safeSegment } from "./navigation.js";
+import { graphFor, safeSegment, pathTo } from "./navigation.js";
+import { revisionFor } from "./revision.js";
+
+test("each room has unobstructed reachable quarters, independent of status and lifecycle phase", () => {
+  for (const count of [1, 5, 9, 12, 20]) {
+    const layout = createModel(canonicalTheme()).createLayout();
+    layout.reconcile(
+      Array.from({ length: count }, (_, i) => ({
+        id: "quarters-root-" + String(i),
+        source: "herdr",
+        projectId: "quarters",
+        repoId: "repo-" + String(i),
+      })),
+    );
+    for (let page = 0; page < layout.pages(); page++) {
+      const scene = Scene.build(layout.onPage(page), page);
+      assert.equal(scene.platforms.length, layout.onPage(page).length);
+      for (const platform of scene.platforms) {
+        const graph = graphFor(platform),
+          quarters = platform.quarters;
+        assert(
+          [...graph.cells.values()].some(
+            (point) => point.x === quarters.entry.x && point.y === quarters.entry.y,
+          ),
+        );
+        assert(
+          graph.obstacles.every(
+            (rect) =>
+              !(
+                rect.x < quarters.rect.x + quarters.rect.w &&
+                rect.x + rect.w > quarters.rect.x &&
+                rect.y < quarters.rect.y + quarters.rect.h &&
+                rect.y + rect.h > quarters.rect.y
+              ),
+          ),
+        );
+        for (const worker of scene.workers.filter((value) => value.platformKey === platform.key)) {
+          const path = pathTo(graph, worker.chair, quarters.entry, worker);
+          assert(path.length > 0);
+          path.forEach((to, index) => {
+            assert(safeSegment(graph, index ? present(path[index - 1]) : worker.chair, to, worker));
+          });
+        }
+      }
+      const inputs = {
+        page,
+        rooms: layout.onPage(page),
+        platforms: scene.platforms,
+        observatory: scene.observatory,
+        ships: scene.ships ?? [],
+        relays: scene.relays ?? [],
+        walkways: scene.walkways,
+        workers: scene.workers,
+      };
+      assert.equal(revisionFor(inputs), scene.revision);
+      assert.notEqual(
+        revisionFor({
+          ...inputs,
+          platforms: scene.platforms.map((platform) => ({
+            ...platform,
+            quarters: { ...platform.quarters, rect: { ...platform.quarters.rect, w: 4 } },
+          })),
+        }),
+        scene.revision,
+      );
+      assert.equal(
+        revisionFor({
+          ...inputs,
+          workers: scene.workers.map((worker) => ({ ...worker, helperPhase: "returning" })),
+        }),
+        scene.revision,
+      );
+    }
+  }
+});
+
+test("helper lifecycle routes from quarters, freezes stale returns, and settles safe arrivals or impossible routes", () => {
+  const layout = createModel(canonicalTheme()).createLayout();
+  layout.reconcile([
+    { id: "lifecycle-root", source: "herdr", status: "working" },
+    {
+      id: "lifecycle-helper",
+      source: "helper",
+      parentId: "lifecycle-root",
+      lineageState: "verified",
+      status: "working",
+    },
+  ]);
+  const scene = Scene.build(layout.onPage(0), 0),
+    worker = present(scene.workers.find((value) => value.kind === "helper")),
+    platform = present(scene.platforms.find((value) => value.key === worker.platformKey)),
+    graph = graphFor(platform);
+  worker.helperPhase = "entering";
+  worker.quartersEntry = platform.quarters.entry;
+  const motion = Scene.createMovement();
+  motion.reconcile(scene, { now: 0 });
+  assert.deepEqual(
+    present(motion.step(0).find((value) => value.id === worker.id)).point,
+    platform.quarters.entry,
+  );
+  let enteringSettled = false;
+  for (let now = 100; now < 20000; now += 100) {
+    const frame = present(motion.step(now).find((value) => value.id === worker.id));
+    if (frame.settled) {
+      assert.equal(frame.settled, "entering");
+      enteringSettled = true;
+      break;
+    }
+  }
+  assert(enteringSettled);
+  const returning = {
+    ...worker,
+    helperPhase: "returning" as const,
+    row: { ...worker.row, lifecycleEvidence: { state: "closed" } },
+  };
+  scene.workers = scene.workers.map((value) => (value.id === worker.id ? returning : value));
+  motion.reconcile(scene, { now: 20000 });
+  const frozen = present(
+    motion.step(20100, { stale: true }).find((value) => value.id === worker.id),
+  );
+  assert.equal(frozen.settled, undefined);
+  assert.deepEqual(
+    present(motion.step(21100, { stale: true }).find((value) => value.id === worker.id)).point,
+    frozen.point,
+  );
+  let from = frozen.point,
+    returned = false;
+  for (let now = 21200; now <= 50000; now += 100) {
+    const frame = present(motion.step(now).find((value) => value.id === worker.id));
+    assert(safeSegment(graph, from, frame.point, returning));
+    from = frame.point;
+    if (frame.settled) {
+      assert.equal(frame.settled, "returning");
+      assert.deepEqual(frame.point, platform.quarters.entry);
+      returned = true;
+      break;
+    }
+  }
+  assert(returned);
+  // A room extended behind the canonical banks gives a real safe path longer than 30 seconds.
+  const extended = { ...platform, rect: { ...platform.rect, h: 110 } },
+    long = {
+      ...returning,
+      chair: { x: platform.rect.x + 15.5, y: platform.rect.y + 95.5, z: 0 },
+    };
+  const longScene = { ...scene, revision: "extended", platforms: [extended], workers: [long] },
+    longMotion = Scene.createMovement();
+  longMotion.reconcile(longScene, { now: 0 });
+  let previous = long.chair,
+    settledAt = 0;
+  const longGraph = graphFor(extended);
+  for (let now = 100; now <= 90000; now += 100) {
+    const frame = present(longMotion.step(now)[0]);
+    assert(safeSegment(longGraph, previous, frame.point, long));
+    previous = { ...frame.point, z: 0 };
+    if (now <= 30000) assert.equal(frame.settled, undefined);
+    if (frame.settled) {
+      settledAt = now;
+      break;
+    }
+  }
+  assert(settledAt > 30000);
+  const blocked = {
+    ...scene,
+    revision: "blocked",
+    platforms: [
+      {
+        ...platform,
+        decorationRegions: [
+          ...platform.decorationRegions,
+          {
+            kind: "wall",
+            rect: {
+              x: platform.quarters.entry.x - 0.4,
+              y: platform.quarters.entry.y - 0.4,
+              w: 0.8,
+              h: 0.8,
+            },
+          },
+        ],
+      },
+    ],
+    workers: [returning],
+  };
+  const impossible = Scene.createMovement();
+  impossible.reconcile(blocked, { now: 0 });
+  const frame = present(impossible.step(100)[0]);
+  assert.equal(frame.settled, "returning");
+  assert.deepEqual(frame.point, returning.chair);
+  const changedRoute = Scene.createMovement();
+  changedRoute.reconcile(longScene, { now: 0 });
+  const lastSafe = present(changedRoute.step(100)[0]).point;
+  changedRoute.reconcile(
+    {
+      ...longScene,
+      revision: "new-obstruction",
+      platforms: [
+        { ...extended, decorationRegions: blocked.platforms[0]?.decorationRegions ?? [] },
+      ],
+    },
+    { now: 100 },
+  );
+  const stopped = present(changedRoute.step(200)[0]);
+  assert.equal(stopped.settled, "returning");
+  assert.deepEqual(
+    stopped.point,
+    lastSafe,
+    "a geometry-induced failure settles without jumping across obstacles",
+  );
+  const reduced = Scene.createMovement();
+  reduced.reconcile(scene, { now: 0 });
+  assert.equal(
+    present(reduced.step(0, { reduced: true, stale: true }).find((value) => value.id === worker.id))
+      .settled,
+    undefined,
+  );
+  assert.equal(
+    present(reduced.step(1, { reduced: true }).find((value) => value.id === worker.id)).settled,
+    "returning",
+  );
+});
 
 test("helpers joining a resting parent consume their lag and regroup in a clear room", () => {
   const layout = createModel(canonicalTheme()).createLayout(),

@@ -78,6 +78,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
   };
 
   stop = () => {
+    this.view.clearSettlements();
     if (!this.view.running) return;
     this.view.running = false;
     if (this.view.frame !== null) this.view.caf(this.view.frame);

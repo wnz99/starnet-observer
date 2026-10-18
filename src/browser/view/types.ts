@@ -192,6 +192,7 @@ export interface MailFrame {
   envelopes: Envelope[];
 }
 export interface UpdateOptions {
+  onHelperSettled?: (id: string, phase: "entering" | "returning") => void;
   stale?: () => boolean;
   rowStale?: (worker: Worker) => boolean;
   mailFrame?: (now: number) => MailFrame;

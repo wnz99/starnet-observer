@@ -56,6 +56,7 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
       animate = !isStale && !reduced;
 
     this.view.actors = this.view.movement.step(now, { stale: this.view.workerStale, reduced });
+    this.view.dispatchSettlements();
     this.followFocused();
     // immediate, so a reduced-motion snap keeps the worker in view
     const mail = this.view.mailFrame ? this.view.mailFrame(now) : { drones: [], envelopes: [] };

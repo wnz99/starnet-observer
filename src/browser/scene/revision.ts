@@ -3,6 +3,7 @@ export function revisionFor(input: {
   page: number;
   observatory: Scene["observatory"];
   rooms: SceneRooms;
+  platforms: Scene["platforms"];
   ships: NonNullable<Scene["ships"]>;
   relays: NonNullable<Scene["relays"]>;
   walkways: Scene["walkways"];
@@ -13,6 +14,7 @@ export function revisionFor(input: {
     page,
     observatory.extents,
     observatory.overseer || null,
+    input.platforms.map((platform) => platform.quarters),
     rooms
       .map((r) => [
         r.key,

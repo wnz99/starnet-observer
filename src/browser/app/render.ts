@@ -242,7 +242,12 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     /* Mail eligibility is its own transport proof, independent of agent staleness. QuerySpine keeps the same data
        object on a failed request, so a change in that proof must reach the mail panels even when nothing else did. */
     const proof = state.busLive(snapshot);
-    if (!options.refresh && this.sameContent(previous, snapshot, stale, proof)) {
+    const presentationChanged = this.options.floor.observe(snapshot);
+    if (
+      !options.refresh &&
+      !presentationChanged &&
+      this.sameContent(previous, snapshot, stale, proof)
+    ) {
       totals.render(snapshot, this.options.floor.displayedRows);
       return;
     }

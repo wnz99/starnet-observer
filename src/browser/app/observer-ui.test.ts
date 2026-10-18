@@ -31,8 +31,174 @@ import type { Resource } from "../view/drawing.fixture.js";
 import type { Scene } from "../scene/types.js";
 import type { UiViewOptions, UiFrame } from "./ui-test.fixture.js";
 import type { UpdateOptions } from "../view/types.js";
+import { AppState, FRESH_MS } from "./state.js";
+import type { AppQuerySnapshot } from "./data.js";
 const sessionItems = (node: AppFixtureNode): AppFixtureNode[] =>
   node.className.split(" ").includes("session-item") ? [node] : node.children.flatMap(sessionItems);
+test("floor keeps validated returns fresh by source and rejects old page, parent and disposal settlements", () => {
+  let now = 10000,
+    refreshes = 0;
+  const state = new AppState(canonicalTheme(), { now: () => now, frame: () => now });
+  state.active = true;
+  let options: UpdateOptions = {},
+    scene!: Scene;
+  const floor = new Floor({
+    state,
+    now: () => now,
+    frame: () => now,
+    view: viewSpy({
+      update(next, value) {
+        scene = next;
+        options = value;
+      },
+      invalidate() {},
+    }),
+    refresh: () => {
+      refreshes++;
+    },
+    mailFrame: () => ({ drones: [], envelopes: [] }),
+    inspected: () => null,
+    repositoryToggle() {},
+    showZoom() {},
+    overview: () => {
+      state.selected = null;
+    },
+    setPage: (page) => {
+      state.page = page;
+    },
+  });
+  const root: AppRow = { id: "retained-root", source: "herdr", projectId: "a" },
+    child: AppRow = {
+      id: "retained-child",
+      source: "helper",
+      parentId: root.id,
+      projectId: "a",
+      lineageState: "verified",
+      status: "idle",
+    };
+  const render = (rows: AppRow[], herdrAt = now) => {
+    const snapshot: AppQuerySnapshot = {
+      key: "observer.sessions",
+      path: "",
+      hasData: true,
+      pending: false,
+      stale: false,
+      ageMs: 0,
+      errorAt: 0,
+      error: null,
+      updatedAt: now,
+      data: {
+        sessions: rows,
+        health: "available",
+        observedAt: now,
+        sources: {
+          herdr: { health: "available", observedAt: herdrAt },
+          hosts: { remote: { health: "available", observedAt: now } },
+        },
+      },
+    };
+    state.latest = snapshot;
+    state.byId = new Map(rows.map((row) => [row.id, row]));
+    floor.observe(snapshot);
+    const refresh = false;
+    return floor.render(snapshot, [], refresh);
+  };
+  render([root, child]);
+  now++;
+  render([root, { ...child, lifecycleEvidence: { state: "closed" } }]);
+  state.selected = child.id;
+  const returning = present(scene.workers.find((worker) => worker.id === child.id));
+  assert.equal(returning.helperPhase, "returning");
+  const sourceAt = now;
+  now++;
+  assert.equal(render([root]).displayedRows.length, 2);
+  assert.equal(state.selected, child.id, "retained avatar stays selected until it settles");
+  assert.equal(
+    present(options.rowStale)(returning),
+    false,
+    "missing raw row uses its current source proof",
+  );
+  now += FRESH_MS + 1;
+  render([root], sourceAt);
+  assert.equal(
+    present(options.rowStale)(returning),
+    true,
+    "another fresh host cannot renew a retained return",
+  );
+  const expiredCallback = present(options.onHelperSettled);
+  expiredCallback(child.id, "returning");
+  assert.equal(refreshes, 0);
+  now++;
+  assert.equal(render([root]).displayedRows.length, 1);
+  assert.equal(state.selected, null);
+  expiredCallback(child.id, "returning");
+  assert.equal(refreshes, 0);
+  now++;
+  const born: AppRow = {
+    ...child,
+    id: "new-child",
+    taskEvidence: { state: "available", source: "spawn", observedAt: now },
+  };
+  render([root, born]);
+  assert.equal(
+    present(scene.workers.find((worker) => worker.id === born.id)).helperPhase,
+    "entering",
+  );
+  const oldParentCallback = present(options.onHelperSettled);
+  state.selectedHost = "remote";
+  render([root, born]);
+  assert.equal(
+    present(scene.workers.find((worker) => worker.id === born.id)).helperPhase,
+    "entering",
+    "host selection never rebaselines sources",
+  );
+  now++;
+  render([root, { ...root, id: "other-root" }, { ...born, parentId: "other-root" }]);
+  oldParentCallback(born.id, "entering");
+  assert.equal(refreshes, 0);
+  assert.equal(
+    present(scene.workers.find((worker) => worker.id === born.id)).helperPhase,
+    "present",
+  );
+  now++;
+  const roots = Array.from({ length: 8 }, (_, i) => ({
+    ...root,
+    id: "page-root-" + String(i),
+    projectId: "z" + String(i),
+  }));
+  render([root, ...roots]);
+  now++;
+  const paged = {
+    ...born,
+    id: "page-child",
+    taskEvidence: { ...born.taskEvidence, observedAt: now },
+  };
+  render([root, paged, ...roots]);
+  const oldPageCallback = present(options.onHelperSettled),
+    firstPage = state.page;
+  state.page = firstPage === 0 ? 1 : 0;
+  render([root, paged, ...roots]);
+  oldPageCallback(paged.id, "entering");
+  assert.equal(refreshes, 0);
+  state.page = firstPage;
+  render([root, paged, ...roots]);
+  assert.equal(
+    present(scene.workers.find((worker) => worker.id === paged.id)).helperPhase,
+    "present",
+  );
+  now++;
+  const last = {
+    ...paged,
+    id: "last-child",
+    taskEvidence: { ...paged.taskEvidence, observedAt: now },
+  };
+  render([root, last]);
+  const disposedCallback = present(options.onHelperSettled);
+  floor.dispose();
+  disposedCallback(last.id, "entering");
+  assert.equal(refreshes, 0);
+  assert.equal(floor.displayedRows.length, 0);
+});
 test("displayed crew excludes retained helpers without an avatar and preserves history usage", async () => {
   const page = uiFixture();
   let live: Deliver | null = null;
@@ -2505,9 +2671,11 @@ test("observer-ui regression contracts", async () => {
           document = bindDocument(document, own, undefined, { hidden: false });
           let live!: Deliver | null,
             floor!: Scene,
+            floorOptions!: UpdateOptions,
             realView!: ReturnType<ReturnType<typeof createViewFactory>["create"]>,
             now = 0,
-            updateCount = 0;
+            updateCount = 0,
+            observedAt = 10000;
           const bodies = new Map<string | undefined, SpriteBody<Resource>>(),
             poses = new Map<
               string | undefined,
@@ -2520,6 +2688,7 @@ test("observer-ui regression contracts", async () => {
           mountScenario({
             ...context,
             document,
+            now: () => observedAt,
             view: {
               create(options) {
                 realView = RealView.create({
@@ -2544,6 +2713,7 @@ test("observer-ui regression contracts", async () => {
                   ...realView,
                   update(next, payload) {
                     floor = next;
+                    floorOptions = payload;
                     updateCount++;
                     update(next, payload);
                   },
@@ -2586,10 +2756,10 @@ test("observer-ui regression contracts", async () => {
           ) => ({
             data: {
               health: "available",
-              observedAt: Date.now(),
+              observedAt: ++observedAt,
               sessions: [
-                { ...root, observedAt: Date.now() },
-                { ...helper, ...patch, observedAt: Date.now() },
+                { ...root, observedAt },
+                { ...helper, ...patch, observedAt },
               ],
             },
           });
@@ -2625,7 +2795,6 @@ test("observer-ui regression contracts", async () => {
             beforeMetadata,
             "task/token/time-only polls and repeated snapshots retain the scene cache",
           );
-          const closedAt = { ...poses.get(helper.id) };
           notify(live, inventory(transition.patch));
           realView.paint(now);
           assert.equal(
@@ -2634,15 +2803,38 @@ test("observer-ui regression contracts", async () => {
             "withdrawal never rewrites own task status",
           );
           if (transition.closed) {
-            assert.equal(
-              paintUntil(70000),
-              0,
-              "fresh closure stops helper walking despite unchanged own status",
+            const current = inventory(transition.patch);
+            notify(live, {
+              ...current,
+              data: { ...current.data, sessions: current.data.sessions.slice(0, 1) },
+            });
+            assert(
+              floor.workers.some((worker) => worker.id === helper.id),
+              "validated return survives a missing raw row",
             );
-            assert.deepEqual(
-              poses.get(helper.id),
-              { ...closedAt, state: "idle" },
-              "closure freezes the current physical point",
+            assert(
+              paintUntil(90000) > 0,
+              "fresh closure routes the displayed helper back to quarters",
+            );
+            const quarters = ObserverScene.project(
+              present(
+                floor.platforms.find(
+                  (platform) =>
+                    platform.key ===
+                    present(floor.workers.find((worker) => worker.id === helper.id)).platformKey,
+                ),
+              ).quarters.entry,
+            );
+            assert(
+              Math.hypot(
+                present(poses.get(helper.id)).x - quarters.x,
+                present(poses.get(helper.id)).y - quarters.y,
+              ) < 0.001,
+            );
+            assert.equal(
+              present(own.counts).textContent,
+              (transition.status === "working" ? "1" : "0") + " working · 0 waiting · 2 total",
+              "return remains counted until settlement",
             );
             assert.equal(
               present(body).working,
@@ -2690,6 +2882,23 @@ test("observer-ui regression contracts", async () => {
             beforeRepeat,
             "unchanged formation evidence retains the normal scene cache",
           );
+          if (transition.closed) {
+            if (transition.status === "working") {
+              realView.stop();
+              await Promise.resolve();
+              assert(
+                floor.workers.some((worker) => worker.id === helper.id),
+                "view stop invalidates queued settlement",
+              );
+              realView.update(floor, floorOptions);
+              realView.start();
+              realView.paint(now);
+            }
+            await Promise.resolve();
+            assert(!floor.workers.some((worker) => worker.id === helper.id));
+            assert.equal(sessionItems(present(own.sessions)).length, 1);
+            assert.equal(present(own.counts).textContent, "0 working · 0 waiting · 1 total");
+          }
           realView.stop();
         }
         console.log(
@@ -3604,7 +3813,7 @@ test("observer-ui regression contracts", async () => {
         assert.equal(present(own["station-stats"]).hidden, false);
         assert.equal(
           present(own["station-stats-summary"]).textContent,
-          "7 crew · 2 working · In unavailable / Out 1.6K · partial",
+          "6 crew · 2 working · In unavailable / Out 1.6K · partial",
         );
         present(own["station-stats"]).open = true;
         notify(live, inventory());
@@ -3619,10 +3828,10 @@ test("observer-ui regression contracts", async () => {
             .map((node) => node.textContent),
           ["Crew", "Status", "Tokens", "Coverage"],
         );
-        assert.equal(present(dd(0)).textContent, "7 displayed");
+        assert.equal(present(dd(0)).textContent, "6 displayed");
         assert.equal(
           present(dd(1)).textContent,
-          "2 working · 0 waiting · 1 idle · 2 done · 1 unknown · 1 stale",
+          "2 working · 0 waiting · 1 idle · 1 done · 1 unknown · 1 stale",
         );
         assert.deepEqual(
           present(dd(2)).children.map((node) => [node.textContent, node.className]),
@@ -3722,7 +3931,7 @@ test("observer-ui regression contracts", async () => {
         assert.equal(present(toggles()[1]).attributes.get("aria-pressed"), "false");
         assert(invalidated > before, "the floor repaints");
         assert.deepEqual(
-          ["obs_r", "obs_s", "hlp_k", "obs_w", "obs_d"].map((id) => present(itemOf(id)).className),
+          ["obs_r", "obs_s", "hlp_c", "obs_w", "obs_d"].map((id) => present(itemOf(id)).className),
           [
             "session-item repo-selected repo-working",
             "session-item repo-selected",
@@ -3808,8 +4017,9 @@ test("observer-ui regression contracts", async () => {
           "a completed task alone never closes a helper: " + String(completed),
         );
         assert.equal(
-          child(child(child(present(itemOf("hlp_k")), 0), 3), 0).textContent,
-          "link open · killed · task killed",
+          itemOf("hlp_k"),
+          undefined,
+          "historically closed synthetic helpers remain in raw inspection, outside displayed crew",
         );
         // A native pane helper: its own idle status stays, beside its running task report, positive closure and partial
         // assignment, in the parent list, the console row (with its real pane) and its own inspector.
