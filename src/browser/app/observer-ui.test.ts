@@ -3813,7 +3813,7 @@ test("observer-ui regression contracts", async () => {
         assert.equal(present(own["station-stats"]).hidden, false);
         assert.equal(
           present(own["station-stats-summary"]).textContent,
-          "6 crew · 2 working · In unavailable / Out 1.6K · partial",
+          "6 displayed crew · 2 working · history In unavailable / Out 1.6K · partial usage data",
         );
         present(own["station-stats"]).open = true;
         notify(live, inventory());
@@ -3826,7 +3826,7 @@ test("observer-ui regression contracts", async () => {
           present(totals)
             .children.filter((_, index) => index % 2 === 0)
             .map((node) => node.textContent),
-          ["Crew", "Status", "Tokens", "Coverage"],
+          ["Displayed crew", "Status", "Cumulative session-history tokens", "Usage data coverage"],
         );
         assert.equal(present(dd(0)).textContent, "6 displayed");
         assert.equal(
@@ -3845,11 +3845,11 @@ test("observer-ui regression contracts", async () => {
         );
         assert.match(
           child(present(dd(2)), 1).title,
-          /^1,588 tokens · of 5 verified sessions: 2 complete, 1 partial, 1 unavailable, 1 stale$/,
+          /^1,588 tokens · of 5 session histories: 2 complete usage data, 1 partial usage data, 1 unavailable usage data, 1 stale$/,
         );
         assert.equal(
           present(dd(3)).textContent,
-          "2 of 5 sessions complete · 1 partial · 1 unavailable · 1 stale · 1 conflicting, not counted",
+          "2 of 5 session histories with complete usage data · 1 partial usage data · 1 unavailable usage data · 1 stale · 1 conflicting, not counted",
         );
         assert.equal(present(totals).dataset.freshness, "live");
         // Desktop stays fresh when Herdr expires. Station freshness becomes last known; rows retain their own deadlines.
@@ -4060,7 +4060,13 @@ test("observer-ui regression contracts", async () => {
           present(findPart(present(nativePanel), "inspector-meta")).children.map(
             (node) => node.textContent,
           ),
-          ["p9", "api", "Helper · link open", "closed", "task running"],
+          [
+            "p9",
+            "api",
+            "Helper · relationship open · native pane observed",
+            "closed",
+            "task running",
+          ],
         );
         assert.equal(
           present(findPart(present(nativePanel), "inspector-status")).textContent,

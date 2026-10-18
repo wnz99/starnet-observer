@@ -71,6 +71,10 @@ herdr agent list
 
 Keep using those terminals normally. The browser observer refreshes about every two seconds. Verified repository rooms appear first; transcript summaries, helpers, desktop windows, and bus metadata fill in independently. It reads sessions across the active Herdr inventory, not just the folder where you launched the observer.
 
+The helper list, deck counts and status totals describe displayed crew: room avatars, including pane agents and helpers, rather than all retained helper histories or proven running processes. A verified helper relationship does not confirm running presence. Each project room has crew quarters. A helper with fresh, verified new-assignment evidence walks from quarters to its parent; confirmed closed or killed helpers return and disappear. Task completion alone does not send a helper back. Initial observations and recovery after unavailable evidence seed the scene without replaying arrivals.
+
+Statistics show provider-reported cumulative session-history token observations, including retained helper histories hidden from the room. Bounded histories can have partial usage data; coverage means complete, partial or unavailable usage data, not completed tasks. These are not billing totals. Codex input includes cached input, so do not add cache read to input. Claude reports input and cache counters separately.
+
 For a named/non-default Herdr server, launch the observer with `HERDR_SOCKET_PATH` set to that server's Unix socket. The default is `~/.config/herdr/herdr.sock`.
 
 ### Codex session identity

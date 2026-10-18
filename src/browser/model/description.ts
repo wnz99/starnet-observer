@@ -111,6 +111,12 @@ function rosterSource(row: DisplayRow) {
 function providerLabel(row: DisplayRow) {
   return PROVIDERS[row.provider ?? ""] || row.provider || "Agent";
 }
+function helperPresence(row: DisplayRow) {
+  if (row.source !== "helper") return "native pane observed";
+  if (row.lifecycleEvidence?.state === "closed" || row.lineageState === "closed")
+    return row.lifecycleEvidence?.reason === "killed" ? "killed" : "closed";
+  return "running presence unconfirmed";
+}
 export function hoverLabel(row: DisplayRow, stale = false, now = Date.now()) {
   const provider = providerLabel(row);
   const unavailable = stale || row.inventoryHealth === "unavailable";
@@ -123,6 +129,9 @@ export function hoverLabel(row: DisplayRow, stale = false, now = Date.now()) {
     displayTask(row) +
     " · " +
     (row.status || "unknown") +
+    (isHelper(row)
+      ? " · relationship " + (row.lineageState || "unknown") + " · " + helperPresence(row)
+      : "") +
     suffix +
     (observed ? " · last observed " + observed : "")
   );

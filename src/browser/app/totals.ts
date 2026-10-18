@@ -104,10 +104,10 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       list,
       disclosure: ui.get("station-stats"),
       summary: ui.get("station-stats-summary"),
-      crew: group("Crew"),
+      crew: group("Displayed crew"),
       status: group("Status"),
-      tokens: group("Tokens"),
-      coverage: group("Coverage"),
+      tokens: group("Cumulative session-history tokens"),
+      coverage: group("Usage data coverage"),
       counters: new Map(),
     };
     for (const [key] of COUNTER_TOTALS) {
@@ -115,6 +115,19 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       ui.document.attach(this.nodes.tokens, node);
       this.nodes.counters.set(key, node);
     }
+    ui.document.attach(
+      this.nodes.disclosure,
+      ui.text(
+        "p",
+        "",
+        "Includes retained helper histories, including helpers hidden from the room. Counts are provider-reported cumulative observations, not billing totals. Bounded histories can have partial usage data.",
+      ),
+      ui.text(
+        "p",
+        "",
+        "Codex input includes cached input; do not add cache read to input. Claude reports input and cache counters separately.",
+      ),
+    );
     return this.nodes;
   }
   private live(snapshot: AppQuerySnapshot) {
@@ -142,13 +155,13 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       (value === null ? "" : value.toLocaleString("en-US") + " tokens · ") +
       "of " +
       tally(counted.eligible) +
-      " verified sessions: " +
+      " session histories: " +
       tally(counted.available) +
-      " complete, " +
+      " complete usage data, " +
       tally(counted.partial) +
-      " partial, " +
+      " partial usage data, " +
       tally(counted.unavailable) +
-      " unavailable, " +
+      " unavailable usage data, " +
       tally(counted.stale) +
       " stale";
     if (node.title !== hint) node.title = hint;
@@ -161,24 +174,24 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       nodes.summary,
       summaryPrefix(live, usageLive) +
         tally(agents.observed) +
-        " crew · " +
+        " displayed crew · " +
         tally(agents.statuses.working) +
-        " working · In " +
+        " working · history In " +
         shortCounter(aggregate, "inputTokens") +
         " / Out " +
         shortCounter(aggregate, "outputTokens") +
-        (partial ? " · partial" : ""),
+        (partial ? " · partial usage data" : ""),
     );
     setText(
       nodes.coverage,
       tally(coverage.available) +
         " of " +
         tally(coverage.eligible) +
-        " sessions complete · " +
+        " session histories with complete usage data · " +
         tally(coverage.partial) +
-        " partial · " +
+        " partial usage data · " +
         tally(coverage.unavailable) +
-        " unavailable · " +
+        " unavailable usage data · " +
         tally(coverage.stale) +
         " stale" +
         (coverage.conflicting

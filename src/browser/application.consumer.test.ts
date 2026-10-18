@@ -9,6 +9,9 @@ import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { consumerRoot } from "../server/application.consumer.test.js";
+import type { AppRow } from "./app/data.js";
+import type { Scene as SceneGeometry } from "./scene/types.js";
+import type { ActorFrame } from "./scene/motion-types.js";
 interface FixtureOptions {
   observer: { get: () => unknown; inspect: () => unknown };
   token: string;
@@ -20,6 +23,8 @@ interface HttpModule {
 }
 const TOKEN = "synthetic-browser-consumer-token";
 interface CanvasProbe {
+  activeScene: SceneGeometry;
+  actors: ActorFrame[];
   plateFrame: unknown;
   callbacks: { onObservatory: () => void };
   interaction: {
@@ -32,6 +37,77 @@ interface CanvasProbe {
   observatoryRegion: { left: number; top: number; width: number; height: number } | null;
   focused: string | null;
   repositorySelection(): string | null;
+}
+function crewSnapshot(closed: boolean, bornAt: number | null) {
+  const data = snapshot();
+  const first = data.sessions[0];
+  assert.ok(first);
+  const panes: AppRow[] = Array.from({ length: 12 }, (_, index) => ({
+    ...first,
+    id: "obs_" + String(index).padStart(24, "0"),
+    title: "Synthetic worker " + String(index),
+    paneId: "w1:p" + String(index),
+    status:
+      index === 0
+        ? "idle"
+        : index < 9
+          ? "working"
+          : index === 9
+            ? "done"
+            : index === 10
+              ? "unknown"
+              : "idle",
+    observedAt: index === 11 ? data.observedAt - 60000 : data.observedAt,
+  }));
+  const helpers: AppRow[] = Array.from({ length: 64 }, (_, index) => ({
+    id: "helper_" + String(index).padStart(2, "0"),
+    source: "helper",
+    provider: "codex",
+    project: first.project,
+    projectId: first.projectId,
+    repo: first.repo,
+    repoId: first.repoId,
+    parentId: panes[0]?.id ?? null,
+    title: "Synthetic helper " + String(index),
+    status: index < 2 ? "blocked" : "idle",
+    lineageState: "verified",
+    observedAt: data.observedAt,
+    // Retained closed histories stay inspectable and contribute usage, never avatars.
+    lifecycleEvidence: {
+      state: index >= 8 || (closed && index === 0) ? "closed" : "open",
+      reason: index === 0 && closed ? "killed" : null,
+    },
+  }));
+  if (bornAt !== null)
+    helpers.push({
+      ...helpers[2],
+      id: "helper_birth",
+      parentId: panes[0]?.id ?? null,
+      source: "helper",
+      status: "idle",
+      lifecycleEvidence: { state: "open" },
+      taskEvidence: {
+        state: "available",
+        source: "codex:assignment",
+        summary: "Synthetic arrival",
+        observedAt: bornAt,
+      },
+      observedAt: data.observedAt,
+    });
+  return {
+    ...data,
+    sessions: [...panes, ...helpers],
+    sources: { ...data.sources, herdr: { health: "available", observedAt: data.observedAt } },
+    aggregate: {
+      usage: {
+        inputTokens: { value: 76000, state: "available" },
+        outputTokens: { value: 1500, state: "partial" },
+        cacheReadTokens: { value: 64000, state: "available" },
+        cacheWriteTokens: { value: 0, state: "available" },
+      },
+      coverage: { eligible: 76, available: 75, partial: 1, unavailable: 0, stale: 0 },
+    },
+  };
 }
 async function paintedTargets(page: Page) {
   return page.evaluate(() => {
@@ -68,7 +144,7 @@ async function hoverTitle(page: Page) {
   assert.ok(title);
   return title;
 }
-async function nativeCanvas(browser: Browser, root: string, http: HttpModule) {
+async function nativeCanvas(browser: Browser, root: string, http: HttpModule, artifacts: string) {
   const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
   const marker = "framePaint = new FramePaint(this);";
   assert.equal(
@@ -80,10 +156,14 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule) {
     marker,
     "framePaint = (window.__view = this, new FramePaint(this));",
   );
+  let closed = false;
+  let bornAt: number | null = null;
+  let crewEnabled = false;
   const fixture = await listen(http, {
     token: TOKEN,
     observer: {
       get: () => {
+        if (crewEnabled) return crewSnapshot(closed, bornAt);
         const data = snapshot();
         const first = data.sessions[0];
         assert.ok(first);
@@ -215,6 +295,32 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule) {
       null,
       "visible sign takes priority over padded body",
     );
+    crewEnabled = true;
+    await fresh();
+    await crewBehavior(
+      page,
+      () => {
+        closed = true;
+      },
+      () => {
+        bornAt = Date.now();
+      },
+      artifacts,
+    );
+    closed = false;
+    bornAt = null;
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await fresh();
+    await crewMotion(
+      page,
+      () => {
+        closed = true;
+      },
+      () => {
+        bornAt = Date.now();
+      },
+      artifacts,
+    );
     assert.deepEqual(errors, []);
   } finally {
     await canvasPage?.close();
@@ -225,6 +331,184 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule) {
       }),
     );
   }
+}
+async function crewMotion(page: Page, close: () => void, birth: () => void, artifacts: string) {
+  await page.getByRole("button", { name: "Zoom to the Fixture project platform" }).click();
+  const probe = () =>
+    page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      return {
+        workers: view.activeScene.workers.map((worker) => ({
+          id: worker.id,
+          phase: worker.helperPhase,
+        })),
+        actors: view.actors,
+      };
+    });
+  const before = await probe();
+  await observeRosterMutations(page);
+  await page.waitForTimeout(6000);
+  assert.equal(
+    await page.evaluate(() => Number(Reflect.get(window, "__rosterMutations"))),
+    0,
+    "normal actor frame ticks and unchanged polls preserve roster nodes",
+  );
+  const after = await probe();
+  assert(
+    after.actors.some((actor) => {
+      const previous = before.actors.find((value) => value.id === actor.id);
+      return (
+        previous &&
+        Math.hypot(actor.point.x - previous.point.x, actor.point.y - previous.point.y) > 0.1
+      );
+    }),
+    "normal-motion fixture advances actual actor coordinates",
+  );
+  await capture(page, path.join(artifacts, "helper-motion.png"));
+  close();
+  await expect
+    .poll(async () => (await probe()).workers.find((worker) => worker.id === "helper_00")?.phase)
+    .toBe("returning");
+  await expect(page.locator('[data-session-id="helper_00"]')).toContainText("killed");
+  await expect(page.locator('[data-session-id="helper_00"]')).toHaveCount(0, { timeout: 20000 });
+  birth();
+  await expect
+    .poll(async () => (await probe()).workers.find((worker) => worker.id === "helper_birth")?.phase)
+    .toBe("entering");
+  await capture(page, path.join(artifacts, "helper-arrival.png"));
+  await expect
+    .poll(
+      async () => (await probe()).workers.find((worker) => worker.id === "helper_birth")?.phase,
+      { timeout: 20000 },
+    )
+    .toBe("present");
+  await expect(page.locator("#sessions .session-row")).toHaveCount(20);
+}
+async function crewBehavior(page: Page, close: () => void, birth: () => void, artifacts: string) {
+  const rows = page.locator("#sessions .session-row");
+  await expect(rows).toHaveCount(20);
+  const sceneIds = () =>
+    page.evaluate(() =>
+      (Reflect.get(window, "__view") as CanvasProbe).activeScene.workers
+        .map((worker) => worker.id)
+        .sort(),
+    );
+  assert.deepEqual(
+    await rows.evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLElement).dataset.sessionId).sort(),
+    ),
+    await sceneIds(),
+  );
+  await expect(page.locator("#room-count")).toContainText("20 workers on this deck");
+  await expect(page.locator("#counts")).toContainText(
+    "8 working · 2 waiting · 20 total · 1 last known",
+  );
+  await page.locator("#station-stats-summary").click();
+  await expect(page.locator("#station-stats")).toContainText(
+    "20 displayed crew · 8 working · history In 76K / Out 1.5K · partial usage data",
+  );
+  await expect(page.locator("#station-totals")).toContainText(
+    "8 working · 2 waiting · 7 idle · 1 done · 1 unknown · 1 stale",
+  );
+  await expect(page.locator("#station-stats")).toContainText(
+    "Includes retained helper histories, including helpers hidden from the room.",
+  );
+  await expect(page.locator("#station-stats")).toContainText(
+    "Codex input includes cached input; do not add cache read to input.",
+  );
+  await expect(page.locator("#station-totals dt")).toHaveText([
+    "Displayed crew",
+    "Status",
+    "Cumulative session-history tokens",
+    "Usage data coverage",
+  ]);
+  await expect(page.locator("#station-totals .total-counter")).toHaveText([
+    "in 76K",
+    "out 1.5K partial",
+    "cache read 64K",
+    "cache write 0",
+  ]);
+  await page
+    .getByRole("button", {
+      name: "Open details for Codex · helper · Synthetic helper 0",
+      exact: false,
+    })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "relationship verified · running presence unconfirmed",
+  );
+  await page.keyboard.press("Escape");
+  const quarters = await page.evaluate(() =>
+    (Reflect.get(window, "__view") as CanvasProbe).activeScene.platforms.map((platform) => ({
+      rect: platform.rect,
+      quarters: platform.quarters,
+    })),
+  );
+  assert.equal(quarters.length, 1);
+  const room = quarters[0];
+  assert.ok(room && room.quarters.rect.w === 3 && room.quarters.rect.h === 1);
+  assert.equal(room.quarters.rect.x - room.rect.x, 14);
+  if ((await page.locator("#fx-toggle").getAttribute("aria-pressed")) === "true")
+    await page.locator("#fx-toggle").click();
+  await expect(page.locator("#fx-toggle")).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Zoom to the Fixture project platform" }).click();
+  await capture(page, path.join(artifacts, "helper-quarters.png"));
+  await page.locator("#search").fill("Synthetic worker 0");
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator("#search")).toBeFocused();
+  assert.equal((await sceneIds()).length, 20);
+  await page.locator("#search").fill("");
+  await expect(rows).toHaveCount(20);
+  await observeRosterMutations(page);
+  await page.waitForTimeout(2300);
+  assert.equal(
+    await page.evaluate(() => Number(Reflect.get(window, "__rosterMutations"))),
+    0,
+    "unchanged polls and frame ticks preserve roster nodes",
+  );
+  await page.locator('[data-session-id="helper_00"]').click();
+  await page.locator("canvas").focus();
+  close();
+  await expect(rows).toHaveCount(19, { timeout: 10000 });
+  assert.equal((await sceneIds()).length, 19);
+  await expect(page.locator("#station-stats-summary")).toContainText("19 displayed crew");
+  await expect(page.locator("canvas")).toBeFocused();
+  assert.equal(
+    (await paintedTargets(page)).focused,
+    null,
+    "settlement clears removed avatar selection without stealing keyboard focus",
+  );
+  birth();
+  await expect(page.locator('[data-session-id="helper_birth"]')).toHaveCount(1, { timeout: 10000 });
+  await expect(rows).toHaveCount(20);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (Reflect.get(window, "__view") as CanvasProbe).activeScene.workers.find(
+            (worker) => worker.id === "helper_birth",
+          )?.helperPhase,
+      ),
+    )
+    .toBe("present");
+  await expect(page.locator("#station-stats-summary")).toContainText("20 displayed crew");
+  await expect(page.locator("#station-totals .total-counter").first()).toHaveText("in 76K");
+}
+async function observeRosterMutations(page: Page) {
+  await page.evaluate(() => {
+    Reflect.set(window, "__rosterMutations", 0);
+    new MutationObserver((records) => {
+      Reflect.set(
+        window,
+        "__rosterMutations",
+        Number(Reflect.get(window, "__rosterMutations")) +
+          records.filter((record) => record.type === "childList").length,
+      );
+    }).observe(document.getElementById("sessions") ?? document.body, {
+      childList: true,
+      subtree: true,
+    });
+  });
 }
 function signBodyOverlap(targets: Awaited<ReturnType<typeof paintedTargets>>) {
   for (const sign of targets.signs)
@@ -253,7 +537,7 @@ function snapshot() {
     title: "Synthetic browser fixture",
     status: "working",
     observedAt: now,
-    inventoryHealth: "available",
+    inventoryHealth: "available" as const,
     paneId: "w1:p1",
     hostId: "local",
   };
@@ -350,7 +634,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
-    await nativeCanvas(browser, root, http);
+    await nativeCanvas(browser, root, http, artifacts);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -385,6 +669,15 @@ async function runBrowserConsumer(root: string) {
       chromium: browser.version(),
       canvas: true,
       nativeCanvasClicks: true,
+      helperCrew: {
+        initialDisplayed: 20,
+        initialRetainedRecords: 76,
+        scopesAndCoverage: true,
+        stableRoster: true,
+        filterAndSettlementFocus: true,
+        reducedAndNormalLifecycle: true,
+        screenshots: ["helper-quarters.png", "helper-motion.png", "helper-arrival.png"],
+      },
       prepaint: ["starnet", "synthetic-private"],
       fixtureControls: true,
       staleProof: true,
@@ -416,7 +709,7 @@ async function runBrowserConsumer(root: string) {
 }
 test("installed emitted application operates in real Chromium", async () => {
   await runBrowserConsumer(consumerRoot());
-}, 60000);
+}, 120000);
 
 async function hostTabs(browser: Browser, http: HttpModule) {
   const fixture = await listen(http, {
