@@ -6,6 +6,7 @@ import { createQuerySpine } from "../../browser/queryspine.js";
 import type { ObserverOptions } from "./contracts.js";
 import type { ObserverSnapshot } from "../../shared/observer.js";
 import { must, fixtureString, busFixture } from "./testing.fixture.js";
+import { counts } from "../failopen.js";
 const NO_MATCH = false;
 const ID = "00000000-0000-0000-0000-000000000001";
 const pane = (id: string, session = ID) => ({
@@ -25,8 +26,9 @@ const makeCoreObserver = (options: ObserverOptions) =>
     ...options,
   });
 test("observer queryspine polling freshness", async () => {
-  await pollingFreshness();
-  async function pollingFreshness() {
+  for (const contention of ["healthy", "intermittent", "perpetual"])
+    await pollingFreshness(contention);
+  async function pollingFreshness(contention: string) {
     let clock = 0,
       serial = 0,
       inventoryMode = "healthy",
@@ -40,6 +42,15 @@ test("observer queryspine polling freshness", async () => {
       publications: { at: number; data: ObserverSnapshot }[] = [],
       rpcCounts = new Map<string, number>(),
       birthCounts = new Map<number, number>();
+    let activeRpc = 0,
+      maxRpc = 0,
+      activeBirth = 0,
+      maxBirth = 0;
+    const attempts = new Map<string, { start: number; end: number }[]>();
+    const diagnosticsBefore = counts()["observer.identity.content"] || 0;
+    let maxWorkers = 0,
+      maxWaiting = 0;
+    const working = new Set<string>();
     const panes = Array.from({ length: 20 }, (_, index) => ({
       ...pane(`timing:${String(index)}`),
       terminal_id: `terminal_${String(index)}`,
@@ -80,22 +91,47 @@ test("observer queryspine polling freshness", async () => {
       await flush();
       assertHealthyAge();
     }
+    function startRpc(id: string, count: number) {
+      rpcCounts.set(id, count);
+      maxRpc = Math.max(maxRpc, ++activeRpc);
+      if (count % 8 !== 1) return;
+      const records = attempts.get(id) || [];
+      records.push({ start: clock, end: clock });
+      attempts.set(id, records);
+      working.add(id);
+      maxWorkers = Math.max(maxWorkers, working.size);
+      maxWaiting = Math.max(maxWaiting, 20 - attempts.size);
+    }
+    function copyMotion(id: string, count: number, index: number) {
+      const final = count % 8 === 0;
+      if (final) {
+        must(attempts.get(id)?.at(-1)).end = clock;
+        working.delete(id);
+      }
+      const conflict =
+        final &&
+        (contention === "perpetual" || (contention === "intermittent" && index < 4 && count === 8));
+      return { result: { pane_id: id, content_revision: conflict ? 10 : 8 } };
+    }
     const identities = makeIdentityResolver({
       now: () => clock,
       readConfiguration: () => Promise.resolve("configured"),
       readProcessBirth: async (pid) => {
         birthCounts.set(pid, (birthCounts.get(pid) || 0) + 1);
+        maxBirth = Math.max(maxBirth, ++activeBirth);
         await delay(25);
+        activeBirth--;
         return { pid, startSeconds: 1, startMicroseconds: 2 };
       },
       rpc: async (method, params) => {
         const id = fixtureString(params.pane_id || params.target),
           index = Number(id.split(":")[1]);
         const count = (rpcCounts.get(id) || 0) + 1;
-        rpcCounts.set(id, count);
+        startRpc(id, count);
         // Synthetic workload only: eight RPCs plus two fresh birth reads.
         // First footer costs 30 ms; remaining seven RPCs each cost 27.5 ms.
         await delay(count === 1 ? 30 : 27.5);
+        activeRpc--;
         if (method === "agent.get") return { result: { agent: panes[index] } };
         if (method === "pane.process_info")
           return { result: { process_info: { pane_id: id, shell_pid: index + 100 } } };
@@ -105,7 +141,7 @@ test("observer queryspine polling freshness", async () => {
               pane: { ...panes[index], scroll: { max_offset_from_bottom: 0, viewport_rows: 20 } },
             },
           };
-        if (method === "pane.copy_motion") return { result: { pane_id: id, content_revision: 8 } };
+        if (method === "pane.copy_motion") return copyMotion(id, count, index);
         assert.equal(method, "pane.read");
         return {
           result: {
@@ -126,6 +162,9 @@ test("observer queryspine polling freshness", async () => {
         starts.push(clock);
         rpcCounts.clear();
         birthCounts.clear();
+        attempts.clear();
+        maxRpc = 0;
+        maxBirth = 0;
         if (inventoryMode === "failed") throw Error("synthetic outage");
         return Promise.resolve({
           stdout: JSON.stringify({ result: { agents: inventoryMode === "empty" ? [] : panes } }),
@@ -190,13 +229,77 @@ test("observer queryspine polling freshness", async () => {
       timeoutMs: 10000,
       validate: isObserved,
     });
+    async function characterizeContention() {
+      // At most 28 complete attempts, seven four-worker waves, first-admission
+      // skew and unchanged downstream work. Failed work remains in this bound.
+      const bound = 7 * 272.5 + 30 + 100;
+      await advance(1999);
+      const publication = must(publications.at(-1));
+      assert.equal(starts.length, 1);
+      assert(publication.at <= bound);
+      const count = [...attempts.values()].reduce((sum, records) => sum + records.length, 0);
+      assert.equal(count, contention === "intermittent" ? 24 : 28);
+      assert.equal(
+        [...rpcCounts.values()].reduce((sum, value) => sum + value, 0),
+        count * 8,
+      );
+      assert.equal(
+        [...birthCounts.values()].reduce((sum, value) => sum + value, 0),
+        count * 2,
+      );
+      assert.equal(maxRpc, 4);
+      assert.equal(maxWorkers, 4);
+      assert.equal(maxWaiting, 19, "first admitted capture leaves nineteen waiting panes");
+      assert(maxBirth <= 4);
+      for (let index = 4; index < 20; index++) {
+        assert(attempts.has(`timing:${String(index)}`), "later panes retain first admission");
+        assert.equal(attempts.get(`timing:${String(index)}`)?.length, 1);
+      }
+      for (const records of attempts.values()) {
+        assert(records.length <= 3);
+        assert(must(records.at(-1)).end - must(records[0]).start <= 812.5);
+      }
+      const rows = herdrRows(publication.data);
+      assert.equal(
+        rows.filter((row) => row.identitySource === "footer").length,
+        contention === "intermittent" ? 20 : 0,
+      );
+      assert(rows.every((row) => row.observedAt === 0));
+      assert.equal(
+        (counts()["observer.identity.content"] || 0) - diagnosticsBefore,
+        contention === "perpetual" ? 20 : 0,
+        "only exhausted captures emit diagnostics",
+      );
+      console.log(
+        JSON.stringify({
+          contention,
+          publication: publication.at,
+          attempts: count,
+          rpc: count * 8,
+          births: count * 2,
+          maxRpc,
+          maxBirth,
+          maxWorkers,
+          maxWaiting,
+          exhausted: rows.filter((row) => row.identitySource === "unavailable").length,
+          captureLatency: [...attempts.values()].map((records) => ({
+            attempts: records.length,
+            latency: must(records.at(-1)).end - must(records[0]).start,
+          })),
+        }),
+      );
+    }
     let unsubscribe: (() => void) | undefined;
     try {
       unsubscribe = Q.subscribe("observer.sessions", (state) => {
         if (state.hasData && !state.pending) publications.push({ at: clock, data: stateData() });
       });
+      if (contention !== "healthy") {
+        await characterizeContention();
+        return;
+      }
       for (const start of [0, 2000, 4000, 6000]) {
-        await advance(start + 1700);
+        await advance(start + 1500);
         assert.deepEqual(
           starts,
           [0, 2000, 4000, 6000].filter((time) => time <= start),
@@ -206,7 +309,7 @@ test("observer queryspine polling freshness", async () => {
         const publishedSources = publication.data.sources;
         assert.equal(publishedSources.herdr.observedAt, start);
         assert(
-          publication.at - start <= 1700,
+          publication.at - start <= 1500,
           "four capture workers plus first admission and downstream fit synthetic budget",
         );
         assert.equal(herdrRows(publication.data).length, 20);
@@ -216,7 +319,25 @@ test("observer queryspine polling freshness", async () => {
           ),
         );
         assert.deepEqual([...rpcCounts.values()], Array(20).fill(8));
+        assert.equal(
+          [...rpcCounts.values()].reduce((sum, value) => sum + value, 0),
+          160,
+        );
+        console.log(
+          JSON.stringify({
+            contention,
+            publication: publication.at - start,
+            rpc: 160,
+            births: 40,
+            maxRpc,
+            maxBirth,
+            maxWorkers,
+            maxWaiting,
+          }),
+        );
         assert.deepEqual([...birthCounts.values()], Array(20).fill(2));
+        assert.equal(maxRpc, 4);
+        assert(maxBirth <= 4);
         assert.equal(publishedSources.desktop.observedAt, -7000);
         assert.equal(
           publication.data.sessions.find((row) => row.source === "desktop")?.observedAt,
@@ -280,6 +401,7 @@ test("observer queryspine polling freshness", async () => {
         assert(!Q.state("observer.sessions").pending);
         assert.equal(intervals.size, 0);
       } finally {
+        await observer.close();
         events.length = 0;
       }
     }

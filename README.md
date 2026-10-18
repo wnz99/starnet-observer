@@ -15,7 +15,7 @@ You do **not** need to install or run StarNet. The necessary observer code, shar
 | Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
 | [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
 | Codex CLI and/or Claude Code                                    | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys.                      |
-| [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS.                                                                               |
+| [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS through a reused, lazy helper.                                                 |
 | [llm-bus](https://github.com/wnz99/llm-bus) (optional)          | Supplies local agent registrations, message couriers, and message inspectors. Without it, terminal observation still works, but mail is unavailable. |
 | Xcode Command Line Tools (optional)                             | Supplies `swiftc` for observing the Codex desktop app. Not needed for terminal-only use.                                                             |
 
@@ -85,6 +85,10 @@ status_line = ["thread-id"]
 ```
 
 Keep any other status-line fields after `thread-id`, then restart the affected Codex pane. Python 3.11+ and an accessible local Herdr socket are needed for this fallback. An unresolved identity stays unavailable rather than opening a guessed session.
+
+On macOS, fallback verification starts one Python process lazily and reuses it for fresh process-birth queries. It admits at most eight outstanding birth queries and sends one at a time, with a 1500 ms deadline from admission. It closes that helper when the observer shuts down. A capture without contention uses eight Herdr requests and two fresh process-birth queries; transcript inspection repeats verification before and after reading content.
+
+If terminal output changes during capture, the observer retries the complete capture at most twice. A refresh shares eight extra attempts across all panes, with four capture workers. Retries must start within 1500 ms of the first attempt; individual operations have separate timeouts. Sustained output changes can leave identity unavailable until a later refresh succeeds. These bounds do not guarantee a live refresh latency.
 
 ## Enable llm-bus mail and couriers
 

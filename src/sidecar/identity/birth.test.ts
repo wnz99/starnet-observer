@@ -53,6 +53,7 @@ async function drain() {
 }
 nativeTest("birth client reuses one child and queries every fresh PID", async () => {
   const f = fixture();
+  assert.equal(f.children.length, 0, "reader construction stays lazy");
   try {
     const first = f.client.read(41);
     await drain();
@@ -72,10 +73,25 @@ nativeTest("birth client reuses one child and queries every fresh PID", async ()
       child.requests.map((request) => request.pid),
       [41, 42, 41],
     );
+    for (let index = 0; index < 50; index++) {
+      const pending = f.client.read(41);
+      child.reply(birth(41));
+      assert.deepEqual(await pending, birth(41));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1550));
+    const afterOldDeadlines = f.client.read(42);
+    child.reply(birth(42));
+    assert.deepEqual(await afterOldDeadlines, birth(42));
+    assert.equal(f.children.length, 1, "completed job deadlines cannot retire idle healthy helper");
   } finally {
     await f.client.close();
   }
   await assert.rejects(f.client.read(41), /unavailable/);
+  assert(
+    f.children.every(
+      ({ value }) => value.stdin.destroyed && value.stdout.destroyed && value.stderr.destroyed,
+    ),
+  );
 });
 nativeTest("birth client bounds admission without killing healthy work", async () => {
   const f = fixture();
@@ -85,12 +101,17 @@ nativeTest("birth client bounds admission without killing healthy work", async (
     await drain();
     const child = f.children[0];
     assert(child);
+    assert.equal(child.requests.length, 1, "only one outstanding request reaches helper");
     for (const read of reads) {
       child.reply(birth(child.requests.at(-1)?.pid ?? 1));
       await read;
       await drain();
     }
     assert.equal(f.children.length, 1);
+    assert.deepEqual(
+      child.requests.map((request) => request.pid),
+      [1, 2, 3, 4, 5, 6, 7, 8],
+    );
   } finally {
     await f.client.close();
   }

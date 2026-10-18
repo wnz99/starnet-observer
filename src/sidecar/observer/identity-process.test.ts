@@ -2,6 +2,7 @@ import type { ObserverInputRow } from "./contracts.js";
 import { settled } from "./testing.fixture.js";
 import { spawn } from "node:child_process";
 import { makeIdentityResolver } from "../identity/index.js";
+import { makeProcessBirthReader } from "../identity/birth.js";
 import type { IdentityRpc } from "../identity/types.js";
 import { test } from "bun:test";
 import assert from "node:assert/strict";
@@ -126,3 +127,66 @@ test("observer isolates exited owned PID while retaining healthy pane inspection
     );
   }
 }, 30000);
+
+test("observer close drains active and queued native-client reads and reaps its child", async () => {
+  if (process.platform !== "darwin") return;
+  const children: ReturnType<typeof spawn>[] = [];
+  const client = makeProcessBirthReader({
+    endpoint: "/isolated/shutdown.sock",
+    spawn: (() => {
+      // Owned child deliberately never replies, leaving one active and seven queued reads.
+      const child = spawn(
+        process.execPath,
+        ["--no-env-file", "-e", "setInterval(() => {}, 1000)"],
+        {
+          stdio: ["pipe", "pipe", "ignore"],
+        },
+      );
+      children.push(child);
+      return child;
+    }) as unknown as typeof spawn,
+  });
+  const resolver = makeIdentityResolver({
+    now: () => 1000,
+    readProcessBirth: client.read,
+    readConfiguration: () => settled(() => "configured"),
+    rpc: () => {
+      throw Error("closed resolver must not request transport");
+    },
+  });
+  const observer = makeObserver({
+    now: () => 1000,
+    identities: {
+      ...resolver,
+      close: async () => {
+        await resolver.close();
+        await client.close();
+      },
+    },
+    bus: { read: () => busFixture() },
+    desktop: { inventory: () => settled(() => ({ health: "unavailable", windows: [] })) },
+  });
+  const reads = Array.from({ length: 8 }, (_, i) =>
+    assert.rejects(client.read(i + 1), /unavailable/),
+  );
+  const child = children[0];
+  assert(child);
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => {
+      resolve();
+    });
+  });
+  try {
+    await assert.rejects(client.read(9), /unavailable/);
+    const close = observer.close();
+    assert.equal(observer.close(), close);
+    await Promise.all([...reads, close, exited]);
+    assert(child.exitCode !== null || child.signalCode !== null, "owned helper is reaped");
+    await assert.rejects(client.read(1), /unavailable/);
+    assert.equal((await resolver.resolve(pane)).source, "unavailable");
+    assert.equal(children.length, 1, "closed entry cannot spawn another helper");
+  } finally {
+    await observer.close();
+    child.kill();
+  }
+}, 10000);

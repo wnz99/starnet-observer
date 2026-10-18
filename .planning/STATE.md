@@ -35,7 +35,7 @@ Last activity: 2026-10-16 — Simplification removed bootstrap/migration scaffol
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261018-3am | Codex identity performance and redraw availability | Tasks 1–2 reviewed and committed; task 3 in progress | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
+| 261018-3am | Codex identity performance and redraw availability | Tasks 1–3 reviewed and committed; integration verification in progress | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
 
 ## Quick Tasks Completed
 
