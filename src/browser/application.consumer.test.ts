@@ -416,10 +416,10 @@ async function crewBehavior(page: Page, close: () => void, birth: () => void, ar
   await expect(page.locator("#station-totals")).toContainText(
     "8 working · 2 waiting · 7 idle · 1 done · 1 unknown · 1 stale",
   );
-  await expect(page.locator("#station-stats")).toContainText(
+  await expect(page.locator("#station-stats")).not.toContainText(
     "Includes retained helper histories, including helpers hidden from the room.",
   );
-  await expect(page.locator("#station-stats")).toContainText(
+  await expect(page.locator("#station-stats")).not.toContainText(
     "Codex input includes cached input; do not add cache read to input.",
   );
   await expect(page.locator("#station-totals dt")).toHaveText([

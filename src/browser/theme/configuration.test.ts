@@ -121,13 +121,15 @@ test("numeric readouts preserve their fixed font and spacing", () => {
     ".station-stats { margin-top:5px; font:15px/1.2 var(--term);",
     "font:15px/1.2 var(--term); letter-spacing:.04em; font-variant-numeric:tabular-nums; }",
     "#counts { color:var(--dim); font:16px/1.2 var(--term);",
-    ".stat dd { margin:0; font:12px/1.3 ui-monospace,monospace;",
     "#observed { color:var(--dim); font:17px var(--term);",
   ])
     assert.ok(
       stylesheet.replace(/\s+/g, "").replace(/:0\./g, ":.").includes(rule.replace(/\s+/g, "")),
       "fixed readout: " + rule,
     );
+  const statistics = ownDeclarations(stylesheet, ".stat dd");
+  assert.equal(statistics.margin, "0");
+  assert.equal(statistics.font?.replace(/\s+/g, ""), "12px/1.3ui-monospace,monospace");
   // Each numeric readout declares its own fixed font shorthand and tracking, so a profile or scaled rule on an
   // ancestor (e.g. .project-heading, .turn-head, .connection) cannot restyle it through inheritance.
   const numericReadouts = [
