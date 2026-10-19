@@ -102,6 +102,7 @@ export interface Walkway {
   rect: Rect;
   host?: string;
   relay?: boolean | string;
+  accent?: string;
 }
 export interface Mailroom {
   rect: Rect;

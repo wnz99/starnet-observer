@@ -31,9 +31,13 @@ export function revisionFor(input: {
           ]),
         ]
       : []),
-    walkways
-      .filter((walkway) => walkway.relay)
-      .map((walkway) => [walkway.kind, walkway.rect.x, walkway.rect.y]),
+    walkways.map((walkway) => [
+      walkway.kind,
+      walkway.rect,
+      walkway.host,
+      walkway.relay,
+      walkway.accent,
+    ]),
     workers.map((w) => [w.id, w.kind, w.parentId, w.chair.x, w.chair.y]).sort(),
   ]);
 }
