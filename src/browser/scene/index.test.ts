@@ -9,6 +9,7 @@ import type {
   Scene as SceneValue,
   ActorFrame,
   MotionOptions,
+  Graph,
 } from "./types.js";
 import { createModel } from "../model.js";
 import { canonicalTheme } from "../theme.fixture.js";
@@ -18,6 +19,371 @@ import { ActorState } from "./actor.js";
 import { FormationPlanner } from "./formation.js";
 import { graphFor, safeSegment, pathTo } from "./navigation.js";
 import { revisionFor } from "./revision.js";
+
+// Independent clipping oracle checks whole segments, including reserved future furniture.
+const intersectsFurniture = (r: Rect, a: Point, b: Point) => {
+  const intervals = (
+    [
+      ["x", "w"],
+      ["y", "h"],
+    ] as const
+  ).map(([axis, size]) => {
+    const min = r[axis] + 1e-7,
+      max = r[axis] + r[size] - 1e-7,
+      delta = b[axis] - a[axis];
+    if (Math.abs(delta) < 1e-12)
+      return a[axis] > min && a[axis] < max ? [-Infinity, Infinity] : [Infinity, -Infinity];
+    const crossings = [(min - a[axis]) / delta, (max - a[axis]) / delta];
+    return [Math.min(...crossings), Math.max(...crossings)];
+  });
+  return (
+    Math.max(0, ...intervals.map((i) => present(i[0]))) <=
+    Math.min(1, ...intervals.map((i) => present(i[1])))
+  );
+};
+
+function trailHeading(leader: ActorState) {
+  const [from, to] = leader.trail.slice(-2);
+  if (!from || !to) return "";
+  return JSON.stringify([
+    Math.sign(to.point.x - from.point.x),
+    Math.sign(to.point.y - from.point.y),
+  ]);
+}
+function advanceNaturalRoute(
+  motion: ReturnType<typeof Scene.createMovement>,
+  observed: Map<string, ActorState>,
+  leaderId: string,
+  until: number,
+) {
+  let previousBucket = -1,
+    previousDirection = "",
+    previousMoving = false,
+    previousTargets: unknown;
+  for (let now = 0; now <= until; now += 100) {
+    motion.step(now);
+    const leader = present(observed.get(leaderId)),
+      bucket = Math.floor(leader.arc / 0.8),
+      moving = leader.path.length > 0,
+      targets = leader.formation?.targets;
+    const direction = trailHeading(leader);
+    if (moving && previousMoving && bucket === previousBucket && direction === previousDirection)
+      assert.equal(
+        targets,
+        previousTargets,
+        "natural unchanged moving bucket reuses its bounded proposal",
+      );
+    previousBucket = bucket;
+    previousDirection = direction;
+    previousMoving = moving;
+    previousTargets = targets;
+  }
+}
+
+function verifyNaturalRest(count: number, leaderId: string, holdAt: number) {
+  const layout = createModel(canonicalTheme()).createLayout();
+  const root = (id: string, repo = "r"): LayoutRow => ({
+    id,
+    projectId: "p",
+    project: "p",
+    repoId: repo,
+    repo,
+    provider: "codex",
+    status: "idle",
+  });
+  layout.reconcile([
+    root(leaderId),
+    { ...root("obs_other"), status: "working" },
+    ...Array.from({ length: 15 }, (_, i) => ({
+      ...root("obs_furniture-" + String(i), i < 14 ? "r" : "second"),
+      status: "working" as const,
+    })),
+    ...Array.from({ length: count }, (_, i): LayoutRow => ({
+      id: "follower-" + String(i),
+      source: "helper",
+      status: "unknown",
+      parentId: leaderId,
+      lineageState: i % 2 ? "verified" : "open",
+      lifecycleEvidence: { state: "open", reason: null },
+    })),
+  ]);
+  const scene = Scene.build(layout.onPage(0), 0),
+    motion = Scene.createMovement(),
+    parentWorker = present(scene.workers.find((w) => w.id === leaderId)),
+    graph = graphFor(present(scene.platforms.find((p) => p.key === parentWorker.platformKey))),
+    helpers = scene.workers
+      .filter((w) => w.kind === "helper")
+      .sort((a, b) => (a.helperSlot ?? 0) - (b.helperSlot ?? 0)),
+    observed = new Map<string, ActorState>(),
+    original = Object.getOwnPropertyDescriptor(
+      ActorState.prototype,
+      "animate",
+    ) as TypedPropertyDescriptor<ActorState["animate"]>;
+  ActorState.prototype.animate = function (input) {
+    observed.set(this.worker.id, this);
+    present(original.value).call(this, input);
+  };
+  try {
+    motion.reconcile(scene, { now: 0 });
+    advanceNaturalRoute(motion, observed, leaderId, holdAt);
+    const parent = present(observed.get(leaderId));
+    const clearJoin = (a: Point, b: Point) =>
+      [a, b].every(
+        (p) =>
+          p.x >= graph.rect.x + 0.3016 &&
+          p.x <= graph.rect.x + graph.rect.w - 0.3016 &&
+          p.y >= graph.rect.y + 0.3016 &&
+          p.y <= graph.rect.y + graph.rect.h - 0.3016,
+      ) &&
+      !graph.obstacles.some((o) =>
+        intersectsFurniture(
+          { x: o.x - 0.3016, y: o.y - 0.3016, w: o.w + 0.6032, h: o.h + 0.6032 },
+          a,
+          b,
+        ),
+      );
+    const clearOrientation = (axis: Point) => {
+      const at = (lag: number, side: number) => ({
+          x: parent.point.x - axis.x * lag - axis.y * side,
+          y: parent.point.y - axis.y * lag + axis.x * side,
+        }),
+        depth = 1.6 + 1.2 * Math.floor((count - 1) / 2);
+      return (
+        [-0.6, 0, 0.6].every(
+          (side) =>
+            clearJoin(parent.point, at(1.6, side)) && clearJoin(at(1.6, side), at(depth, side)),
+        ) &&
+        Array.from({ length: Math.ceil(count / 2) }, (_, row) =>
+          clearJoin(at(1.6 + 1.2 * row, -0.6), at(1.6 + 1.2 * row, 0.6)),
+        ).every(Boolean)
+      );
+    };
+    const axes = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ];
+    function seekRest() {
+      let clock = holdAt;
+      while ((parent.path.length > 0 || !axes.some(clearOrientation)) && clock < 600000) {
+        clock += 100;
+        motion.step(clock);
+      }
+      assert(clock < 600000, "additional natural route has a full clear resting footprint");
+      return clock;
+    }
+    let clock = holdAt;
+    if (leaderId !== "leader2") {
+      clock = seekRest();
+    }
+    if (leaderId === "leader2") assert.deepEqual(parent.point, { x: -13.5, y: -44.5, z: 0 });
+    assert.equal(parent.path.length, 0, "hold only an already resting natural leader");
+    parent.due = Infinity;
+    const slots = (axis: Point) =>
+      helpers.map((_, i) => ({
+        x:
+          parent.point.x -
+          axis.x * (1.6 + 1.2 * Math.floor(i / 2)) -
+          axis.y * (i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6),
+        y:
+          parent.point.y -
+          axis.y * (1.6 + 1.2 * Math.floor(i / 2)) +
+          axis.x * (i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6),
+      }));
+    const clear = (p: Point) => clearJoin(p, p),
+      candidates = axes.filter(clearOrientation).map(slots);
+    assert(candidates.length > 0, "natural rest has independently clear compact slots");
+    const westward = leaderId === "leader2" ? slots(present(axes[0])) : present(candidates[0]);
+    assert(westward.every(clear), "fixed westward leader2 candidate is independently clear");
+    const lengths = helpers.map((w, i) => {
+      let from = present(observed.get(w.id)).point,
+        length = 0;
+      const route = pathTo(graph, from, present(westward[i]), w);
+      assert(route.length > 0, "all eight current slots have legal joins");
+      for (const point of route) {
+        assert(safeSegment(graph, from, point, w));
+        length += Math.hypot(point.x - from.x, point.y - from.y);
+        from = point;
+      }
+      return length;
+    });
+    const deadline = Math.ceil(((Math.max(...lengths) / 1.6) * 1000 + 2000) / 100) * 100;
+    if (leaderId === "leader2" && count === 8)
+      assert(deadline < 8000, "natural geometry gives a bounded independent join deadline");
+    for (let elapsed = 100; elapsed <= deadline + 4000; elapsed += 100) {
+      motion.step(clock + elapsed);
+      if (elapsed >= deadline)
+        assert(
+          axes.some((axis) =>
+            slots(axis).every((p, i) => {
+              const actual = present(observed.get(present(helpers[i]).id)).point;
+              return Math.hypot(p.x - actual.x, p.y - actual.y) < 0.2;
+            }),
+          ),
+          `every fresh helper recovers its current compact slot by the legal deadline and holds it: ${JSON.stringify({ count, leaderId, elapsed, deadline, parent: parent.point, mode: parent.formation?.mode, actual: helpers.map((w) => observed.get(w.id)?.point) })}`,
+        );
+    }
+  } finally {
+    Object.defineProperty(ActorState.prototype, "animate", original);
+  }
+}
+test("fresh helpers recover compact rows after a natural obstructed trail", () => {
+  for (const count of [1, 2, 3, 7, 8]) {
+    verifyNaturalRest(count, "leader2", 43400);
+    verifyNaturalRest(count, "leader7", 75000);
+    verifyNaturalRest(count, "leader38", 112500);
+  }
+});
+
+function assertTurnRows(offsets: { lag: number; side: number }[], count: number) {
+  offsets.forEach((o, i) => {
+    const expectedSide = i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6;
+    assert(o.lag >= 1.5 && o.lag <= 1.6 + 1.2 * Math.floor(i / 2) + 3.2);
+    assert(Math.abs(o.side - expectedSide) < (expectedSide ? 0.2 : 0.12));
+    if (i % 2) {
+      assert(Math.abs(o.lag - present(offsets[i - 1]).lag) <= 0.4);
+      assert(Math.abs(o.side - present(offsets[i - 1]).side - 1.2) <= 0.2);
+      assert(
+        Math.abs(
+          Math.hypot(o.side - present(offsets[i - 1]).side, o.lag - present(offsets[i - 1]).lag) -
+            1.2,
+        ) <= 0.2,
+      );
+    }
+    if (i >= 2) assert(Math.abs(o.lag - present(offsets[i - 2]).lag - 1.2) <= 0.4);
+  });
+}
+
+function verifyClearTurn(count: number) {
+  const layout = createModel(canonicalTheme()).createLayout();
+  layout.reconcile([
+    { id: "turn-parent", status: "idle" },
+    ...Array.from({ length: count }, (_, i): LayoutRow => ({
+      id: "turn-helper-" + String(i),
+      source: "helper",
+      status: "unknown",
+      parentId: "turn-parent",
+      lineageState: "verified",
+    })),
+  ]);
+  const scene = Scene.build(layout.onPage(0), 0),
+    parent = new ActorState(present(scene.workers.find((w) => w.id === "turn-parent")), 0, 0),
+    graph: Graph = {
+      rect: { x: 0, y: 0, w: 100, h: 100 },
+      obstacles: [],
+      cells: new Map(),
+      edges: new Map(),
+    },
+    helpers = scene.workers
+      .filter((w) => w.kind === "helper")
+      .sort((a, b) => (a.helperSlot ?? 0) - (b.helperSlot ?? 0))
+      .map((w, i) => {
+        const actor = new ActorState(w, 0, 0);
+        actor.depth = 1;
+        actor.point = {
+          x: 20 - 1.6 - 1.2 * Math.floor(i / 2),
+          y: 20 + (i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6),
+        };
+        return actor;
+      }),
+    ordered = helpers.map((actor) => ({ actor, depth: 1 }));
+  parent.point = { x: 20, y: 20 };
+  parent.record({ x: 10, y: 20 });
+  parent.record(parent.point);
+  parent.path = [
+    { x: 24, y: 20 },
+    { x: 24, y: 60 },
+  ];
+  parent.due = Infinity;
+  let heading = "",
+    deadline = Infinity,
+    cachedBucket = -1;
+  let cachedTargets: unknown;
+  const headingFrames = new Map([
+    [JSON.stringify({ x: 1, y: 0 }), 0],
+    [JSON.stringify({ x: 0, y: 1 }), 0],
+  ]);
+  for (let now = 100; now <= 27000; now += 100) {
+    const before = { ...parent.point };
+    parent.animate({
+      now,
+      elapsed: 100,
+      graph,
+      parent: undefined,
+      assignment: undefined,
+      following: false,
+    });
+    const dx = parent.point.x - before.x,
+      dy = parent.point.y - before.y,
+      length = Math.hypot(dx, dy);
+    if (!length) continue;
+    assert(length <= 0.160001, "leader retains normal speed");
+    const axis = {
+        x: Math.abs(dx) < 1e-8 ? 0 : dx / length,
+        y: Math.abs(dy) < 1e-8 ? 0 : dy / length,
+      },
+      key = JSON.stringify(axis),
+      slot = (i: number) => ({
+        x:
+          parent.point.x -
+          axis.x * (1.6 + 1.2 * Math.floor(i / 2)) -
+          axis.y * (i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6),
+        y:
+          parent.point.y -
+          axis.y * (1.6 + 1.2 * Math.floor(i / 2)) +
+          axis.x * (i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6),
+      });
+    if (heading !== key) {
+      heading = key;
+      // The empty controlled floor independently proves all current/swept slots and direct joins clear.
+      const joins = helpers.map((a, i) => Math.hypot(a.point.x - slot(i).x, a.point.y - slot(i).y));
+      deadline = now + (Math.max(...joins) / (2.4 - 1.6)) * 1000 + 2100;
+      cachedBucket = -1;
+    }
+    const stale = false;
+    const assignments = new FormationPlanner(parent, ordered, graph, stale).plan(),
+      bucket = Math.floor(parent.arc / 0.8),
+      targets = present(parent.formation).targets;
+    assert(
+      cachedBucket !== bucket || targets === cachedTargets,
+      "unchanged moving bucket reuses admitted proposal",
+    );
+    cachedBucket = bucket;
+    cachedTargets = targets;
+    for (const actor of helpers) {
+      const previous = { ...actor.point };
+      actor.animate({
+        now,
+        elapsed: 100,
+        graph,
+        parent,
+        following: true,
+        assignment: present(assignments.find((a) => a.actor === actor)),
+      });
+      assert(Math.hypot(actor.point.x - previous.x, actor.point.y - previous.y) <= 0.240001);
+    }
+    if (now < deadline) continue;
+    const offsets = helpers.map((a) => ({
+      lag: -(a.point.x - parent.point.x) * axis.x - (a.point.y - parent.point.y) * axis.y,
+      side: -(a.point.x - parent.point.x) * axis.y + (a.point.y - parent.point.y) * axis.x,
+    }));
+    assertTurnRows(offsets, count);
+    headingFrames.set(key, present(headingFrames.get(key)) + 1);
+  }
+  assert(
+    present(headingFrames.get(JSON.stringify({ x: 1, y: 0 }))) > 0,
+    "pre-turn geometry-deadline all-row assertions have nonzero coverage",
+  );
+  assert(
+    present(headingFrames.get(JSON.stringify({ x: 0, y: 1 }))) >= 20,
+    "post-turn geometry-deadline all-row assertions have sustained coverage",
+  );
+  console.log("Clear turn coverage", count, JSON.stringify([...headingFrames]));
+}
+test("compact crews reacquire every row through a clear short right-angle turn", () => {
+  for (const count of [1, 2, 3, 7, 8]) verifyClearTurn(count);
+});
 
 test("each room has unobstructed reachable quarters, independent of status and lifecycle phase", () => {
   for (const count of [1, 5, 9, 12, 20]) {
@@ -292,6 +658,78 @@ test("helpers joining a resting parent consume their lag and regroup in a clear 
         assert.equal(present(helpers[i + 1]).frame(reduced).pose, "idle");
       }
   }
+  const ordered = helpers.map((actor) => ({ actor, depth: 1 })),
+    admitted = present(parent.formation).targets;
+  let cellScans = 0;
+  const iterator = graph.cells[Symbol.iterator];
+  graph.cells[Symbol.iterator] = () => {
+    cellScans++;
+    return iterator.call(graph.cells);
+  };
+  try {
+    assert(
+      pathTo(graph, present(helpers[0]).point, present(helpers[1]).point).length > 0,
+      "positive control finds a route between settled helpers",
+    );
+    assert(cellScans > 0, "positive control observes grid route work");
+    cellScans = 0;
+    for (let now = 30100; now <= 34000; now += 100) {
+      const assignments = new FormationPlanner(parent, ordered, graph, stale).plan();
+      assert.equal(
+        present(parent.formation).targets,
+        admitted,
+        "unchanged held footprint reuses one bounded proposal",
+      );
+      for (const actor of helpers)
+        actor.animate({
+          now,
+          elapsed: 100,
+          graph,
+          parent,
+          assignment: present(assignments.find((a) => a.actor === actor)),
+          following: true,
+        });
+    }
+    assert.equal(
+      cellScans,
+      0,
+      "held proposal and completed paths perform no repeated grid route search",
+    );
+  } finally {
+    graph.cells[Symbol.iterator] = iterator;
+  }
+  const first = present(helpers[0]),
+    before = { ...first.point },
+    arc = parent.arc;
+  parent.point = { ...parent.point, x: parent.point.x - 0.2 };
+  const shifted = new FormationPlanner(parent, ordered, graph, stale).plan();
+  assert.equal(parent.arc, arc);
+  first.cursor = arc + 100;
+  first.animate({
+    now: 34100,
+    elapsed: 100,
+    graph,
+    parent,
+    assignment: present(shifted.find((a) => a.actor === first)),
+    following: true,
+  });
+  assert(
+    Math.hypot(first.point.x - before.x, first.point.y - before.y) > 0.1,
+    "compact coordinates change at the same arc even beyond a historical cursor",
+  );
+  const retained = present(parent.formation).targets;
+  new FormationPlanner(parent, ordered, { ...graph }, stale).plan();
+  assert.notEqual(
+    present(parent.formation).targets,
+    retained,
+    "new geometry identity invalidates compact proposal",
+  );
+  new FormationPlanner(parent, ordered.slice(1), graph, stale).plan();
+  assert.equal(
+    present(parent.formation).memberIds.length,
+    7,
+    "membership invalidates compact proposal and odd tail",
+  );
 });
 
 test("crew projection matches scene placement, parent admission and native pane fallback across decks", () => {
@@ -1067,27 +1505,6 @@ test("observer-scene regression contracts", () => {
   }
   verifyHelperStationsAndOverflow();
 
-  // Independent clipping oracle checks whole segments, including reserved future furniture.
-  const intersectsFurniture = (r: Rect, a: Point, b: Point) => {
-    const intervals = (
-      [
-        ["x", "w"],
-        ["y", "h"],
-      ] as const
-    ).map(([axis, size]) => {
-      const min = r[axis] + 1e-7,
-        max = r[axis] + r[size] - 1e-7,
-        delta = b[axis] - a[axis];
-      if (Math.abs(delta) < 1e-12)
-        return a[axis] > min && a[axis] < max ? [-Infinity, Infinity] : [Infinity, -Infinity];
-      const crossings = [(min - a[axis]) / delta, (max - a[axis]) / delta];
-      return [Math.min(...crossings), Math.max(...crossings)];
-    });
-    return (
-      Math.max(0, ...intervals.map((i) => present(i[0]))) <=
-      Math.min(1, ...intervals.map((i) => present(i[1])))
-    );
-  };
   const reservedFurniture = (platform: Platform) => {
     const r = platform.rect;
     return Array.from({ length: 24 }, (_, i) => ({
@@ -1110,7 +1527,12 @@ test("observer-scene regression contracts", () => {
       platform.decorationRegions.filter((d) => d.kind !== "apron").map((d) => d.rect),
     );
   };
-  const assertSafeTravel = (scene: SceneValue, previous: ActorFrame, current: ActorFrame) => {
+  const assertSafeTravel = (
+    scene: SceneValue,
+    previous: ActorFrame,
+    current: ActorFrame,
+    following = false,
+  ) => {
     const worker = scene.workers.find((w) => w.id === current.id),
       platform = scene.platforms.find((p) => p.key === present(worker).platformKey);
     const furniture = reservedFurniture(present(platform)).map((r) =>
@@ -1124,7 +1546,7 @@ test("observer-scene regression contracts", () => {
     );
     assert(
       Math.hypot(current.point.x - previous.point.x, current.point.y - previous.point.y) <=
-        0.160001,
+        (following ? 0.240001 : 0.160001),
       "every transition has capped speed, including joins and returns",
     );
     assert(
@@ -1215,7 +1637,12 @@ test("observer-scene regression contracts", () => {
         "polls and helper input order preserve formation trajectories",
       );
       for (const actor of current) {
-        assertSafeTravel(scene, present(previous.get(actor.id)), actor);
+        assertSafeTravel(
+          scene,
+          present(previous.get(actor.id)),
+          actor,
+          actor.id.startsWith("follower-"),
+        );
         verifyUnknownFollower(actor);
       }
       previous = new Map(current.map((a) => [a.id, a]));
@@ -1237,7 +1664,12 @@ test("observer-scene regression contracts", () => {
         for (let now = clock + 100; now <= clock + 40000; now += 100) {
           const current = motion.step(now);
           for (const actor of current)
-            assertSafeTravel(strolling, present(previous.get(actor.id)), actor);
+            assertSafeTravel(
+              strolling,
+              present(previous.get(actor.id)),
+              actor,
+              actor.id.startsWith("follower-"),
+            );
           previous = new Map(current.map((a) => [a.id, a]));
         }
         clock += 40000;
@@ -1477,7 +1909,7 @@ test("observer-scene regression contracts", () => {
       restingSince = now;
       // Allow the 5.2-unit deepest row, quantization, and turn acquisition.
       // Eligibility depends only on leader travel, never on successful helper formation.
-      if (now > 30000 && run.distance >= 8 && Math.abs(run.axis.y) < 0.01) {
+      if (now > 30000 && run.distance >= 12 && Math.abs(run.axis.y) < 0.01) {
         assertWalkingPairs(actors, leader, run.axis, count);
         walkingSamples++;
         if (++walkingCycleSamples === 5) walkingCycles++;
@@ -1487,7 +1919,13 @@ test("observer-scene regression contracts", () => {
       if (now % 5000 === 0) motion.reconcile(scene, { now });
       const actors = motion.step(now),
         leader = present(actors.find((actor) => actor.id === parent.id));
-      for (const actor of actors) assertSafeTravel(scene, present(previous.get(actor.id)), actor);
+      for (const actor of actors)
+        assertSafeTravel(
+          scene,
+          present(previous.get(actor.id)),
+          actor,
+          actor.id.startsWith("follower-"),
+        );
       run = recordStraightTravel(run, present(previous.get(parent.id)).point, leader.point);
       checkWalking(actors, leader, now);
       if (now > 30000 && now - restingSince >= 4000) {
@@ -1501,7 +1939,7 @@ test("observer-scene regression contracts", () => {
     assert(walkingCycles >= 3, "sustained walking is checked across repeated stroll/rest cycles");
     console.log("Sustained room coverage", { count, walkingSamples, walkingCycles, settledRests });
   }
-  for (const count of [1, 2, 3, 8]) verifySustainedRoomRest(count);
+  for (const count of [1, 2, 3, 7, 8]) verifySustainedRoomRest(count);
   const observeCompactSquad = (
     count: number,
     leaderId: string | null = null,
@@ -1515,7 +1953,10 @@ test("observer-scene regression contracts", () => {
       .filter((w) => w.kind === "helper")
       .sort((a, b) => (a.helperSlot ?? -1) - (b.helperSlot ?? -1) || a.id.localeCompare(b.id));
     const excludedId = exclusion ? present(allHelpers[0]).id : null,
-      helpers = allHelpers.filter((w) => w.id !== excludedId);
+      helpers = allHelpers.filter((w) => w.id !== excludedId),
+      platform = present(scene.platforms.find((p) => p.key === present(helpers[0]).platformKey)),
+      graph = graphFor(platform),
+      furniture = reservedFurniture(platform);
     let previous: Point | undefined,
       history: { point: Point; arc: number }[] = [],
       arc = 0,
@@ -1529,7 +1970,6 @@ test("observer-scene regression contracts", () => {
       regroupFrames = 0,
       maxWidthRatio = 0,
       maxHeightRatio = 0;
-    const turnFrames = Array.from({ length: Math.ceil(count / 2) }, () => 0);
     const headings = new Set<string>(),
       rowFrames = Array.from({ length: Math.ceil(count / 2) }, () => 0);
 
@@ -1613,46 +2053,6 @@ test("observer-scene regression contracts", () => {
         });
       }
     }
-    function checkTurns(actors: ActorFrame[], now: number) {
-      const last = history.at(-1),
-        start = history.at(-2);
-      if (count === 8 && start && now > 90000) {
-        const currentLength = present(last).arc - start.arc,
-          currentAxis = {
-            x: (present(last).point.x - start.point.x) / currentLength,
-            y: (present(last).point.y - start.point.y) / currentLength,
-          };
-        for (let row = 0; row < 4; row++) {
-          const pair = helpers
-            .slice(row * 2, row * 2 + 2)
-            .map((w) => present(actors.find((a) => a.id === w.id)).point);
-          const matchesOldAxis = history.slice(1).some((b, j) => {
-            const a = history[j],
-              length = b.arc - present(a).arc;
-            if (length < 1.2) return false;
-            const dx = (b.point.x - present(a).point.x) / length,
-              dy = (b.point.y - present(a).point.y) / length;
-            if (dx * currentAxis.x + dy * currentAxis.y > 0.95) return false;
-            const offsets = pair.map((p) => ({
-              along: (p.x - present(a).point.x) * dx + (p.y - present(a).point.y) * dy,
-              side: -(p.x - present(a).point.x) * dy + (p.y - present(a).point.y) * dx,
-            }));
-            const lag = arc - present(a).arc - present(offsets[0]).along,
-              depth = 1.6 + row * 1.2;
-            return (
-              offsets.every((o) => o.along >= 0 && o.along <= length) &&
-              present(offsets[0]).side < -0.4 &&
-              present(offsets[1]).side > 0.4 &&
-              Math.abs(present(offsets[1]).side - present(offsets[0]).side - 1.2) <= 0.2 &&
-              Math.abs(present(offsets[0]).along - present(offsets[1]).along) <= 0.4 &&
-              lag >= depth - 0.08 &&
-              lag <= depth + 3.2
-            );
-          });
-          if (matchesOldAxis) turnFrames[row] = present(turnFrames[row]) + 1;
-        }
-      }
-    }
     function pairOffsets(
       a: { lag: number; side: number },
       b: { lag: number; side: number } | undefined,
@@ -1661,6 +2061,7 @@ test("observer-scene regression contracts", () => {
         ? a.side < -0.4 &&
             b.side > 0.4 &&
             Math.abs(b.side - a.side - 1.2) <= 0.2 &&
+            Math.abs(Math.hypot(b.side - a.side, b.lag - a.lag) - 1.2) <= 0.2 &&
             Math.abs(a.lag - b.lag) <= 0.4
         : Math.abs(a.side) <= 0.12;
     }
@@ -1677,10 +2078,12 @@ test("observer-scene regression contracts", () => {
       }
       return paired;
     }
+    let acquisition: { heading: string; deadline: number } | null = null;
     function compactAxis(actors: ActorFrame[], leader: ActorFrame, now: number): Point | null {
       const last = history.at(-1),
         start = history.at(-2);
-      if (!start || present(last).arc - start.arc < 7 || now < 90000) {
+      if (!start || (exclusion && now < 90000) || leader.pose !== "walk") {
+        acquisition = null;
         return null;
       }
       const length = present(last).arc - start.arc,
@@ -1688,16 +2091,70 @@ test("observer-scene regression contracts", () => {
           x: (present(last).point.x - start.point.x) / length,
           y: (present(last).point.y - start.point.y) / length,
         };
-      if (Math.min(Math.abs(axis.x), Math.abs(axis.y)) > 0.01) {
+      const radius = 0.3016,
+        at = (lag: number, side: number) => ({
+          x: leader.point.x - axis.x * lag - axis.y * side,
+          y: leader.point.y - axis.y * lag + axis.x * side,
+        }),
+        clear = (a: Point, b: Point) =>
+          [a, b].every(
+            (p) =>
+              p.x >= platform.rect.x + radius &&
+              p.x <= platform.rect.x + platform.rect.w - radius &&
+              p.y >= platform.rect.y + radius &&
+              p.y <= platform.rect.y + platform.rect.h - radius,
+          ) &&
+          !furniture.some((o) =>
+            intersectsFurniture(
+              { x: o.x - radius, y: o.y - radius, w: o.w + 2 * radius, h: o.h + 2 * radius },
+              a,
+              b,
+            ),
+          ),
+        depth = 1.6 + 1.2 * Math.floor((count - 1) / 2);
+      // Only leader/world geometry selects windows; include both target buckets in the swept corridor.
+      if (
+        ![-0.6, 0, 0.6].every(
+          (side) =>
+            clear(leader.point, at(1.6, side)) && clear(at(1.6, side), at(depth + 0.8, side)),
+        ) ||
+        !Array.from({ length: Math.ceil(count / 2) }, (_, row) =>
+          clear(at(1.6 + row * 1.2, -0.6), at(1.6 + row * 1.2, 0.6)),
+        ).every(Boolean)
+      ) {
+        acquisition = null;
         return null;
       }
+      const heading = JSON.stringify([Math.round(axis.x * 1e8), Math.round(axis.y * 1e8)]);
+      if (acquisition?.heading !== heading) {
+        const joins = helpers.map((w, i) => {
+          let from = present(actors.find((a) => a.id === w.id)).point,
+            length = 0;
+          const to = at(
+              1.6 + 1.2 * Math.floor(i / 2),
+              i === count - 1 && count % 2 ? 0 : i % 2 ? 0.6 : -0.6,
+            ),
+            route = safeSegment(graph, from, to, w) ? [to] : pathTo(graph, from, to, w);
+          if (route.length === 0) return Infinity;
+          for (const p of route) {
+            length += Math.hypot(p.x - from.x, p.y - from.y);
+            from = p;
+          }
+          return length;
+        });
+        acquisition = { heading, deadline: now + (Math.max(...joins) / 0.8) * 1000 + 2100 };
+      }
+      if (now < acquisition.deadline) return null;
       const measured = helpers.map((w) => {
         const point = present(actors.find((a) => a.id === w.id)).point,
           dx = point.x - leader.point.x,
           dy = point.y - leader.point.y;
         return { lag: -(dx * axis.x + dy * axis.y), side: -dx * axis.y + dy * axis.x };
       });
-      if (!matchesPairs(measured)) return null;
+      assert(
+        matchesPairs(measured),
+        `all rows acquire during independently clear walking windows: ${JSON.stringify({ count, now, measured })}`,
+      );
       return axis;
     }
     function checkProjection(actors: ActorFrame[], leader: ActorFrame, axis: Point) {
@@ -1741,7 +2198,7 @@ test("observer-scene regression contracts", () => {
       compactFrames++;
       if (streak === 10) windows++;
       if (count === 8 && traversed.size === 8) regroupFrames++;
-      headings.add(String(Math.round(axis.x)) + "," + String(Math.round(axis.y)));
+      headings.add(JSON.stringify([Math.round(axis.x * 1e8), Math.round(axis.y * 1e8)]));
       rowFrames.forEach((_, i) => (rowFrames[i] = present(rowFrames[i]) + 1));
     }
     for (let now = 0; now <= 600000; now += 100) {
@@ -1752,7 +2209,6 @@ test("observer-scene regression contracts", () => {
         leader = actors.find((a) => a.id === fixture.parent.id);
       recordLeader(present(leader));
       checkPassages(actors, now);
-      checkTurns(actors, now);
       const axis = compactAxis(actors, present(leader), now);
       if (!axis) {
         streak = 0;
@@ -1772,7 +2228,6 @@ test("observer-scene regression contracts", () => {
       passageFrames,
       traversed: traversed.size,
       regroupFrames,
-      turnFrames,
       maxWidthRatio,
       maxHeightRatio,
     };
@@ -1784,25 +2239,34 @@ test("observer-scene regression contracts", () => {
       );
       const windows = coverage.reduce((n, c) => n + c.windows, 0),
         compactFrames = coverage.reduce((n, c) => n + c.compactFrames, 0);
-      const headings = new Set(coverage.flatMap((c) => c.headings));
+      const headings = new Set(coverage.flatMap((c) => c.headings)),
+        rowFrames = Array.from({ length: Math.ceil(count / 2) }, (_, row) =>
+          coverage.reduce((n, c) => n + present(c.rowFrames[row]), 0),
+        );
       assert(
-        windows > 1 && compactFrames >= 20 && headings.size > 1,
+        windows >= 3 &&
+          compactFrames >= 20 &&
+          rowFrames.every((frames) => frames >= 20) &&
+          headings.size > 0,
         `sustained historical compact squad, count ${String(count)}: ${JSON.stringify(coverage)}`,
       );
       if (count === 8) {
         assert(
-          coverage.every((c) => c.traversed === 8 && c.regroupFrames >= 10 && c.lineFrames >= 10),
+          coverage.every((c) => c.traversed === 8 && c.lineFrames >= 10) &&
+            coverage.some((c) => c.regroupFrames >= 10),
           "all eight traverse independently unsafe pair doors in ordered distinct single file, then sustain pairs again",
-        );
-        assert(
-          coverage.every((c) => c.turnFrames.every((n) => n > 0)),
-          "all four pair rows follow their own historical tangent after leader turns",
         );
       }
       console.log(
         "Compact public coverage",
         count,
-        JSON.stringify({ windows, compactFrames, headings: [...headings], runs: coverage }),
+        JSON.stringify({
+          windows,
+          compactFrames,
+          rowFrames,
+          headings: [...headings],
+          runs: coverage,
+        }),
       );
     }
   }

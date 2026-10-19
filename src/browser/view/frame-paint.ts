@@ -20,6 +20,7 @@ const RADAR = {
   glowRange: 0.3,
   glowPeriod: 4000,
 };
+const TETHER = { alpha: 0.6, width: 1.5, dash: [4, 4] };
 
 export class FramePaint<R extends SpriteResource, B extends R = R> {
   readonly items;
@@ -121,11 +122,38 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
         this.view.camera.zoom * this.view.dpr <= layer.resolution;
 
     this.view.ctx.drawImage(layer.canvas, b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+    this.paintTethers();
 
     if (!stationArt)
       this.view.ctx.imageSmoothingEnabled = this.view.camera.zoom * this.view.dpr < 1;
     return { A, stationArt, ambient };
   };
+  private paintTethers(): void {
+    const actors = new Map(this.view.actors.map((actor) => [actor.id, actor]));
+    const ctx = this.view.ctx;
+    for (const worker of this.view.activeScene.workers) {
+      const connector = worker.connector,
+        actor = actors.get(worker.id);
+      if (
+        !connector ||
+        !actor ||
+        !(Math.hypot(actor.point.x - worker.chair.x, actor.point.y - worker.chair.y) <= 0.001)
+      )
+        continue;
+      const from = P(connector.from),
+        to = P(connector.to);
+      ctx.save();
+      ctx.globalAlpha = TETHER.alpha;
+      ctx.strokeStyle = worker.accent;
+      ctx.lineWidth = TETHER.width;
+      ctx.setLineDash(TETHER.dash);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   radar = (now: number, animate: boolean) => {
     {
       const mail = this.view.activeScene.mail;

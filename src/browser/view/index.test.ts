@@ -14,6 +14,8 @@ import { createMail } from "../mail.js";
 import { createModel } from "../model.js";
 import type { LayoutRow } from "../model/types.js";
 import * as Scene from "../scene/index.js";
+import type { ActorFrame } from "../scene/motion-types.js";
+import { create as createOffice } from "../office-art.js";
 import type { Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
 import { load } from "../sprites/runtime.fixture.js";
 import type { SpriteAppearance, SpriteBody } from "../sprites/types.js";
@@ -35,6 +37,7 @@ import {
 } from "./helpers.js";
 import { palette, resolveLook } from "./look.js";
 import { officeFurnishing } from "./office-furnishing.js";
+import { officePaintersFor } from "./office.js";
 import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
 import type {
@@ -791,6 +794,270 @@ test("observer-view regression contracts", async () => {
     assert(scene.revision);
   }
   verifyStaticCacheInvalidation();
+
+  // Helper desk links follow chair occupancy without rebuilding the static floor.
+  function verifyOccupiedHelperLinks() {
+    for (const mode of ["station", "office"] as const) {
+      const layout = Model.createLayout();
+      layout.reconcile([
+        { id: "parent", projectId: "links", repoId: "links", status: "idle" },
+        ...["first", "second"].map((id) => ({
+          id,
+          parentId: "parent",
+          source: "helper" as const,
+          lineageState: "verified" as const,
+          projectId: "links",
+          repoId: "links",
+          status: "idle" as const,
+        })),
+      ]);
+      const scene = Scene.build(layout.onPage(0), 0),
+        node = canvas(),
+        layers: ReturnType<typeof canvas>[] = [];
+      let reduced = false,
+        stale = false;
+      const runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          reducedMotion: () => reduced,
+          env: {
+            raf: () => 1,
+            caf() {},
+            dpr: () => 1,
+            sprites: sprites(),
+            now: () => 0,
+            createCanvas: () => {
+              const layer = canvas();
+              layers.push(layer);
+              return layer;
+            },
+          },
+        },
+      );
+      if (mode === "office") {
+        const images = Object.fromEntries(
+          SCENE_ART_ROLE_NAMES.map((role) => [role, new OfficeImageFixture()]),
+        ) as Record<SceneArtRoleName, OfficeImageFixture>;
+        const composition = createOffice({
+          images,
+          colors: runtime.C,
+          project: Scene.project,
+          crewHeight: 60,
+        });
+        runtime.office = {
+          state: "ready",
+          composition,
+          painters: officePaintersFor(runtime.look, composition),
+        };
+      }
+      runtime.update(scene, { stale: () => stale });
+      runtime.fx = false;
+      const helpers = scene.workers.filter((worker) => worker.connector);
+      assert.equal(helpers.length, 2);
+      const first = present(helpers[0]),
+        second = present(helpers[1]);
+      let frames: ActorFrame[] = scene.workers.map((worker) => ({
+        id: worker.id,
+        point: { ...worker.chair },
+        pose: "idle",
+        direction: "south",
+      }));
+      runtime.movement.step = () => frames;
+      const strokes: {
+        from: Point;
+        to: Point;
+        color: unknown;
+        dash: number[];
+        width: number;
+        alpha: number;
+        cached: boolean;
+      }[] = [];
+      let from = { x: 0, y: 0 },
+        to = from,
+        dash: number[] = [];
+      const observe = (context: ViewContext<Resource>, { cached = false } = {}) => {
+        const ctx = context;
+        ctx.moveTo = (x, y) => {
+          from = { x, y };
+        };
+        ctx.lineTo = (x, y) => {
+          to = { x, y };
+        };
+        ctx.setLineDash = (value) => {
+          dash = value;
+        };
+        ctx.stroke = () =>
+          strokes.push({
+            from,
+            to,
+            color: ctx.strokeStyle,
+            dash: [...dash],
+            width: ctx.lineWidth,
+            alpha: ctx.globalAlpha,
+            cached,
+          });
+      };
+      observe(node.ctx);
+      const makeCanvas = runtime.makeCanvas;
+      runtime.makeCanvas = (width, height) => {
+        const layer = makeCanvas(width, height);
+        observe(present(layer.getContext("2d")), { cached: true });
+        return layer;
+      };
+      let now = 0;
+      const paint = (expected: string[], label: string) => {
+        strokes.length = 0;
+        runtime.framePaint.paint((now += 100));
+        const visible = helpers
+          .filter((worker) => {
+            const connector = present(worker.connector),
+              a = Scene.project(connector.from),
+              b = Scene.project(connector.to);
+            const matches = strokes.filter(
+              (stroke) =>
+                stroke.from.x === a.x &&
+                stroke.from.y === a.y &&
+                stroke.to.x === b.x &&
+                stroke.to.y === b.y &&
+                stroke.color === worker.accent &&
+                stroke.dash.join() === "4,4" &&
+                stroke.width === 1.5 &&
+                stroke.alpha === 0.6,
+            );
+            assert(
+              matches.every((stroke) => !stroke.cached),
+              "static floor contains no helper link",
+            );
+            return matches.length > 0;
+          })
+          .map((worker) => worker.id);
+        assert.deepEqual(visible.sort(), [...expected].sort(), mode + ": " + label);
+        assert.equal(runtime.staticLayer?.builds, 1, label + ": motion reuses static floor");
+      };
+      const move = (id: string, offset: number, pose = "walk") => {
+        const worker = present(scene.workers.find((value) => value.id === id));
+        frames = frames.map((actor) =>
+          actor.id === id
+            ? { ...actor, point: { ...worker.chair, x: worker.chair.x + offset }, pose }
+            : actor,
+        );
+      };
+      paint([first.id, second.id], "both seated");
+      move(first.id, 0.0005);
+      paint([first.id, second.id], "arrival tolerance");
+      move(first.id, 0.002);
+      paint([second.id], "first departure beyond tolerance");
+      move(first.id, 2);
+      move("parent", 3);
+      paint([second.id], "walking away despite parent movement");
+      move(first.id, 2, "idle");
+      paint([second.id], "idle away");
+      move(first.id, 1, "working");
+      paint([second.id], "working return transit");
+      move(first.id, 0, "working");
+      paint([first.id, second.id], "working arrival");
+      move(first.id, 1, "blocked");
+      paint([second.id], "blocked transit");
+      move(first.id, 0, "blocked");
+      paint([first.id, second.id], "blocked arrival");
+      move(first.id, 1);
+      stale = true;
+      paint([second.id], "stale frozen away");
+      frames = frames.filter((actor) => actor.id !== second.id);
+      paint([], "missing actor");
+      stale = false;
+      reduced = true;
+      function verifyRealMotion() {
+        const movement = Scene.createMovement();
+        movement.reconcile(scene, { now: 0 });
+        let motionTime = 0;
+        for (; motionTime < 15000; motionTime += 100) {
+          frames = movement.step(motionTime);
+          if (
+            frames.some(
+              (actor) =>
+                actor.id === first.id &&
+                Math.hypot(actor.point.x - first.chair.x, actor.point.y - first.chair.y) > 1,
+            )
+          )
+            break;
+        }
+        assert(motionTime < 15000, "real helper departs its chair");
+        reduced = false;
+        const workingScene = {
+          ...scene,
+          workers: scene.workers.map((worker) => ({
+            ...worker,
+            row: { ...worker.row, status: "working" as const },
+          })),
+        };
+        movement.reconcile(workingScene, { now: motionTime });
+        let transit = false,
+          arrived = false;
+        for (let elapsed = 0; elapsed < 15000; elapsed += 100) {
+          frames = movement.step((motionTime += 100));
+          const actor = present(frames.find((value) => value.id === first.id));
+          const home =
+            Math.hypot(actor.point.x - first.chair.x, actor.point.y - first.chair.y) <= 0.001;
+          paint(
+            helpers
+              .filter((worker) =>
+                frames.some(
+                  (value) =>
+                    value.id === worker.id &&
+                    Math.hypot(value.point.x - worker.chair.x, value.point.y - worker.chair.y) <=
+                      0.001,
+                ),
+              )
+              .map((worker) => worker.id),
+            "real working home return",
+          );
+          if (!home) transit = true;
+          if (home) {
+            arrived = true;
+            break;
+          }
+        }
+        assert(transit && arrived, "real return hides link in transit and restores it on arrival");
+        movement.reconcile(scene, { now: motionTime });
+        for (let elapsed = 0; elapsed < 15000; elapsed += 100) {
+          frames = movement.step((motionTime += 100));
+          if (
+            frames.some(
+              (actor) =>
+                actor.id === first.id &&
+                Math.hypot(actor.point.x - first.chair.x, actor.point.y - first.chair.y) > 0.1,
+            )
+          )
+            break;
+        }
+        assert(
+          frames.some(
+            (actor) =>
+              actor.id === first.id &&
+              Math.hypot(actor.point.x - first.chair.x, actor.point.y - first.chair.y) > 0.1,
+          ),
+          "real helper leaves again before reduced snap",
+        );
+        reduced = true;
+        frames = movement.step(motionTime + 100, { reduced: true });
+        assert(
+          helpers.every((worker) =>
+            frames.some(
+              (actor) =>
+                actor.id === worker.id &&
+                Math.hypot(actor.point.x - worker.chair.x, actor.point.y - worker.chair.y) <= 0.001,
+            ),
+          ),
+        );
+        paint([first.id, second.id], "real reduced-motion chair snap");
+      }
+      verifyRealMotion();
+      assert.equal(layers.length, 1);
+    }
+  }
+  verifyOccupiedHelperLinks();
 
   // Repository partitions: a later repository section brings two low walls leaving the central aisle open; they paint.
   function verifyPartitionPaint() {

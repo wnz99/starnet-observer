@@ -8,7 +8,6 @@ import type {
   Scene,
   Ship,
   Walkway,
-  Worker,
 } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { GeometryPainter } from "./geometry-painter.js";
@@ -36,7 +35,6 @@ const HULL = {
   downDim: 0.55,
 };
 const DEPTH = { connector: 40, hub: 0.01 };
-const TETHER = { alpha: 0.6, width: 1.5, dash: [4, 4] };
 const QUARTERS = { alpha: 0.18, middle: 2, font: "9px monospace", label: "QUARTERS" };
 interface StaticPiece {
   key: number;
@@ -60,7 +58,6 @@ class StationFloor<R extends SpriteResource> {
     this.walls();
     this.dimShips();
     this.art.pools?.(this.context, this.scene);
-    for (const worker of this.scene.workers) if (worker.connector) this.tether(worker);
   }
   private hull(ship: Ship) {
     const ctx = this.context,
@@ -189,22 +186,6 @@ class StationFloor<R extends SpriteResource> {
           rectPoly(ship.rect, 0),
           withAlpha(this.art.colors["body-outline"], ship.shadow ? HULL.shadowDim : HULL.downDim),
         );
-  }
-  private tether(worker: Worker) {
-    const connector = present(worker.connector),
-      from = project(connector.from),
-      to = project(connector.to),
-      ctx = this.context;
-    ctx.save();
-    ctx.globalAlpha = TETHER.alpha;
-    ctx.strokeStyle = worker.accent;
-    ctx.lineWidth = TETHER.width;
-    ctx.setLineDash(TETHER.dash);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-    ctx.restore();
   }
 }
 export function staticPass<R extends SpriteResource>(

@@ -1,12 +1,12 @@
 ---
 gsd_state_version: "1.0"
-current_phase_name: Helper crew consistency
-status: "Implementation and review complete; PR #20 pending final tracking-head verification and merge."
-last_updated: "2026-10-18T21:44:40+00:00"
+current_phase_name: Helper formation recovery and occupied desk links
+status: "Implementation and review complete; PR #21 pending final tracking-head review, CI and merge."
+last_updated: "2026-10-19T00:05:03Z"
 last_activity: 2026-10-19
-last_activity_desc: "Helper crew consistency reviewed clean; 269 native tests, installed/browser consumers and source Ubuntu CI passed."
-state_head: 9f46b378271338e53ae8e77c5705e7d015406383
-stopped_at: "PR #20 implementation reviewed; final tracking-head checks and merge pending"
+last_activity_desc: "Helper recovery and occupied links reviewed clean; 271 native tests and installed/browser consumers passed; final tracking-head gates pending."
+state_head: 402883f968658d44ed6919212befa36f520f4267
+stopped_at: "PR #21 implementation reviewed; final tracking-head review, CI and merge pending"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** Helper visibility, formation, quarters and truthful crew statistics, quick task 261018-wb7.
+**Current focus:** Helper formation recovery and occupied desk links, quick task 261019-28k.
 
 ## Current Position
 
 Phase: None (0 planned)
 Plan: None
-Status: Helper crew consistency implementation and independent aggregate/initial PR review complete; plan conformance found no gaps. PR #20 awaits final tracking-head verification and merge.
-Last activity: 2026-10-19 — Displayed-crew parity, sustained formation, per-room quarters, evidence-based lifecycle and truthful history/usage labels. Source gate passed 269 native tests plus production-first installed/browser consumers; source Ubuntu CI 39168106447 passed.
+Status: Helper recovery and occupied-link implementation and independent aggregate/initial PR review complete; revision-2 conformance found no gaps. PR #21 awaits final tracking-head review, CI and merge.
+Last activity: 2026-10-19 — Current-position regrouping, bounded following acquisition and links drawn only at occupied helper chairs. Source gate passed 271 native tests plus production-first installed/browser consumers; source Ubuntu CI 39178798972 passed. Final tracking-head CI remains required.
 
 ## Registered Work
 
@@ -40,6 +40,7 @@ Last activity: 2026-10-19 — Displayed-crew parity, sustained formation, per-ro
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261019-28k | Repair helper formation recovery and occupied desk links | 2026-10-19 | [PR #21](https://github.com/wnz99/starnet-observer/pull/21) | Implementation/review complete; revision-2 conformance clean; 271 native tests and installed/browser consumers passed; final tracking-head review, CI and merge pending | [261019-28k](./quick/261019-28k-repair-helper-formation-recovery-and-occ/) |
 | 261018-q7j | UI responsiveness, native clicks and agent indicators | 2026-10-18 | [PR #19](https://github.com/wnz99/starnet-observer/pull/19) | Implementation/review complete; 256 native tests and installed/browser consumers passed; final tracking-head checks and merge pending | [261018-q7j](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/) |
 | 261018-3am | Codex identity performance and redraw availability | 2026-10-18 | [PR #18](https://github.com/wnz99/starnet-observer/pull/18) | Complete; independent review clean; 254 local tests and Ubuntu CI passed | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
 | 261016-srp | Repository simplification | 2026-10-16 | [PR #16](https://github.com/wnz99/starnet-observer/pull/16) | Reviewed; Ubuntu CI 238/238; builds/installed/browser passed | [261016-srp](./quick/261016-srp-simplify-agent-created-repository-toolin/) |
@@ -78,9 +79,9 @@ No blocking theme issue remains. Synthetic-source browser verification passed; n
 ## Session Continuity
 
 Last session: 2026-10-19
-Current work: Helper crew consistency implementation and review complete; PR #20 records delivery progress.
-Resume file: [Helper crew consistency summary](./quick/261018-wb7-helper-visibility-formation-quarters-and/261018-wb7-SUMMARY.md)
-Next action: Verify the final tracking head locally and in configured CI, review the tracking delta, then merge PR #20 after all gates pass. Original live snapshot remains unavailable; no paid/live runs or optional external settings.
+Current work: Helper recovery and occupied links implementation and review complete; PR #21 records delivery progress.
+Resume file: [Helper recovery summary](./quick/261019-28k-repair-helper-formation-recovery-and-occ/261019-28k-SUMMARY.md)
+Next action: Review the final tracking delta, verify required local checks and configured CI on the final head, then merge PR #21 after all gates pass. Larger crews' second acquired natural heading and original live-scene equivalence remain accepted evidence limits; no paid/live runs or optional external settings.
 
 ### Registered Work
 
