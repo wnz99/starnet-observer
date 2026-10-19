@@ -72,7 +72,12 @@ class IdentityResolver {
     try {
       const resolution = await this.footer(pane, refresh);
       if (resolution.reason === "content-changed")
-        failNote("observer.identity.content", new Error("Live footer changed during capture"));
+        failNote(
+          "observer.identity.content",
+          new Error(
+            "Terminal content changed during identity capture; retry budget exhausted, session identity unavailable until a later capture succeeds",
+          ),
+        );
       return resolution;
     } catch (error) {
       refresh.failed(error);

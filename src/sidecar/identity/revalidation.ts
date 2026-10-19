@@ -37,7 +37,12 @@ function roots(proofs: unknown[]) {
 }
 function matchesCapture(current: IdentityResolution, proof: FooterProof) {
   if (current.reason === "content-changed")
-    failNote("observer.identity.content", new Error("Live footer changed during capture"));
+    failNote(
+      "observer.identity.content",
+      new Error(
+        "Terminal content changed during identity revalidation; retry budget exhausted, transcript access withheld until verification succeeds",
+      ),
+    );
   return (
     current.source === "footer" &&
     current.sessionId === proof.sessionId &&
