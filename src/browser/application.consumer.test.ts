@@ -9,7 +9,7 @@ import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { consumerRoot } from "../server/application.consumer.test.js";
-import type { AppRow } from "./app/data.js";
+import type { AppRow, AppSnapshot } from "./app/data.js";
 import type { Scene as SceneGeometry } from "./scene/types.js";
 import type { ActorFrame } from "./scene/motion-types.js";
 interface FixtureOptions {
@@ -24,6 +24,11 @@ interface HttpModule {
 const TOKEN = "synthetic-browser-consumer-token";
 interface CanvasProbe {
   activeScene: SceneGeometry;
+  camera: { zoom: number; tx: number; ty: number };
+  viewport: { width: number; height: number };
+  mode: string;
+  platform: string | null;
+  cameraControl: { focusPlatform(key: string): boolean };
   actors: ActorFrame[];
   ctx: CanvasRenderingContext2D;
   framePaint: { paint(now: number): unknown };
@@ -162,10 +167,13 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
   let closed = false;
   let bornAt: number | null = null;
   let crewEnabled = false;
+  let annexRoots: number | null = null;
+  let annexCompact = false;
   const fixture = await listen(http, {
     token: TOKEN,
     observer: {
       get: () => {
+        if (annexRoots !== null) return annexSnapshot(annexRoots, annexCompact);
         if (crewEnabled) return crewSnapshot(closed, bornAt);
         const data = snapshot();
         const first = data.sessions[0];
@@ -324,7 +332,16 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       },
       artifacts,
     );
+    crewEnabled = false;
+    annexRoots = 24;
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await fresh();
+    const annexes = await annexNavigation(page, artifacts, ({ roots, compact }) => {
+      annexRoots = roots;
+      annexCompact = compact;
+    });
     assert.deepEqual(errors, []);
+    return annexes;
   } finally {
     await canvasPage?.close();
     fixture.server.closeAllConnections();
@@ -334,6 +351,278 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       }),
     );
   }
+}
+
+function annexSnapshot(roots: number, compact: boolean): AppSnapshot {
+  const data = snapshot(),
+    now = data.observedAt;
+  const family = (id: string, count: number, host?: string): AppRow[] =>
+    Array.from({ length: count }, (_, index) => ({
+      id: id + "_" + String(index),
+      project: id,
+      projectId: id,
+      repo: id,
+      repoId: id,
+      provider: "codex",
+      source: "herdr",
+      status: "working",
+      observedAt: now,
+      ...(host ? { host } : {}),
+    }));
+  const sessions = [
+    ...family("Left", roots),
+    ...(compact
+      ? []
+      : [
+          ...family("Right", 25),
+          ...Array.from({ length: 7 }, (_, index) => family("Project" + String(index), 1)).flat(),
+        ]),
+    ...family("Remote", 25, "remote"),
+  ];
+  return {
+    ...data,
+    sessions,
+    health: "available",
+    sources: {
+      hosts: {
+        local: {
+          health: "available",
+          observedAt: now,
+          agents: sessions.filter((row) => !row.host).length,
+        },
+        remote: { health: "available", observedAt: now, agents: 25 },
+      },
+    },
+    bus: {
+      health: "available",
+      messages: [],
+      remote: {
+        relay: "relay.example.test",
+        machine: "fixture-local",
+        lastActivityAt: now,
+        onRelay: [{ id: "Left_48", repo: "Left" }],
+        peers: [
+          {
+            machine: "fixture-shadow",
+            repos: ["Shadow"],
+            agents: 49,
+            lastSeen: now,
+            list: Array.from({ length: 49 }, (_, index) => ({
+              id: "peer_" + index.toString(16).padStart(24, "0"),
+              provider: "codex",
+              repo: "Shadow",
+              lastSeen: now,
+            })),
+          },
+        ],
+      },
+    },
+  };
+}
+
+async function annexFrame(page: Page) {
+  return page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    return {
+      scene: view.activeScene,
+      camera: view.camera,
+      viewport: view.viewport,
+      mode: view.mode,
+      platform: view.platform,
+      focused: view.focused,
+      page: localStorage.getItem("observer.page"),
+    };
+  });
+}
+
+async function annexNavigation(
+  page: Page,
+  artifacts: string,
+  change: (options: { roots: number; compact: boolean }) => void,
+) {
+  const baseline = await annexFrame(page);
+  const parentDesks = baseline.scene.workers
+    .filter((worker) => worker.row.projectId === "Left")
+    .map((worker) => [worker.id, worker.chair]);
+  change({ roots: 49, compact: false });
+  await expect
+    .poll(
+      async () =>
+        (await annexFrame(page)).scene.workers.find((worker) => worker.id === "Left_48")?.id,
+    )
+    .toBe("Left_48");
+  const grown = await annexFrame(page);
+  assert.deepEqual(
+    grown.scene.workers
+      .filter((worker) => parentDesks.some(([id]) => id === worker.id))
+      .map((worker) => [worker.id, worker.chair]),
+    parentDesks,
+    "growth preserves all existing parent desks",
+  );
+  const platforms = grown.scene.platforms;
+  const left = platforms.filter((platform) => platform.projectId === "Left");
+  const right = platforms.filter((platform) => platform.projectId === "Right");
+  assert.deepEqual(
+    left.map((platform) => platform.rect.x),
+    [-30, -54, -78],
+  );
+  assert.deepEqual(
+    right.map((platform) => platform.rect.x),
+    [24, 48],
+  );
+  assert.equal(platforms.filter((platform) => platform.host === "remote").length, 2);
+  assert.equal(platforms.filter((platform) => platform.host?.startsWith("relay:")).length, 3);
+  assert.equal(grown.scene.walkways.filter((walkway) => walkway.kind === "annex-link").length, 6);
+  assert(
+    grown.scene.walkways
+      .filter((walkway) => walkway.kind === "annex-link" && !walkway.host)
+      .some((walkway) => walkway.relay && walkway.accent === left[0]?.accent),
+  );
+  assertAnnexHulls(grown.scene);
+  await page.locator("#overview").click();
+  const overview = await annexFrame(page);
+  assertAnnexFit(overview);
+  await capture(page, path.join(artifacts, "annex-overview.png"));
+  await page.locator("#next-page").click();
+  await expect(page.locator("#page-label")).toHaveText("Deck 2 / 2");
+  await page.locator('[data-session-id="Left_48"]').focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await annexFrame(page)).focused).toBe("Left_48");
+  await expect(page.locator("#page-label")).toHaveText("Deck 1 / 2");
+  await page.getByRole("button", { name: "Zoom to the Left platform" }).click();
+  assert.equal((await annexFrame(page)).platform, left[0]?.key, "project zoom targets parent");
+  await page.locator('[data-session-id="Left_48"]').focus();
+  await page.keyboard.press("Enter");
+  const empty = await emptyAnnexTarget(page);
+  const box = await page.locator("canvas").boundingBox();
+  assert.ok(box);
+  await page.waitForTimeout(550);
+  await page.mouse.dblclick(box.x + empty.x, box.y + empty.y);
+  await expect.poll(async () => (await annexFrame(page)).platform).toBe(empty.key);
+  assert.equal((await annexFrame(page)).mode, "platform");
+  await capture(page, path.join(artifacts, "annex-focus.png"));
+  await page.locator("canvas").focus();
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await annexFrame(page)).mode).toBe("overview");
+  await annexGhost(page, box);
+  await page.locator("#next-page").click();
+  change({ roots: 24, compact: true });
+  await expect
+    .poll(
+      async () =>
+        (await annexFrame(page)).scene.platforms.filter((platform) => platform.projectId === "Left")
+          .length,
+    )
+    .toBe(1);
+  await expect(page.locator("#page-label")).toHaveText("Deck 1");
+  assert.equal((await annexFrame(page)).page, "0");
+  assert.deepEqual(
+    (await annexFrame(page)).scene.workers
+      .filter((worker) => worker.row.projectId === "Left")
+      .map((worker) => [worker.id, worker.chair]),
+    parentDesks,
+    "shrink preserves parent desks",
+  );
+  return {
+    roots: { left: 49, right: 25, remote: 25, shadow: 49, otherProjects: 7 },
+    page: Number(overview.page ?? 0),
+    platforms: platforms.map(({ key, rect, host }) => ({ key, rect, host })),
+    assertions: {
+      stableDesks: true,
+      oppositeBanks: true,
+      hullSeparation: true,
+      overviewFit: true,
+      offDeckSelection: true,
+      parentZoom: true,
+      annexFloorZoom: true,
+      escapeOverview: true,
+      ghostHoverOnly: true,
+      savedPageClamp: true,
+    },
+    screenshots: ["annex-overview.png", "annex-focus.png"],
+  };
+}
+function assertAnnexHulls(scene: SceneGeometry) {
+  const hulls = scene.ships ?? [];
+  for (const [index, hull] of hulls.entries()) {
+    for (const other of hulls.slice(index + 1))
+      assert(
+        hull.rect.x + hull.rect.w <= other.rect.x ||
+          other.rect.x + other.rect.w <= hull.rect.x ||
+          hull.rect.y + hull.rect.h <= other.rect.y ||
+          other.rect.y + other.rect.h <= hull.rect.y,
+        "expanded hulls remain separate",
+      );
+  }
+}
+function assertAnnexFit(overview: Awaited<ReturnType<typeof annexFrame>>) {
+  for (const walkway of overview.scene.walkways) {
+    for (const x of [walkway.rect.x, walkway.rect.x + walkway.rect.w])
+      for (const y of [walkway.rect.y, walkway.rect.y + walkway.rect.h]) {
+        const sx = 24 * (x - y) * overview.camera.zoom + overview.camera.tx;
+        const sy = 12 * (x + y) * overview.camera.zoom + overview.camera.ty;
+        assert(
+          sx >= 0 && sx <= overview.viewport.width && sy >= 0 && sy <= overview.viewport.height,
+          "overview contains outer bridges",
+        );
+      }
+  }
+}
+async function emptyAnnexTarget(page: Page) {
+  return page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    const room = view.activeScene.platforms.find(
+      (platform) => platform.projectId === "Left" && platform.key.endsWith(":2"),
+    );
+    if (!room) throw new Error("Missing outer annex");
+    const free = (point: { x: number; y: number }) =>
+      point.x > 0 &&
+      point.x < view.viewport.width &&
+      point.y > 0 &&
+      point.y < view.viewport.height &&
+      !view.interaction.titleAt(point) &&
+      !view.interaction.signAt(point) &&
+      !view.regions.some(
+        (region) =>
+          point.x >= region.left &&
+          point.x <= region.left + region.width &&
+          point.y >= region.top &&
+          point.y <= region.top + region.height,
+      );
+    for (const dx of [10, 16, 4])
+      for (const dy of [24, 22, 20]) {
+        const x = room.rect.x + dx,
+          y = room.rect.y + dy;
+        const point = {
+          x: 24 * (x - y) * view.camera.zoom + view.camera.tx,
+          y: 12 * (x + y) * view.camera.zoom + view.camera.ty,
+        };
+        if (free(point)) return { ...point, key: room.key };
+      }
+    throw new Error("No empty annex floor target");
+  });
+}
+async function annexGhost(page: Page, box: { x: number; y: number }) {
+  const ghost = await page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    const worker = view.activeScene.workers.find(
+      (worker) => worker.row.shadow && worker.platformKey.endsWith(":2"),
+    );
+    if (!worker) throw new Error("Missing shadow annex worker");
+    view.cameraControl.focusPlatform(worker.platformKey);
+    return worker.id;
+  });
+  await page.waitForTimeout(100);
+  const target = (await paintedTargets(page)).bodies.find((body) => body.id === ghost);
+  assert.ok(target, "ghost retains hover geometry");
+  await page.mouse.click(
+    box.x + target.left + target.width / 2,
+    box.y + target.top + target.height * 0.75,
+  );
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  assert.equal((await annexFrame(page)).focused, null);
+  await expect(page.locator(`[data-session-id="${ghost}"]`)).toHaveCount(0);
+  await expect(page.locator(".row-attach, .row-close")).toHaveCount(0);
 }
 async function crewMotion(page: Page, close: () => void, birth: () => void, artifacts: string) {
   await page.getByRole("button", { name: "Zoom to the Fixture project platform" }).click();
@@ -733,7 +1022,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
-    await nativeCanvas(browser, root, http, artifacts);
+    const annexes = await nativeCanvas(browser, root, http, artifacts);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -768,6 +1057,7 @@ async function runBrowserConsumer(root: string) {
       chromium: browser.version(),
       canvas: true,
       nativeCanvasClicks: true,
+      annexes,
       helperCrew: {
         initialDisplayed: 20,
         initialRetainedRecords: 76,
