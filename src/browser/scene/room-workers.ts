@@ -2,13 +2,12 @@ import { contains, deskFor, rootObstacles, helperStationFor, overlaps } from "./
 import { helperStations } from "../model/identity.js";
 import { element } from "../model/types.js";
 import type { Room } from "../model/types.js";
-import type { Rect, Section, Point, Mailroom, Worker, Overflow } from "./types.js";
+import type { Rect, Section, Point, Worker, Overflow } from "./types.js";
 const SEATS = {
   chairX: 1,
   chairY: 0.5,
   laneOffset: 0.75,
   aisleX: 10,
-  localDockY: 6,
   helperChairY: 0.36,
   helperScale: 0.72,
   half: 2,
@@ -16,10 +15,7 @@ const SEATS = {
 };
 interface RouteGeometry {
   entry: Point;
-  elbow: Point;
-  join: Point;
-  own: Mailroom;
-  spineX: number;
+  path: readonly Point[];
 }
 export function rootWorkers(
   room: Room,
@@ -54,11 +50,7 @@ export function rootWorkers(
           chair,
           { x: chair.x, y: laneY, z: 0 },
           { x: rect.x + SEATS.aisleX, y: laneY, z: 0 },
-          route.entry,
-          route.elbow,
-          route.join,
-          ...(room.host ? [] : [{ x: route.spineX, y: SEATS.localDockY, z: 0 }]),
-          route.own.hub,
+          ...route.path,
         ],
       };
     });

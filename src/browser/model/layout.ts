@@ -245,10 +245,11 @@ export class Layout {
     const helperTrim = this.trimHelpers(valid),
       helperPlacement = this.placeHelpers(valid);
     this.helperRows(units, byId);
-    const huesChanged = this.hues.reconcile(units, this.owners);
+    const parents = new Map(Array.from(units).filter(([, room]) => room.annex === 0));
+    const huesChanged = this.hues.reconcile(parents, this.owners);
     this.rooms = Array.from(units.values(), (room) => ({
       ...room,
-      slot: this.hues.slot(room.key),
+      slot: this.hues.slot(`${room.projectId}:0`),
       ...this.hues.colorFor(room.projectId),
     }));
     return {
@@ -275,12 +276,7 @@ export class Layout {
   }
   pageFor(id: string) {
     const pane = this.panes.get(id) ?? this.helpers.get(id);
-    return pane
-      ? Math.floor(
-          this.hues.slot(`${pane.project}:${String(Math.floor(pane.block / BLOCKS_PER_ROOM))}`) /
-            ROOMS_PER_PAGE,
-        )
-      : 0;
+    return pane ? Math.floor(this.hues.slot(`${pane.project}:0`) / ROOMS_PER_PAGE) : 0;
   }
   colorFor(project: string) {
     return this.hues.colorFor(project);

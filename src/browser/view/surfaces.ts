@@ -185,6 +185,7 @@ export class Surfaces<R extends SpriteResource> {
       lampColor: this.look.colors.window,
       supportColor: this.look.colors["walkway-support"],
     });
+    this.geometry.walkwayTrim(r, walkway.accent);
   };
 
   paintHub = (mail: Mailroom) => {

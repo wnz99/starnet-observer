@@ -1,0 +1,11 @@
+# Approved outward-annex decisions
+
+User approved semantic revision 1 on 2026-10-19, including the pagination tradeoff and implementation. Independent plan review approved revision 1, cycle 1, round 1 without findings. The verbatim plan retains its authoring-stage pending-approval wording; this approval record supersedes that wording. Execute the two approved tasks sequentially through `wnz-phase-executor`, with its independent task reviews. GSD initialization registers tracking only; no GSD planner or executor was dispatched.
+
+Grow left-bank annexes left and right-bank annexes right, in a simple outward chain. Preserve parent placement and desk identity. Short project-colored front links connect each annex to its inward neighbor; mail follows the chain through the parent to its own host's mailroom. Relay amber retains its existing meaning. Preserve grouping, capacities, identity/security boundaries, host ownership and shadow hover-only behavior.
+
+Each host/deck keeps eight project anchors. Annexes share their parent's anchor and deck, so a deck can contain more than eight room slabs. This can reduce deck count and make overview labels smaller for large families. Preserve individual room zoom, worker focus, saved-page clamping and existing bounded caching; assess width and readability with synthetic geometry and screenshots.
+
+The owned feature branch is feat/outward-annexes, based on main at 0bf8b8cec6a0b360a2e334a56d78356a6b9dfa23. Registration changes only GSD records. No source implementation, paid/live run, real controls, deployment, shared-tool or account changes occurred during registration.
+
+The original private plan and discovery are at .planning/drafts/outward-annexes/PLAN.md and .planning/drafts/outward-annexes/DISCOVERY.md in the primary checkout. The registered plan is byte-for-byte identical, SHA-256 7a11030e15f248b41007c299e5baa9b2078222d1acc9cca82a2ce46a61e22b27. Its relative DISCOVERY.md reference belongs to that original draft location; the tracked discovery summary is 261019-m2e-RESEARCH.md beside this file. FLOW.json remains private and is not copied into GSD. Detailed review/execution evidence remains in /private/tmp/starnet-outward-annexes-planning/LEDGER.md and its indexed reports.

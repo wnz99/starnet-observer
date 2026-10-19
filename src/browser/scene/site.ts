@@ -1,5 +1,7 @@
 import { required } from "../model/types.js";
-import type { Rect, SceneRooms, BuildOptions, Host, Mailroom } from "./types.js";
+import { roomRect } from "./room-placement.js";
+import { observatoryFor } from "./observatory.js";
+import type { Rect, SceneRooms, BuildOptions, Mailroom } from "./types.js";
 /* Remote ships sit in a line below the flagship (this machine), with a clear gap between hulls. llm-bus is per host,
    so each remote ship has its OWN mailroom (same furniture as the flagship's) on its top edge, with its rooms flanking
    it and a short spine down from it; that host's crew and couriers stay inside its own ship. Nothing physical joins
@@ -25,12 +27,6 @@ export const mailroomAt = (top: number, dx = 0) => ({
     { x: dx + SITE.hubX, y: top + SITE.hubY, z: 0 },
   ],
 });
-export const remoteRoomRect = (top: number, slot: number, dx = 0) => ({
-  x: dx + (slot % SITE.banks ? SITE.remoteOddX : SITE.remoteEvenX),
-  y: top + SITE.rowSpacing * Math.floor(slot / SITE.banks),
-  w: SITE.roomWidth,
-  h: SITE.roomHeight,
-});
 const SHADOW_GAP = 14,
   REMOTE_LEFT = -24,
   REMOTE_RIGHT = 38;
@@ -47,13 +43,9 @@ export const hullAround = (rects: readonly Rect[], margin = HULL_MARGIN) => {
   };
 };
 const SITE = {
-  oddY: -42,
-  evenY: -48,
-  rowSpacing: 32,
-  slots: 8,
-  banks: 2,
+  localLeft: -33,
   localRight: 47,
-  roomHullBottom: 29,
+  connectorDepth: 3,
   mailWidth: 14,
   mailHeight: 12,
   hubX: 7,
@@ -65,14 +57,23 @@ const SITE = {
   padY: 9,
   podX: 11,
   chuteX: 2,
-  remoteOddX: 16,
-  remoteEvenX: -22,
-  roomWidth: 20,
-  roomHeight: 26,
   sides: 2,
 };
-export function roomY(bank: number, index: number) {
-  return (bank ? SITE.oddY : SITE.evenY) + SITE.rowSpacing * index;
+function envelope(rooms: SceneRooms, host: string | null, top = 0, dx = 0) {
+  const parts = [
+    mailroomAt(top, dx).rect,
+    ...rooms
+      .filter((room) => (room.host || null) === host)
+      .map((room) => {
+        const rect = roomRect(room, top, dx);
+        return { ...rect, h: rect.h + SITE.connectorDepth };
+      }),
+    ...(host === null ? [observatoryFor().rect] : []),
+  ];
+  const hull = hullAround(parts, host === null ? HULL_MARGIN : REMOTE_MARGIN);
+  const left = Math.min(hull.x, dx + (host === null ? SITE.localLeft : REMOTE_LEFT)),
+    right = Math.max(hull.x + hull.w, dx + (host === null ? SITE.localRight : REMOTE_RIGHT));
+  return { ...hull, x: left, w: right - left };
 }
 export function locateShips(rooms: SceneRooms, extras: BuildOptions) {
   // Ships appear only when remote hosts are configured; a single-host station is laid out exactly as before.
@@ -87,29 +88,18 @@ export function locateShips(rooms: SceneRooms, extras: BuildOptions) {
   };
   for (const room of rooms) if (room.host) shipIndex(room.host);
   // Ship tops: below the flagship hull's bottom edge (its lowest connector), then below each remote hull in turn.
-  const rowTop = (room: SceneRooms[number]) => {
-    const slot = room.slot % SITE.slots;
-    return roomY(slot % SITE.banks, Math.floor(slot / SITE.banks));
-  };
-  let cursor =
-    Math.max(
-      SITE.mailHeight,
-      ...rooms.filter((room) => !room.host).map((room) => rowTop(room) + SITE.roomHullBottom),
-    ) + HULL_MARGIN;
+  const local = envelope(rooms, null);
+  let cursor = local.y + local.h;
   const tops = new Map<string, number>(),
     mailrooms = new Map<string, Mailroom>(),
     dxs = new Map<string, number>();
   for (const host of remoteHosts.filter((host) => !host.shadow)) {
-    const top = cursor + SHIP_GAP_Y + REMOTE_MARGIN,
-      own = rooms.filter((room) => room.host === host.id);
+    const top = cursor + SHIP_GAP_Y + REMOTE_MARGIN;
     tops.set(host.id, top);
     mailrooms.set(host.id, mailroomAt(top));
     dxs.set(host.id, 0);
-    cursor =
-      Math.max(
-        top + SITE.mailHeight,
-        ...own.map((room) => remoteRoomRect(top, room.slot % SITE.slots).y + SITE.roomHullBottom),
-      ) + REMOTE_MARGIN;
+    const hull = envelope(rooms, host.id, top);
+    cursor = hull.y + hull.h;
   }
   dockShadows(rooms, { remoteHosts, tops, mailrooms, dxs });
 
@@ -121,24 +111,26 @@ function dockShadows(rooms: SceneRooms, locations: ShipLocations) {
   const { remoteHosts, tops, mailrooms, dxs } = locations;
   /* A shadow ship (an unobserved machine on a relay) docks beside the observed ship it is linked to, level with that
      ship's mailroom, so the column of observed ships and their ssh links never change; several shadows line up east. */
-  const localRight = Math.max(
-      SITE.localRight,
-      ...rooms
-        .filter((room) => !room.host)
-        .map((room) => ((room.slot % SITE.slots) % SITE.banks ? SITE.localRight : 0)),
-    ),
-    eastOf = new Map<Host, number>();
+  const occupied = [
+    envelope(rooms, null),
+    ...remoteHosts
+      .filter((host) => !host.shadow)
+      .map((host) => envelope(rooms, host.id, required(tops, host.id))),
+  ];
   for (const host of remoteHosts.filter((host) => host.shadow)) {
     const member =
       host.member !== undefined && (host.member === null || tops.has(host.member))
         ? host.member
         : null;
-    const right = eastOf.get(member) ?? (member === null ? localRight : REMOTE_RIGHT),
-      dx = right + SHADOW_GAP - REMOTE_LEFT,
-      top = member === null ? 0 : required(tops, member);
+    const top = member === null ? 0 : required(tops, member),
+      own = envelope(rooms, host.id, top);
+    const overlaps = occupied.filter(
+      (other) => own.y < other.y + other.h && own.y + own.h > other.y,
+    );
+    const dx = Math.max(0, ...overlaps.map((other) => other.x + other.w + SHADOW_GAP - own.x));
     tops.set(host.id, top);
     dxs.set(host.id, dx);
     mailrooms.set(host.id, mailroomAt(top, dx));
-    eastOf.set(member, dx + REMOTE_RIGHT);
+    occupied.push({ ...own, x: own.x + dx });
   }
 }

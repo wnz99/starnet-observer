@@ -35,6 +35,87 @@ import { AppState, FRESH_MS } from "./state.js";
 import type { AppQuerySnapshot } from "./data.js";
 const sessionItems = (node: AppFixtureNode): AppFixtureNode[] =>
   node.className.split(" ").includes("session-item") ? [node] : node.children.flatMap(sessionItems);
+test("annex row selection returns to the family deck and removed decks clamp saved preferences", async () => {
+  const page = uiFixture();
+  page.window.localStorage.setItem("observer.page", "99");
+  let live: Deliver | null = null;
+  let frame!: UiFrame;
+  const focused: string[] = [];
+  const app = page.mount({
+    createView: () =>
+      viewSpy({
+        start() {},
+        stop() {},
+        overview() {},
+        invalidate() {},
+        update: (scene, options) => {
+          frame = { scene, options };
+        },
+        focus: (id) => {
+          focused.push(id);
+        },
+      }),
+    query: {
+      ...querySpy({
+        define() {},
+        invalidate: () => Promise.resolve(),
+        subscribe: (_key, listener) => {
+          live = listener;
+          return () => {};
+        },
+      }),
+      dispose() {},
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const now = Date.now();
+    const family: AppRow[] = Array.from({ length: 49 }, (_, index) => ({
+      id: "annex_" + String(index),
+      project: "Family",
+      projectId: "family",
+      repoId: "family",
+      provider: "codex",
+      status: "working",
+      observedAt: now,
+    }));
+    const others: AppRow[] = Array.from({ length: 8 }, (_, index) => ({
+      ...family[0],
+      id: "other_" + String(index),
+      projectId: "other_" + String(index),
+      project: "Other " + String(index),
+    }));
+    const render = (sessions: AppRow[]) => {
+      notify(live, {
+        hasData: true,
+        updatedAt: now,
+        data: { health: "available", observedAt: now, sessions },
+      });
+    };
+    render([...family, ...others]);
+    assert.match(page.get("page-label").textContent, /2.*2/);
+    const row = present(
+      page.document
+        .querySelectorAll(page.get("sessions"), ".session-row")
+        .find((value) => value.dataset.sessionId === "annex_48"),
+    );
+    row.emit("click");
+    assert.deepEqual(focused, ["annex_48"]);
+    assert.match(page.get("page-label").textContent, /1.*2/);
+    assert(frame.scene.workers.some((worker) => worker.id === "annex_48"));
+    assert.equal(
+      frame.scene.platforms.filter((platform) => platform.projectId === "family").length,
+      3,
+    );
+    page.get("next-page").emit("click");
+    render(family);
+    assert.equal(page.get("next-page").disabled, true);
+    assert(frame.scene.workers.some((worker) => worker.id === "annex_48"));
+    assert.equal(page.window.localStorage.getItem("observer.page"), "0");
+  } finally {
+    app.dispose();
+  }
+});
 test("floor keeps validated returns fresh by source and rejects old page, parent and disposal settlements", () => {
   let now = 10000,
     refreshes = 0;

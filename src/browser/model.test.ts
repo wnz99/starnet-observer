@@ -12,6 +12,41 @@ function at<T>(values: readonly T[], index: number): T {
 const fresh = false,
   stale = true;
 const Model = createModel(canonicalTheme());
+test("annexes keep project deck anchors across sparse sections and helpers", () => {
+  const layout = Model.createLayout();
+  const projects: LayoutRow[] = Array.from({ length: 9 }, (_, index) => ({
+    id: `anchor-${String(index)}`,
+    projectId: `project-${String(index)}`,
+    project: `project-${String(index)}`,
+  }));
+  layout.reconcile(projects);
+  const parent = layout.allRooms().find((room) => room.slot >= 8);
+  assert.ok(parent);
+  const rows: LayoutRow[] = [
+    ...projects,
+    ...Array.from({ length: 25 }, (_, index) => ({
+      id: `growth-${String(index)}`,
+      projectId: parent.projectId,
+      project: parent.projectId,
+    })),
+    { id: "annex-helper", source: "helper", parentId: "growth-24" },
+  ];
+  layout.reconcile(rows);
+  assert.equal(layout.pageFor("growth-24"), 1);
+  assert.equal(layout.pageFor("annex-helper"), 1);
+  assert.equal(layout.pages(), 2);
+  const sparse = Model.createLayout();
+  sparse.reconcile(
+    Array.from({ length: 4 }, (_, index) => ({
+      id: `section-${String(index)}`,
+      projectId: "sparse",
+      project: "sparse",
+      repoId: `repo-${String(index)}`,
+    })),
+  );
+  assert.equal(sparse.allRooms().length, 2);
+  assert.equal(new Set(sparse.allRooms().map((room) => room.slot)).size, 1);
+});
 test("original model checkout suffix collision proofs", () => {
   // Canonical checkout IDs can share their last four hash characters. Only extend the collision.
   {

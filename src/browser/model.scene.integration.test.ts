@@ -153,7 +153,7 @@ test("original model allocation, lineage, checkout and theme geometry with real 
 
   function verifyHueConflictAnnex() {
     // Eleven projects fill deck 1 and three rooms of deck 2; a deck-1 project whose hue is already on deck 2 then
-    // grows past 24 seats. Its annex takes the next deck instead, so no surviving project is recoloured.
+    // grows past 24 seats. Its annex shares its parent anchor, so no surviving project is recoloured.
     const layout = Model.createLayout(),
       names = Array.from({ length: 11 }, (_, index) => "hue" + String(index));
     let rows = names.map((name) => ({ id: name + "_0", project: name, projectId: name }));
@@ -182,14 +182,10 @@ test("original model allocation, lineage, checkout and theme geometry with real 
         "distinct hues on deck " + String(page + 1),
       );
     }
-    assert.equal(
-      layout.pageFor(grower + "_24"),
-      2,
-      "the annex skips the deck that already shows its hue",
-    );
+    assert.equal(layout.pageFor(grower + "_24"), 0, "the annex stays on its parent's deck");
     assert.equal(
       element(
-        layout.onPage(2).filter((room) => room.projectId === grower),
+        layout.onPage(0).filter((room) => room.projectId === grower),
         0,
       ).floor,
       before.get(grower),

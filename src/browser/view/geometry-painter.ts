@@ -2,11 +2,12 @@ import { project } from "../scene/index.js";
 import type { Point, Rect } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { BoxColors } from "./primitives.js";
-import { corners, visibleFaces } from "./primitives.js";
+import { center, corners, visibleFaces } from "./primitives.js";
 import type { ViewContext } from "./types.js";
 const FLOOR_ELLIPSE = { x: 34, y: 17 };
 const FULL_TURN = Math.PI * 2;
 const GLOW_ASPECT = 2;
+const WALKWAY_TRIM_HEIGHT = 0.01;
 export class GeometryPainter<R extends SpriteResource> {
   constructor(readonly context: ViewContext<R>) {}
   poly(points: readonly Point[], fill?: string | null, stroke?: string | null) {
@@ -75,6 +76,18 @@ export class GeometryPainter<R extends SpriteResource> {
     c.lineTo(to.x, to.y);
     c.stroke();
     c.restore();
+  }
+  walkwayTrim(rect: Rect, accent: string | undefined) {
+    if (!accent) return;
+    const middle = center(rect),
+      z = WALKWAY_TRIM_HEIGHT;
+    this.line(
+      rect.w >= rect.h ? { ...middle, x: rect.x, z } : { ...middle, y: rect.y, z },
+      rect.w >= rect.h
+        ? { ...middle, x: rect.x + rect.w, z }
+        : { ...middle, y: rect.y + rect.h, z },
+      { color: accent },
+    );
   }
   grid(rect: Rect, { step, alpha, color }: GridStyle) {
     this.context.save();

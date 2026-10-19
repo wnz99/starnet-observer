@@ -37,6 +37,8 @@ import {
 } from "./helpers.js";
 import { palette, resolveLook } from "./look.js";
 import { officeFurnishing } from "./office-furnishing.js";
+import { OfficeFloor } from "./office-floor.js";
+import { Surfaces } from "./surfaces.js";
 import { officePaintersFor } from "./office.js";
 import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
@@ -53,6 +55,75 @@ const canonicalPalette = palette(canonicalTheme().scene.colors);
 const art = paintersFor(canonicalLook);
 const Model = createModel(canonicalTheme());
 const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
+
+for (const office of [false, true]) {
+  test((office ? "office" : "station") + " annex bridge trim preserves existing surfaces", () => {
+    const strokes: { color: unknown; from: Point; to: Point }[] = [];
+    let from = { x: 0, y: 0 },
+      to = from;
+    const ctx = drawing({
+      moveTo: (x: number, y: number) => {
+        from = { x, y };
+      },
+      lineTo: (x: number, y: number) => {
+        to = { x, y };
+      },
+      stroke: () => {
+        strokes.push({ color: ctx.strokeStyle, from, to });
+      },
+    });
+    const images = Object.fromEntries(
+      SCENE_ART_ROLE_NAMES.map((role) => [role, new OfficeImageFixture()]),
+    ) as Record<SceneArtRoleName, OfficeImageFixture>;
+    const composition = createOffice({
+      images,
+      colors: canonicalLook.colors,
+      project: Scene.project,
+      crewHeight: 60,
+    });
+    const floor = office
+      ? new OfficeFloor(canonicalLook, composition, ctx)
+      : new Surfaces(canonicalLook, ctx);
+    const paint = floor instanceof OfficeFloor ? floor.walkway.bind(floor) : floor.paintWalkway;
+    for (const [rect, a, b] of [
+      [
+        { x: -44, y: -20.5, w: 24, h: 1 },
+        { x: -576, y: -768.24 },
+        { x: 0, y: -480.24 },
+      ],
+      [
+        { x: 2, y: 3, w: 1, h: 24 },
+        { x: -12, y: 65.76 },
+        { x: -588, y: 353.76 },
+      ],
+    ] as const) {
+      strokes.length = 0;
+      const walkway = {
+        kind: "annex-link" as const,
+        rect,
+        accent: "#3157b9",
+        relay: true as const,
+      };
+      paint(walkway);
+      assert.deepEqual(
+        strokes.filter((stroke) => stroke.color === walkway.accent),
+        [{ color: walkway.accent, from: a, to: b }],
+      );
+      if (!office)
+        assert(
+          strokes.some((stroke) => stroke.color === canonicalLook.colors.amber),
+          "project trim preserves amber relay rails",
+        );
+      strokes.length = 0;
+      const neutral = { kind: "connector" as const, rect };
+      paint(neutral);
+      assert(
+        !strokes.some((stroke) => stroke.color === walkway.accent),
+        "ordinary walkways do not acquire project trim",
+      );
+    }
+  });
+}
 
 test("observer-view regression contracts", async () => {
   // Pure helpers: zoom tiers, plate priority and the static-layer budget.

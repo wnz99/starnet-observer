@@ -140,6 +140,7 @@ export class OfficeFloor<R extends SpriteResource> {
     const r = value.rect;
     this.faces(corners(r), 0, -OFFICE_TRIM.walkwayDrop);
     this.floor(corners(r), "corridor", r);
+    this.geometry.walkwayTrim(r, value.accent);
   }
   hub(mail: Mailroom) {
     const r = mail.rect,

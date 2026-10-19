@@ -1,6 +1,6 @@
 import { partitionsFor, pointAt, strip, onHost } from "./geometry.js";
 import { element, required } from "../model/types.js";
-import { roomY, remoteRoomRect } from "./site.js";
+import { roomRect } from "./room-placement.js";
 import { rootWorkers, helperWorkers } from "./room-workers.js";
 import type { ShipLocations } from "./site.js";
 import type { Room, LayoutRow } from "../model/types.js";
@@ -19,18 +19,14 @@ import type {
 } from "./types.js";
 const ROOM = {
   quarters: { x: 14, y: 2.6, w: 3, h: 1, entryX: 15.5, entryY: 3.5 },
-  slots: 8,
   banks: 2,
-  rightX: 24,
-  leftX: -30,
-  width: 20,
-  height: 26,
   spineX: 7,
   rightSpine: 19,
   leftSpine: -5,
   entryX: 10,
   entryY: 25,
   elbowY: 28,
+  localDockY: 6,
   sectionX: 1,
   sectionY: 4,
   blockHeight: 7,
@@ -104,7 +100,7 @@ function roomCrew(room: Room, rect: Rect, sections: Section[]) {
 }
 export function representedRows(rooms: SceneRooms): LayoutRow[] {
   return rooms.flatMap((room) => {
-    const rect = { x: 0, y: 0, w: ROOM.width, h: ROOM.height };
+    const rect = roomRect(room);
     const crew = roomCrew(room, rect, sectionsFor(room, rect));
     return [
       ...crew.roots.rows.map((value) => value.row),
@@ -120,13 +116,13 @@ const DECORATION = [
   { kind: "apron", rect: { x: 17, y: 24, w: 2, h: 1 } },
 ];
 function locationFor(room: Room, locations: ShipLocations, mail: Mailroom) {
-  const slot = room.slot % ROOM.slots,
-    bank = slot % ROOM.banks,
-    index = Math.floor(slot / ROOM.banks);
+  const bank = room.slot % ROOM.banks;
   const own = room.host ? required(locations.mailrooms, room.host) : mail;
-  const rect = room.host
-    ? remoteRoomRect(required(locations.tops, room.host), slot, locations.dxs.get(room.host) || 0)
-    : { x: bank ? ROOM.rightX : ROOM.leftX, y: roomY(bank, index), w: ROOM.width, h: ROOM.height };
+  const rect = roomRect(
+    room,
+    room.host ? required(locations.tops, room.host) : 0,
+    room.host ? locations.dxs.get(room.host) || 0 : 0,
+  );
   const spineX = room.host
     ? ROOM.spineX + (locations.dxs.get(room.host) || 0)
     : bank
@@ -137,18 +133,70 @@ function locationFor(room: Room, locations: ShipLocations, mail: Mailroom) {
     join = { x: spineX, y: elbow.y, z: 0 };
   return { own, rect, spineX, entry, elbow, join, bankKey: room.host || bank };
 }
-function buildRoom(input: {
-  room: Room;
-  locations: ShipLocations;
-  mail: Mailroom;
-  relayMembers: NonNullable<BuildOptions["relayMembers"]>;
-}) {
-  const { room, locations, mail, relayMembers } = input;
-  const route = locationFor(room, locations, mail),
-    { rect, entry, elbow, join } = route;
+type RoomLocation = ReturnType<typeof locationFor>;
+interface FamilyRoute extends RoomLocation {
+  path: readonly Point[];
+  predecessor?: Point;
+  relayRoom: boolean;
+  relayTraffic: boolean;
+}
+function familiesFor(rooms: SceneRooms) {
+  const families = new Map<string | undefined, Map<string, Room[]>>();
+  for (const room of rooms) {
+    let projects = families.get(room.host);
+    if (!projects) families.set(room.host, (projects = new Map<string, Room[]>()));
+    const family = projects.get(room.projectId) ?? [];
+    family.push(room);
+    projects.set(room.projectId, family);
+  }
+  return Array.from(families.values()).flatMap((projects) => Array.from(projects.values()));
+}
+function routesForFamily(
+  rooms: readonly Room[],
+  locations: ShipLocations,
+  mail: Mailroom,
+  relayMembers: NonNullable<BuildOptions["relayMembers"]>,
+) {
+  const routes = new Map<Room, FamilyRoute>();
+  const family = rooms.slice().sort((a, b) => a.annex - b.annex);
+  const parent = element(family, 0);
+  if (parent.annex !== 0) throw new Error(`Missing parent for ${parent.key}`);
+  const parentLocation = locationFor(parent, locations, mail);
+  const suffix = [
+    parentLocation.join,
+    ...(parent.host ? [] : [{ x: parentLocation.spineX, y: ROOM.localDockY, z: 0 }]),
+    parentLocation.own.hub,
+  ];
+  let previous: FamilyRoute | undefined;
+  for (const [index, room] of family.entries()) {
+    if (room.annex !== index) throw new Error(`Missing predecessor for ${room.key}`);
+    const location = locationFor(room, locations, mail);
+    const path = previous
+      ? [location.entry, location.elbow, ...previous.path.slice(1)]
+      : [location.entry, location.elbow, ...suffix];
+    const route: FamilyRoute = {
+      ...location,
+      path,
+      ...(previous ? { predecessor: previous.elbow } : {}),
+      relayRoom: room.rows.some((value) => relayMembers.has(value.row.id)),
+      relayTraffic: false,
+    };
+    routes.set(room, route);
+    previous = route;
+  }
+  let relayTraffic = false;
+  for (const room of family.slice().reverse()) {
+    const route = required(routes, room);
+    relayTraffic ||= route.relayRoom;
+    route.relayTraffic = relayTraffic;
+  }
+  return routes;
+}
+function buildRoom(input: { room: Room; route: FamilyRoute }) {
+  const { room, route } = input,
+    { rect, entry, elbow, join, predecessor, relayRoom } = route;
   // A room holding any agent the relay carries (published by its bus, or a shadow ship's roster) lays its walkways in
   // the relay's colour all the way to its mailroom: those agents' mail can continue onto the relay highway.
-  const relayRoom = room.rows.some((value) => relayMembers.has(value.row.id));
   const sections = sectionsFor(room, rect),
     helpers = roomCrew(room, rect, sections);
   const platform: Platform = {
@@ -173,19 +221,20 @@ function buildRoom(input: {
       entry: pointAt(rect, ROOM.quarters.entryX, ROOM.quarters.entryY),
     },
   };
-  const walkways = [strip(entry, elbow, "connector"), strip(elbow, join, "connector")].map(
-    (value) => {
-      const walkway = onHost(value, room.host);
-      return relayRoom ? { ...walkway, relay: true } : walkway;
+  const walkways = [
+    { ...strip(entry, elbow, "connector"), ...(relayRoom ? { relay: true } : {}) },
+    {
+      ...strip(elbow, predecessor ?? join, predecessor ? "annex-link" : "connector"),
+      ...(predecessor ? { accent: room.accent } : {}),
+      ...(route.relayTraffic ? { relay: true } : {}),
     },
-  );
+  ].map((value) => onHost(value, room.host));
   return {
     platform,
     workers: rootWorkers(helpers.roots, rect, sections, route).concat(helpers.workers),
     helperOverflow: helpers.helperOverflow,
     walkways,
     route,
-    relayRoom,
   };
 }
 export function populateRooms(
@@ -199,9 +248,14 @@ export function populateRooms(
     workers: Worker[] = [],
     helperOverflow: Overflow[] = [];
   const banks = new Map<string | number, Bank>();
+  const routes = new Map(
+    familiesFor(rooms).flatMap((family) =>
+      Array.from(routesForFamily(family, locations, mail, relayMembers)),
+    ),
+  );
   for (const room of rooms) {
-    const result = buildRoom({ room, locations, mail, relayMembers });
-    const { route, relayRoom } = result,
+    const result = buildRoom({ room, route: required(routes, room) });
+    const { route } = result,
       { bankKey, spineX, own, join } = route;
     if (!banks.has(bankKey))
       banks.set(bankKey, {
@@ -212,8 +266,8 @@ export function populateRooms(
         relay: false,
       });
     const bank = required(banks, bankKey);
-    bank.ys.push(join.y);
-    if (relayRoom) bank.relay = true;
+    if (room.annex === 0) bank.ys.push(join.y);
+    if (route.relayTraffic) bank.relay = true;
     platforms.push(result.platform);
     walkways.push(...result.walkways);
     workers.push(...result.workers);
