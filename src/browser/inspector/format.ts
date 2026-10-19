@@ -67,7 +67,7 @@ function statRow(
   const value =
     state === "unavailable" ? null : format(record(field) ? field.value : null, options.now);
   if (value === null) return { key, label, state: "unavailable", text: "Unavailable" };
-  return { key, label, state, text: state === "partial" ? value + " · partial" : value };
+  return { key, label, state, text: value };
 }
 export function statRows(stats: unknown, now = Date.now()) {
   return FIELDS.map(([key, label, format]) => statRow(key, label, format, { stats, now }));
