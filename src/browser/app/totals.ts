@@ -115,19 +115,6 @@ export class Totals<N extends AppNode, R extends SpriteResource> {
       ui.document.attach(this.nodes.tokens, node);
       this.nodes.counters.set(key, node);
     }
-    ui.document.attach(
-      this.nodes.disclosure,
-      ui.text(
-        "p",
-        "",
-        "Includes retained helper histories, including helpers hidden from the room. Counts are provider-reported cumulative observations, not billing totals. Bounded histories can have partial usage data.",
-      ),
-      ui.text(
-        "p",
-        "",
-        "Codex input includes cached input; do not add cache read to input. Claude reports input and cache counters separately.",
-      ),
-    );
     return this.nodes;
   }
   private live(snapshot: AppQuerySnapshot) {

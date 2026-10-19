@@ -58,8 +58,8 @@ test("original inspector formatting, follow, pause, visibility locks and stable 
     assert.deepEqual(required(text, "inputTokens"), ["available", "1,234,567"]);
     assert.deepEqual(
       required(text, "outputTokens"),
-      ["partial", "890 · partial"],
-      "a windowed sum is never shown as a whole-session total",
+      ["partial", "890"],
+      "the numeric value stays concise while its coverage state remains partial",
     );
     assert.deepEqual(
       required(text, "cacheReadTokens"),
@@ -603,6 +603,7 @@ test("original inspector formatting, follow, pause, visibility locks and stable 
     assert.ok(tokens);
     assert.ok(activity);
     assert.equal(tokens.dataset.state, "partial");
+    assert.equal(tokens.child(1).textContent, "1,200");
     assert.match(tokens.child(1).title, /bounded-window/);
     feed(
       "obs_a",

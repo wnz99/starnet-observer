@@ -1141,25 +1141,32 @@ body.is-stale .eyebrow {
   border-bottom: 1px solid var(--line);
 }
 .stat {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
   min-width: 0;
-  padding: 6px 10px 7px 12px;
+  padding: 3px 12px;
   background: var(--footer-bg);
 }
 .stat dt {
-  margin-bottom: 2px;
+  flex: none;
+  white-space: nowrap;
   font: calc(14px * var(--type-scale))/1 var(--term);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--dim);
 }
 .stat dd {
+  flex: 1 1 0;
   margin: 0;
+  text-align: right;
   font:
     12px/1.3 ui-monospace,
     monospace;
   letter-spacing: normal;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 .stat-unavailable dd {
   color: var(--dim);
@@ -1460,6 +1467,9 @@ body.is-stale .inspector {
   }
 }
 @media (max-width: 500px) {
+  .inspector-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
   h1 {
     font-size: calc(24px * var(--type-scale));
   }
