@@ -669,7 +669,7 @@ test("observer-identity regression contracts", async () => {
           assert.equal(
             error.message,
             response === "stale"
-              ? "Live footer changed during capture"
+              ? "Terminal content changed during identity capture"
               : "Invalid identity response",
           );
           assert(!error.message.includes("PRIVATE"));

@@ -13,7 +13,7 @@ const ALLOWED_METHODS = [
 function responseFrame(text: string, id: string) {
   const response = object(JSON.parse(text));
   if (response.id === id && object(response.error).code === "stale_content")
-    throw Object.assign(new Error("Live footer changed during capture"), {
+    throw Object.assign(new Error("Terminal content changed during identity capture"), {
       code: CONTENT_CHANGED_CODE,
     });
   if (response.id !== id || response.error || !response.result)
