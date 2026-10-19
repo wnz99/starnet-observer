@@ -35,7 +35,6 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261019-m2e | Outward-docked project annexes | Both tasks implemented and independently approved; revision-1 conformance clean; aggregate verification, full-head PR review, CI and merge pending | [261019-m2e](./quick/261019-m2e-outward-docked-project-annexes/) |
 
 ## Quick Tasks Completed
 
@@ -59,6 +58,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 | 261015-vtr | Sync PR 10 and fix helper index lineage proof bugs | 2026-10-15 | [PR #10](https://github.com/wnz99/starnet-observer/pull/10) | Complete; merged | [261015-vtr-sync-pr-10-and-fix-helper-index-lineage-](./quick/261015-vtr-sync-pr-10-and-fix-helper-index-lineage-/) |
 | 261015-vno | Sync PR 11 and fix host, relay and mail defects | 2026-10-15 | [PR #11](https://github.com/wnz99/starnet-observer/pull/11) | Complete; verified; independent final review clean | [261015-vno](./quick/261015-vno-sync-pr-11-with-main-preserving-existing/) |
 | 261018-wb7 | Helper visibility, formation, quarters and truthful crew statistics | 2026-10-19 | [PR #20](https://github.com/wnz99/starnet-observer/pull/20) | Implementation/review complete; 269 native tests, production-first installed/browser consumers and source Ubuntu CI passed; final tracking-head checks and merge pending | [261018-wb7](./quick/261018-wb7-helper-visibility-formation-quarters-and/) |
+| 261019-m2e | Outward-docked project annexes | 2026-10-19 | [PR #24](https://github.com/wnz99/starnet-observer/pull/24) | Implementation/review complete; revision-1 conformance clean; 281 native tests and installed/browser consumers passed; final tracking-head review, CI and merge pending | [261019-m2e-outward-docked-project-annexes](./quick/261019-m2e-outward-docked-project-annexes/) |
 
 ## Accumulated Context
 
