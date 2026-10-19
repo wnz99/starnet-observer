@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261019-m2e | Outward-docked project annexes | Approved revision 1 registered; pagination tradeoff accepted; two sequential implementation tasks pending | [261019-m2e](./quick/261019-m2e-outward-docked-project-annexes/) |
+| 261019-m2e | Outward-docked project annexes | Both tasks implemented and independently approved; revision-1 conformance clean; aggregate verification, full-head PR review, CI and merge pending | [261019-m2e](./quick/261019-m2e-outward-docked-project-annexes/) |
 
 ## Quick Tasks Completed
 
