@@ -207,12 +207,13 @@ export class RowView<N extends AppNode, R extends SpriteResource> {
     return format.composedTask(row) ? format.taskText(row) : taskTitle(row) || "untitled task";
   }
   private panel(row: AppRow) {
-    const { state, format, panels, ui } = this.options;
-    ui.document.setDisabled(this.inspect, { disabled: !!state.latest?.data?.presentation });
-    ui.document.setDisabled(this.title, { disabled: !!state.latest?.data?.presentation });
+    const { format, panels, ui } = this.options;
+    const target = panels.agentTarget(row);
+    ui.document.setDisabled(this.inspect, { disabled: target === null });
+    ui.document.setDisabled(this.title, { disabled: target === null });
     this.inspect.setAttribute(
       "aria-label",
-      (panels.isOpenTarget(panels.agentTarget(row)) ? "Close inspector for " : "Inspect ") +
+      (panels.isOpenTarget(target) ? "Close inspector for " : "Inspect ") +
         format.workerName(row) +
         " — " +
         this.taskLabel(row),

@@ -128,6 +128,13 @@ export interface Sweep {
 export interface Lineage extends Sweep {
   result: HelperResult;
   failed?: boolean;
+  withdrawn?: Set<string>;
+}
+export interface PublishedLineage {
+  rows: ObserverInputRow[];
+  proofs: Map<string, FooterProof>;
+  groupOwners: Map<string, string>;
+  annotated: Set<string>;
 }
 export interface WarmTarget {
   row: ObserverInputRow;

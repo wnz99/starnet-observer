@@ -12,8 +12,12 @@ import { consumerRoot } from "../server/application.consumer.test.js";
 import type { AppRow, AppSnapshot } from "./app/data.js";
 import type { Scene as SceneGeometry } from "./scene/types.js";
 import type { ActorFrame } from "./scene/motion-types.js";
+import type { makeObserver as ObserverFactory } from "../sidecar/observer/index.js";
+import type { makeIdentityResolver as IdentityFactory } from "../sidecar/identity/index.js";
+import type { Inventory, ObserverInputRow } from "../sidecar/observer/contracts.js";
+const NO_OVERSEER_MATCH = false;
 interface FixtureOptions {
-  observer: { get: () => unknown; inspect: () => unknown };
+  observer: { get: () => unknown; inspect: (id: string, expectedIdentity?: unknown) => unknown };
   token: string;
   theme?: { pack: string };
   control?: { attach: () => unknown };
@@ -999,6 +1003,451 @@ async function canvas(page: Page) {
     )
     .toBeGreaterThan(100);
 }
+async function outputFixture(root: string) {
+  const { makeObserver } = (await import(
+    pathToFileURL(path.join(root, "dist/runtime/src/sidecar/observer/index.js")).href
+  )) as { makeObserver: typeof ObserverFactory };
+  const { makeIdentityResolver } = (await import(
+    pathToFileURL(path.join(root, "dist/runtime/src/sidecar/identity/index.js")).href
+  )) as { makeIdentityResolver: typeof IdentityFactory };
+  const state = {
+    now: Date.now(),
+    output: false,
+    session: "00000000-0000-0000-0000-000000000001",
+    present: true,
+    empty: false,
+    conflicts: 0,
+    reads: 0,
+    sweeps: 0,
+    revision: 8,
+  };
+  const pane = { pane_id: "w1:p1", agent: "codex" as const, terminal_id: "terminal_one" };
+  const identities = makeIdentityResolver({
+    now: () => state.now,
+    readConfiguration: () => Promise.resolve("configured"),
+    readProcessBirth: (pid) => Promise.resolve({ pid, startSeconds: 1, startMicroseconds: 2 }),
+    rpc: (method, params) => {
+      if (method === "agent.get") return Promise.resolve({ result: { agent: pane } });
+      if (method === "pane.get")
+        return Promise.resolve({
+          result: { pane: { ...pane, scroll: { max_offset_from_bottom: 100, viewport_rows: 20 } } },
+        });
+      if (method === "pane.process_info")
+        return Promise.resolve({
+          result: { process_info: { pane_id: pane.pane_id, shell_pid: 41 } },
+        });
+      if (method === "pane.copy_motion") {
+        if (params.content_revision !== undefined && params.content_revision !== state.revision) {
+          state.conflicts++;
+          return Promise.reject(
+            Object.assign(Error("Synthetic terminal output"), { code: "IDENTITY_CONTENT_CHANGED" }),
+          );
+        }
+        return Promise.resolve({
+          result: { pane_id: pane.pane_id, content_revision: state.revision },
+        });
+      }
+      assert.equal(method, "pane.read");
+      // Synthetic activity increments content_revision; footer identity remains unchanged.
+      if (state.output) state.revision += 2;
+      return Promise.resolve({
+        result: {
+          read: {
+            pane_id: pane.pane_id,
+            source: "recent",
+            format: "text",
+            truncated: true,
+            text: "\n  " + state.session + " · GPT-6.1-Sol medium\n  ? for shortcuts\n",
+          },
+        },
+      });
+    },
+  });
+  let release = () => {};
+  let pending: Promise<void> | null = null;
+  const observer = makeObserver({
+    now: () => state.now,
+    warmDetails: false,
+    identities,
+    endpoint: "synthetic-output",
+    overseerState: {
+      read: () => Promise.resolve({ state: "empty" }),
+      match: () => Promise.resolve(NO_OVERSEER_MATCH),
+    },
+    execute: () =>
+      Promise.resolve({
+        stdout: JSON.stringify({
+          result: {
+            agents: state.present
+              ? [{ ...pane, agent_status: "working", title: "Output fixture" }]
+              : [],
+          },
+        }),
+      }),
+    projects: {
+      resolve: () =>
+        Promise.resolve({
+          projectId: "project_fixture",
+          project: "Fixture project",
+          repoId: "repo_fixture",
+          repo: "fixture-repo",
+        }),
+    },
+    desktop: {
+      inventory: () => Promise.resolve({ health: "available", windows: [], observedAt: state.now }),
+    },
+    bus: {
+      read: () =>
+        Promise.resolve({ health: "available", observedAt: state.now, reason: null, rows: [] }),
+    },
+    transcripts: {
+      retain() {},
+      read: () => Promise.resolve({ available: false }),
+      inspect: () => {
+        state.reads++;
+        return Promise.resolve({
+          available: true,
+          health: "available",
+          asOf: new Date(state.now).toISOString(),
+          reason: null,
+          generation: "output-fixture",
+          truncated: false,
+          window: {
+            maxTurns: 80,
+            maxTextChars: 8000,
+            maxTotalChars: 64000,
+            readBytes: 0,
+            maxDiskReadBytes: 64000,
+          },
+          stats: {
+            model: { value: "verified-model", state: "available" },
+            startedAt: { value: null, state: "unavailable" },
+            lastActivityAt: { value: null, state: "unavailable" },
+            durationMs: { value: null, state: "unavailable" },
+            inputTokens: { value: null, state: "unavailable" },
+            outputTokens: { value: null, state: "unavailable" },
+            cacheReadTokens: { value: null, state: "unavailable" },
+            cacheWriteTokens: { value: null, state: "unavailable" },
+          },
+          turns: Array.from({ length: 24 }, (_, index) => ({
+            id: "turn_" + String(index),
+            role: "assistant",
+            at: null,
+            text: "Verified conversation " + String(index) + "\n" + "Synthetic text. ".repeat(16),
+            textTruncated: false,
+          })),
+        });
+      },
+    },
+    helpers: {
+      prepareChildren: async (parents) => {
+        state.sweeps++;
+        if (pending) await pending;
+        const parent = parents[0];
+        return {
+          rows:
+            parent?.inspectionIdentity && !state.empty
+              ? [
+                  {
+                    id: "obs_aaaaaaaaaaaaaaaaaaaaaaaa",
+                    provider: "codex",
+                    source: "helper",
+                    sessionId: "00000000-0000-0000-0000-000000000002",
+                    inspectionIdentity: "helper:obs_aaaaaaaaaaaaaaaaaaaaaaaa",
+                    parentId: parent.id,
+                    title: "Output helper",
+                    status: "working",
+                    observedAt: state.now,
+                    inventoryHealth: "available",
+                    lifecycleEvidence: { state: "open", reason: null },
+                    taskEvidence: {
+                      state: "available",
+                      summary: "Original task",
+                      source: "fixture",
+                      observedAt: state.now,
+                    },
+                    tool: {
+                      available: true,
+                      observedAt: state.now,
+                      last: { name: "Bash", phase: "started", outcome: null, at: state.now },
+                    },
+                    usage: {
+                      inputTokens: { value: 42, state: "available" },
+                      outputTokens: null,
+                      cacheReadTokens: null,
+                      cacheWriteTokens: null,
+                      observedAt: state.now,
+                    },
+                  },
+                ]
+              : [],
+          annotations: new Map(),
+          overflow: new Map(),
+        };
+      },
+    },
+  });
+  return {
+    state,
+    observer,
+    hold: () => {
+      pending = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    },
+    release: () => {
+      pending = null;
+      release();
+    },
+  };
+}
+
+function assertHistoricalEvidence(aged: Inventory, helper: ObserverInputRow) {
+  const agedHelper = aged.sessions.find((value) => value.id === helper.id);
+  assert.ok(agedHelper);
+  assert.equal(agedHelper.observedAt, helper.observedAt);
+  assert.equal(agedHelper.taskEvidence?.observedAt, helper.taskEvidence?.observedAt);
+  assert.equal(agedHelper.usage?.observedAt, helper.usage?.observedAt);
+  assert.equal(agedHelper.tool?.available, false);
+  const { inputTokens } = aged.aggregate.usage;
+  assert.equal(inputTokens.value, null);
+  assert.equal(aged.sources.desktop.health, "available");
+}
+
+async function refreshContinuity(
+  browser: Browser,
+  root: string,
+  http: HttpModule,
+  artifacts: string,
+) {
+  const output = await outputFixture(root);
+  const { state, observer } = output;
+  const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
+  const first = await observer.get();
+  await new Promise((resolve) => setImmediate(resolve));
+  const loaded = await observer.get();
+  const parent = loaded.sessions.find((row) => row.source === "herdr");
+  const helper = loaded.sessions.find((row) => row.source === "helper");
+  assert.ok(parent?.inspectionIdentity && helper);
+  const fixture = await listen(http, { token: TOKEN, observer });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "reduce",
+  });
+  const errors = observeErrors(page);
+  try {
+    await page.clock.install({ time: state.now });
+    await page.route("**/app/main.js", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: original.replace(
+          "framePaint = new FramePaint(this);",
+          "framePaint = (window.__view = this, new FramePaint(this));",
+        ),
+      }),
+    );
+    await page.goto(fixture.url);
+    const row = page.locator('[data-session-id="' + parent.id + '"]');
+    await expect(row).toBeVisible();
+    await page.locator(".row-inspect").first().click();
+    const log = page.locator(".inspector-log");
+    const health = page.locator(".inspector-health");
+    await expect(log.locator(".turn")).toHaveCount(24);
+    await expect(page.locator(".inspector-stats")).toContainText("verified-model");
+    const snapshotTime = await page.evaluate(
+      (at) =>
+        new Date(at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      state.now,
+    );
+    await page.locator(".inspector-follow").click();
+    await page.locator(".inspector-pause").click();
+    await log.evaluate(() => {
+      const node = document.querySelector(".inspector-log");
+      if (node) node.scrollTop = 140;
+    });
+    await page.locator(".inspector-pause").focus();
+    const baseline = await page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      Reflect.set(window, "__stableTurn", document.querySelector(".turn"));
+      Reflect.set(window, "__stableRows", [...document.querySelectorAll("[data-session-id]")]);
+      const continuity = { removedTurn: false, loadingFlash: false };
+      Reflect.set(window, "__refreshContinuity", continuity);
+      const mutations = new MutationObserver((records) => {
+        const turn = Reflect.get(window, "__stableTurn") as Node;
+        if (records.some((record) => [...record.removedNodes].some((node) => node.contains(turn))))
+          continuity.removedTurn = true;
+        if (document.querySelector(".inspector-health")?.textContent.includes("Loading"))
+          continuity.loadingFlash = true;
+      });
+      mutations.observe(document.querySelector(".inspector") ?? document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      Reflect.set(window, "__refreshMutations", mutations);
+      return {
+        camera: { ...view.camera },
+        revision: view.activeScene.revision,
+        scroll: document.querySelector(".inspector-log")?.scrollTop,
+        stats: document.querySelector(".inspector-stats")?.textContent,
+      };
+    });
+    output.hold();
+    const sweeps = state.sweeps;
+    state.now += 2200;
+    await observer.get();
+    await expect.poll(() => state.sweeps).toBe(sweeps + 1);
+    state.output = true;
+    state.now += 2200;
+    const unavailable = await observer.get();
+    assert.equal(
+      unavailable.sessions.find((value) => value.id === parent.id)?.identityHealth,
+      "unavailable",
+    );
+    assert.equal(
+      state.conflicts,
+      3,
+      "unchanged footer exhausts three capture attempts under output",
+    );
+    const historical = unavailable.sessions.find((value) => value.id === helper.id);
+    assert.equal(historical?.inventoryHealth, "unavailable");
+    assert.equal(historical.observedAt, helper.observedAt);
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect(health).toContainText("Last verified snapshot · current identity unverified");
+    await expect(health).toContainText("snapshot from " + snapshotTime);
+    const reads = state.reads;
+    state.now += 7000;
+    const aged = await observer.get();
+    assertHistoricalEvidence(aged, helper);
+    await page.clock.runFor(7000);
+    await page.clock.resume();
+    assert.equal(
+      state.reads,
+      reads,
+      "historical identity cannot authorize another transcript read",
+    );
+    assert.equal(
+      state.sweeps,
+      sweeps + 1,
+      "pending helper traversal cannot overlap or become empty",
+    );
+    const helperRow = page.locator('[data-session-id="' + helper.id + '"]');
+    await expect(helperRow.locator("..").locator(".row-title")).toBeDisabled();
+    await expect(helperRow.locator("..").locator(".row-inspect")).toBeDisabled();
+    const stable = await page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const rows = Reflect.get(window, "__stableRows") as Element[];
+      return {
+        turn: Reflect.get(window, "__stableTurn") === document.querySelector(".turn"),
+        rows: rows.every((node) => node.isConnected),
+        camera: view.camera,
+        revision: view.activeScene.revision,
+        scroll: document.querySelector(".inspector-log")?.scrollTop,
+        stats: document.querySelector(".inspector-stats")?.textContent,
+      };
+    });
+    assert.equal(stable.turn, true);
+    assert.equal(stable.rows, true);
+    assert.deepEqual(stable.camera, baseline.camera);
+    assert.equal(stable.revision, baseline.revision, "uncertainty changes metadata, not geometry");
+    assert.equal(stable.scroll, baseline.scroll);
+    assert.equal(stable.stats, baseline.stats);
+    await expect(page.locator(".inspector-pause")).toBeFocused();
+    await capture(page, path.join(artifacts, "refresh-historical.png"));
+    state.output = false;
+    output.release();
+    state.now += 2200;
+    await observer.get();
+    await new Promise((resolve) => setImmediate(resolve));
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect.poll(() => state.reads).toBeGreaterThan(reads);
+    assert.equal(
+      await log
+        .locator(".turn")
+        .first()
+        .evaluate((node) => node === Reflect.get(window, "__stableTurn")),
+      true,
+      "recovery preserves loaded nodes while paused",
+    );
+    await page.locator(".inspector-pause").click();
+    await expect(health).not.toContainText("Loading");
+    const continuity = await page.evaluate(() => {
+      (Reflect.get(window, "__refreshMutations") as MutationObserver).disconnect();
+      return Reflect.get(window, "__refreshContinuity") as {
+        removedTurn: boolean;
+        loadingFlash: boolean;
+      };
+    });
+    assert.deepEqual(continuity, { removedTurn: false, loadingFlash: false });
+    await capture(page, path.join(artifacts, "refresh-recovered.png"));
+    state.empty = true;
+    state.now += 2200;
+    await observer.get();
+    await new Promise((resolve) => setImmediate(resolve));
+    const empty = await observer.get();
+    assert.equal(
+      empty.sessions.some((value) => value.id === helper.id),
+      false,
+    );
+    assert.ok(state.sweeps > sweeps + 1, "a completed accepted sweep replaces retained helpers");
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect(helperRow).toHaveCount(0);
+    state.empty = false;
+    state.now += 2200;
+    await observer.get();
+    await new Promise((resolve) => setImmediate(resolve));
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect(helperRow).toBeVisible();
+    state.session = "00000000-0000-0000-0000-000000000003";
+    state.now += 2200;
+    await observer.get();
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect(log.locator(".turn")).toHaveCount(0);
+    await expect(page.locator(".inspector-stats")).not.toContainText("verified-model");
+    state.present = false;
+    state.now += 2200;
+    await observer.get();
+    await page.clock.runFor(2200);
+    await page.clock.resume();
+    await expect(helperRow).toHaveCount(0);
+    await expect(log.locator(".turn")).toHaveCount(0);
+    assert.deepEqual(errors, []);
+    return {
+      realCaptureConflicts: state.conflicts,
+      fixedFooter: first.sessions[0]?.inspectionIdentity,
+      historicalNodesAndStats: true,
+      focusScrollCamera: true,
+      oldHelperEvidence: true,
+      deniedReads: true,
+      disabledHistoricalActions: true,
+      originalSnapshotTime: true,
+      pendingSweepAndNoLoadingFlash: true,
+      authoritativeEmptyResult: true,
+      recovery: true,
+      replacementAndRemoval: true,
+      screenshots: ["refresh-historical.png", "refresh-recovered.png"],
+    };
+  } finally {
+    output.release();
+    await page.close();
+    await observer.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}
 async function runBrowserConsumer(root: string) {
   const artifacts = await fs.mkdtemp(path.join(os.tmpdir(), "observer-browser-evidence-"));
   const http = (await import(
@@ -1022,6 +1471,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
+    const stableRefresh = await refreshContinuity(browser, root, http, artifacts);
     const annexes = await nativeCanvas(browser, root, http, artifacts);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
@@ -1058,6 +1508,7 @@ async function runBrowserConsumer(root: string) {
       canvas: true,
       nativeCanvasClicks: true,
       annexes,
+      stableRefresh,
       helperCrew: {
         initialDisplayed: 20,
         initialRetainedRecords: 76,

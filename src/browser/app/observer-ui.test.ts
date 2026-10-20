@@ -3267,7 +3267,7 @@ test("observer-ui regression contracts", async () => {
         );
         assert.deepEqual([...subs.keys()], ["observer.inspect.obs_8"]);
         assert.equal(document.activeElement, partOf(present(top()), "inspector-title"));
-        // Covered entries are reconciled: a stale or lost row withdraws its kept rows during covered.
+        // Covered entries retain transcript history during uncertainty without polling.
         const covered = roots().find(
           (root) => present(partOf(root, "inspector-title")).textContent === "Codex · 6",
         );
@@ -3292,8 +3292,12 @@ test("observer-ui regression contracts", async () => {
         );
         assert.deepEqual(
           turnsOf(present(covered)),
-          [],
-          "a covered panel is withdrawn when its row goes stale",
+          ["k1"],
+          "a covered panel retains historical transcript when its row goes stale",
+        );
+        assert.match(
+          present(partOf(present(covered), "inspector-health")).textContent,
+          /Last verified snapshot · current identity unverified/,
         );
         assert.equal(subs.has("observer.inspect.obs_5"), false, "and is still not read");
         notify(live, settled(inventory()));
@@ -3303,7 +3307,11 @@ test("observer-ui regression contracts", async () => {
           subs.has("observer.inspect.obs_5"),
           "a revealed panel whose row recovered reads again",
         );
-        assert.deepEqual(turnsOf(present(covered)), [], "with no stale rows shown");
+        assert.deepEqual(
+          turnsOf(present(covered)),
+          ["k1"],
+          "history survives same-identity recovery",
+        );
         // Hidden: every panel suspends; after fresh proof only the top reads again.
         present(titleButton("obs_9")).emit("click");
         document.hidden = true;
@@ -3377,13 +3385,89 @@ test("observer-ui regression contracts", async () => {
           paneId: null,
           title: "Ada",
         };
-        const withHelper = (parentId: string, drop: string | null = null) =>
+        const withHelper = (
+          parentId: string,
+          drop: string | null = null,
+          inventoryHealth: "available" | "unavailable" = "available",
+        ) =>
           inventory((originalData) => {
             const data = { ...originalData };
             data.sessions = data.sessions.filter((row) => row.id !== drop);
-            data.sessions.push({ ...helperRow, parentId, observedAt: Date.now() });
+            data.sessions.push({
+              ...helperRow,
+              parentId,
+              inventoryHealth,
+              observedAt: Date.now(),
+            });
             return data;
           });
+        const helperSnapshot = (parentId: string, turns: string[], model: string) =>
+          snapshot("hlp_x", turns, {
+            inspectionIdentity: "helper:hlp_x|" + parentId,
+            stats: { model: { value: model, state: "available" } },
+          });
+        notify(live, settled(withHelper("obs_0", null, "unavailable")));
+        const historicalItem = item("hlp_x"),
+          historicalTitle = present(titleButton("hlp_x")),
+          historicalInspect = present(magnifier("hlp_x"));
+        assert.equal(historicalTitle.disabled, true, "historical helper titles are disabled");
+        assert.equal(historicalInspect.disabled, true, "historical helper inspection is disabled");
+        historicalTitle.emit("click");
+        historicalInspect.emit("click");
+        present(view5.onTitleToggle)("hlp_x");
+        assert.equal(
+          roots().length,
+          0,
+          "synthetic and canvas events cannot open historical helpers",
+        );
+        assert.equal(subs.size, 0, "historical helper entrypoints start no reads");
+        notify(
+          live,
+          settled(
+            inventory((data) => ({
+              ...data,
+              sessions: [...data.sessions, { ...helperRow, observedAt: Date.now() - 7000 }],
+            })),
+          ),
+        );
+        assert.equal(
+          historicalInspect.disabled,
+          true,
+          "expired helper evidence cannot open a panel",
+        );
+        notify(live, settled(withHelper("obs_0")));
+        assert.equal(item("hlp_x"), historicalItem, "recovery preserves the helper row");
+        assert.equal(historicalTitle.disabled, false);
+        assert.equal(historicalInspect.disabled, false);
+        present(view5.onTitleToggle)("hlp_x");
+        assert(subs.has("observer.inspect.hlp_x"), "recovery reenables canvas opening");
+        notify(live, settled(withHelper("obs_0", null, "unavailable")));
+        present(docEvents.keydown)({ key: "Escape", preventDefault() {} });
+        assert.equal(roots().length, 0, "historical panels remain closable with Escape");
+        historicalTitle.emit("click");
+        assert.equal(roots().length, 0, "a closed historical panel cannot reopen");
+        notify(
+          live,
+          settled(
+            inventory((data) => ({
+              ...data,
+              sessions: [
+                ...data.sessions,
+                {
+                  ...helperRow,
+                  source: "herdr",
+                  observedAt: Date.now() - 7000,
+                },
+              ],
+            })),
+          ),
+        );
+        assert.equal(
+          historicalTitle.disabled,
+          false,
+          "native helper annotations keep native opening policy",
+        );
+        assert.equal(historicalInspect.disabled, false);
         notify(live, settled(withHelper("obs_0")));
         present(titleButton("obs_0")).emit("click");
         const parentPanel = top(),
@@ -3426,6 +3510,10 @@ test("observer-ui regression contracts", async () => {
         notify(live, settled(withHelper("obs_0")));
         present(titleButton("hlp_x")).emit("click");
         assert(subs.has("observer.inspect.hlp_x"));
+        present(subs.get("observer.inspect.hlp_x"))(
+          helperSnapshot("obs_0", ["old-parent"], "old-parent-model"),
+        );
+        assert.deepEqual(turnsOf(present(top())), ["old-parent"]);
         notify(live, settled(withHelper("obs_1")));
         assert.equal(
           subs.has("observer.inspect.hlp_x"),
@@ -3436,19 +3524,55 @@ test("observer-ui regression contracts", async () => {
           present(partOf(present(top()), "inspector-health")).textContent,
           /different session/,
         );
+        assert.deepEqual(turnsOf(present(top())), [], "reparenting clears loaded text");
         present(titleButton("hlp_x")).emit("click");
         assert.equal(roots().length, 1, "opening it again replaces the obsolete panel");
         assert(subs.has("observer.inspect.hlp_x"));
+        const helperPanel = present(top()),
+          helperPart = (name: string) => present(partOf(helperPanel, name)),
+          helperRead = present(subs.get("observer.inspect.hlp_x"));
+        helperRead(helperSnapshot("obs_1", ["verified"], "verified-model"));
+        const helperTurns = helperPart("inspector-log").children.slice(),
+          helperModel = child(child(helperPart("inspector-stats"), 0), 1);
+        assert.equal(helperModel.textContent, "verified-model");
+        helperPart("inspector-pause").emit("click");
+        helperRead(helperSnapshot("obs_1", ["verified", "held"], "held-model"));
+        assert.match(helperPart("inspector-buffer").textContent, /1 new held/);
+        notify(live, settled(withHelper("obs_1", null, "unavailable")));
+        assert.equal(subs.has("observer.inspect.hlp_x"), false);
+        assert.deepEqual(helperPart("inspector-log").children, helperTurns);
+        assert.equal(helperModel.textContent, "verified-model");
+        assert.match(helperPart("inspector-health").textContent, /Last verified snapshot/);
+        assert.match(helperPart("inspector-buffer").textContent, /1 new held/);
+        assert.equal(present(titleButton("hlp_x")).disabled, true);
+        assert.equal(present(magnifier("hlp_x")).disabled, true);
+        assert.equal(present(titleButton("hlp_x")).attributes.get("aria-expanded"), "false");
+        assert.equal(present(magnifier("hlp_x")).attributes.has("aria-controls"), false);
+        present(titleButton("hlp_x")).emit("click");
+        present(magnifier("hlp_x")).emit("click");
+        present(view5.onTitleToggle)("hlp_x");
+        assert.equal(top(), helperPanel, "unavailable entrypoints leave the historical panel open");
+        assert.equal(subs.size, 0, "unavailable entrypoints cannot restart a historical read");
+        notify(live, settled(withHelper("obs_1")));
+        const recoveredHelperRead = present(subs.get("observer.inspect.hlp_x"));
+        assert.deepEqual(helperPart("inspector-log").children, helperTurns);
         notify(live, settled(withHelper("obs_1", "obs_1")));
         assert.equal(
           subs.has("observer.inspect.hlp_x"),
           false,
           "a helper whose parent left is withheld",
         );
-        assert.equal(
-          present(partOf(present(top()), "inspector-health")).textContent,
-          ObserverInspector.REASONS["inventory-unavailable"],
-        );
+        assert.deepEqual(turnsOf(helperPanel), [], "parent removal clears loaded text");
+        assert.equal(helperModel.textContent, "Unavailable", "parent removal clears stats");
+        assert.doesNotMatch(helperPart("inspector-buffer").textContent, /held/);
+        assert.match(helperPart("inspector-health").textContent, /left the roster/);
+        const withdrawnHealth = helperPart("inspector-health").textContent;
+        helperRead(helperSnapshot("obs_1", ["obsolete"], "obsolete-model"));
+        recoveredHelperRead(helperSnapshot("obs_1", ["late"], "late-model"));
+        helperPart("inspector-pause").emit("click");
+        assert.deepEqual(turnsOf(helperPanel), [], "late reads and unpause cannot restore text");
+        assert.equal(helperModel.textContent, "Unavailable");
+        assert.equal(helperPart("inspector-health").textContent, withdrawnHealth);
         present(docEvents.keydown)({ key: "Escape", preventDefault() {} });
         notify(live, settled(inventory()));
         // Mail is proved by the current transport: an old unchanged copy time and down agent sources still allow reading.

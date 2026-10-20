@@ -23,16 +23,11 @@ export class Publisher {
       const previous = this.state.sourceRows("herdr").find((value) => value.id === row.id);
       return { ...row, tool: previous?.tool || row.tool, usage: previous?.usage || null };
     });
-    let children: ObserverInputRow[] =
-      this.state.herdrSource.health === "available"
-        ? []
-        : this.state
-            .sourceRows("helper")
-            .map((row) => ({ ...row, inventoryHealth: "unavailable" }));
+    let children: ObserverInputRow[] = [];
     if (this.state.lineage) {
       const publication = new Publication(this.state, this.state.lineage, roots);
       roots = publication.roots(roots);
-      if (this.state.herdrSource.health === "available") children = publication.children();
+      children = publication.children();
       publication.commit();
     }
     const roster = [...roots, ...children];

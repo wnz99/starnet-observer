@@ -38,6 +38,7 @@ export class SessionRow<N extends AppNode, R extends SpriteResource> {
       const row = options.state.byId.get(id);
       if (!row) return;
       const target = options.panels.agentTarget(row);
+      if (!target) return;
       if (!options.panels.isOpenTarget(target)) options.select(id);
       options.panels.togglePanel(target, this.view.inspect);
     });
