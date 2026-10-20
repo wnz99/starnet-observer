@@ -15,6 +15,7 @@ import type {
   Owners,
   Sweep,
   Lineage,
+  PublishedLineage,
   WarmTarget,
   Inventory,
   ObserverOptions,
@@ -48,6 +49,7 @@ export class State {
   enrichment: Promise<unknown> | null = null;
   enrichmentTarget: Sweep | null = null;
   lineage: Lineage | null = null;
+  publishedLineage: PublishedLineage | null = null;
   desktopPending: Promise<void> | null = null;
   busPending: Promise<void> | null = null;
   summaries = new Map<string, { owners: Owners; tool: Tool; observedAt: number | string }>();

@@ -1,9 +1,8 @@
 import type { InspectorNode } from "./dom.js";
 import type { ViewOptions } from "./types.js";
 import { clock, REASONS } from "./format.js";
-import { age } from "../model/description.js";
 import { InspectionRows } from "./rows.js";
-import { isSnapshot, PROVENANCE } from "./validation.js";
+import { isLoaded, isSnapshot, PROVENANCE } from "./validation.js";
 import type { InspectionDisplay } from "./validation.js";
 const END_SCROLL_MARGIN = 24;
 export class InspectionView<N extends InspectorNode> {
@@ -14,6 +13,7 @@ export class InspectionView<N extends InspectorNode> {
   private follow = true;
   private paused = false;
   private unseen = 0;
+  private retainedReason: string | null = null;
   private disposed = false;
   private readonly listeners: { node: N; event: string; listener: () => void }[] = [];
   constructor(private readonly options: ViewOptions<N>) {
@@ -105,6 +105,7 @@ export class InspectionView<N extends InspectorNode> {
     this.paused = false;
   }
   restart() {
+    this.retainedReason = null;
     this.last = null;
     this.windowed = false;
     this.resetLog();
@@ -113,6 +114,7 @@ export class InspectionView<N extends InspectorNode> {
     this.controls();
   }
   withhold(message: string) {
+    this.retainedReason = null;
     this.last = null;
     this.resetLog();
     this.rows.stats(null);
@@ -120,6 +122,7 @@ export class InspectionView<N extends InspectorNode> {
     this.health(message, "unavailable");
   }
   hidden() {
+    this.retainedReason = null;
     this.last = null;
     this.resetLog();
     this.rows.stats(null);
@@ -127,6 +130,7 @@ export class InspectionView<N extends InspectorNode> {
     this.controls();
   }
   withdrawSnapshot(message: string, state: string) {
+    this.retainedReason = null;
     this.last = null;
     this.rows.stats(null);
     this.resetLog();
@@ -144,6 +148,19 @@ export class InspectionView<N extends InspectorNode> {
     empty.textContent = "No conversation is shown while the session is unavailable.";
     this.controls();
   }
+  retainTranscript(message: string): boolean {
+    if (!this.last || this.last.health !== "available" || this.windowed || isLoaded(this.last))
+      return false;
+    this.retainedReason = message;
+    this.health(
+      "Last verified snapshot · current identity unverified · snapshot from " +
+        clock(this.last.asOf) +
+        " · " +
+        message,
+      "stale",
+    );
+    return true;
+  }
   failed(message: string) {
     if (/\bhttp 404\b/.test(message)) {
       this.last = null;
@@ -158,21 +175,25 @@ export class InspectionView<N extends InspectorNode> {
       );
       return;
     }
-    this.health(
-      this.last
-        ? "Stale · could not refresh · snapshot from " +
-            age(this.last.asOf, this.options.now?.() ?? Date.now())
-        : "The inspector service could not be reached.",
-      "stale",
-    );
+    if (!this.retainTranscript("Could not refresh: " + message))
+      this.health("The inspector service could not be reached.", "stale");
   }
   receive(data: InspectionDisplay) {
     if (data.health !== "available") {
+      if (
+        ["inventory-unavailable", "identity-unavailable", "transcript-unavailable"].includes(
+          data.reason ?? "",
+        ) &&
+        this.retainTranscript(REASONS[data.reason ?? ""] ?? "Inspector data is unavailable.")
+      )
+        return;
+      this.retainedReason = null;
       this.last = data;
       this.rows.stats(data.stats);
       this.unavailable(data.reason);
       return;
     }
+    this.retainedReason = null;
     if (isSnapshot(data)) {
       this.windowed = true;
       this.paused = false;
@@ -198,7 +219,8 @@ export class InspectionView<N extends InspectorNode> {
     else if (!result.fresh) this.unseen += result.added;
     this.controls();
     this.notice(data);
-    this.health("Snapshot as of " + clock(data.asOf), "available");
+    if (this.retainedReason) this.retainTranscript(this.retainedReason);
+    else this.health("Snapshot as of " + clock(data.asOf), "available");
   }
   private notice(data: InspectionDisplay) {
     const { get } = this.options;

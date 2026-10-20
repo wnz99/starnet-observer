@@ -24,7 +24,8 @@ class PanelDescriptions {
   }
   agentTarget(row: AppRow): AgentTarget | null {
     const { state } = this.options;
-    return state.latest?.data?.presentation
+    // Retained helper history has no current opening authority; an existing panel keeps its description below.
+    return state.latest?.data?.presentation || (row.source === "helper" && state.rowStale(row))
       ? null
       : { kind: "agent", id: row.id, identity: this.targetIdentity(row) };
   }
@@ -46,10 +47,10 @@ class PanelDescriptions {
     const { state, format } = this.options;
     const row = state.byId.get(id);
     if (!row) return null;
-    // Eligibility is the row's own freshness; a helper also needs its exact parent still in the roster.
-    const eligible =
-      !state.rowStale(row) &&
-      (!isHelper(row) || (typeof row.parentId === "string" && state.byId.has(row.parentId)));
+    // A missing parent withdraws this conversation; source uncertainty only stops further reading.
+    if (isHelper(row) && (typeof row.parentId !== "string" || !state.byId.has(row.parentId)))
+      return null;
+    const eligible = !state.rowStale(row);
     return {
       name: format.workerName(row),
       identity: this.targetIdentity(row),

@@ -29,6 +29,7 @@ class Inspector<N extends InspectorNode> {
   private expected: string | null = null;
   private identity: string | null | undefined;
   private unsubscribe: (() => void) | null = null;
+  private subscriptionGeneration = 0;
   private seen: unknown = null;
   private suspended = false;
   private held: string | null | undefined;
@@ -84,7 +85,7 @@ class Inspector<N extends InspectorNode> {
       return;
     }
     if (!snapshot.hasData) {
-      this.view.health("Loading snapshot…", "loading");
+      if (!this.view.last) this.view.health("Loading snapshot…", "loading");
       return;
     }
     this.receiveData(snapshot.data);
@@ -104,6 +105,8 @@ class Inspector<N extends InspectorNode> {
   private poll() {
     if (this.isDisposed() || this.id === null) return;
     const key = "observer.inspect." + this.id;
+    const generation = ++this.subscriptionGeneration,
+      expected = this.expected;
     this.options.QuerySpine.define(key, {
       path:
         "/api/observer/sessions/" +
@@ -118,12 +121,18 @@ class Inspector<N extends InspectorNode> {
     });
     if (this.isDisposed()) return;
     const unsubscribe = this.options.QuerySpine.subscribe(key, (snapshot) => {
-      if ("observer.inspect." + (this.id ?? "null") === key) this.receive(snapshot);
+      if (
+        generation === this.subscriptionGeneration &&
+        expected === this.expected &&
+        "observer.inspect." + (this.id ?? "null") === key
+      )
+        this.receive(snapshot);
     });
-    if (this.isDisposed()) unsubscribe();
+    if (this.isDisposed() || generation !== this.subscriptionGeneration) unsubscribe();
     else this.unsubscribe = unsubscribe;
   }
   private stop() {
+    this.subscriptionGeneration++;
     const unsubscribe = this.unsubscribe;
     this.unsubscribe = null;
     unsubscribe?.();
@@ -151,27 +160,41 @@ class Inspector<N extends InspectorNode> {
     this.identity = null;
     this.withhold(message);
   }
-  private sync() {
-    if (this.isDisposed() || this.id === null || this.suspended || this.locked) return;
-    const row = this.row(),
-      next = readableIdentity(row);
+  private uncertain(row: RosterDescription) {
+    this.stop();
     if (this.isDisposed()) return;
-    if (next !== null && next !== this.expected) {
-      this.lock(REPLACED);
-      return;
-    }
+    if (!this.view.retainTranscript(missing(row))) this.view.withhold(missing(row));
+  }
+  private syncIdentity(row: RosterDescription) {
+    const next = readableIdentity(row);
     if (next === this.identity) return;
     this.identity = next;
-    if (next === null) this.withhold(missing(row));
-    else this.restart();
+    if (next === null) this.uncertain(row);
+    else if (this.view.last?.health === "available" && !this.view.windowed) {
+      if (!this.covered) this.poll();
+    } else this.restart();
+  }
+  private sync() {
+    if (this.isDisposed() || this.id === null || this.suspended || this.locked) return;
+    const row = this.row();
+    if (this.isDisposed()) return;
+    if (!row) {
+      this.identity = null;
+      this.withhold(missing(row));
+      return;
+    }
+    if (row.identity !== null && row.identity !== this.expected) this.lock(REPLACED);
+    else this.syncIdentity(row);
   }
   open(next: string, target?: string | null) {
     if (this.isDisposed()) return;
     if (!next) return;
+    this.stop();
     this.id = next;
     this.expected = target ?? null;
     this.identity = undefined;
     this.view.open();
+    this.view.restart();
     this.suspended = false;
     this.locked = false;
     this.covered = false;

@@ -39,6 +39,134 @@ interface ReadCall {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
 }
+test("transcript history survives uncertain proof without granting reads or accepting old callbacks", () => {
+  const { get } = Inspector.buildPanel(fixtureDocument, 1);
+  const callbacks: ((snapshot: QuerySnapshot) => void)[] = [];
+  let subscriptions = 0;
+  let row: { identity: string | null; inventory: string } | null = {
+    identity: "codex:stable",
+    inventory: "available",
+  };
+  const inspector = Inspector.createInspector({
+    get,
+    document: fixtureDocument,
+    QuerySpine: {
+      define() {},
+      subscribe(_key, callback) {
+        subscriptions++;
+        callbacks.push(callback);
+        callback(querySnapshot({ hasData: false }));
+        return () => {};
+      },
+    },
+    describe: () => row && { name: "Codex", stale: false, title: "Task", meta: [], ...row },
+  });
+  const available = (text = "verified", extra: Record<string, unknown> = {}) =>
+    querySnapshot({
+      data: {
+        id: "obs_a",
+        health: "available",
+        inspectionIdentity: "codex:stable",
+        asOf: "2026-10-11T21:00:00.000Z",
+        generation: "stable",
+        provenance: { kind: "transcript" },
+        stats: { model: { value: "model", state: "available" } },
+        turns: [{ id: text, role: "user", text }],
+        ...extra,
+      },
+    });
+  inspector.open("obs_a", "codex:stable");
+  const original = at(callbacks, 0);
+  original(available());
+  const originalTime = get("inspector-health").textContent.replace("Snapshot as of ", "");
+  const log = get("inspector-log"),
+    node = log.child(0),
+    stat = get("inspector-stats").child(0);
+  log.scrollTop = 42;
+  log.emit("scroll");
+  original(querySnapshot({ ...available(), pending: true }));
+  get("inspector-pause").emit("click");
+  original(available("buffered"));
+  for (const proof of [
+    { identity: null, inventory: "available" },
+    { identity: "codex:stable", inventory: "unavailable" },
+  ]) {
+    row = proof;
+    inspector.roster();
+    original(available("discarded"));
+    assert.equal(log.child(0), node);
+    assert.equal(log.scrollTop, 42);
+    assert.equal(get("inspector-stats").child(0), stat);
+    assert.equal(get("inspector-stats").child(0).child(1).textContent, "model");
+    assert.match(
+      get("inspector-health").textContent,
+      /Last verified snapshot · current identity unverified/,
+    );
+    assert(get("inspector-health").textContent.includes(originalTime));
+    assert.equal(get("inspector").dataset.health, "stale");
+    assert.equal(get("inspector-pause").attributes.get("aria-pressed"), "true");
+    assert.match(get("inspector-buffer").textContent, /1 new held/);
+    assert.equal(subscriptions, 1, "uncertain rows never read");
+  }
+  row = { identity: "codex:stable", inventory: "available" };
+  inspector.roster();
+  assert.equal(subscriptions, 2);
+  assert.equal(log.child(0), node, "resubscription has no loading reset");
+  original(available("late"));
+  assert.equal(log.child(0), node, "same-target obsolete callback is rejected");
+  get("inspector-pause").emit("click");
+  assert.equal(log.child(0).dataset.turnId, "buffered", "pending buffer survives uncertainty");
+  assert.equal(get("inspector").dataset.health, "stale", "old buffered text stays historical");
+  const current = at(callbacks, 1);
+  current(available());
+  for (const reason of [
+    "inventory-unavailable",
+    "identity-unavailable",
+    "transcript-unavailable",
+  ]) {
+    const displayed = log.child(0);
+    current(available("", { health: "unavailable", reason, turns: [] }));
+    assert.equal(log.child(0), displayed);
+    assert.equal(get("inspector").dataset.health, "stale");
+  }
+  current(available());
+  assert.equal(get("inspector").dataset.health, "available");
+  row = null;
+  inspector.roster();
+  assert.equal(log.children.length, 0, "positive removal clears history");
+  row = { identity: "codex:stable", inventory: "available" };
+  for (const reason of ["unknown-session", "invalid-identity"]) {
+    inspector.open("obs_a", "codex:stable");
+    const callback = requiredValue(callbacks.at(-1));
+    callback(available());
+    callback(available("", { health: "unavailable", reason, turns: [], stats: null }));
+    assert.equal(log.children.length, 0, reason + " clears transcript");
+  }
+  inspector.open("obs_a", "codex:stable");
+  const mismatch = requiredValue(callbacks.at(-1));
+  mismatch(available());
+  get("inspector-pause").emit("click");
+  mismatch(available("held before mismatch"));
+  mismatch(available("", { health: "unavailable", reason: "identity-mismatch", turns: [] }));
+  mismatch(available("late after mismatch"));
+  get("inspector-pause").emit("click");
+  assert.equal(log.children.length, 0, "mismatch discards paused buffer and locks old callbacks");
+  inspector.roster();
+  assert.match(get("inspector-health").textContent, /different session/);
+  inspector.open("obs_a", "codex:stable");
+  requiredValue(callbacks.at(-1))(available());
+  row = { identity: null, inventory: "available" };
+  inspector.open("obs_b", null);
+  assert.equal(log.children.length, 0, "new unreadable target never inherits old text");
+  assert.equal(get("inspector").dataset.health, "unavailable");
+  row = { identity: "codex:stable", inventory: "available" };
+  inspector.open("obs_a", "codex:stable");
+  requiredValue(callbacks.at(-1))(available());
+  row = { identity: "codex:replacement", inventory: "unavailable" };
+  inspector.roster();
+  assert.equal(log.children.length, 0, "positive replacement clears even with unavailable source");
+  inspector.dispose();
+});
 test("original inspector formatting, follow, pause, visibility locks and stable nodes", () => {
   focusCalls.length = 0;
   {
@@ -357,15 +485,20 @@ test("original inspector formatting, follow, pause, visibility locks and stable 
     }),
   );
   assert.equal(el("inspector").dataset.health, "stale");
-  assert.match(el("inspector-health").textContent, /^Stale · could not refresh/);
+  assert.match(el("inspector-health").textContent, /^Last verified snapshot/);
   assert.equal(log.children.length, 1);
   feed(
     "obs_a",
     snapshot([], { health: "unavailable", reason: "transcript-unavailable", generation: null }),
   );
-  assert.equal(log.children.length, 0);
-  assert.equal(el("inspector-health").textContent, Inspector.REASONS["transcript-unavailable"]);
-  expect(el("inspector-empty").hidden).toBeFalse();
+  assert.equal(log.children.length, 1);
+  assert.match(el("inspector-health").textContent, /Last verified snapshot/);
+  assert(
+    el("inspector-health").textContent.includes(
+      requiredValue(Inspector.REASONS["transcript-unavailable"]),
+    ),
+  );
+  expect(el("inspector-empty").hidden).toBeTrue();
   feed(
     "obs_a",
     querySnapshot({ hasData: false, data: null, error: { name: "Error", message: "http 404" } }),
@@ -400,9 +533,9 @@ test("original inspector formatting, follow, pause, visibility locks and stable 
   );
   roster.set("obs_a", { identity: "codex:s9", inventory: "unavailable" });
   inspector.roster();
-  assert.equal(log.children.length, 0);
+  assert.equal(log.children.length, 1);
   expect(live.has("observer.inspect.obs_a"), "an unavailable inventory stops the read").toBeFalse();
-  assert.equal(el("inspector-health").textContent, Inspector.REASONS["inventory-unavailable"]);
+  assert.match(el("inspector-health").textContent, /Last verified snapshot/);
   roster.set("obs_a", { identity: "codex:s9", inventory: "available" });
   inspector.roster();
   assert(live.has("observer.inspect.obs_a"), "recovery restarts the read");
@@ -802,6 +935,27 @@ test("original real-query cover transcript identity and window re-read", async (
   await flush();
   at(reads, 0).resolve(data("g1", ["t1", "t2"]));
   await flush();
+  const verifiedNodes = own("inspector-log").children.slice();
+  void Q.refresh("observer.inspect.obs_t").catch(() => {});
+  await flush();
+  const uncertainRead = at(reads, reads.length - 1);
+  row.inventory = "unavailable";
+  view.roster();
+  const stoppedReads = reads.length;
+  uncertainRead.resolve(data("g1", ["discarded uncertain answer"]));
+  view.roster();
+  await flush();
+  assert.equal(reads.length, stoppedReads, "real query cannot read while inventory is unavailable");
+  assert.deepEqual(own("inspector-log").children, verifiedNodes);
+  assert.match(own("inspector-health").textContent, /Last verified snapshot/);
+  row.inventory = "available";
+  view.roster();
+  await flush();
+  assert.equal(reads.length, stoppedReads + 1);
+  assert.deepEqual(own("inspector-log").children, verifiedNodes, "recovery has no loading flash");
+  at(reads, reads.length - 1).resolve(data("g1", ["t1", "t2"]));
+  await flush();
+  assert.deepEqual(own("inspector-log").children, verifiedNodes, "equal recovery keeps real nodes");
   own("inspector-pause").emit("click");
   const nodes = own("inspector-log").children.slice();
   void Q.refresh("observer.inspect.obs_t").catch(() => {});

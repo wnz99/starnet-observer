@@ -8,9 +8,9 @@ export const MOBILE = "(max-width: 850px)";
 export const REASONS: Readonly<Record<string, string>> = {
   "unknown-session": "This session is no longer known to the observer.",
   "inventory-unavailable":
-    "This session's source is unavailable or not refreshed, so no conversation is shown.",
+    "This session's source is unavailable or not refreshed; further reading is stopped.",
   "identity-unavailable":
-    "The conversation behind this row could not be identified, so none is shown.",
+    "The conversation behind this row could not be identified; further reading is stopped.",
   "transcript-unavailable": "The transcript for this session could not be read.",
   "loaded-ui-unavailable": "No loaded conversation text could be read from this app window.",
   "identity-mismatch": "This row now shows a different session; open it again to read it.",

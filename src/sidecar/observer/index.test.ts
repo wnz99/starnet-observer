@@ -146,6 +146,7 @@ test("observer regression contracts", async () => {
     await overseerRoles();
     await progressivePublication();
     await progressiveOwnership();
+    await historicalLineage();
     await progressiveOptionalFreshness();
     await sparseEvidenceShape();
     await receiverAdapters();
@@ -816,7 +817,12 @@ test("observer regression contracts", async () => {
       clock += 3000;
       fail = true;
       result = await observer.get();
-      assert(result.sessions.every((row) => !row.parentId));
+      assert.equal(
+        must(result.sessions[1]).parentId,
+        must(result.sessions[0]).id,
+        "source outage preserves last-known grouping",
+      );
+      assert(result.sessions.every((row) => row.inventoryHealth === "unavailable"));
       assert.equal((await observer.inspect(helper.id)).reason, "unknown-session");
       clock += 3000;
       fail = false;
@@ -3331,6 +3337,234 @@ test("observer regression contracts", async () => {
       summary.resolve();
       helper.resolve();
       await observer.close();
+    }
+  }
+
+  async function historicalLineage() {
+    for (const replacement of [
+      "session",
+      "process",
+      "terminal",
+      "provider",
+      "removed",
+      "empty",
+      "recover",
+    ]) {
+      let clock = 1000,
+        uncertain = false,
+        unavailable = false,
+        replaced = false,
+        sweeps = 0,
+        reads = 0;
+      const pending = deferred(),
+        bindings = new Set<string>(),
+        child = "obs_" + "c".repeat(24),
+        grandchild = "obs_" + "d".repeat(24);
+      const observer = makeCoreObserver(
+        progressiveOptions({
+          now: () => clock,
+          execute: () =>
+            settled(() => {
+              if (unavailable) throw Error("fixture unavailable");
+              return {
+                stdout: JSON.stringify({
+                  result: {
+                    agents:
+                      replaced && replacement === "removed"
+                        ? []
+                        : [
+                            {
+                              ...pane("root"),
+                              agent: replaced && replacement === "provider" ? "claude" : "codex",
+                              agent_status: uncertain ? "idle" : "working",
+                            },
+                          ],
+                  },
+                }),
+              };
+            }),
+          identities: {
+            resolveMany: (rows) =>
+              settled(() =>
+                rows.map(() => {
+                  const identity =
+                    replaced && replacement === "session"
+                      ? "00000000-0000-0000-0000-000000000002"
+                      : ID;
+                  return {
+                    sessionId: uncertain ? null : identity,
+                    source: uncertain ? "unavailable" : "footer",
+                    proof: uncertain
+                      ? null
+                      : {
+                          provider: "codex" as const,
+                          paneId: "root",
+                          terminalId:
+                            replaced && replacement === "terminal" ? "new-terminal" : "terminal",
+                          sessionId: identity,
+                          birth: {
+                            pid: replaced && replacement === "process" ? 8 : 7,
+                            startSeconds: 1,
+                            startMicroseconds: 2,
+                          },
+                          contentRevision: 1,
+                          observedAt: clock,
+                        },
+                  };
+                }),
+              ),
+            revalidateAll: () => settled(() => true),
+          },
+          transcripts: { retain() {}, read: () => settled(() => ({ available: false })) },
+          helpers: {
+            prepareChildren: async (parents) => {
+              const sweep = ++sweeps;
+              if (sweep > 1) await pending.promise;
+              const rows: ObserverInputRow[] =
+                sweep === 1 || replacement === "recover"
+                  ? [child, grandchild].map((id, index) => ({
+                      id,
+                      source: "helper",
+                      provider: "codex",
+                      sessionId: index
+                        ? "00000000-0000-0000-0000-00000000000d"
+                        : "00000000-0000-0000-0000-00000000000c",
+                      parentId: index ? child : must(parents[0]).id,
+                      inventoryHealth: "available",
+                      inspectionIdentity: "helper:" + id,
+                      observedAt: sweep === 1 ? 777 + index : clock,
+                      status: "working",
+                      usage: usageFixture({
+                        observedAt: 700,
+                        inputTokens: { value: 42, state: "available" },
+                      }),
+                      taskEvidence: {
+                        state: "available",
+                        summary: "Original task",
+                        source: "fixture",
+                        observedAt: 701,
+                      },
+                      lifecycleEvidence: {
+                        state: "open",
+                        reason: null,
+                        source: "fixture",
+                        observedAt: 702,
+                      },
+                      taskStatusEvidence: { status: "running", source: "fixture", observedAt: 703 },
+                      tool: { available: false },
+                    }))
+                  : [];
+              return {
+                rows,
+                annotations: new Map<string, Partial<ObserverInputRow>>(),
+                overflow: new Map<string, number>(),
+                commitBindings(ids) {
+                  bindings.clear();
+                  for (const row of rows) if (ids.has(row.id)) bindings.add(row.id);
+                },
+              };
+            },
+            inspect: () =>
+              settled(() => {
+                reads++;
+                return inspection({ available: true });
+              }),
+          },
+        }),
+      );
+      try {
+        await observer.get();
+        const first = await inventoryWhen(observer, (data) => data.sessions.length === 3);
+        const { usage: firstUsage } = first.aggregate;
+        assert.equal(firstUsage.inputTokens.value, 84, "fresh helpers initially contribute usage");
+        assert.equal(bindings.size, 2);
+        uncertain = true;
+        clock = 3000;
+        const lost = await observer.get();
+        assert.equal(lost.sessions.length, 3, "temporary identity loss retains published ancestry");
+        assert.equal(must(lost.sessions[0]).inspectionIdentity, null);
+        assert.equal(
+          must(lost.sessions[0]).status,
+          "idle",
+          "fresh native status is never restored from history",
+        );
+        assert.equal(bindings.size, 0, "historical presentation has no active bindings");
+        const { usage: lostUsage, agents: lostAgents } = lost.aggregate;
+        assert.equal(
+          lostUsage.inputTokens.value,
+          null,
+          "historical helpers contribute no current usage",
+        );
+        assert.equal(lostAgents.stale, 2);
+        for (const row of lost.sessions.slice(1)) {
+          assert.deepEqual(row, {
+            ...must(first.sessions.find((value) => value.id === row.id)),
+            inventoryHealth: "unavailable",
+          });
+          assert.equal(
+            (await observer.inspect(row.id, "helper:" + row.id + "|" + String(row.parentId)))
+              .reason,
+            "inventory-unavailable",
+          );
+        }
+        assert.equal(reads, 0, "retained helpers are rejected before any transcript read");
+        unavailable = true;
+        clock = 5000;
+        assert.equal(
+          (await observer.get()).sessions.length,
+          3,
+          "source outage keeps historical tree",
+        );
+        unavailable = false;
+        uncertain = false;
+        clock = 11000;
+        const recovered = await observer.get();
+        assert.equal(
+          recovered.sessions.length,
+          3,
+          "recovery waits for a successful helper observation",
+        );
+        assert.equal(must(recovered.sessions[1]).inventoryHealth, "unavailable");
+        assert.equal(must(recovered.sessions[1]).observedAt, 777);
+        assert.equal(must(must(recovered.sessions[1]).usage).observedAt, 700);
+        const { agents } = recovered.aggregate;
+        assert.equal(agents.statuses.working, 1, "unavailable helpers never count as working");
+        if (!["empty", "recover"].includes(replacement)) {
+          replaced = true;
+          clock += 2000;
+          const changed = await observer.get();
+          assert(
+            !changed.sessions.some((row) => row.source === "helper"),
+            replacement + " discards history immediately",
+          );
+        }
+        pending.resolve();
+        await pending.promise;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (replacement === "recover") {
+          const refreshed = await inventoryWhen(
+            observer,
+            (data) =>
+              data.sessions.find((row) => row.id === child)?.inventoryHealth === "available",
+          );
+          assert.equal(must(refreshed.sessions.find((row) => row.id === child)).observedAt, clock);
+          assert.deepEqual(
+            [...bindings],
+            [child, grandchild],
+            "new successful observation restores bindings with rows",
+          );
+          continue;
+        }
+        const empty = await observer.get();
+        assert(
+          !empty.sessions.some((row) => row.source === "helper"),
+          "successful empty result replaces history",
+        );
+        assert.equal(bindings.size, 0);
+      } finally {
+        pending.resolve();
+        await observer.close();
+      }
     }
   }
 
