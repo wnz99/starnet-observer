@@ -9,7 +9,7 @@
     "node": "24.19.0"
   },
   "scripts": {
-    "check": "bun run check:static && bun --no-env-file test && bun run dependency-isolation",
+    "check": "bun run check:static && bun run test:core && bun run dependency-isolation",
     "check:fallow": "fallow dead-code --summary --quiet && fallow dupes --summary --quiet",
     "check:format": "prettier --check --ignore-unknown .",
     "check:hygiene": "sh tools/quality/hooks.sh hygiene",
@@ -25,7 +25,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.runtime.json --noEmit && tsc -p tsconfig.browser.json --noEmit && tsc -p tsconfig.tools.json --noEmit && tsc -p tsconfig.browser-tests.json",
     "start": "bun --no-env-file tools/start.ts",
-    "test": "bun run build && bun --no-env-file test",
+    "test": "bun run build && bun run test:core && bun run dependency-isolation",
+    "test:core": "bun --no-env-file test --path-ignore-patterns '**/application.consumer.test.ts'",
     "presentation": "bun --no-env-file tools/start.ts --presentation",
     "validate:themes": "bun --no-env-file scripts/validate-theme-packs.ts",
     "build:runtime": "bun --no-env-file tools/build.ts runtime",

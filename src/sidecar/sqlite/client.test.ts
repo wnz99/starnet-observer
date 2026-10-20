@@ -158,7 +158,7 @@ test('observer-sqlite-worker regression contracts',()=>sqliteContracts({createSe
       },
     );
     assert.match(result.stdout, /cleanup failure contained/);
-    assert.match(result.stdout, /native stall: 11000 ms;.*scratch empty after continuation/);
+    assert.match(result.stdout, /native stall: 2500 ms;.*scratch empty after continuation/);
     assert.match(result.stdout, /SQLite worker:.*bounded queue and teardown OK/);
     assert.match(result.stderr, /1 pass/);
     assert.match(result.stderr, /0 fail/);

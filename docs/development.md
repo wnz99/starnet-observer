@@ -23,6 +23,7 @@ Ubuntu CI runs for pull requests and pushes to main. It installs frozen dependen
 ```sh
 bun run build
 bun run test
+bun run test:core
 bun run package
 bun run dependency-isolation
 bun run test:browser
@@ -30,7 +31,9 @@ bun run test:browser
 
 `build` emits runtime JavaScript to `dist/runtime` and browser resources to `dist/public`. Local startup includes installed private theme packs. `package` stages only tracked distributable sources and canonical assets in a temporary directory, builds there and emits `dist/starnet-observer.tgz`. Package privacy tests reject local configuration, private packs, presets, planning files and development dependencies. LICENSE, NOTICE, Swift source and canonical browser resources travel with the archive.
 
-The installed-package check creates an external temporary consumer, refuses inherited dependencies and implicit dotenv, installs production dependencies first and verifies the installed bin, HTTP endpoints, resources and native SQLite worker. It then installs the pinned browser harness from `tools/fixtures/consumer/bun.lock` and runs both colocated application consumers. Fixtures are removed afterward. macOS checks can compile the installed Swift resource; Ubuntu checks the explicit unsupported desktop fallback. Hosted CI runs Ubuntu only; it does not establish live macOS desktop or SSH integration.
+`bun run test` builds runtime/public assets, runs core regressions and verifies the installed package. `bun run test:core` runs regressions against existing build output, excluding the two application consumers. Both the full test command and CI run those consumers through `dependency-isolation`, so the full Chromium acceptance suite runs once against the installed archive. `bun run test:browser` remains available for a focused browser run against existing local build output.
+
+The installed-package check creates an external temporary consumer, refuses inherited dependencies and implicit dotenv, installs production dependencies first and verifies the installed bin, HTTP endpoints, resources and native SQLite worker. It then installs the pinned browser harness from `tools/fixtures/consumer/bun.lock` and runs both colocated application consumers. Fixtures are removed afterward. The detailed SQLite lifecycle scenarios run once against emitted runtime code; the source/emitted worker test retains native protocol, identity, environment and source-file integrity checks at both boundaries. macOS checks can compile the installed Swift resource; Ubuntu checks the explicit unsupported desktop fallback. Hosted CI runs Ubuntu only; it does not establish live macOS desktop or SSH integration.
 
 Browser fixtures use synthetic snapshots and injected controls. Install the locked Chromium executable with:
 
