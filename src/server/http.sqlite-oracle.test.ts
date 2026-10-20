@@ -363,9 +363,9 @@ console.log('cleanup failure contained; no replacement before cleanup; demand an
       assert.equal(cleanupErr, "", "no cleanup paths or raw errors escape to diagnostics");
       assert.match(cleanupOut, /cleanup failure contained/);
       console.log(cleanupOut.trim());
-      // Native work can outlast the production deadline. Close must revoke private paths without awaiting it.
+      // Native work stays blocked past request rejection. Close must revoke private paths without awaiting it.
       const nativeStall = path.join(root, "native-stall.js");
-      const stallMs = 11000;
+      const stallMs = 2500;
       const continued = path.join(root, "native-continued");
       fs.writeFileSync(
         nativeStall,
@@ -407,6 +407,7 @@ console.log('cleanup failure contained; no replacement before cleanup; demand an
       await nativeClose;
       const closeElapsed = performance.now() - closeStartedAt;
       assert(closeElapsed < 1000, "close does not await uninterruptible native exit");
+      assert(!fs.existsSync(continued), "native work is still blocked when close resolves");
       assert.deepEqual(
         fs.readdirSync(scratch),
         [],

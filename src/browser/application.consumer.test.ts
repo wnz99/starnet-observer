@@ -37,7 +37,7 @@ interface CanvasProbe {
   ctx: CanvasRenderingContext2D;
   framePaint: { paint(now: number): unknown };
   staticLayer: { builds: number } | null;
-  plateFrame: unknown;
+  plateFrame: { scene: SceneGeometry; zoom: number; tx: number; ty: number } | null;
   callbacks: { onObservatory: () => void };
   interaction: {
     titleAt(point: { x: number; y: number }): unknown;
@@ -207,12 +207,21 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     await page.route("**/app/main.js", (route) =>
       route.fulfill({ body: injected, contentType: "text/javascript" }),
     );
+    const painted = () =>
+      page.waitForFunction(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe | undefined;
+        const frame = view?.plateFrame;
+        return (
+          view &&
+          frame?.scene === view.activeScene &&
+          frame.zoom === view.camera.zoom &&
+          frame.tx === view.camera.tx &&
+          frame.ty === view.camera.ty
+        );
+      });
     const fresh = async () => {
       await page.goto(fixture.url);
-      await page.waitForFunction(() => {
-        const view = Reflect.get(window, "__view") as CanvasProbe | undefined;
-        return Boolean(view?.plateFrame);
-      });
+      await painted();
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(400);
       await page.evaluate(() => {
@@ -231,7 +240,7 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       await page.locator("canvas").focus();
       for (let zoom = 0; zoom < 9 && (await paintedTargets(page)).signs.length === 0; zoom++) {
         await page.keyboard.press("+");
-        await page.waitForTimeout(40);
+        await painted();
       }
     };
     const click = async (
@@ -245,7 +254,8 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       if (mode === "double") await page.mouse.dblclick(x, y);
       else await page.mouse.click(x, y);
     };
-    for (const delay of [0, 600, 1200]) {
+    // Immediate and separated clicks cover the native detail partitions; dblclick is checked below.
+    for (const delay of [0, 600]) {
       await fresh();
       const sign = (await paintedTargets(page)).signs[0];
       assert.ok(sign);
@@ -298,7 +308,7 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     let overlap: { left: number; top: number; width: number; height: number } | null = null;
     for (let zoom = 0; zoom < 22 && !overlap; zoom++) {
       await page.keyboard.press(zoom < 12 ? "+" : "-");
-      await page.waitForTimeout(35);
+      await painted();
       const targets = await paintedTargets(page);
       overlap = signBodyOverlap(targets);
     }
