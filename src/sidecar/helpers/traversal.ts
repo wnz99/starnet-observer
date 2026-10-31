@@ -31,12 +31,21 @@ export class HelperTraversal {
     this.graph = new HelperGraph(parents);
   }
   async prove(
-    provider: Root["provider"],
-    child: string,
-    parent: string,
-    candidate?: Pick<Candidate, "file" | "spawn">,
+    ...[provider, child, parent, candidate, parentBinding]: [
+      provider: Root["provider"],
+      child: string,
+      parent: string,
+      candidate?: Pick<Candidate, "file" | "spawn">,
+      parentBinding?: ChildBinding,
+    ]
   ) {
-    const key = JSON.stringify([provider, child, parent, candidate?.file || null]);
+    const key = JSON.stringify([
+      provider,
+      child,
+      parent,
+      candidate?.file,
+      parentBinding?.codexMetadata,
+    ]);
     if (!this.proved.has(key))
       this.proved.set(
         key,
@@ -46,6 +55,7 @@ export class HelperTraversal {
           parent,
           candidate?.file,
           candidate?.spawn,
+          parentBinding,
         )) ?? null,
       );
     return this.proved.get(key) ?? null;
@@ -183,6 +193,7 @@ export class HelperTraversal {
         candidate.child,
         candidate.canonical || parent.sessionId,
         candidate,
+        parent.provider === "codex" ? binding : undefined,
       );
       if (!proved) continue;
       const child = this.admit(parent, proved, candidate, ancestors);
@@ -197,8 +208,8 @@ export class HelperTraversal {
     roots.sort(
       (a, b) => this.graph.depth(a) - this.graph.depth(b) || identity(a).localeCompare(identity(b)),
     );
-    const ownership = await this.graph.ownership(roots, (provider, child, parent) =>
-      this.prove(provider, child, parent),
+    const ownership = await this.graph.ownership(roots, (provider, child, parent, parentBinding) =>
+      this.prove(provider, child, parent, undefined, parentBinding),
     );
     for (const parent of roots) {
       // Proved ownership suppresses independent rediscovery of an ancestor's subtree.

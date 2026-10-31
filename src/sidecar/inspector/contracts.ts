@@ -26,6 +26,10 @@ export interface Spawn extends Assignment {
   parentSessionId?: string | undefined;
   parentFile?: string | undefined;
 }
+export interface CodexChildMetadata {
+  rootSessionId: string;
+  historyStartOrdinal?: number | undefined;
+}
 export interface ChildBinding {
   provider: Provider;
   sessionId: string;
@@ -35,7 +39,7 @@ export interface ChildBinding {
   projection?: Projection | undefined;
   usage?: ObserverRow["usage"] | undefined;
   spawn?: Spawn | undefined;
-  historyStartOrdinal?: number | undefined;
+  codexMetadata?: CodexChildMetadata | undefined;
 }
 export type UsageKey = "inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens";
 export type Totals = Record<UsageKey, number | null>;

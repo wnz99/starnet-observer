@@ -33,6 +33,19 @@ interface Context {
 export class Children {
   readonly claims = new Map<string, Claims>();
   constructor(private readonly context: Context) {}
+  private trustedParent(provider: Provider, parent: string, binding?: ChildBinding) {
+    return (
+      !binding ||
+      (this.context.reader.hasBinding(binding) &&
+        provider === "codex" &&
+        binding.provider === "codex" &&
+        binding.sessionId === parent)
+    );
+  }
+  private proof(provider: Provider, parent: string, binding?: ChildBinding) {
+    if (provider !== "codex") return {};
+    return { codexMetadata: { rootSessionId: binding?.codexMetadata?.rootSessionId ?? parent } };
+  }
   async codexMetadata(id: string, sessionId: string, binding: ChildBinding | undefined) {
     const { discovery, reader, spawnProjection } = this.context;
     const file = binding?.file || (await discovery.locate("codex", sessionId));
@@ -44,15 +57,17 @@ export class Children {
     );
   }
   async bind(
-    ...[provider, sessionId, parentSessionId, candidate, spawn]: [
+    ...[provider, sessionId, parentSessionId, candidate, spawn, parentBinding]: [
       provider: Provider,
       sessionId: string,
       parentSessionId: string,
       candidate?: string,
       spawn?: Spawn,
+      parentBinding?: ChildBinding,
     ]
   ): Promise<ChildBinding | null> {
     const { resources, discovery, reader, now } = this.context;
+    if (!this.trustedParent(provider, parentSessionId, parentBinding)) return null;
     if (
       !resources.roots[provider] ||
       !sessionId ||
@@ -65,7 +80,14 @@ export class Children {
       if (!file) return null;
       const binding = await bindResource(
         resources,
-        { provider, sessionId, parentSessionId, file, spawn },
+        {
+          provider,
+          sessionId,
+          parentSessionId,
+          file,
+          spawn,
+          ...this.proof(provider, parentSessionId, parentBinding),
+        },
         now,
       );
       if (binding) reader.bindings.add(binding);

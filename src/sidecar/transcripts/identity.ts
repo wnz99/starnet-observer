@@ -5,7 +5,7 @@ import { recordBelongsToSession } from "../inspector/index.js";
 import { object, string } from "../inspector/values.js";
 import { redactText } from "../inspector/fields.js";
 import type { ChildBinding, Provider } from "./contracts.js";
-import { forkHistoryStart, inheritedRecord } from "../inspector/identity.js";
+import { decodeCodexChildMetadata, inheritedRecord } from "../inspector/identity.js";
 export const cleanName = (value: unknown) =>
   typeof value === "string" ? cleanControls(value).slice(0, MAX_NAME_CHARS) : "";
 export function childMetadata(data: Buffer, binding: ChildBinding) {
@@ -15,21 +15,26 @@ class ChildIdentity {
   private verified = false;
   private nickname: string | null = null;
   constructor(private readonly binding: ChildBinding) {}
-  private prepareFork(record: Record<string, unknown>) {
+  private prepareMetadata(record: Record<string, unknown>) {
     const binding = this.binding;
-    const start = forkHistoryStart(
+    const decoded = decodeCodexChildMetadata(
       object(record.payload),
       binding.sessionId,
       binding.parentSessionId,
+      binding.codexMetadata?.rootSessionId ?? binding.parentSessionId,
     );
-    if (this.verified || start === null || record.ordinal !== 0) return true;
-    if (binding.historyStartOrdinal === undefined) binding.historyStartOrdinal = start;
-    return binding.historyStartOrdinal === start;
+    if (!decoded) return false;
+    if (object(record.payload).history_mode === "paginated" && record.ordinal !== 0) return false;
+    if (!Object.isFrozen(binding)) binding.codexMetadata = Object.freeze(decoded);
+    return (
+      binding.codexMetadata?.rootSessionId === decoded.rootSessionId &&
+      binding.codexMetadata.historyStartOrdinal === decoded.historyStartOrdinal
+    );
   }
   private codex(record: Record<string, unknown>) {
     const binding = this.binding;
     if (this.verified && inheritedRecord(record, binding)) return true;
-    if (!this.prepareFork(record)) return false;
+    if (!this.prepareMetadata(record)) return false;
     if (
       this.verified ||
       !recordBelongsToSession(record, binding.provider, binding.sessionId, binding)

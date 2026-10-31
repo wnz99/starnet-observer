@@ -1,28 +1,85 @@
-import type { SessionContext } from "./contracts.js";
+import type { CodexChildMetadata, SessionContext } from "./contracts.js";
 import { object } from "./values.js";
-export function forkHistoryStart(
+function historyOrdinal(value: unknown) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+export function decodeCodexChildMetadata(
   payload: Record<string, unknown>,
-  sessionId: string,
+  child: string,
   parent: string,
-) {
-  const ordinal = payload.subagent_history_start_ordinal;
-  return payload.id === sessionId &&
-    payload.session_id === parent &&
-    payload.parent_thread_id === parent &&
+  root: string,
+): CodexChildMetadata | null {
+  const paginated = payload.multi_agent_version === "v2" && payload.history_mode === "paginated";
+  const spawn = object(object(object(payload.source).subagent).thread_spawn);
+  const native = payload.thread_source === "subagent" && spawn.parent_thread_id === parent;
+  const shared = payload.session_id !== undefined && payload.session_id !== child;
+  if (!childAliases(payload, child, parent)) return null;
+  if (shared && (payload.session_id !== root || !paginated)) return null;
+  if (!supportedFormat(payload, paginated)) return null;
+  if (!validNativeSource(payload, native)) return null;
+  return decodeHistory(payload, { root, parent, paginated, native, shared });
+}
+function validNativeSource(payload: Record<string, unknown>, native: boolean) {
+  return (
+    (object(payload.source).subagent === undefined && payload.thread_source !== "subagent") ||
+    native
+  );
+}
+function historyBaseAllowed(value: unknown, fork: boolean) {
+  return value === undefined || value === null || (fork && validHistoryBase(value));
+}
+function childAliases(payload: Record<string, unknown>, child: string, parent: string) {
+  return (
+    (payload.id === child || (payload.id === undefined && payload.session_id === child)) &&
+    (payload.thread_id === undefined || payload.thread_id === child) &&
+    payload.parent_thread_id === parent
+  );
+}
+function supportedFormat(payload: Record<string, unknown>, paginated: boolean) {
+  return (
+    (payload.multi_agent_version === undefined && payload.history_mode === undefined) || paginated
+  );
+}
+function validHistoryBase(value: unknown) {
+  const base = object(value);
+  return (
+    typeof base.thread_id === "string" &&
+    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(base.thread_id) &&
+    [base.end_ordinal_exclusive, base.end_byte_offset].every(
+      (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+    )
+  );
+}
+function decodeHistory(
+  payload: Record<string, unknown>,
+  context: {
+    root: string;
+    parent: string;
+    paginated: boolean;
+    native: boolean;
+    shared: boolean;
+  },
+): CodexChildMetadata | null {
+  const { root, parent, paginated, native, shared } = context;
+  const boundary = payload.subagent_history_start_ordinal;
+  const fork = payload.forked_from_id !== undefined || boundary !== undefined;
+  if (fork && !validFork(payload, parent, paginated)) return null;
+  if (!fork && (shared || paginated) && !native) return null;
+  if (!historyBaseAllowed(payload.history_base, fork)) return null;
+  return { rootSessionId: root, ...(fork ? { historyStartOrdinal: boundary as number } : {}) };
+}
+function validFork(payload: Record<string, unknown>, parent: string, paginated: boolean) {
+  return (
+    paginated &&
     payload.forked_from_id === parent &&
-    payload.multi_agent_version === "v2" &&
-    payload.history_mode === "paginated" &&
-    typeof ordinal === "number" &&
-    Number.isSafeInteger(ordinal) &&
-    ordinal > 0
-    ? ordinal
-    : null;
+    historyOrdinal(payload.subagent_history_start_ordinal) !== null
+  );
 }
 export function inheritedRecord(
   record: Record<string, unknown>,
   binding: SessionContext["binding"],
 ) {
-  const boundary = binding?.historyStartOrdinal;
+  const boundary = binding?.codexMetadata?.historyStartOrdinal;
   return (
     boundary !== undefined &&
     typeof record.ordinal === "number" &&
@@ -32,7 +89,7 @@ export function inheritedRecord(
   );
 }
 function ownForkRecord(record: Record<string, unknown>, binding: SessionContext["binding"]) {
-  const boundary = binding?.historyStartOrdinal;
+  const boundary = binding?.codexMetadata?.historyStartOrdinal;
   if (boundary === undefined) return true;
   const ordinal = record.ordinal;
   if (typeof ordinal !== "number" || !Number.isSafeInteger(ordinal)) return false;
@@ -40,16 +97,25 @@ function ownForkRecord(record: Record<string, unknown>, binding: SessionContext[
 }
 function codexMetadata(payload: Record<string, unknown>, context: SessionContext) {
   const { sessionId, binding } = context;
-  const fork = binding ? forkHistoryStart(payload, sessionId, binding.parentSessionId) : null;
+  if (binding) {
+    const proof = binding.codexMetadata;
+    const decoded = decodeCodexChildMetadata(
+      payload,
+      sessionId,
+      binding.parentSessionId,
+      proof?.rootSessionId ?? binding.parentSessionId,
+    );
+    return (
+      decoded !== null &&
+      decoded.rootSessionId === proof?.rootSessionId &&
+      decoded.historyStartOrdinal === proof.historyStartOrdinal
+    );
+  }
   return (
     (payload.id === sessionId || payload.session_id === sessionId) &&
     ["id", "session_id", "thread_id"].every(
-      (key) =>
-        payload[key] === undefined ||
-        payload[key] === sessionId ||
-        (key === "session_id" && fork !== null && binding?.historyStartOrdinal === fork),
-    ) &&
-    (!binding || payload.parent_thread_id === binding.parentSessionId)
+      (key) => payload[key] === undefined || payload[key] === sessionId,
+    )
   );
 }
 function codexRecord(record: Record<string, unknown>, context: SessionContext) {

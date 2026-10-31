@@ -22,6 +22,77 @@ import { makeTranscriptObserver } from "./index.js";
 import * as failopen from "../failopen.js";
 import { makeHelperObserver } from "../helpers/index.js";
 import * as inspector from "../inspector/index.js";
+import { SpawnIndices } from "./spawn-index.js";
+import { Resources } from "./resources.js";
+import { READ_BYTES } from "./contracts.js";
+
+test("spawn index withdraws claims for child identity conflicts outside both windows", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-spawn-conflict-"));
+  const child = "00000000-0000-0000-0000-000000000001";
+  const parent = "00000000-0000-0000-0000-000000000002";
+  const first = "00000000-0000-0000-0000-000000000003";
+  const second = "00000000-0000-0000-0000-000000000004";
+  const line = (record: unknown) => JSON.stringify(record) + "\n";
+  const header = {
+    type: "session_meta",
+    ordinal: 0,
+    payload: {
+      id: child,
+      session_id: parent,
+      parent_thread_id: parent,
+      multi_agent_version: "v2",
+      history_mode: "paginated",
+      thread_source: "subagent",
+      source: { subagent: { thread_spawn: { parent_thread_id: parent } } },
+    },
+  };
+  const spawn = (id: string) =>
+    line({
+      type: "event_msg",
+      payload: {
+        type: "item_completed",
+        item: {
+          type: "CollabAgentToolCall",
+          tool: "spawn_agent",
+          status: "completed",
+          sender_thread_id: child,
+          receiver_thread_ids: [id],
+        },
+      },
+    });
+  const padding = line({ type: "padding", payload: "x".repeat(1000) }).repeat(
+    Math.ceil(READ_BYTES / 1000),
+  );
+  try {
+    const file = path.join(root, child + ".jsonl");
+    const initial = line(header) + spawn(first) + padding;
+    await fs.writeFile(file, initial);
+    const observer = makeTranscriptObserver({ now: () => 1000, roots: { codex: root } });
+    const binding = required(await observer.bindChild("codex", child, parent, file));
+    const indices = new SpawnIndices(new Resources(fs, { codex: root }), () => 1000);
+    await indices.projection(file, child, binding, "codex");
+    await indices.idle();
+    assert(
+      required(await indices.projection(file, child, binding, "codex")).helperSpawns.has(first),
+    );
+    await fs.appendFile(
+      file,
+      line({ ...header, payload: { ...header.payload, session_id: second } }) +
+        spawn(second) +
+        padding,
+    );
+    const withdrawn = required(await indices.projection(file, child, binding, "codex"));
+    assert.equal(withdrawn.helperClaimsPartial, true);
+    assert.equal(withdrawn.helperSpawns.size, 0, "withdraw cached and subsequent claims");
+    assert.equal(
+      required(await indices.projection(file, child, binding, "codex")).helperSpawns.size,
+      0,
+      "a cold rebuild cannot restore claims from the conflicting stream",
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
 
 test("observer-transcripts regression contracts", async () => {
   assert.throws(() => makeTranscriptObserver(), /requires an injected now clock/);

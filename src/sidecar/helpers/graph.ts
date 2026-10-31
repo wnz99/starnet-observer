@@ -6,9 +6,22 @@ type Prove = (
   provider: Root["provider"],
   child: string,
   parent: string,
+  parentBinding?: ChildBinding,
 ) => Promise<ChildBinding | null>;
 function validIds(parent: string, child: string) {
   return UUID.test(parent) && UUID.test(child);
+}
+async function proveChain(
+  chain: { child: string; parent: string }[],
+  prove: Prove,
+  parentBinding?: ChildBinding,
+) {
+  let binding = parentBinding;
+  for (const edge of chain.slice().reverse()) {
+    binding = (await prove("codex", edge.child, edge.parent, binding)) ?? undefined;
+    if (!binding) break;
+  }
+  return binding;
 }
 function nativeCandidates(parent: Root, projection: ChildBinding["projection"]): Candidate[] {
   return [...(projection?.helperSpawns ?? [])].flatMap(([child, spawn]) =>
@@ -133,6 +146,7 @@ export class HelperGraph {
     return null;
   }
   async ownership(roots: Root[], prove: Prove) {
+    const terminal = new Map<string, ChildBinding>();
     const observed = new Map(roots.map((row) => [identity(row), row])),
       ownership = new Map<string, Root>();
     for (const row of roots) {
@@ -140,14 +154,13 @@ export class HelperGraph {
       // DB edges supply candidates only. Every intervening transcript must prove
       // the chain before an observed pane loses its independent-root ownership.
       if (!found || this.invalid.has(found.ancestor.sessionId)) continue;
-      let proved = true;
-      for (const edge of found.chain) {
-        if (!(await prove("codex", edge.child, edge.parent))) {
-          proved = false;
-          break;
-        }
+      let binding = terminal.get(found.ancestor.id);
+      if (ownership.has(found.ancestor.id) && !binding) continue;
+      binding = await proveChain(found.chain, prove, binding);
+      if (binding) {
+        ownership.set(row.id, ownership.get(found.ancestor.id) || found.ancestor);
+        terminal.set(row.id, binding);
       }
-      if (proved) ownership.set(row.id, ownership.get(found.ancestor.id) || found.ancestor);
     }
     return ownership;
   }
