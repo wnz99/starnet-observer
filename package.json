@@ -5,10 +5,14 @@
   "description": "Standalone read-only local observer for Herdr, Codex, Claude Code, and llm-bus.",
   "license": "MIT",
   "engines": {
-    "bun": ">=1.3.13",
+    "bun": ">=1.4.4",
     "node": "24.19.0"
   },
   "scripts": {
+    "preinstall": "bun upgrade",
+    "prestart": "bun upgrade",
+    "predev": "bun upgrade",
+    "prepresentation": "bun upgrade",
     "check": "bun run check:static && bun run test:core && bun run dependency-isolation",
     "check:fallow": "fallow dead-code --summary --quiet && fallow dupes --summary --quiet",
     "check:format": "prettier --check --ignore-unknown .",
@@ -43,7 +47,7 @@
     "url": "https://github.com/wnz99/starnet-observer.git"
   },
   "homepage": "https://github.com/wnz99/starnet-observer#readme",
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@latest",
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/bun": "1.3.13",

@@ -11,7 +11,7 @@ You do **not** need to install or run StarNet. The necessary observer code, shar
 | Dependency                                                      | Purpose                                                                                                                                              |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | macOS                                                           | Supported initial target; native verification remains unverified.                                                                                    |
-| [Bun](https://bun.sh/) 1.3.13 or newer                          | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
+| [Bun](https://bun.sh/) latest stable (minimum 1.4.4)            | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
 | Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
 | [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
 | Codex CLI and/or Claude Code                                    | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys.                      |
@@ -22,6 +22,8 @@ You do **not** need to install or run StarNet. The necessary observer code, shar
 There are no runtime package dependencies. Bun runs the server and regression suite; its native `bun:sqlite` reads private database snapshots. Pinned development dependencies provide quality tooling; Node 24.19.0 is required for those tools, not for application startup.
 
 `bun.lock` records the development dependency graph. Use `bun install --frozen-lockfile` to replay it.
+
+Repository install, start, dev and presentation commands upgrade Bun to the latest stable release before proceeding. These commands need network access and update the installed Bun shared with other projects. CI also uses latest stable Bun. Direct execution of built or packaged files uses the currently installed Bun without upgrading it.
 
 ## Install the observer
 
