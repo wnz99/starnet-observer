@@ -148,6 +148,15 @@ export class Plates<R extends SpriteResource, B extends R = R> {
     this.hoverBrackets();
   };
   recordTargets = (accepted: TextPlate[]) => {
+    this.view.platformRegions = accepted
+      .filter((plate) => plate.platformKey)
+      .map((plate) => ({
+        id: required(plate.platformKey),
+        left: plate.x,
+        top: plate.y,
+        width: plate.w,
+        height: plate.h,
+      }));
     // Title hits are exactly the accepted, drawn plate boxes: never the body, never a dropped plate.
     this.view.titleRegions = accepted
       .filter((plate) => plate.target)

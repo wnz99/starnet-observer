@@ -52,7 +52,8 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
       color: platform.accent,
       priority: PLATFORM_SIGN.priority,
     });
-    if (!options.isStale && !options.staleKeys.has(platform.key)) return [title];
+    const heading = { ...title, platformKey: platform.key };
+    if (!options.isStale && !options.staleKeys.has(platform.key)) return [heading];
     const stale = this.view.plates.textPlate(
       STALE_SIGN.label,
       at.x,
@@ -65,7 +66,7 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
         dash: STALE_SIGN.dash,
       },
     );
-    return [title, stale];
+    return [heading, stale];
   }
   private section(
     platform: Platform,
@@ -99,6 +100,7 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
         h: plate.h * lines.length,
         lines,
         repo,
+        platformKey: platform.key,
       },
     ];
   }

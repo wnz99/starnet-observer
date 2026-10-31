@@ -2266,7 +2266,7 @@ test("observer-view regression contracts", async () => {
   verifyTitleTargets();
   // Task 5: drawn repository section signs toggle exact repository highlighting. Only accepted signs of sections that hold
   // a worker with that exact repository id are targets; same-name repositories stay apart; a sign click toggles once per
-  // gesture and never zooms; a camera or scene change before the next paint makes old sign boxes hit nothing.
+  // gesture; double-click fits its room. A camera or scene change before paint retires old sign boxes.
   function verifyRepositorySigns() {
     const layout = Model.createLayout(),
       rows: LayoutRow[] = (
@@ -2290,6 +2290,7 @@ test("observer-view regression contracts", async () => {
     const scene = Scene.build(layout.onPage(0), 0),
       node = canvas(1000, 700),
       repoToggles: string[] = [],
+      platforms: string[] = [],
       toggles: string[] = [],
       selected: string[] = [];
     let now = 0,
@@ -2299,6 +2300,7 @@ test("observer-view regression contracts", async () => {
       canvas: node,
       onSelect: (id) => selected.push(id),
       onTitleToggle: (id) => toggles.push(id),
+      onPlatform: (key) => platforms.push(key),
       nameFor: (id) => id,
       hoverLabel: (id) => id,
       env: {
@@ -2374,7 +2376,12 @@ test("observer-view regression contracts", async () => {
     click(at, 2);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
     assert.deepEqual(repoToggles, ["repo_a"], "a sign double-click toggles once");
-    assert.deepEqual([view.camera(), view.mode()], [camera, mode], "and never zooms or pans");
+    assert.deepEqual(platforms, [present(scene.platforms[0]).key], "and focuses its room");
+    assert.deepEqual(
+      [view.camera(), view.mode()],
+      [camera, mode],
+      "an already fitted room stays fitted",
+    );
     // The highlight is read per paint: rings across every repo_a worker, a double ring across the freshly working one, and the
     // selected sign recoloured without moving.
     const strokes: [ViewContext<Resource>["strokeStyle"], number][] = [],
@@ -2425,6 +2432,24 @@ test("observer-view regression contracts", async () => {
     now += 1000;
     click(again);
     assert.deepEqual(repoToggles, ["repo_a", "repo_a"], "the repainted sign toggles again");
+    node.handlers.get("dblclick")({ ...again, detail: 2 });
+    assert.equal(view.mode(), "platform", "a repository name leaves manual zoom for room fit");
+    assert.deepEqual(view.camera(), camera, "the repository name uses the same room camera");
+    view.zoomBy(1.2);
+    now += 1000;
+    view.paint(now);
+    const heading = Scene.toScreen(present(scene.platforms[0]).sign, view.camera());
+    const headingEvent = { ...at, clientX: heading.x, clientY: heading.y - 12 };
+    click(headingEvent);
+    click(headingEvent, 2);
+    node.handlers.get("dblclick")({ ...headingEvent, detail: 2 });
+    assert.equal(view.mode(), "platform", "the room heading also fits its room");
+    assert.deepEqual(view.camera(), camera);
+    assert.deepEqual(
+      repoToggles,
+      ["repo_a", "repo_a"],
+      "heading zoom preserves repository highlighting",
+    );
     // A rebuilt scene before the next paint likewise retires every old box.
     now += 1000;
     view.update(Scene.build(layout.onPage(0), 0), {});

@@ -96,6 +96,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     this.view.hovered = null;
     this.view.titleRegions = [];
     this.view.signRegions = [];
+    this.view.platformRegions = [];
     this.view.shipRegions = [];
     this.view.attentionRegions = [];
     this.view.plateFrame = null;
