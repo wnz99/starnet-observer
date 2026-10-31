@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC0-1.0
 import assert from "node:assert/strict";
-import { JSON5, TOML } from "bun";
+import { JSON5, TOML, semver } from "bun";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
@@ -21,11 +21,11 @@ const JSON_INDENT = 2,
   ARCHIVE_INTEGRITY_INDEX = 2;
 const root = await realpath(resolve(import.meta.dir, ".."));
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-  packageManager: string;
+  engines: { bun: string };
   devDependencies: { "@playwright/test": string };
 };
-if (`bun@${process.versions.bun}` !== manifest.packageManager)
-  throw new Error("Bun runtime does not match packageManager");
+if (!semver.satisfies(Bun.version, manifest.engines.bun))
+  throw new Error("Unsupported Bun version; run bun upgrade");
 const environment = { ...process.env };
 delete environment.NODE_PATH;
 function run(args: string[], cwd: string) {

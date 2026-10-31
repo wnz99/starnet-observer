@@ -1,6 +1,6 @@
 # Development
 
-Use the Bun, Node and uv versions pinned by `package.json`, `.node-version` and `bun run check:versions`. Bun runs the application and native SQLite. Node and uv serve development tooling; the installed application has no package dependencies.
+Use the latest stable Bun (minimum 1.4.4). CI resolves `latest` on every run. Repository install, start, dev and presentation commands run `bun upgrade` first, so they require network access and update the installed Bun executable shared with other repositories. Direct `bun` invocations, including the packaged executable, use the installed version without upgrading it. `bun run check:versions` enforces the minimum Bun version; Node and uv retain their pinned versions. Bun runs the application and native SQLite. Node and uv serve development tooling; the installed application has no package dependencies.
 
 ## Setup and local checks
 

@@ -11,7 +11,7 @@ case "${1:-}" in
       "uv 0.13.1"|"uv 0.13.1 "*) ;;
       *) printf "%s\n" "Wrong uv version" >&2; exit 1 ;;
     esac
-    test "$(bun --version)" = "1.3.13"
+    bun --no-env-file -e 'if (!Bun.semver.satisfies(Bun.version, require("./package.json").engines.bun)) { console.error("Unsupported Bun version; run bun upgrade"); process.exit(1); }'
     test "$(node --version)" = "v24.19.0"
     ;;
   install)
