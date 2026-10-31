@@ -3,21 +3,17 @@ import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 import { busRecord } from "./types.js";
 import { resources } from "./overview-resources.js";
 import { remoteActivity } from "./overview-remote.js";
+import { overviewTime as TIME } from "./overview-time.js";
 
 type Overview = NonNullable<NonNullable<ObserverSnapshot["bus"]>["coordination"]>["overview"];
 type Status = "available" | "partial" | "unavailable";
-const TIME = "ROUND((julianday(sent_at)-2440587.5)*86400000)";
 const RECENT = TIME + " BETWEEN ? AND ?";
 const INVALID = TIME + " IS NULL OR " + TIME + " > ?";
-const LAST_SEEN = TIME.replace("sent_at", "last_seen");
+const LAST_SEEN = TIME.replaceAll("sent_at", "last_seen");
 const LIMIT = 100;
 const AGENT_WINDOW = 300000;
 const FAILED_WAKE = "failed";
 const FAILED_REASON = "wake-failed";
-const timestamp = (value: unknown) => {
-  const at = typeof value === "string" ? Date.parse(value) : NaN;
-  return Number.isFinite(at) ? at : null;
-};
 function aggregate(database: SnapshotDatabase, sql: string, args: number[]) {
   try {
     const row = database.query(sql).all(...args)[0];
@@ -50,7 +46,9 @@ function attention(database: SnapshotDatabase, bounds: number[], source: Status)
   try {
     const rows = database
       .query(
-        "SELECT id, sent_at, acknowledged_at, wake_status FROM messages WHERE " +
+        "SELECT id, " +
+          TIME +
+          " AS sentAt, acknowledged_at, wake_status FROM messages WHERE " +
           RECENT +
           " AND (acknowledged_at IS NULL OR wake_status='failed') ORDER BY id DESC LIMIT 101",
       )
@@ -58,12 +56,12 @@ function attention(database: SnapshotDatabase, bounds: number[], source: Status)
     result.truncated = rows.length > LIMIT;
     for (const row of rows.slice(0, LIMIT)) {
       if (!busRecord(row)) continue;
-      const at = timestamp(row.sent_at);
+      const at = row.sentAt;
       if (
         typeof row.id !== "number" ||
         !Number.isSafeInteger(row.id) ||
         row.id < 1 ||
-        at === null
+        typeof at !== "number"
       ) {
         result.status = "partial";
         continue;

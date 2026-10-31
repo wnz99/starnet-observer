@@ -13,6 +13,67 @@ import { selectBusOverview } from "./overview.js";
 import { publicCoordination } from "./public-coordination.js";
 import { validCoordination } from "../sqlite/validate-bus.js";
 
+test("overview excludes SQLite-relative timestamps consistently before aggregation and ranking", () => {
+  const database = new Database(":memory:");
+  const asOf = Date.parse("2026-10-31T12:00:00Z");
+  try {
+    database.run(`CREATE TABLE agents(kind TEXT,last_seen TEXT);
+      CREATE TABLE messages(id INTEGER,sender TEXT,recipient TEXT,sent_at TEXT,acknowledged_at TEXT,wake_status TEXT);
+      CREATE TABLE remote_outbox(local_id INTEGER,state TEXT);
+      CREATE TABLE remote_imports(local_id INTEGER);
+      CREATE TABLE wake_dispatch(recipient TEXT,next_attempt_at TEXT,lease_until TEXT);
+      INSERT INTO wake_dispatch VALUES ('machine/repo/codex:private','recorded',NULL);`);
+    const message = database.query(
+      "INSERT INTO messages VALUES (?,'codex:private','machine/repo/codex:private',?,NULL,'failed')",
+    );
+    const agent = database.query("INSERT INTO agents VALUES ('codex',?)");
+    const route = database.query("INSERT INTO remote_outbox VALUES (?,'queued_local')");
+    const values = [
+      "now",
+      "2461345.0",
+      "12:00:00",
+      "2026-10-31",
+      "2026-10-31T12:00:00",
+      "2026-10-31T12:00:00.Z",
+    ];
+    for (const [id, value] of values.entries()) {
+      message.run(id + 1, value);
+      agent.run(value);
+      route.run(id + 1);
+    }
+    const invalid = must(selectBusOverview(database, asOf));
+    assert.deepEqual(invalid.agents, { status: "partial", codex: 0, claude: 0 });
+    assert.deepEqual(invalid.messages, { status: "partial", total: 0, local: 0, remote: 0 });
+    assert.deepEqual(invalid.awaiting, { status: "partial", count: 0, oldestAt: null });
+    assert.deepEqual(invalid.wakes, {
+      pending: { status: "partial", count: 0 },
+      failed: { status: "partial", count: 0 },
+    });
+    assert.deepEqual(invalid.attention, { status: "partial", truncated: false, rows: [] });
+    assert.deepEqual(invalid.remoteActivity, { status: "partial", truncated: false, rows: [] });
+    // Closed windows, explicit offsets and Python-style UTC timestamps stay supported.
+    message.run(100, "2026-10-31T13:00:00.000+02:00");
+    message.run(101, "2026-10-31 12:00:00.000000+00:00");
+    route.run(101);
+    agent.run("2026-10-31T11:55:00Z");
+    const valid = must(selectBusOverview(database, asOf));
+    assert.equal(valid.agents.codex, 1);
+    assert.equal(valid.messages.total, 2);
+    assert.equal(valid.awaiting.oldestAt, asOf - 3600000);
+    assert.equal(valid.wakes.failed.count, 2);
+    assert.equal(valid.wakes.pending.count, 1);
+    assert.deepEqual(
+      valid.attention.rows.map((row) => row.sentAt),
+      [asOf, asOf - 3600000],
+    );
+    assert.deepEqual(valid.remoteActivity.rows, [
+      { machine: "machine", sentAt: asOf, state: "queued_local" },
+    ]);
+  } finally {
+    database.close();
+  }
+});
+
 test("optional schemas degrade independently; remote grouping and resource waiters stay bounded", () => {
   const database = new Database(":memory:");
   const asOf = Date.parse("2026-10-31T12:00:00Z");

@@ -1,9 +1,9 @@
 import type { ObserverSnapshot } from "../../shared/observer.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 import { busRecord } from "./types.js";
+import { overviewTime as TIME } from "./overview-time.js";
 
 type Overview = NonNullable<NonNullable<ObserverSnapshot["bus"]>["coordination"]>["overview"];
-const TIME = "ROUND((julianday(sent_at)-2440587.5)*86400000)";
 const MAX_MACHINES = 32;
 function sourceStatus(
   outbox: boolean,
@@ -11,10 +11,6 @@ function sourceStatus(
 ): NonNullable<Overview>["remoteActivity"]["status"] {
   return outbox && imports ? "available" : outbox || imports ? "partial" : "unavailable";
 }
-const timestamp = (value: unknown) => {
-  const at = typeof value === "string" ? Date.parse(value) : NaN;
-  return Number.isFinite(at) ? at : null;
-};
 export function remoteActivity(
   database: SnapshotDatabase,
   outbox: boolean,
@@ -40,7 +36,9 @@ export function remoteActivity(
         prefix +
           ", ranked AS (SELECT *,ROW_NUMBER() OVER(PARTITION BY machine ORDER BY " +
           TIME +
-          " DESC,id DESC) AS rank FROM valid WHERE valid=1) SELECT machine,sent_at,state FROM ranked WHERE rank=1 ORDER BY machine LIMIT 33",
+          " DESC,id DESC) AS rank FROM valid WHERE valid=1) SELECT machine," +
+          TIME +
+          " AS sentAt,state FROM ranked WHERE rank=1 ORDER BY machine LIMIT 33",
       )
       .all(asOf);
     result.truncated = rows.length > MAX_MACHINES;
@@ -78,8 +76,8 @@ function routePrefix(outbox: boolean, imports: boolean) {
 }
 function remoteRow(row: unknown): NonNullable<Overview>["remoteActivity"]["rows"][number] | null {
   if (!busRecord(row) || typeof row.machine !== "string") return null;
-  const sentAt = timestamp(row.sent_at);
-  if (sentAt === null) return null;
+  const sentAt = row.sentAt;
+  if (typeof sentAt !== "number" || !Number.isFinite(sentAt)) return null;
   const state =
     row.state === "queued_local" ||
     row.state === "accepted_remote" ||
