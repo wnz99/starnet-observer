@@ -165,6 +165,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   titleRegions: TitleBox[] = [];
 
   signRegions: SignBox[] = [];
+  platformRegions: TitleBox[] = [];
 
   plateFrame: PlateFrame | null = null;
 

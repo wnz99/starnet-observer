@@ -241,6 +241,7 @@ export interface TextPlate extends Plate {
   lines?: string[];
   target?: string;
   repo?: string | null;
+  platformKey?: string;
   ship?: { host: string | null };
   observatory?: boolean;
 }

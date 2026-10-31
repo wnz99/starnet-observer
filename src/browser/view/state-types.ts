@@ -7,6 +7,7 @@ export interface Tap {
   id: string | null;
   title: string | null;
   sign: string | null;
+  platform: string | null;
   obs: boolean | null;
   ship: { host: string | null } | null;
   mail?: { host: string | null } | null;

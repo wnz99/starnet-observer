@@ -89,15 +89,24 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
 
   private targetsAt(point: Point): Omit<Tap, "point"> {
     const title = this.titleAt(point);
-    if (title) return { id: null, title, sign: null, obs: false, ship: null };
+    if (title) return { id: null, title, sign: null, platform: null, obs: false, ship: null };
     const sign = this.signAt(point);
-    if (sign) return { id: null, title, sign, obs: false, ship: null };
+    const platform = this.paintedFrameCurrent()
+      ? (this.view.platformRegions.find(
+          (r) =>
+            point.x >= r.left &&
+            point.x <= r.left + r.width &&
+            point.y >= r.top &&
+            point.y <= r.top + r.height,
+        )?.id ?? null)
+      : null;
+    if (platform) return { id: null, title, sign, platform, obs: false, ship: null };
     const id = Scene.hitTest(point, this.view.regions);
-    if (id) return { id, title, sign: null, obs: false, ship: null };
+    if (id) return { id, title, sign: null, platform: null, obs: false, ship: null };
     const mail = this.mailroomAt(point);
-    if (mail) return { id, title, sign, obs: false, ship: null, mail };
+    if (mail) return { id, title, sign, platform, obs: false, ship: null, mail };
     const obs = this.observatoryAt(point);
-    return { id, title, sign, obs, ship: obs ? null : this.shipAt(point) };
+    return { id, title, sign, platform, obs, ship: obs ? null : this.shipAt(point) };
   }
   private mailroomAt(point: Point) {
     if (!this.view.callbacks.onMailroom || !this.paintedFrameCurrent()) return null;
@@ -128,9 +137,9 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   select(point: Point, continuation = false) {
     const repeat = continuation && this.nearTap(point);
     const target = repeat ? required(this.tap) : this.targetsAt(point);
-    const { id, title, sign, obs, ship } = target;
+    const { id } = target;
     if (!repeat) this.toggleTargets(target);
-    if (!repeat) this.tap = { id, title, sign, obs, ship, mail: target.mail ?? null, point };
+    if (!repeat) this.tap = { ...target, point };
     if (id && this.view.workerIndex.has(id)) this.view.callbacks.onSelect(id);
   }
 
@@ -152,8 +161,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     const point = this.gestures.local(event),
       known = this.nearTap(point) ? this.tap : null;
     this.tap = null;
-    if (this.mailDoubleClick(point, known)) return;
-    if (this.handledDoubleClick(known)) return; // a title, sign or observatory double-click already acted once; it never zooms
+    if (this.handledDoubleClick(point, known)) return;
     // The clicks' own target decides; only a double-click with no recorded click hit-tests the current view.
     const id = this.doubleClickWorker(point, known);
     if (id) {
@@ -172,10 +180,19 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
 
   private focusPlatformAt(point: Point) {
     const key = Scene.hitPlatform(point, this.view.activeScene, this.view.camera);
-    if (key && this.view.cameraControl.focusPlatform(key)) this.view.callbacks.onPlatform(key);
+    if (key) this.focusPlatform(key);
   }
-  private handledDoubleClick(known: Tap | null) {
-    return known && (known.title || known.sign || known.obs);
+  private focusPlatform(key: string) {
+    if (this.view.cameraControl.focusPlatform(key)) this.view.callbacks.onPlatform(key);
+  }
+  private handledDoubleClick(point: Point, known: Tap | null) {
+    if (this.mailDoubleClick(point, known)) return true;
+    const target = known ?? this.targetsAt(point);
+    if (target.platform) {
+      this.focusPlatform(target.platform);
+      return true;
+    }
+    return !!(target.title || target.sign || target.obs);
   }
   private doubleClickWorker(point: Point, known: Tap | null) {
     return known
