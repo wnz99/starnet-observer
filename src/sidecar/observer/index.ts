@@ -37,6 +37,7 @@ function defaultHelpers(
         bindChild: { get: () => transcripts.bindChild?.bind(transcripts) },
         claudeCandidates: { get: () => transcripts.claudeCandidates?.bind(transcripts) },
         helperMetadata: { get: () => transcripts.helperMetadata?.bind(transcripts) },
+        codexMetadata: { get: () => transcripts.codexMetadata?.bind(transcripts) },
         claudeClaims: { get: () => transcripts.claudeClaims?.bind(transcripts) },
       },
     ),

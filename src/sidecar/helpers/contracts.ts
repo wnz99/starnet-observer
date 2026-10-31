@@ -39,6 +39,7 @@ export interface HelperTranscripts {
     parent: string,
     file?: string,
     spawn?: Spawn,
+    parentBinding?: ChildBinding,
   ): Awaitable<ChildBinding | null>;
   claudeCandidates?(
     parent: string,

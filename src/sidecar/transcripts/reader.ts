@@ -57,7 +57,7 @@ function initial(context: ReadContext, now: number): ReadState {
   };
 }
 const bindingKey = (binding: ChildBinding | null | undefined) =>
-  JSON.stringify(binding ? [binding.parentSessionId, binding.file] : null);
+  JSON.stringify(binding ? [binding.parentSessionId, binding.file, binding.codexMetadata] : null);
 function rewritten(state: ReadState, stat: Stats, prefixData: Buffer, changed: boolean) {
   const prefixLength = state.prefixLength || prefixData.length;
   const prefixHash = digest(prefixData.subarray(0, prefixLength));
@@ -183,6 +183,7 @@ export class Reader {
       detailed,
       binding?.parentSessionId,
       binding?.file,
+      bindingKey(binding),
     ]);
     let pending = this.pending.get(key);
     if (!pending) {

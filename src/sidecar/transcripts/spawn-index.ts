@@ -5,6 +5,8 @@ import { consumeHelperMetadata, createProjection } from "../inspector/index.js";
 import type { ChildBinding, Projection, TranscriptHandle, Provider } from "./contracts.js";
 import { READ_BYTES } from "./contracts.js";
 import { close } from "./resources.js";
+import { childMetadata, recordIdentityConflicts } from "./identity.js";
+import { prefix } from "./windows.js";
 import type { Resources } from "./resources.js";
 const MAX_BYTES = 128 * 1024 * 1024;
 const CHUNK_BYTES = 1024 * 1024;
@@ -82,7 +84,12 @@ export class SpawnIndices {
     binding?: ChildBinding | null,
     provider: Provider = "claude",
   ): Promise<Projection | null> {
-    const key = JSON.stringify([provider, file, sessionId, binding?.parentSessionId]);
+    const key = JSON.stringify([
+      provider,
+      file,
+      sessionId,
+      binding && [binding.parentSessionId, binding.codexMetadata],
+    ]);
     const cached = this.indices.get(key);
     const replacing = !cached && this.indices.size >= MAX_INDICES;
     const state = cached ?? this.admit(key);
@@ -119,6 +126,10 @@ class SpawnScan {
     private readonly resources: Resources,
     private readonly context: ScanContext,
   ) {}
+  private async verifyChild(handle: TranscriptHandle, size: number) {
+    if (this.context.binding && !childMetadata(await prefix(handle, size), this.context.binding))
+      throw new Error("Child identity unavailable");
+  }
   private async previousHash(handle: TranscriptHandle): Promise<Hash> {
     const hash = crypto.createHash("sha256");
     // Reuse metadata only after proving every previously indexed byte is unchanged.
@@ -140,18 +151,26 @@ class SpawnScan {
       projection.helperClaimsPartial = true;
       return;
     }
+    let record: unknown;
     try {
-      const record: unknown = JSON.parse(bytes.toString("utf8"));
-      consumeHelperMetadata(
-        projection,
-        record,
-        this.context.provider,
-        this.context.sessionId,
-        this.context.binding,
-      );
+      record = JSON.parse(bytes.toString("utf8"));
     } catch {
       /* Invalid rows carry no spawn evidence. */
+      return;
     }
+    const { provider, sessionId, binding } = this.context;
+    if (
+      (binding || provider === "codex") &&
+      recordIdentityConflicts(record, provider, sessionId, binding)
+    )
+      throw new Error("Transcript identity conflict");
+    consumeHelperMetadata(
+      projection,
+      record,
+      this.context.provider,
+      this.context.sessionId,
+      this.context.binding,
+    );
   }
   private consumeChunk(chunk: Buffer) {
     const projection = this.state.projection;
@@ -192,6 +211,7 @@ class SpawnScan {
       handle = await this.resources.open(resource.full);
       const stat = await handle.stat();
       await this.resources.verify(resource, stat);
+      await this.verifyChild(handle, stat.size);
       if (stat.size > MAX_BYTES) {
         unavailable(this.state);
         return;
