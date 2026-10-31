@@ -1,6 +1,7 @@
 import type { ObserverSnapshot } from "../../shared/observer.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 import { busRecord } from "./types.js";
+import { overviewTime } from "./overview-time.js";
 type Resources = NonNullable<
   NonNullable<NonNullable<ObserverSnapshot["bus"]>["coordination"]>["overview"]
 >["resources"];
@@ -8,10 +9,12 @@ type Resource = Resources["rows"][number];
 const LIMIT = 100;
 const LABEL_CHARS = 160;
 const ADDRESS_CHARS = 256;
-const timestamp = (value: unknown) => {
-  const at = typeof value === "string" ? Date.parse(value) : NaN;
-  return Number.isFinite(at) ? at : null;
-};
+const ACQUIRED = overviewTime.replaceAll("sent_at", "acquired_at");
+const EXPIRES = overviewTime.replaceAll("sent_at", "expires_at");
+const CHECK = overviewTime.replaceAll("sent_at", "check_at");
+const REQUESTED = overviewTime.replaceAll("sent_at", "requested_at");
+const timestamp = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 function readable(database: SnapshotDatabase, sql: string) {
   try {
     database.query(sql).all();
@@ -42,7 +45,13 @@ function invalidSources(database: SnapshotDatabase, held: boolean, waiting: bool
       .query(
         "SELECT 1 FROM resource_locks WHERE " +
           invalidKey +
-          " OR holder IS NULL OR length(holder)>256 OR julianday(acquired_at) IS NULL OR julianday(expires_at) IS NULL OR julianday(check_at) IS NULL LIMIT 1",
+          " OR holder IS NULL OR length(holder)>256 OR " +
+          ACQUIRED +
+          " IS NULL OR " +
+          EXPIRES +
+          " IS NULL OR " +
+          CHECK +
+          " IS NULL LIMIT 1",
       )
       .all()[0];
   const waiters =
@@ -51,7 +60,9 @@ function invalidSources(database: SnapshotDatabase, held: boolean, waiting: bool
       .query(
         "SELECT 1 FROM resource_lock_waiters WHERE " +
           invalidKey +
-          " OR waiter IS NULL OR length(waiter)>256 OR julianday(requested_at) IS NULL LIMIT 1",
+          " OR waiter IS NULL OR length(waiter)>256 OR " +
+          REQUESTED +
+          " IS NULL LIMIT 1",
       )
       .all()[0];
   return Boolean(locks || waiters);
@@ -130,7 +141,13 @@ function resourceDetails(
 function heldResource(database: SnapshotDatabase, key: Pick<Resource, "resource" | "scope">) {
   const raw = database
     .query(
-      "SELECT substr(holder,1,257) AS holder,acquired_at,expires_at,check_at FROM resource_locks WHERE resource=? AND scope=? LIMIT 1",
+      "SELECT substr(holder,1,257) AS holder," +
+        ACQUIRED +
+        " AS acquired_at," +
+        EXPIRES +
+        " AS expires_at," +
+        CHECK +
+        " AS check_at FROM resource_locks WHERE resource=? AND scope=? LIMIT 1",
     )
     .all(key.resource, key.scope)[0];
   const fields: Pick<Resource, "holder" | "acquiredAt" | "expiresAt" | "checkAt"> = {
@@ -156,7 +173,9 @@ function heldResource(database: SnapshotDatabase, key: Pick<Resource, "resource"
 function resourceWaiters(database: SnapshotDatabase, key: Pick<Resource, "resource" | "scope">) {
   const raw = database
     .query(
-      "SELECT substr(waiter,1,257) AS agent,requested_at FROM resource_lock_waiters WHERE resource=? AND scope=? ORDER BY requested_at LIMIT 101",
+      "SELECT substr(waiter,1,257) AS agent," +
+        REQUESTED +
+        " AS requested_at FROM resource_lock_waiters WHERE resource=? AND scope=? ORDER BY requested_at LIMIT 101",
     )
     .all(key.resource, key.scope);
   const result = { rows: [] as Resource["waiters"], invalid: false, truncated: raw.length > LIMIT };

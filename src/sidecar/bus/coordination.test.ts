@@ -127,6 +127,67 @@ test("overview rejects normalized calendar dates and hours while retaining real 
   }
 });
 
+test("resource timestamps share absolute calendar validity and preserve unknown fields", () => {
+  const database = new Database(":memory:");
+  try {
+    database.run(`CREATE TABLE resource_locks(resource TEXT,scope TEXT,holder TEXT,acquired_at TEXT,expires_at TEXT,check_at TEXT);
+      CREATE TABLE resource_lock_waiters(resource TEXT,scope TEXT,waiter TEXT,requested_at TEXT);`);
+    const valid = "2024-02-29 14:00:00.123456+02:00";
+    const at = Date.parse("2024-02-29T12:00:00.123Z");
+    const values = [
+      "2026-02-30T12:00:00Z",
+      "2026-04-31T12:00:00Z",
+      "2100-02-29T12:00:00Z",
+      "2026-10-30T24:00:00Z",
+      "now",
+      "2461345.0",
+      "2026-10-31T12:00:00",
+      null,
+      valid,
+    ];
+    for (const value of values) {
+      for (let field = 0; field < 4; field++) {
+        database.run("DELETE FROM resource_locks; DELETE FROM resource_lock_waiters;");
+        const times = [valid, valid, valid, valid];
+        const inputs = times.map((time, index) => (index === field ? value : time));
+        database.run(
+          "INSERT INTO resource_locks VALUES ('deploy','shared','codex:private',?,?,?)",
+          inputs.slice(0, 3),
+        );
+        database.run(
+          "INSERT INTO resource_lock_waiters VALUES ('deploy','shared','claude:private',?)",
+          [inputs[3] ?? null],
+        );
+        const overview = must(selectBusOverview(database, at));
+        const expected = [at, at, at, at].map((time, index) =>
+          index === field && value !== valid ? null : time,
+        );
+        assert.equal(overview.resources.status, value === valid ? "available" : "partial");
+        const row = must(overview.resources.rows[0]);
+        assert.deepEqual(
+          [row.acquiredAt, row.expiresAt, row.checkAt, row.waiters[0]?.requestedAt],
+          expected,
+        );
+        const coordination = { sections: [], overview };
+        assert.equal(validCoordination(coordination), true);
+        const projected = must(publicCoordination(coordination, () => "unknown").coordination);
+        const projectedResources = must(projected.overview).resources;
+        assert.deepEqual(
+          projectedResources.rows.map((resource) => [
+            resource.acquiredAt,
+            resource.expiresAt,
+            resource.checkAt,
+            resource.waiters[0]?.requestedAt,
+          ]),
+          [expected],
+        );
+      }
+    }
+  } finally {
+    database.close();
+  }
+});
+
 test("optional schemas degrade independently; remote grouping and resource waiters stay bounded", () => {
   const database = new Database(":memory:");
   const asOf = Date.parse("2026-10-31T12:00:00Z");
