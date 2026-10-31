@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mountObserver } from "./mount.js";
 import { MountProbe, flushMount } from "./mount-lifecycle.fixture.js";
 import type { AppFixtureNode } from "./dom.fixture.js";
+import type { AppBus } from "./data.js";
 import { present } from "../view/drawing.fixture.js";
 
 function snapshot(label: string) {
@@ -163,6 +164,54 @@ test("bus cards use aggregate observations while recent activity stays bounded a
     assert.equal(resource.open, true);
     assert.equal(probe.page.document.activeElement, read);
     assert.match(part(probe, "mail-inspector-meta-").textContent, /snapshot.*metrics/);
+  } finally {
+    mounted.dispose();
+  }
+});
+test("truncated remote observations do not claim the diagnostic row cap", async () => {
+  const probe = new MountProbe();
+  const mounted = mountObserver(probe.options);
+  const data = snapshot("Resource");
+  const coordination = data.bus.coordination;
+  const remoteActivity: NonNullable<
+    NonNullable<AppBus["coordination"]>["overview"]
+  >["remoteActivity"] = {
+    status: "partial",
+    truncated: true,
+    rows: Array.from({ length: 32 }, (_, index) => ({
+      machine: "machine-" + String(index),
+      sentAt: 0,
+      state: "delivered_local",
+    })),
+  };
+  try {
+    await flushMount();
+    probe.reply(0, {
+      ...data,
+      bus: {
+        ...data.bus,
+        coordination: {
+          ...coordination,
+          overview: { ...coordination.overview, remoteActivity },
+          sections: [{ ...present(coordination.sections[0]), truncated: true }],
+        },
+      },
+    });
+    await flushMount();
+    present(probe.viewOptions).onMailroom?.(null);
+    const nodes = all(present(probe.page.document.getElementById("panels")));
+    const remote = present(
+      present(nodes.find((node) => node.textContent === "Remote activity")).parent,
+    );
+    assert.equal(remote.hidden, false);
+    const text = present(remote.children[1]).textContent;
+    assert.match(text, /Partial observations\nAdditional observations omitted\n/);
+    assert.equal(text.split(" · delivered_local · sent ").length - 1, 32);
+    assert(!text.includes("100"), "remote truncation cannot claim the diagnostics cap");
+    assert.match(
+      present(nodes.find((node) => node.className === "bus-diagnostics")).textContent,
+      /Resource locks · first 100 rows/,
+    );
   } finally {
     mounted.dispose();
   }

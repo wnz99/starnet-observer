@@ -91,7 +91,7 @@ class BusOverview<N extends AppNode, R extends SpriteResource> {
         : status === "partial"
           ? "Partial observations\n"
           : "Unavailable from this observer\n") +
-      (truncated ? "First 100 rows · additional observations omitted\n" : "")
+      (truncated ? "Additional observations omitted\n" : "")
     );
   }
   render(bus: AppBus | null, participant: (id: string | undefined) => string, now: number) {
