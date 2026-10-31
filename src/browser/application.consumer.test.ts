@@ -1471,17 +1471,58 @@ function mailroomSnapshot() {
       reason: null,
       observedAt: data.observedAt,
       window: 100,
-      messages: [2, 1].map((id) => ({
+      messages: Array.from({ length: 12 }, (_, index) => 12 - index).map((id) => ({
         id,
-        identity: "mail_" + String(id).repeat(64),
+        identity: "mail_" + id.toString(16).padStart(64, "0"),
         from: data.sessions[0]?.id,
         to: "external",
         sentAt: data.observedAt,
         acknowledgedAt: null,
         wake: "requested",
-        replyTo: id === 2 ? 1 : null,
+        replyTo: id === 12 ? 1 : null,
       })),
       coordination: {
+        overview: {
+          asOf: data.observedAt,
+          agents: { status: "available", codex: 7, claude: 3 },
+          messages: { status: "available", total: 120, local: 100, remote: 20 },
+          awaiting: { status: "available", count: 21, oldestAt: data.observedAt - 60000 },
+          wakes: {
+            pending: { status: "available", count: 2 },
+            failed: { status: "available", count: 1 },
+          },
+          attention: {
+            status: "available",
+            truncated: false,
+            rows: [{ id: 12, sentAt: data.observedAt, reasons: ["unacknowledged", "wake-failed"] }],
+          },
+          resources: {
+            status: "available",
+            truncated: false,
+            rows: [
+              {
+                resource: "Synthetic deployment",
+                scope: "shared",
+                holder: data.sessions[0]?.id,
+                acquiredAt: data.observedAt,
+                expiresAt: data.observedAt + 60000,
+                checkAt: data.observedAt + 30000,
+                waiters: [{ agent: "external", requestedAt: data.observedAt }],
+              },
+            ],
+          },
+          remoteActivity: {
+            status: "available",
+            truncated: false,
+            rows: [
+              {
+                machine: "Synthetic remote",
+                sentAt: data.observedAt - 60000,
+                state: "delivered_local",
+              },
+            ],
+          },
+        },
         sections: [
           {
             title: "Resource locks",
@@ -1511,7 +1552,7 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
         reads.push(id);
         return {
           id,
-          identity: "mail_" + String(id).repeat(64),
+          identity: "mail_" + id.toString(16).padStart(64, "0"),
           health: "available",
           reason: null,
           asOf: new Date().toISOString(),
@@ -1533,20 +1574,54 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
     await expect(panel.getByRole("heading", { name: "Mailroom · this machine" })).toBeVisible();
     await expect(panel).toContainText("Synthetic deployment");
     assert.deepEqual(reads, [], "mailroom open does not inspect bodies");
+    await expect(panel.locator(".bus-card")).toHaveCount(4);
+    await expect(panel.locator(".bus-message")).toHaveCount(10);
+    await expect(panel).toContainText("120 total");
+    await capture(page, path.join(artifacts, "mailroom-cards.png"));
+    const diagnostics = panel
+      .locator("details")
+      .filter({ has: page.locator("summary", { hasText: /^Diagnostics$/ }) });
+    await expect(diagnostics).not.toHaveAttribute("open", "");
+    await diagnostics.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(diagnostics).toHaveAttribute("open", "");
+    const resource = panel.locator(".bus-resource");
+    await resource.locator("summary").click();
+    await expect(resource).toHaveAttribute("open", "");
+    await expect(resource).toContainText("Next check:");
+    await expect(panel).toContainText(
+      "Synthetic remote · delivered_local · sent 1m ago · observed",
+    );
+    await capture(page, path.join(artifacts, "mailroom-groups.png"));
+    await panel.getByRole("button", { name: "Read message #12", exact: true }).focus();
+    await page.waitForTimeout(2400);
+    await expect(
+      panel.getByRole("button", { name: "Read message #12", exact: true }),
+    ).toBeFocused();
+    await expect(resource).toHaveAttribute("open", "");
+    await expect(diagnostics).toHaveAttribute("open", "");
     await capture(page, path.join(artifacts, "mailroom-details.png"));
-    await panel.getByRole("button", { name: "Read message #2", exact: true }).click();
-    await expect(page.locator("dialog[open]")).toContainText("Synthetic message 2");
+    await panel.getByRole("button", { name: "Read message #12", exact: true }).click();
+    await expect(page.locator("dialog[open]")).toContainText("Synthetic message 12");
     await page
       .locator("dialog[open]")
       .getByRole("button", { name: "Reply to #1", exact: true })
       .click();
     await expect(page.locator("dialog[open]")).toContainText("Synthetic message 1");
-    assert.deepEqual(reads, [2, 1], "reply follows an identity-checked parent read");
+    assert.deepEqual(
+      reads,
+      [12, 1],
+      "reply follows an identity-checked parent outside displayed ten",
+    );
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     await expect(page.locator("dialog[open]")).toContainText("Mailroom · this machine");
     await page.setViewportSize({ width: 600, height: 800 });
     await expect(page.locator("dialog[open]")).toHaveAttribute("data-mode", "modal");
+    await page.locator("dialog[open] .bus-cards").evaluate((node) => {
+      node.scrollIntoView({ block: "start" });
+    });
+    await capture(page, path.join(artifacts, "mailroom-details-narrow.png"));
     await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: "Bus details", exact: true })).toBeFocused();
   } finally {

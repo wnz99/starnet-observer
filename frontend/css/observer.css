@@ -869,11 +869,41 @@ input::placeholder {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.bus-summary {
+.bus-diagnostics {
   margin: 0;
   font: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.bus-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bus-card,
+.bus-group {
+  padding: 8px;
+  border: 1px solid var(--line);
+  margin-bottom: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bus-card h3,
+.bus-card p {
+  margin: 0 0 4px;
+}
+.bus-card p,
+.bus-observation {
+  white-space: pre-line;
+}
+.bus-resource summary,
+.bus-group > summary {
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .bus-cards {
+    grid-template-columns: 1fr;
+  }
 }
 .bus-messages {
   padding-left: 22px;

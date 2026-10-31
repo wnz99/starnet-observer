@@ -29,20 +29,31 @@ function sections(bus: AppBus | null, participant: (id: string) => string) {
   const lines: string[] = [];
   if (!bus?.coordination) lines.push("Coordination details: unavailable from this observer");
   for (const section of bus?.coordination?.sections || []) {
+    if (emptySection(section)) continue;
     lines.push("", section.title + (section.truncated ? " · first 100 rows" : ""));
     lines.push(sectionStatus(section.available, section.rows.length));
-    for (const row of section.rows)
-      lines.push(
-        row.label + (row.agent ? " · " + participant(row.agent) : "") + "\n  " + row.detail,
-      );
+    for (const row of section.rows) lines.push(diagnosticRow(row, participant));
   }
   return lines;
+}
+function diagnosticRow(
+  row: { label: string; agent?: string; detail: string },
+  participant: (id: string) => string,
+) {
+  return row.label + (row.agent ? " · " + participant(row.agent) : "") + "\n  " + row.detail;
+}
+function emptySection(section: { available: boolean; rows: unknown[]; truncated: boolean }) {
+  return section.available && section.rows.length === 0 && !section.truncated;
 }
 function sectionStatus(available: boolean, rows: number) {
   if (!available) return "Unavailable in this mailbox";
   return rows === 0 ? "None recorded" : "";
 }
-export function busSummary(bus: AppBus | null, participant: (id: string) => string, now: number) {
+export function busDiagnostics(
+  bus: AppBus | null,
+  participant: (id: string) => string,
+  now: number,
+) {
   const lines = [
     "Observed: " + (bus?.observedAt ? new Date(bus.observedAt).toISOString() : "unavailable"),
   ];

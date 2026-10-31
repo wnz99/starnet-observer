@@ -1,7 +1,7 @@
 # Quick Task 261031-sut: Bus metrics panel and room double-click toggle - Context
 
 **Gathered:** 2026-10-31
-**Status:** Approved revision 3 registered; implementation pending
+**Status:** T1 independently clean; T2 implemented, review pending; T3 pending
 
 <domain>
 ## Task Boundary

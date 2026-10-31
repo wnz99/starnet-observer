@@ -6,9 +6,11 @@ import type { BusTarget, PanelTarget } from "./roster-ports.js";
 import type { AppUi } from "./ui.js";
 import { NodeEvents, setText } from "./ui.js";
 import { busHealth, mailStatus } from "./mail-text.js";
-import { busSummary } from "./bus-text.js";
+import { busDiagnostics } from "./bus-text.js";
+import { createBusOverview } from "./bus-overview.js";
 import { validIdentity } from "../inspector/mail-validation.js";
 import { age } from "../model/description.js";
+const RECENT_MESSAGE_LIMIT = 10;
 
 interface Options<N extends AppNode, R extends SpriteResource> {
   ui: AppUi<N, R>;
@@ -28,18 +30,25 @@ interface MessageRow<N> {
 }
 class BusPanel<N extends AppNode, R extends SpriteResource> {
   private readonly summary: N;
+  private readonly overview;
   private readonly messages: N;
+  private readonly recentHeading: N;
   private readonly events: NodeEvents;
   private readonly entries = new Map<number, MessageRow<N>>();
   private visible = true;
   private suspended = false;
   constructor(private readonly options: Options<N, R>) {
     const { ui, state } = options;
-    this.summary = ui.text("pre", "bus-summary", "");
+    this.overview = createBusOverview(ui);
+    this.summary = ui.text("pre", "bus-diagnostics", "");
+    const diagnostics = ui.text("details", "bus-group", "");
+    ui.document.attach(diagnostics, ui.text("summary", "", "Diagnostics"), this.summary);
     this.messages = ui.text("ol", "bus-messages", "");
+    this.recentHeading = ui.text("h3", "", "Recent activity");
+    this.overview.recent(this.recentHeading, this.messages);
     this.events = new NodeEvents(() => !state.disposed);
     const body = options.get("mail-inspector-body");
-    ui.document.attach(body, this.summary, ui.text("h3", "", "Recent messages"), this.messages);
+    ui.document.attach(body, this.overview.root, diagnostics);
     body.hidden = false;
     options.get("mail-inspector-close").setAttribute("aria-label", "Close mailroom");
     this.events.on(options.get("mail-inspector-close"), "click", () => {
@@ -134,7 +143,16 @@ class BusPanel<N extends AppNode, R extends SpriteResource> {
     });
   }
   private ledger(items: AppMessage[]) {
-    const present = new Set(items.map((message) => message.id));
+    const displayed = items
+      .filter(
+        (message) =>
+          typeof message.sentAt === "number" &&
+          Number.isFinite(message.sentAt) &&
+          message.sentAt <= this.options.now(),
+      )
+      .sort((a, b) => b.id - a.id)
+      .slice(0, RECENT_MESSAGE_LIMIT);
+    const present = new Set(displayed.map((message) => message.id));
     for (const [id, entry] of this.entries)
       if (!present.has(id)) {
         entry.events.dispose();
@@ -142,13 +160,14 @@ class BusPanel<N extends AppNode, R extends SpriteResource> {
       }
     const { ui } = this.options;
     const focused = ui.document.activeElement;
-    const nodes = items.map((message) => this.message(message, items));
+    const nodes = displayed.map((message) => this.message(message, items));
     const scroll = this.messages.scrollTop;
     if (ui.arrange(this.messages, nodes)) {
       this.messages.scrollTop = scroll;
       if (focused && nodes.some((node) => ui.document.contains(node, focused)))
         focused.focus({ preventScroll: true });
     }
+    return displayed.length;
   }
   render() {
     if (!this.visible || this.suspended) return;
@@ -160,28 +179,38 @@ class BusPanel<N extends AppNode, R extends SpriteResource> {
   }
   private renderBus() {
     const current = this.bus();
+    this.header();
+    setText(
+      this.summary,
+      busDiagnostics(current || null, (id) => this.participant(id), this.options.now()),
+    );
+    this.overview.render(current || null, (id) => this.participant(id), this.options.now());
+    const items = current?.messages || [];
+    const displayed = this.ledger(items);
+    this.recentHeading.hidden = displayed === 0;
+    this.messages.hidden = displayed === 0;
+    this.options.get("mail-inspector-empty").hidden = displayed > 0;
+    setText(
+      this.options.get("mail-inspector-empty"),
+      current ? "No recent messages" : "Bus unavailable",
+    );
+  }
+  private header() {
+    const current = this.bus();
     setText(
       this.options.get("mail-inspector-title"),
       "Mailroom · " + (this.options.target.id || "this machine"),
     );
     setText(
       this.options.get("mail-inspector-meta"),
-      "Recent " + String(current?.window || 100) + " messages · coordination snapshots",
+      "Latest ten messages · snapshot " +
+        age(current?.observedAt, this.options.now()) +
+        " · metrics " +
+        age(current?.coordination?.overview?.asOf, this.options.now()),
     );
     setText(
       this.options.get("mail-inspector-health"),
       (this.stale() ? "Last known · " : "") + busHealth(current || null, this.options.now()),
-    );
-    setText(
-      this.summary,
-      busSummary(current || null, (id) => this.participant(id), this.options.now()),
-    );
-    const items = current?.messages || [];
-    this.ledger(items);
-    this.options.get("mail-inspector-empty").hidden = items.length > 0;
-    setText(
-      this.options.get("mail-inspector-empty"),
-      current ? "No recent messages" : "Bus unavailable",
     );
   }
   focusTarget() {
