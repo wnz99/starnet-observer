@@ -5,6 +5,11 @@ import { MountProbe, flushMount } from "./mount-lifecycle.fixture.js";
 import type { AppFixtureNode } from "./dom.fixture.js";
 import type { AppBus } from "./data.js";
 import { present } from "../view/drawing.fixture.js";
+import { sanitizeBus } from "../../sidecar/remotes/bus.js";
+import { validCoordination } from "../../sidecar/sqlite/validate-bus.js";
+import { createBusOverview } from "./bus-overview.js";
+import { createUi } from "./ui.js";
+import { AppFixtureDocument } from "./dom.fixture.js";
 
 function snapshot(label: string) {
   return {
@@ -70,6 +75,70 @@ function snapshot(label: string) {
 function all(node: AppFixtureNode): AppFixtureNode[] {
   return [node, ...node.children.flatMap(all)];
 }
+test("remote overview timestamps reject invalid Dates before rendering and retain diagnostics", () => {
+  const fields = [
+    "asOf",
+    "oldestAt",
+    "attention",
+    "acquiredAt",
+    "expiresAt",
+    "checkAt",
+    "requestedAt",
+    "remoteActivity",
+  ];
+  for (const field of fields) {
+    for (const timestamp of [
+      -1e100, -8640000000000001, -8640000000000000, 0, 8640000000000000, 8640000000000001, 1e100,
+    ]) {
+      const data = snapshot("Resource");
+      const overview = data.bus.coordination.overview;
+      const resource = present(overview.resources.rows[0]);
+      const at = (key: string) => (field === key ? timestamp : 0);
+      const input = {
+        ...overview,
+        asOf: at("asOf"),
+        awaiting: { ...overview.awaiting, oldestAt: at("oldestAt") },
+        attention: {
+          ...overview.attention,
+          rows: [{ id: 1, sentAt: at("attention"), reasons: ["unacknowledged"] }],
+        },
+        resources: {
+          ...overview.resources,
+          rows: [
+            {
+              ...resource,
+              acquiredAt: at("acquiredAt"),
+              expiresAt: at("expiresAt"),
+              checkAt: at("checkAt"),
+              waiters: [{ agent: "external", requestedAt: at("requestedAt") }],
+            },
+          ],
+        },
+        remoteActivity: {
+          ...overview.remoteActivity,
+          rows: [
+            {
+              machine: "fixture",
+              sentAt: at("remoteActivity"),
+              state: "queued_local",
+            },
+          ],
+        },
+      };
+      const coordination = { ...data.bus.coordination, overview: input };
+      const accepted = Math.abs(timestamp) <= 8640000000000000;
+      assert.equal(validCoordination(coordination), accepted, field + String(timestamp));
+      const bus = present(sanitizeBus("fixture", { ...data.bus, coordination }, new Set(), 0));
+      assert.equal(bus.coordination?.overview !== undefined, accepted);
+      assert.deepEqual(bus.coordination?.sections, data.bus.coordination.sections);
+      const document = new AppFixtureDocument();
+      const renderer = createBusOverview(createUi(document));
+      assert.doesNotThrow(() => {
+        renderer.render(bus, () => "external", 0);
+      });
+    }
+  }
+});
 function part(probe: MountProbe, prefix: string) {
   const root = present(probe.page.document.getElementById("panels"));
   return present(all(root).find((node) => node.id.startsWith(prefix)));

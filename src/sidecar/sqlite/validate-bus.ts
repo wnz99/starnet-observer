@@ -21,6 +21,12 @@ function number(value: unknown): value is number | null {
 function instant(value: unknown) {
   return value === null || (typeof value === "string" && Number.isFinite(Date.parse(value)));
 }
+function timestamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(new Date(value).getTime());
+}
+function optionalTimestamp(value: unknown) {
+  return value === null || timestamp(value);
+}
 function provider(value: unknown) {
   return value === "codex" || value === "claude";
 }
@@ -198,8 +204,7 @@ function attentionRow(value: unknown) {
   return (
     busRecord(value) &&
     messageId(value.id) &&
-    typeof value.sentAt === "number" &&
-    Number.isFinite(value.sentAt) &&
+    timestamp(value.sentAt) &&
     Array.isArray(value.reasons) &&
     value.reasons.length > 0 &&
     value.reasons.length <= MAX_REASONS &&
@@ -215,9 +220,9 @@ function resourceRow(value: unknown) {
     bounded(value.resource, LABEL_CHARS) &&
     (value.scope === "shared" || value.scope === "repository") &&
     (value.holder === undefined || bounded(value.holder, ADDRESS_CHARS)) &&
-    number(value.acquiredAt) &&
-    number(value.expiresAt) &&
-    number(value.checkAt) &&
+    optionalTimestamp(value.acquiredAt) &&
+    optionalTimestamp(value.expiresAt) &&
+    optionalTimestamp(value.checkAt) &&
     validWaiters(value.waiters)
   );
 }
@@ -227,7 +232,9 @@ function validWaiters(value: unknown) {
     value.length <= MAX_WINDOW &&
     value.every(
       (waiter: unknown) =>
-        busRecord(waiter) && bounded(waiter.agent, ADDRESS_CHARS) && number(waiter.requestedAt),
+        busRecord(waiter) &&
+        bounded(waiter.agent, ADDRESS_CHARS) &&
+        optionalTimestamp(waiter.requestedAt),
     )
   );
 }
@@ -235,7 +242,7 @@ function validAwaiting(value: unknown) {
   return (
     metric(value, ["count"]) &&
     busRecord(value) &&
-    number(value.oldestAt) &&
+    optionalTimestamp(value.oldestAt) &&
     (value.status !== "unavailable" || value.oldestAt === null)
   );
 }
@@ -247,8 +254,7 @@ export function validOverview(
 ): value is NonNullable<BusState["coordination"]>["overview"] {
   return (
     busRecord(value) &&
-    typeof value.asOf === "number" &&
-    Number.isFinite(value.asOf) &&
+    timestamp(value.asOf) &&
     metric(value.agents, ["codex", "claude"]) &&
     metric(value.messages, ["total", "local", "remote"]) &&
     validAwaiting(value.awaiting) &&
@@ -261,8 +267,7 @@ export function validOverview(
       (row) =>
         busRecord(row) &&
         bounded(row.machine, MACHINE_CHARS) &&
-        typeof row.sentAt === "number" &&
-        Number.isFinite(row.sentAt) &&
+        timestamp(row.sentAt) &&
         relayState(row.state),
     )
   );
