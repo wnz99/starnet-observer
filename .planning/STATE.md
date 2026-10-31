@@ -35,12 +35,12 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-0jt | Fix Codex native child identity and nested discovery | PR #31 R1 adapter finding corrected; fresh static/build and 298 core tests passed; full-branch re-review/CI pending | [261101-0jt](./quick/261101-0jt-fix-codex-native-child-identity-and-nest/) |
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261101-0jt | Fix Codex native child identity and nested discovery | 2026-11-01 | [PR #31](https://github.com/wnz99/starnet-observer/pull/31) | Implementation, independent source review and required verification complete; 24 focused/298 core tests and source Ubuntu CI passed; final tracking-head CI and merge pending at summary preparation | [261101-0jt](./quick/261101-0jt-fix-codex-native-child-identity-and-nest/) |
 | 261019-28k | Repair helper formation recovery and occupied desk links | 2026-10-19 | [PR #21](https://github.com/wnz99/starnet-observer/pull/21) | Implementation/review complete; revision-2 conformance clean; 271 native tests and installed/browser consumers passed; final tracking-head review, CI and merge pending | [261019-28k](./quick/261019-28k-repair-helper-formation-recovery-and-occ/) |
 | 261018-q7j | UI responsiveness, native clicks and agent indicators | 2026-10-18 | [PR #19](https://github.com/wnz99/starnet-observer/pull/19) | Implementation/review complete; 256 native tests and installed/browser consumers passed; final tracking-head checks and merge pending | [261018-q7j](./quick/261018-q7j-fix-ui-responsiveness-native-clicks-and-/) |
 | 261018-3am | Codex identity performance and redraw availability | 2026-10-18 | [PR #18](https://github.com/wnz99/starnet-observer/pull/18) | Complete; independent review clean; 254 local tests and Ubuntu CI passed | [261018-3am](./quick/261018-3am-optimize-codex-identity-capture-during-t/) |
