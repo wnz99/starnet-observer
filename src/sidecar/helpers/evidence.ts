@@ -33,7 +33,7 @@ function lifecycle(
   task: TaskEvent | null,
 ): NonNullable<ObserverRow["lifecycleEvidence"]> {
   if (provider === "codex") {
-    if (relationship === "open" && task?.source === "codex:shutdown_complete")
+    if (relationship !== "closed" && task?.source === "codex:shutdown_complete")
       return {
         state: "closed",
         reason: "closed",
@@ -43,7 +43,7 @@ function lifecycle(
     return {
       state: relationship,
       reason: relationship === "closed" ? "closed" : null,
-      source: "codex:thread_spawn_edges",
+      source: relationship === "unknown" ? "codex:spawn_agent" : "codex:thread_spawn_edges",
       observedAt: null,
     };
   }
@@ -95,7 +95,8 @@ function taskStatus(
   provider: ObserverRow["provider"],
 ) {
   const own = binding.projection?.ownTask;
-  const event = provider === "claude" ? candidate.event : parent?.helperEvents.get(candidate.child);
+  const event =
+    candidate.event ?? (provider === "codex" ? parent?.helperEvents.get(candidate.child) : null);
   if (!own) return event || null;
   if (!event) return own;
   return newer(own, event) ? event : own;

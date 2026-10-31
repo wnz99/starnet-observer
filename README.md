@@ -73,6 +73,8 @@ Keep using those terminals normally. The browser observer refreshes about every 
 
 The helper list, deck counts and status totals describe displayed crew: room avatars, including pane agents and helpers, rather than all retained helper histories or proven running processes. A verified helper relationship does not confirm running presence. Each project room has crew quarters. A helper with fresh, verified new-assignment evidence walks from quarters to its parent; confirmed closed or killed helpers return and disappear. Task completion alone does not send a helper back. Initial observations and recovery after unavailable evidence seed the scene without replaying arrivals.
 
+Codex helper discovery combines recorded database edges with native transcript spawn evidence. Every candidate still needs its own transcript to verify the exact parent relationship. Older spawn evidence can appear on a later refresh while the bounded background index completes. Paginated forks use their explicit history boundary to exclude copied parent messages and token usage from the child.
+
 Statistics show provider-reported cumulative session-history token observations, including retained helper histories hidden from the room. Bounded histories can have partial usage data; coverage means complete, partial or unavailable usage data, not completed tasks. These are not billing totals. Codex input includes cached input, so do not add cache read to input. Claude reports input and cache counters separately.
 
 For a named/non-default Herdr server, launch the observer with `HERDR_SOCKET_PATH` set to that server's Unix socket. The default is `~/.config/herdr/herdr.sock`.
@@ -108,6 +110,10 @@ llm-bus install
 Restart your agents. In Codex, review and trust the bus hooks in `/hooks`, as described in the [bus README](https://github.com/wnz99/llm-bus#install-and-verify). If the command is missing, run `uv tool update-shell` and open a new terminal.
 
 Run `llm-bus whoami` through each agent's shell tool to confirm registration. Agents use `llm-bus send` to exchange messages; the observer visualizes that traffic. It never sends, acknowledges, or wakes agents itself.
+
+Double-click a mailroom on the station, or choose **Bus details** in the sidebar, to open its read-only detail panel. It expands the recent-message list with registrations, the resource catalog, locks and waiters, wake dispatch and coverage, relay publications and peers, synchronization, work reports, and monitor/submission counts. Each coordination section shows at most 100 rows and marks truncation. Missing or incompatible tables show as unavailable; stale snapshots stay marked as last known. Registrations and cached peers do not prove that an agent is reachable. Lock expiration and check times are recorded observations, not a new lock grant.
+
+Messages with a recorded `reply_to` show **Reply to #…**. For local messages whose parent remains in the recent window, the link opens that parent's inspector. Older parents are identified by number but cannot be opened from this window. Remote messages retain their reply links as metadata; their bodies remain unavailable at the hub. Opening the mailroom does not read bodies; opening a local message performs the existing redacted, identity-checked read. Presentation mode disables these panels. The optional cross-person `llm-bus collab` mailbox is separate and is not read by this view.
 
 The observer reads the default macOS mailbox at `~/.local/share/llm-bus/bus.sqlite3`. If you use a custom bus database, set `LLM_BUS_DB` to the same database file when launching it. The bus must have actual messages for couriers to appear.
 

@@ -163,6 +163,7 @@ export interface ViewOptions<R extends SpriteResource, B extends R = R> {
   onTitleToggle?: (id: string) => void;
   onPlatform?: (key: string) => void;
   onObservatory?: () => void;
+  onMailroom?: (host: string | null) => void;
   onShip?: ((host: string | null) => void) | null;
   hostSelection?: () => string | null | undefined;
   onMode?: (state: { mode: string; platform: string | null }) => void;

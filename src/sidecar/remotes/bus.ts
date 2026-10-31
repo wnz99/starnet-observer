@@ -2,6 +2,7 @@ const MAX_BUS_WINDOW = 1000,
   DEFAULT_BUS_WINDOW = 100;
 import { sanitizeRelay, sanitizeRemote } from "./relay.js";
 import { LIMITS } from "./limits.js";
+import { publicCoordination } from "../bus/public-coordination.js";
 import type { ObserverSnapshot } from "../../shared/observer.js";
 import { ID, remap, matches, has, record, text, time } from "./fields.js";
 /* A remote host's own llm-bus, as its observer published it (publicBus shape). Each host's bus stands alone: message
@@ -39,6 +40,7 @@ export function sanitizeBus(
     observedAt: health === "available" ? receivedAt : null,
     window: busWindow(bus.window),
     messages,
+    ...publicCoordination(bus.coordination, endpoint),
     ...(remote ? { remote } : {}),
   };
 }
@@ -65,8 +67,14 @@ function sanitizeMessage(
     sentAt: time(message.sentAt),
     acknowledgedAt: time(message.acknowledgedAt),
     wake: has(WAKES, message.wake) ? message.wake : "unknown",
+    ...replyLink(message.replyTo),
     ...(relay ? { relay } : {}),
   };
+}
+function replyLink(value: unknown) {
+  return value === null || (typeof value === "number" && Number.isSafeInteger(value) && value > 0)
+    ? { replyTo: value }
+    : {};
 }
 
 function busWindow(value: unknown) {

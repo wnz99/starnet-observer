@@ -9,6 +9,7 @@ function selectionCallbacks<R extends SpriteResource, B extends R>(options: View
     onTitleToggle: options.onTitleToggle ?? (() => {}),
     onPlatform: options.onPlatform ?? (() => {}),
     onObservatory: options.onObservatory ?? (() => {}),
+    onMailroom: options.onMailroom ?? null,
     onMode: options.onMode ?? (() => {}),
     onCamera: options.onCamera ?? (() => {}),
     onShip: options.onShip ?? null,

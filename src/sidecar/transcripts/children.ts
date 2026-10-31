@@ -26,12 +26,23 @@ interface Context {
     file: string,
     sessionId: string,
     binding?: ChildBinding | null,
+    provider?: Provider,
   ) => Promise<Projection | null>;
   now: () => number;
 }
 export class Children {
   readonly claims = new Map<string, Claims>();
   constructor(private readonly context: Context) {}
+  async codexMetadata(id: string, sessionId: string, binding: ChildBinding | undefined) {
+    const { discovery, reader, spawnProjection } = this.context;
+    const file = binding?.file || (await discovery.locate("codex", sessionId));
+    if (!file) return undefined;
+    return (
+      (await spawnProjection(file, sessionId, binding, "codex")) ??
+      binding?.projection ??
+      reader.states.get(id)?.projection
+    );
+  }
   async bind(
     ...[provider, sessionId, parentSessionId, candidate, spawn]: [
       provider: Provider,

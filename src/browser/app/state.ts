@@ -98,12 +98,14 @@ export class AppState {
   }
   // The mail panel lists the selected host's own bus (this machine's unless a remote host tab is chosen).
   panelBus() {
+    return this.busFor(this.selectedHost);
+  }
+  presentation() {
+    return !!this.latest?.data?.presentation;
+  }
+  busFor(host: string | null) {
     const data = this.latest?.data;
-    return (
-      (this.selectedHost && data?.hostBus?.[this.selectedHost]) ||
-      (this.selectedHost ? null : data?.bus) ||
-      null
-    );
+    return (host && data?.hostBus?.[host]) || (host ? null : data?.bus) || null;
   }
   messageFor(id: number) {
     return this.panelBus()?.messages?.find((message) => message.id === id);

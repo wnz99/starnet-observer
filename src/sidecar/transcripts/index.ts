@@ -35,6 +35,7 @@ export function makeTranscriptObserver(options: TranscriptOptions = {}) {
       discovery.begin();
     },
     helperMetadata: (id: string) => reader.states.get(id)?.projection,
+    codexMetadata: children.codexMetadata.bind(children),
     read: reader.read.bind(reader),
     inspect: (id: string, provider: "codex" | "claude", sessionId: string | null | undefined) =>
       reader.read(id, provider, sessionId, DETAIL_READ),

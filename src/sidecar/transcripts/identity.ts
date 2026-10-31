@@ -5,6 +5,7 @@ import { recordBelongsToSession } from "../inspector/index.js";
 import { object, string } from "../inspector/values.js";
 import { redactText } from "../inspector/fields.js";
 import type { ChildBinding, Provider } from "./contracts.js";
+import { forkHistoryStart, inheritedRecord } from "../inspector/identity.js";
 export const cleanName = (value: unknown) =>
   typeof value === "string" ? cleanControls(value).slice(0, MAX_NAME_CHARS) : "";
 export function childMetadata(data: Buffer, binding: ChildBinding) {
@@ -14,18 +15,34 @@ class ChildIdentity {
   private verified = false;
   private nickname: string | null = null;
   constructor(private readonly binding: ChildBinding) {}
+  private prepareFork(record: Record<string, unknown>) {
+    const binding = this.binding;
+    const start = forkHistoryStart(
+      object(record.payload),
+      binding.sessionId,
+      binding.parentSessionId,
+    );
+    if (this.verified || start === null || record.ordinal !== 0) return true;
+    if (binding.historyStartOrdinal === undefined) binding.historyStartOrdinal = start;
+    return binding.historyStartOrdinal === start;
+  }
+  private codex(record: Record<string, unknown>) {
+    const binding = this.binding;
+    if (this.verified && inheritedRecord(record, binding)) return true;
+    if (!this.prepareFork(record)) return false;
+    if (
+      this.verified ||
+      !recordBelongsToSession(record, binding.provider, binding.sessionId, binding)
+    )
+      return false;
+    this.verified = true;
+    const name = string(object(record.payload).agent_nickname);
+    this.nickname = name === undefined ? null : cleanName(redactText(name));
+    return true;
+  }
   private consume(record: Record<string, unknown>) {
     const binding = this.binding;
-    if (binding.provider === "codex" && record.type === "session_meta") {
-      if (
-        this.verified ||
-        !recordBelongsToSession(record, binding.provider, binding.sessionId, binding)
-      )
-        return false;
-      this.verified = true;
-      const name = string(object(record.payload).agent_nickname);
-      this.nickname = name === undefined ? null : cleanName(redactText(name));
-    }
+    if (binding.provider === "codex" && record.type === "session_meta") return this.codex(record);
     if (claudeIdentity(record, binding)) {
       if (!recordBelongsToSession(record, binding.provider, binding.sessionId, binding))
         return false;
@@ -54,6 +71,7 @@ export function recordIdentityConflicts(
   binding?: ChildBinding | null,
 ): boolean {
   const record = object(raw);
+  if (provider === "codex" && inheritedRecord(record, binding)) return false;
   const identity =
     (provider === "codex" && record.type === "session_meta") ||
     (provider === "claude" &&

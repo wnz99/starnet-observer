@@ -9,6 +9,7 @@ export interface BusRow {
   sentAt: string | null;
   acknowledgedAt: string | null;
   wake: PublicBus["messages"][number]["wake"];
+  replyTo?: number | null;
   relay?: Relay;
 }
 export interface RemoteView {
@@ -21,6 +22,7 @@ export interface RemoteView {
 export interface BusState {
   rows: BusRow[];
   remote?: RemoteView | null;
+  coordination?: PublicBus["coordination"];
   observedAt: number | null;
   health: "available" | "unavailable" | "unknown";
   reason: string | null;

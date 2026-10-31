@@ -50,6 +50,7 @@ class HelperObserver {
     const roots = await graph.roots(readSummary),
       source = await this.source(roots);
     if (source.rows) graph.edges(source.rows);
+    await graph.nativeRoots(roots, this.transcripts);
     await traversal.discover(roots);
     return {
       rows: traversal.rows,

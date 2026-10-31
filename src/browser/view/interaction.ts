@@ -87,15 +87,37 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     return !!tap && Math.hypot(point.x - tap.point.x, point.y - tap.point.y) <= this.TAP_SLOP;
   };
 
-  private targetsAt(point: Point) {
+  private targetsAt(point: Point): Omit<Tap, "point"> {
     const title = this.titleAt(point);
     if (title) return { id: null, title, sign: null, obs: false, ship: null };
     const sign = this.signAt(point);
     if (sign) return { id: null, title, sign, obs: false, ship: null };
     const id = Scene.hitTest(point, this.view.regions);
     if (id) return { id, title, sign: null, obs: false, ship: null };
+    const mail = this.mailroomAt(point);
+    if (mail) return { id, title, sign, obs: false, ship: null, mail };
     const obs = this.observatoryAt(point);
     return { id, title, sign, obs, ship: obs ? null : this.shipAt(point) };
+  }
+  private mailroomAt(point: Point) {
+    if (!this.view.callbacks.onMailroom || !this.paintedFrameCurrent()) return null;
+    const floor = Scene.fromScreen(point, this.view.camera);
+    const scene = this.view.activeScene;
+    const rooms = scene.ships?.length
+      ? scene.ships
+          .filter((ship) => !ship.shadow && ship.mail)
+          .map((ship) => ({ host: ship.local ? null : ship.id, mail: ship.mail }))
+      : [{ host: null, mail: scene.mail }];
+    return (
+      rooms.find(
+        ({ mail }) =>
+          mail &&
+          floor.x >= mail.rect.x &&
+          floor.x <= mail.rect.x + mail.rect.w &&
+          floor.y >= mail.rect.y &&
+          floor.y <= mail.rect.y + mail.rect.h,
+      ) ?? null
+    );
   }
   click = (event: ViewEvent) => {
     const point = this.gestures.completedClick;
@@ -108,11 +130,11 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     const target = repeat ? required(this.tap) : this.targetsAt(point);
     const { id, title, sign, obs, ship } = target;
     if (!repeat) this.toggleTargets(target);
-    if (!repeat) this.tap = { id, title, sign, obs, ship, point };
+    if (!repeat) this.tap = { id, title, sign, obs, ship, mail: target.mail ?? null, point };
     if (id && this.view.workerIndex.has(id)) this.view.callbacks.onSelect(id);
   }
 
-  private toggleTargets(target: ReturnType<Interaction<R, B>["targetsAt"]>) {
+  private toggleTargets(target: Omit<Tap, "point">) {
     const { title, sign, obs, ship } = target;
     if (ship) this.view.callbacks.onShip?.(ship.host);
     if (title && this.view.workerIndex.has(title)) this.view.callbacks.onTitleToggle(title);
@@ -130,6 +152,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     const point = this.gestures.local(event),
       known = this.nearTap(point) ? this.tap : null;
     this.tap = null;
+    if (this.mailDoubleClick(point, known)) return;
     if (this.handledDoubleClick(known)) return; // a title, sign or observatory double-click already acted once; it never zooms
     // The clicks' own target decides; only a double-click with no recorded click hit-tests the current view.
     const id = this.doubleClickWorker(point, known);
@@ -140,6 +163,12 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     if (known && known.id) return; // its worker left: never substitute the floor now under the old point
     this.focusPlatformAt(point);
   };
+  private mailDoubleClick(point: Point, known: Tap | null) {
+    const mail = known ? known.mail : this.mailroomAt(point);
+    if (!mail) return false;
+    this.view.callbacks.onMailroom?.(mail.host);
+    return true;
+  }
 
   private focusPlatformAt(point: Point) {
     const key = Scene.hitPlatform(point, this.view.activeScene, this.view.camera);

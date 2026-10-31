@@ -9,6 +9,7 @@ export interface Tap {
   sign: string | null;
   obs: boolean | null;
   ship: { host: string | null } | null;
+  mail?: { host: string | null } | null;
   point: Point;
 }
 export interface Drag {

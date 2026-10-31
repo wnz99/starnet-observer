@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { selectCoordination } from "./coordination.js";
 import { selectRemote } from "./relay.js";
 import { WINDOW, MAX_RAW_CHARS, busRecord } from "./types.js";
 import type { BusRow } from "./types.js";
@@ -70,8 +71,12 @@ function wake(value: unknown): BusRow["wake"] {
   }
 }
 function selectLocal(database: SnapshotDatabase, proof: Fingerprint) {
+  const hasReply = database
+    .query("PRAGMA table_info(messages)")
+    .all()
+    .some((column) => busRecord(column) && column.name === "reply_to");
   return database
-    .query(QUERY)
+    .query(hasReply ? QUERY.replace("wake_status FROM", "wake_status, reply_to FROM") : QUERY)
     .all()
     .flatMap((row) =>
       validRow(row)
@@ -84,6 +89,16 @@ function selectLocal(database: SnapshotDatabase, proof: Fingerprint) {
               sentAt: instant(row.sent_at),
               acknowledgedAt: instant(row.acknowledged_at),
               wake: wake(row.wake_status),
+              ...(hasReply
+                ? {
+                    replyTo:
+                      typeof row.reply_to === "number" &&
+                      Number.isSafeInteger(row.reply_to) &&
+                      row.reply_to > 0
+                        ? row.reply_to
+                        : null,
+                  }
+                : {}),
             },
           ]
         : [],
@@ -91,18 +106,20 @@ function selectLocal(database: SnapshotDatabase, proof: Fingerprint) {
 }
 export function selectRows(database: SnapshotDatabase, proof: Fingerprint, selectedAt: number) {
   const rows: BusRow[] = selectLocal(database, proof);
+  const coordination = selectCoordination(database);
   // Relay metadata is optional: a bus without (or with unreadable) remote tables still reads as a plain local bus.
   try {
     const selection = selectRemote(database, rows, selectedAt);
     return {
       rows,
+      coordination,
       remote: selection?.view ?? null,
       selectedAt,
       expiresAt: selection?.expiresAt ?? Infinity,
     };
   } catch {
     for (const row of rows) delete row.relay;
-    return { rows, remote: null, selectedAt, expiresAt: Infinity };
+    return { rows, coordination, remote: null, selectedAt, expiresAt: Infinity };
   }
 }
 export function selectInspection(

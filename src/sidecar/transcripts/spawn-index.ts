@@ -2,7 +2,7 @@ const LINE_FEED = 10;
 import crypto from "node:crypto";
 import type { Hash } from "node:crypto";
 import { consumeHelperMetadata, createProjection } from "../inspector/index.js";
-import type { ChildBinding, Projection, TranscriptHandle } from "./contracts.js";
+import type { ChildBinding, Projection, TranscriptHandle, Provider } from "./contracts.js";
 import { READ_BYTES } from "./contracts.js";
 import { close } from "./resources.js";
 import type { Resources } from "./resources.js";
@@ -23,6 +23,7 @@ interface IndexState {
   usedAt: number;
 }
 interface ScanContext {
+  provider: Provider;
   file: string;
   sessionId: string;
   binding?: ChildBinding | null | undefined;
@@ -79,15 +80,16 @@ export class SpawnIndices {
     file: string,
     sessionId: string,
     binding?: ChildBinding | null,
+    provider: Provider = "claude",
   ): Promise<Projection | null> {
-    const key = JSON.stringify([file, sessionId, binding?.parentSessionId || null]);
+    const key = JSON.stringify([provider, file, sessionId, binding?.parentSessionId]);
     const cached = this.indices.get(key);
     const replacing = !cached && this.indices.size >= MAX_INDICES;
     const state = cached ?? this.admit(key);
     if (!state) return unavailable();
     state.usedAt = this.now();
     const wasReady = state.ready;
-    state.promise ??= new SpawnScan(state, this.resources, { file, sessionId, binding })
+    state.promise ??= new SpawnScan(state, this.resources, { file, sessionId, binding, provider })
       .run()
       .finally(() => {
         state.promise = null;
@@ -143,7 +145,7 @@ class SpawnScan {
       consumeHelperMetadata(
         projection,
         record,
-        "claude",
+        this.context.provider,
         this.context.sessionId,
         this.context.binding,
       );
@@ -184,7 +186,7 @@ class SpawnScan {
   async run() {
     let handle: TranscriptHandle | undefined;
     try {
-      const resource = await this.resources.capture("claude", this.context.file, {
+      const resource = await this.resources.capture(this.context.provider, this.context.file, {
         child: !!this.context.binding,
       });
       handle = await this.resources.open(resource.full);

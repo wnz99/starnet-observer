@@ -17,7 +17,11 @@ import type { makeIdentityResolver as IdentityFactory } from "../sidecar/identit
 import type { Inventory, ObserverInputRow } from "../sidecar/observer/contracts.js";
 const NO_OVERSEER_MATCH = false;
 interface FixtureOptions {
-  observer: { get: () => unknown; inspect: (id: string, expectedIdentity?: unknown) => unknown };
+  observer: {
+    get: () => unknown;
+    inspect: (id: string, expectedIdentity?: unknown) => unknown;
+    inspectMessage?: (id: number, expectedIdentity?: string) => unknown;
+  };
   token: string;
   theme?: { pack: string };
   control?: { attach: () => unknown };
@@ -1458,6 +1462,103 @@ async function refreshContinuity(
     );
   }
 }
+function mailroomSnapshot() {
+  const data = snapshot();
+  return {
+    ...data,
+    bus: {
+      health: "available",
+      reason: null,
+      observedAt: data.observedAt,
+      window: 100,
+      messages: [2, 1].map((id) => ({
+        id,
+        identity: "mail_" + String(id).repeat(64),
+        from: data.sessions[0]?.id,
+        to: "external",
+        sentAt: data.observedAt,
+        acknowledgedAt: null,
+        wake: "requested",
+        replyTo: id === 2 ? 1 : null,
+      })),
+      coordination: {
+        sections: [
+          {
+            title: "Resource locks",
+            available: true,
+            truncated: false,
+            rows: [
+              {
+                label: "Synthetic deployment",
+                detail: "Shared across repositories · check pending",
+                agent: data.sessions[0]?.id,
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: string) {
+  const reads: number[] = [];
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: {
+      get: mailroomSnapshot,
+      inspect: () => ({ health: "unavailable", turns: [] }),
+      inspectMessage: (id) => {
+        reads.push(id);
+        return {
+          id,
+          identity: "mail_" + String(id).repeat(64),
+          health: "available",
+          reason: null,
+          asOf: new Date().toISOString(),
+          text: "Synthetic message " + String(id),
+          truncated: false,
+          window: { maxTextChars: 32768 },
+        };
+      },
+    },
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "reduce",
+  });
+  try {
+    await page.goto(fixture.url);
+    await page.getByRole("button", { name: "Bus details", exact: true }).click();
+    const panel = page.locator("dialog[open]");
+    await expect(panel.getByRole("heading", { name: "Mailroom · this machine" })).toBeVisible();
+    await expect(panel).toContainText("Synthetic deployment");
+    assert.deepEqual(reads, [], "mailroom open does not inspect bodies");
+    await capture(page, path.join(artifacts, "mailroom-details.png"));
+    await panel.getByRole("button", { name: "Read message #2", exact: true }).click();
+    await expect(page.locator("dialog[open]")).toContainText("Synthetic message 2");
+    await page
+      .locator("dialog[open]")
+      .getByRole("button", { name: "Reply to #1", exact: true })
+      .click();
+    await expect(page.locator("dialog[open]")).toContainText("Synthetic message 1");
+    assert.deepEqual(reads, [2, 1], "reply follows an identity-checked parent read");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("dialog[open]")).toContainText("Mailroom · this machine");
+    await page.setViewportSize({ width: 600, height: 800 });
+    await expect(page.locator("dialog[open]")).toHaveAttribute("data-mode", "modal");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Bus details", exact: true })).toBeFocused();
+  } finally {
+    await page.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}
 async function runBrowserConsumer(root: string) {
   const artifacts = await fs.mkdtemp(path.join(os.tmpdir(), "observer-browser-evidence-"));
   const http = (await import(
@@ -1483,6 +1584,7 @@ async function runBrowserConsumer(root: string) {
   try {
     const stableRefresh = await refreshContinuity(browser, root, http, artifacts);
     const annexes = await nativeCanvas(browser, root, http, artifacts);
+    await mailroomDetails(browser, http, artifacts);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -1533,6 +1635,7 @@ async function runBrowserConsumer(root: string) {
       fixtureControls: true,
       staleProof: true,
       panelsAndFocus: true,
+      mailroomCoordinationAndReplies: true,
       hostTabs: true,
       screenshotContext:
         "Fresh 1440x1000 contexts, reduced motion, no stored preferences; capture before interactions after fonts and paint. Fixture adds empty remote dock; old baseline differs in geometry and FX, so no exact pixel-parity claim.",

@@ -29,7 +29,7 @@ interface RenderOptions<N extends AppNode, R extends SpriteResource> {
   roster: AppRoster<N>;
   totals: Totals<N, R>;
   deadline: FreshnessDeadline;
-  panels: Pick<PanelStack<N, R>, "resume" | "roster">;
+  panels: Pick<PanelStack<N, R>, "resume" | "resumeMailrooms" | "roster">;
   select(id: string): void;
   now(): number;
 }
@@ -77,16 +77,17 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     /* Proof is the read resume started: invalidation bumps the resource generation, so a request issued before the
        page was hidden can settle but never replaces the data. New data, settled after resume and live, proves it. */
     if (
-      state.awaitingProof &&
       snapshot.data &&
       snapshot.data !== state.cachedAtResume &&
       !snapshot.error &&
       !snapshot.pending &&
-      !stale &&
       snapshot.updatedAt >= state.resumedAt
     ) {
-      state.awaitingProof = false;
-      panels.resume();
+      panels.resumeMailrooms();
+      if (state.awaitingProof && !stale) {
+        state.awaitingProof = false;
+        panels.resume();
+      }
     }
   }
   private presentation(snapshot: AppQuerySnapshot) {

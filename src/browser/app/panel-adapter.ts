@@ -8,6 +8,8 @@ import { panelKey, type AppPanelView, type PanelEntry } from "./panel-stack.js";
 import type { AgentTarget, MailTarget, PanelTarget } from "./roster-ports.js";
 import type { AppState } from "./state.js";
 import { NodeEvents, type AppUi } from "./ui.js";
+import { createBusPanel } from "./bus-panel.js";
+import type { BusTarget } from "./roster-ports.js";
 
 interface AdapterOptions<N extends AppNode, R extends SpriteResource> {
   ui: AppUi<N, R>;
@@ -24,7 +26,28 @@ export class PanelAdapter<N extends AppNode, R extends SpriteResource> {
   constructor(private readonly options: AdapterOptions<N, R>) {}
   create(target: PanelTarget) {
     const serial = ++this.serial;
-    return target.kind === "agent" ? this.agent(target, serial) : this.mail(target, serial);
+    return target.kind === "agent"
+      ? this.agent(target, serial)
+      : target.kind === "bus"
+        ? this.bus(target, serial)
+        : this.mail(target, serial);
+  }
+  private bus(target: BusTarget, serial: number) {
+    const shell = buildMailPanel(this.options.ui.document, serial, "bus");
+    let entry: PanelEntry<N> | null = null;
+    const view = createBusPanel({
+      ...this.options,
+      target,
+      get: shell.get,
+      close: () => {
+        if (entry) this.options.close(entry);
+      },
+      toggle: (next, trigger) => {
+        this.options.toggle(next, trigger);
+      },
+    });
+    entry = this.entry(target, shell, view, view.open);
+    return entry;
   }
   private inspectHelper(target: AgentTarget, id: string, identity: string, trigger: N) {
     const { state, descriptions } = this.options;
@@ -74,8 +97,38 @@ export class PanelAdapter<N extends AppNode, R extends SpriteResource> {
         if (entry && !this.options.state.disposed) this.options.close(entry);
       },
     });
-    entry = this.entry(target, shell, view, () => {
+    const reply = ui.text("button", "mail-reply", "");
+    ui.document.setType(reply, "button");
+    ui.document.attach(shell.root, reply);
+    const updateReply = () => {
+      const message = this.options.state.messageFor(target.id);
+      const id = message?.identity === target.identity ? message.replyTo : null;
+      const parent = id ? this.options.state.messageFor(id) : null;
+      reply.hidden = !id;
+      reply.textContent = "Reply to #" + String(id) + (parent ? "" : " (outside recent window)");
+      ui.document.setDisabled(reply, {
+        disabled: !parent?.identity || !this.options.state.busLive(),
+      });
+    };
+    const decorated = {
+      ...view,
+      roster() {
+        view.roster();
+        updateReply();
+      },
+    };
+    entry = this.entry(target, shell, decorated, () => {
       view.open(target.id, target.identity);
+      updateReply();
+    });
+    entry.events.on(reply, "click", () => {
+      const message = this.options.state.messageFor(target.id);
+      const parent =
+        message?.identity === target.identity && message.replyTo
+          ? this.options.state.messageFor(message.replyTo)
+          : null;
+      if (parent?.identity && this.options.state.busLive())
+        this.options.toggle({ kind: "mail", id: parent.id, identity: parent.identity }, reply);
     });
     return entry;
   }
