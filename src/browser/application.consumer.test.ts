@@ -48,6 +48,7 @@ interface CanvasProbe {
     signAt(point: { x: number; y: number }): unknown;
   };
   signRegions: { left: number; top: number; width: number; height: number }[];
+  platformRegions: { id: string; left: number; top: number; width: number; height: number }[];
   titleRegions: { left: number; top: number; width: number; height: number }[];
   regions: { left: number; top: number; width: number; height: number; id: string }[];
   observatoryRegion: { left: number; top: number; width: number; height: number } | null;
@@ -130,10 +131,13 @@ async function paintedTargets(page: Page) {
     const view = Reflect.get(window, "__view") as CanvasProbe;
     return {
       signs: view.signRegions,
+      headings: view.platformRegions,
       titles: view.titleRegions,
       bodies: view.regions,
       observatory: view.observatoryRegion,
       focused: view.focused,
+      mode: view.mode,
+      platform: view.platform,
       repository: view.repositorySelection(),
     };
   });
@@ -292,6 +296,31 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     assert.ok(sign);
     await click(sign, "double");
     await expect.poll(async () => (await paintedTargets(page)).repository).toBe("repo_fixture");
+    const fittedRoom = (await paintedTargets(page)).platform;
+    assert.ok(fittedRoom);
+    for (const [mode, platform, repository] of [
+      ["overview", null, null],
+      ["platform", fittedRoom, null],
+      ["overview", null, "repo_fixture"],
+      ["platform", fittedRoom, "repo_fixture"],
+    ] as const) {
+      await painted();
+      const targets = await paintedTargets(page);
+      // Overview omits repository labels; its painted room heading remains a native refit target.
+      const target =
+        mode === "overview"
+          ? targets.signs[0]
+          : targets.headings.find((heading) => heading.id === fittedRoom);
+      assert.ok(target, "repaint exposes the current room navigation target");
+      await click(target, "double");
+      await expect
+        .poll(async () => {
+          const current = await paintedTargets(page);
+          return [current.mode, current.platform, current.repository];
+        })
+        .toEqual([mode, platform, repository]);
+    }
+    await capture(page, path.join(artifacts, "room-toggle-refit.png"));
     const title = await hoverTitle(page);
     await click(title, "double");
     await expect(page.getByRole("dialog")).toHaveCount(1);
@@ -1694,6 +1723,7 @@ async function runBrowserConsumer(root: string) {
       chromium: browser.version(),
       canvas: true,
       nativeCanvasClicks: true,
+      roomDoubleClickFitOverviewRefit: true,
       annexes,
       stableRefresh,
       helperCrew: {

@@ -106,7 +106,20 @@ export async function sqliteContracts({
         const first = await client.readBus();
         assert.equal(first.health, "available");
         clock = 2000;
-        assert.deepEqual(await client.readBus(), first, "unchanged rows retain observation time");
+        const refreshed = await client.readBus();
+        assert.equal(first.coordination?.overview?.asOf, 1000);
+        assert.equal(refreshed.coordination?.overview?.asOf, 2000);
+        assert.deepEqual(
+          refreshed,
+          {
+            ...first,
+            coordination: {
+              ...first.coordination,
+              overview: { ...first.coordination.overview, asOf: 2000 },
+            },
+          },
+          "aggregate calculation advances while unchanged rows and source observation time remain stable",
+        );
         const inspected = await client.inspectMessage(1, requiredHttpValue(first.rows[0]).identity);
         assert.equal(inspected.health, "available");
         assert(
