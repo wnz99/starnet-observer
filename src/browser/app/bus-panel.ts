@@ -144,12 +144,11 @@ class BusPanel<N extends AppNode, R extends SpriteResource> {
   }
   private ledger(items: AppMessage[]) {
     const displayed = items
-      .filter(
-        (message) =>
-          typeof message.sentAt === "number" &&
-          Number.isFinite(message.sentAt) &&
-          message.sentAt <= this.options.now(),
-      )
+      .filter((message) => {
+        const sentAt =
+          typeof message.sentAt === "number" ? message.sentAt : Date.parse(message.sentAt ?? "");
+        return Number.isFinite(sentAt) && sentAt <= this.options.now();
+      })
       .sort((a, b) => b.id - a.id)
       .slice(0, RECENT_MESSAGE_LIMIT);
     const present = new Set(displayed.map((message) => message.id));

@@ -21,7 +21,7 @@ function snapshot(label: string) {
           identity: "mail_" + "a".repeat(64),
           from: "external",
           to: "external",
-          sentAt: 0,
+          sentAt: new Date(0).toISOString() as number | string | null,
           acknowledgedAt: null,
           wake: "requested",
         },
@@ -126,7 +126,12 @@ test("bus cards use aggregate observations while recent activity stays bounded a
   data.bus.messages.push(
     { ...template, id: 13, sentAt: Number.NaN },
     { ...template, id: 14, sentAt: 100000 },
+    { ...template, id: 15, sentAt: "not a timestamp" },
+    { ...template, id: 16, sentAt: null },
+    { ...template, id: 17, sentAt: new Date(100000).toISOString() },
+    { ...template, id: 18, sentAt: Number.POSITIVE_INFINITY },
   );
+  data.bus.messages[2] = { ...template, id: 3, sentAt: 0 };
   try {
     await flushMount();
     probe.reply(0, data);
@@ -143,6 +148,8 @@ test("bus cards use aggregate observations while recent activity stays bounded a
     );
     assert.equal(nodes.filter((node) => node.className === "bus-message").length, 10);
     assert(!nodes.some((node) => node.textContent === "Read message #1"));
+    assert(nodes.some((node) => node.textContent === "Read message #3"));
+    assert.equal(part(probe, "mail-inspector-empty-").hidden, true);
     const remote = present(nodes.find((node) => node.textContent === "Remote activity")).parent;
     assert.equal(remote?.hidden, true);
     const resource = present(nodes.find((node) => node.className === "bus-resource"));

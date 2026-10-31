@@ -1476,7 +1476,7 @@ function mailroomSnapshot() {
         identity: "mail_" + id.toString(16).padStart(64, "0"),
         from: data.sessions[0]?.id,
         to: "external",
-        sentAt: data.observedAt,
+        sentAt: new Date(data.observedAt).toISOString(),
         acknowledgedAt: null,
         wake: "requested",
         replyTo: id === 12 ? 1 : null,
