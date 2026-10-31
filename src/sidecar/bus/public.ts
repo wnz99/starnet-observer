@@ -1,4 +1,5 @@
 import { ADDRESS, WINDOW } from "./types.js";
+import { publicCoordination } from "./public-coordination.js";
 import type { BusState, BusPane } from "./types.js";
 // Exact identity join: one pane with this provider:session gets its observer id; two or more stay ambiguous.
 export function publicBus(state: BusState, sessions: BusPane[]) {
@@ -14,6 +15,7 @@ export function publicBus(state: BusState, sessions: BusPane[]) {
     reason: state.reason,
     observedAt: state.observedAt,
     window: WINDOW,
+    ...publicCoordination(state.coordination, endpoint),
     messages: state.rows.map((row) => ({
       id: row.id,
       ...(row.identity === undefined ? {} : { identity: row.identity }),
@@ -22,6 +24,7 @@ export function publicBus(state: BusState, sessions: BusPane[]) {
       sentAt: row.sentAt,
       acknowledgedAt: row.acknowledgedAt,
       wake: row.wake,
+      ...(row.replyTo === undefined ? {} : { replyTo: row.replyTo }),
       ...(row.relay ? { relay: { ...row.relay } } : {}),
     })),
     ...(state.remote

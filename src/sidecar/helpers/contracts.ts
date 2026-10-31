@@ -46,6 +46,11 @@ export interface HelperTranscripts {
     id: string,
   ): Awaitable<(Omit<Candidate, "child" | "state"> & { sessionId: string })[]>;
   helperMetadata?(id: string): Projection | undefined;
+  codexMetadata?(
+    id: string,
+    sessionId: string,
+    binding: ChildBinding | undefined,
+  ): Awaitable<Projection | undefined>;
   claudeClaims?(id: string): Claims | undefined;
   inspectChild(id: string, binding: ChildBinding): Awaitable<ChildInspection>;
 }

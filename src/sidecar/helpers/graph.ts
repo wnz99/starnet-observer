@@ -10,7 +10,15 @@ type Prove = (
 function validIds(parent: string, child: string) {
   return UUID.test(parent) && UUID.test(child);
 }
+function nativeCandidates(parent: Root, projection: ChildBinding["projection"]): Candidate[] {
+  return [...(projection?.helperSpawns ?? [])].flatMap(([child, spawn]) =>
+    spawn && validIds(parent.sessionId, child)
+      ? [{ child, state: "unknown", spawn, event: projection?.helperEvents.get(child) ?? null }]
+      : [],
+  );
+}
 export class HelperGraph {
+  private readonly native = new Map<string, ChildBinding["projection"]>();
   readonly exact = new Map<string, Root | null>();
   readonly byParent = new Map<string, Candidate[]>();
   readonly incoming = new Map<string, string>();
@@ -69,6 +77,29 @@ export class HelperGraph {
       if (visited.has(node)) for (const member of visited) this.invalid.add(member);
     }
   }
+  async nativeRoots(roots: Root[], transcripts: HelperTranscripts) {
+    for (const root of roots) {
+      if (root.provider !== "codex") continue;
+      const projection =
+        (await transcripts.codexMetadata?.(root.id, root.sessionId, undefined)) ??
+        transcripts.helperMetadata?.(root.id);
+      this.native.set(root.id, projection);
+      for (const candidate of nativeCandidates(root, projection))
+        this.recordNative(root, candidate);
+    }
+    this.rejectCycles();
+  }
+  private recordNative(root: Root, candidate: Candidate) {
+    const existing = this.incoming.get(candidate.child);
+    if (existing) {
+      if (existing !== root.sessionId) this.invalid.add(candidate.child);
+      return;
+    }
+    this.incoming.set(candidate.child, root.sessionId);
+    const candidates = this.byParent.get(root.sessionId) ?? [];
+    candidates.push(candidate);
+    this.byParent.set(root.sessionId, candidates);
+  }
   depth(row: Root) {
     const ancestors = new Set<string>();
     let sessionId = row.sessionId;
@@ -125,12 +156,27 @@ export class HelperGraph {
     binding: ChildBinding | undefined,
     transcripts: HelperTranscripts,
   ): Promise<Candidate[]> {
-    if (parent.provider === "codex")
-      return (this.byParent.get(parent.sessionId) || []).sort((a, b) =>
-        a.child.localeCompare(b.child),
-      );
+    if (parent.provider === "codex") return this.codexCandidates(parent, binding, transcripts);
     const candidates =
       (await transcripts.claudeCandidates?.(parent.sessionId, binding, parent.id)) ?? [];
     return candidates.map((value) => ({ ...value, child: value.sessionId, state: "verified" }));
+  }
+  private async codexCandidates(
+    parent: Root,
+    binding: ChildBinding | undefined,
+    transcripts: HelperTranscripts,
+  ) {
+    const candidates = new Map(
+      (this.byParent.get(parent.sessionId) || []).map((candidate) => [candidate.child, candidate]),
+    );
+    const projection = binding
+      ? ((await transcripts.codexMetadata?.(parent.id, parent.sessionId, binding)) ??
+        binding.projection)
+      : this.native.get(parent.id);
+    // Native activity supplies candidates when the host omits SQLite edges. The
+    // traversal still verifies the child's own transcript and exact parentage.
+    for (const candidate of nativeCandidates(parent, projection))
+      if (!candidates.has(candidate.child)) candidates.set(candidate.child, candidate);
+    return [...candidates.values()].sort((a, b) => a.child.localeCompare(b.child));
   }
 }

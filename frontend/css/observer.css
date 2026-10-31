@@ -869,6 +869,27 @@ input::placeholder {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+.bus-summary {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bus-messages {
+  padding-left: 22px;
+  white-space: normal;
+}
+.bus-message {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.bus-message p {
+  white-space: pre-wrap;
+}
+.bus-message button,
+.mail-reply {
+  margin: 4px;
+}
 .mail-route {
   display: block;
   overflow: hidden;

@@ -72,6 +72,7 @@ class BusReader {
       const unchanged = this.reusable && result.fingerprint.join("|") === this.reusable.join("|");
       this.state = {
         rows: result.rows,
+        coordination: result.coordination,
         remote: result.remote,
         observedAt: unchanged ? this.state.observedAt : this.now(),
         health: "available",

@@ -1,11 +1,53 @@
 import type { SessionContext } from "./contracts.js";
 import { object } from "./values.js";
+export function forkHistoryStart(
+  payload: Record<string, unknown>,
+  sessionId: string,
+  parent: string,
+) {
+  const ordinal = payload.subagent_history_start_ordinal;
+  return payload.id === sessionId &&
+    payload.session_id === parent &&
+    payload.parent_thread_id === parent &&
+    payload.forked_from_id === parent &&
+    payload.multi_agent_version === "v2" &&
+    payload.history_mode === "paginated" &&
+    typeof ordinal === "number" &&
+    Number.isSafeInteger(ordinal) &&
+    ordinal > 0
+    ? ordinal
+    : null;
+}
+export function inheritedRecord(
+  record: Record<string, unknown>,
+  binding: SessionContext["binding"],
+) {
+  const boundary = binding?.historyStartOrdinal;
+  return (
+    boundary !== undefined &&
+    typeof record.ordinal === "number" &&
+    Number.isSafeInteger(record.ordinal) &&
+    record.ordinal > 0 &&
+    record.ordinal < boundary
+  );
+}
+function ownForkRecord(record: Record<string, unknown>, binding: SessionContext["binding"]) {
+  const boundary = binding?.historyStartOrdinal;
+  if (boundary === undefined) return true;
+  const ordinal = record.ordinal;
+  if (typeof ordinal !== "number" || !Number.isSafeInteger(ordinal)) return false;
+  return ordinal >= boundary || (ordinal === 0 && record.type === "session_meta");
+}
 function codexMetadata(payload: Record<string, unknown>, context: SessionContext) {
   const { sessionId, binding } = context;
+  const fork = binding ? forkHistoryStart(payload, sessionId, binding.parentSessionId) : null;
   return (
     (payload.id === sessionId || payload.session_id === sessionId) &&
     ["id", "session_id", "thread_id"].every(
-      (key) => payload[key] === undefined || payload[key] === sessionId,
+      (key) =>
+        payload[key] === undefined ||
+        payload[key] === sessionId ||
+        (key === "session_id" && fork !== null && binding?.historyStartOrdinal === fork),
     ) &&
     (!binding || payload.parent_thread_id === binding.parentSessionId)
   );
@@ -13,6 +55,7 @@ function codexMetadata(payload: Record<string, unknown>, context: SessionContext
 function codexRecord(record: Record<string, unknown>, context: SessionContext) {
   const { sessionId, binding } = context,
     payload = object(record.payload);
+  if (!ownForkRecord(record, binding)) return false;
   if (record.type === "session_meta") return codexMetadata(payload, context);
   if (binding && payload.parent_thread_id && payload.parent_thread_id !== binding.parentSessionId)
     return false;

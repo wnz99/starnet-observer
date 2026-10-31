@@ -1675,12 +1675,14 @@ test("observer-view regression contracts", async () => {
       frames: ((now: number) => void)[] = [],
       selected: string[] = [],
       platforms: string[] = [],
+      mailrooms: (string | null)[] = [],
       modes: { mode: string; platform: string | null }[] = [];
     let now = 0;
     const view = View.create({
       canvas: node,
       onSelect: (id) => selected.push(id),
       onPlatform: (key) => platforms.push(key),
+      onMailroom: (host) => mailrooms.push(host),
       onMode: (value) => modes.push(value),
       nameFor: (id) => id,
       env: {
@@ -1762,6 +1764,18 @@ test("observer-view regression contracts", async () => {
       node.handlers.get("dblclick")({ clientX: point.x, clientY: point.y, preventDefault() {} });
     };
     const rootRegion = regionOf(view, "obs_r");
+    dbl(
+      Scene.toScreen(
+        {
+          x: scene.mail.rect.x + scene.mail.rect.w / 2,
+          y: scene.mail.rect.y + scene.mail.rect.h / 2,
+          z: 0,
+        },
+        view.camera(),
+      ),
+    );
+    assert.deepEqual(mailrooms, [null], "double-clicking the mailroom identifies the local bus");
+    assert.equal(platforms.length, 0, "mailroom inspection never zooms a project");
     dbl({ x: rootRegion.left + rootRegion.width / 2, y: rootRegion.top + rootRegion.height / 2 });
     assert.deepEqual(selected, ["obs_r"], "a worker under the pointer wins over its platform");
     assert.equal(platforms.length, 0);

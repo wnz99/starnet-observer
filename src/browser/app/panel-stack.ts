@@ -60,7 +60,7 @@ export class PanelStack<N extends AppNode, R extends SpriteResource> {
     return this.panelFor(target) !== null;
   }
   hasMail() {
-    return this.entries.some((entry) => entry.target.kind === "mail");
+    return this.entries.some((entry) => entry.target.kind !== "agent");
   }
   hasAgents() {
     return this.entries.some((entry) => entry.target.kind === "agent");
@@ -189,13 +189,18 @@ export class PanelStack<N extends AppNode, R extends SpriteResource> {
     (inside ? active : top.view.focusTarget()).focus();
   }
   roster(kind: "agent" | "mail") {
-    for (const entry of this.entries) if (entry.target.kind === kind) entry.view.roster();
+    for (const entry of this.entries)
+      if (entry.target.kind === kind || (kind === "mail" && entry.target.kind === "bus"))
+        entry.view.roster();
   }
   suspend() {
     for (const entry of this.entries) entry.view.suspend();
   }
   resume() {
     for (const entry of this.entries) entry.view.resume();
+  }
+  resumeMailrooms() {
+    for (const entry of this.entries) if (entry.target.kind === "bus") entry.view.resume();
   }
   pagehide() {
     for (const entry of this.entries.slice().reverse()) this.close(entry, { restoreFocus: false });

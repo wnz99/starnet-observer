@@ -84,6 +84,7 @@ export function createMailText(options: MailTextOptions) {
       (age(message.sentAt, options.now()) || "at an unknown time") +
       " · " +
       mailStatus(message) +
+      (message.replyTo ? " · reply to #" + String(message.replyTo) : "") +
       (message.to && options.rowFor(message.to)
         ? ""
         : message.from && options.rowFor(message.from)

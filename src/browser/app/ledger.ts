@@ -36,7 +36,23 @@ function mailTarget(message: AppMessage): MailTarget | null {
    message by id at click time, so ACK and wake changes never need new nodes. */
 export class Ledger<N extends AppNode, R extends SpriteResource> {
   private readonly rows = new Map<number, LedgerRow<N>>();
-  constructor(private readonly options: LedgerOptions<N, R>) {}
+  private readonly events = new NodeEvents(() => !this.options.state.disposed);
+  private readonly details;
+  constructor(private readonly options: LedgerOptions<N, R>) {
+    const { ui, state, panels } = options;
+    this.details = ui.text("button", "", "Bus details");
+    ui.document.setType(this.details, "button");
+    this.details.setAttribute("aria-haspopup", "dialog");
+    this.events.on(this.details, "click", () => {
+      if (!state.latest?.data?.presentation)
+        panels.togglePanel(
+          { kind: "bus", id: state.selectedHost || "", identity: state.selectedHost || "local" },
+          this.details,
+        );
+    });
+    const container = ui.document.getElementById("mail");
+    if (container) ui.document.insertBefore(container, this.details, ui.get("mail-ledger"));
+  }
   // Selecting a ledger row focuses the recipient pane, else the sender; neither being observed is said plainly.
   private showMail(message: AppMessage) {
     const { state } = this.options;
@@ -146,6 +162,7 @@ export class Ledger<N extends AppNode, R extends SpriteResource> {
     const { ui, panels } = this.options;
     const messages = bus?.messages ?? [];
     const limit = this.counts(bus, messages, courier.state().skipped);
+    this.details.hidden = this.options.state.presentation();
     const focused = ui.document.activeElement;
     const ledger = ui.get("mail-ledger");
     const top = ledger.scrollTop;
@@ -174,6 +191,7 @@ export class Ledger<N extends AppNode, R extends SpriteResource> {
     return this.rows.get(id)?.read ?? null;
   }
   dispose() {
+    this.events.dispose();
     for (const entry of this.rows.values()) entry.events.dispose();
     this.rows.clear();
   }

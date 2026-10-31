@@ -688,6 +688,8 @@ test("observer-ui regression contracts", async () => {
         "zoom-in",
         "zoom-out",
         "fx-toggle",
+        "mail",
+        "mail-title",
         "mail-health",
         "mail-counts",
         "mail-ledger",
@@ -1210,6 +1212,7 @@ test("observer-ui regression contracts", async () => {
       messages: [
         {
           id: 3,
+          replyTo: 2,
           from: "external",
           to: "ambiguous",
           sentAt: sent,
@@ -1319,6 +1322,23 @@ test("observer-ui regression contracts", async () => {
       data,
     });
     notify(listener, proved({ ...snapshot.data, observedAt: Date.now(), bus: ackedMail }));
+    const details = present(elements.mail).children.find(
+      (node) => node.textContent === "Bus details",
+    );
+    present(details).emit("click");
+    assert.equal(
+      panelPart(present(elements.panels), "mail-inspector-title")?.textContent,
+      "Mailroom · this machine",
+    );
+    assert.equal(reads.length, 0, "opening the mailroom never reads message bodies");
+    present(events.keydown)({ key: "Escape", preventDefault() {} });
+    viewOptions.onMailroom?.(null);
+    assert.equal(
+      present(elements.panels).children.length,
+      1,
+      "canvas mailroom opens the same panel",
+    );
+    present(events.keydown)({ key: "Escape", preventDefault() {} });
     const read = child(present(elements["mail-ledger"]), 2).children[1];
     assert.equal(present(read).className, "row-inspect");
     assert.equal(present(read).attributes.get("aria-label"), "Read message #1");

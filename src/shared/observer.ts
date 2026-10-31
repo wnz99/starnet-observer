@@ -154,6 +154,14 @@ interface PublicBus {
   reason: string | null;
   observedAt: number | null;
   window: number;
+  coordination?: {
+    sections: {
+      title: string;
+      available: boolean;
+      truncated: boolean;
+      rows: { label: string; detail: string; agent?: string }[];
+    }[];
+  };
   messages: {
     id: number;
     identity?: string;
@@ -164,6 +172,7 @@ interface PublicBus {
     sentAt: number | string | null;
     acknowledgedAt: number | string | null;
     wake: "none" | "requested" | "failed" | "unsupported" | "unknown";
+    replyTo?: number | null;
     relay?: {
       direction: "in" | "out";
       machine: string;

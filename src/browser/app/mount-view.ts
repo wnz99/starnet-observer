@@ -35,6 +35,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   ViewOptions<R, B>,
   | "onSelect"
   | "onObservatory"
+  | "onMailroom"
   | "onShip"
   | "hostSelection"
   | "onTitleToggle"
@@ -48,6 +49,13 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
     },
     onObservatory: () => {
       links.overlays?.observatoryClicked();
+    },
+    onMailroom: (host) => {
+      if (!state.latest?.data?.presentation)
+        links.panels?.togglePanel(
+          { kind: "bus", id: host || "", identity: host || "local" },
+          ui.get("world"),
+        );
     },
     onShip: (host) => {
       links.hosts?.clicked(host);

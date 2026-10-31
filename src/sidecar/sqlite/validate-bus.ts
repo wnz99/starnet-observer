@@ -67,8 +67,12 @@ function row(value: unknown): value is BusRow {
     instant(value.sentAt) &&
     instant(value.acknowledgedAt) &&
     wake(value.wake) &&
+    optionalMessageId(value.replyTo) &&
     optionalRelay(value.relay)
   );
+}
+function optionalMessageId(value: unknown) {
+  return value === undefined || value === null || messageId(value);
 }
 function strings(value: unknown, max: number) {
   return Array.isArray(value) && value.length <= max && value.every(string);
@@ -127,6 +131,31 @@ export function validBusState(value: unknown, window = MAX_WINDOW): value is Bus
   return (
     number(value.observedAt) &&
     (value.reason === null || string(value.reason)) &&
-    optionalRemote(value.remote)
+    optionalRemote(value.remote) &&
+    validCoordination(value.coordination)
+  );
+}
+export function validCoordination(value: unknown): value is BusState["coordination"] {
+  return (
+    value === undefined ||
+    (busRecord(value) &&
+      Array.isArray(value.sections) &&
+      value.sections.length <= 12 &&
+      value.sections.every(
+        (section: unknown) =>
+          busRecord(section) &&
+          string(section.title) &&
+          typeof section.available === "boolean" &&
+          typeof section.truncated === "boolean" &&
+          Array.isArray(section.rows) &&
+          section.rows.length <= MAX_WINDOW &&
+          section.rows.every(
+            (entry: unknown) =>
+              busRecord(entry) &&
+              string(entry.label) &&
+              string(entry.detail) &&
+              (entry.agent === undefined || string(entry.agent)),
+          ),
+      ))
   );
 }

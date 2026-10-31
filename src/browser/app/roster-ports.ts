@@ -15,7 +15,12 @@ export interface MailTarget {
   id: number;
   identity: string;
 }
-export type PanelTarget = AgentTarget | MailTarget;
+export interface BusTarget {
+  kind: "bus";
+  id: string;
+  identity: string;
+}
+export type PanelTarget = AgentTarget | MailTarget | BusTarget;
 export interface RosterPanels<N extends AppNode> {
   agentTarget(row: AppRow): AgentTarget | null;
   panelFor(target: PanelTarget | null): { root: N } | null;
