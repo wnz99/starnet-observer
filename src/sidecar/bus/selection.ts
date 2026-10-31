@@ -5,6 +5,7 @@ import { WINDOW, MAX_RAW_CHARS, busRecord } from "./types.js";
 import type { BusRow } from "./types.js";
 import type { Fingerprint, SnapshotDatabase } from "../sqlite/snapshots.js";
 const WAKE_FAILED = "failed";
+const OVERVIEW_TTL_MS = 1000;
 const QUERY =
   "SELECT id, sender, recipient, sent_at, acknowledged_at, wake_status FROM messages ORDER BY id DESC LIMIT " +
   String(WINDOW);
@@ -106,7 +107,7 @@ function selectLocal(database: SnapshotDatabase, proof: Fingerprint) {
 }
 export function selectRows(database: SnapshotDatabase, proof: Fingerprint, selectedAt: number) {
   const rows: BusRow[] = selectLocal(database, proof);
-  const coordination = selectCoordination(database);
+  const coordination = selectCoordination(database, selectedAt);
   // Relay metadata is optional: a bus without (or with unreadable) remote tables still reads as a plain local bus.
   try {
     const selection = selectRemote(database, rows, selectedAt);
@@ -115,11 +116,17 @@ export function selectRows(database: SnapshotDatabase, proof: Fingerprint, selec
       coordination,
       remote: selection?.view ?? null,
       selectedAt,
-      expiresAt: selection?.expiresAt ?? Infinity,
+      expiresAt: Math.min(selection?.expiresAt ?? Infinity, selectedAt + OVERVIEW_TTL_MS),
     };
   } catch {
     for (const row of rows) delete row.relay;
-    return { rows, coordination, remote: null, selectedAt, expiresAt: Infinity };
+    return {
+      rows,
+      coordination,
+      remote: null,
+      selectedAt,
+      expiresAt: selectedAt + OVERVIEW_TTL_MS,
+    };
   }
 }
 export function selectInspection(

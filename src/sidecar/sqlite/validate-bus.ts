@@ -7,6 +7,11 @@ const MAX_REPOS = 16;
 const MAX_AGENTS = 48;
 const MAX_PUBLICATIONS = 2000;
 const MAX_WINDOW = 100;
+const LABEL_CHARS = 160;
+const ADDRESS_CHARS = 256;
+const MACHINE_CHARS = 128;
+const MAX_REASONS = 2;
+const FAILED_REASON = "wake-failed";
 function string(value: unknown): value is string {
   return typeof value === "string" && value.length <= MAX_FIELD_CHARS;
 }
@@ -139,6 +144,7 @@ export function validCoordination(value: unknown): value is BusState["coordinati
   return (
     value === undefined ||
     (busRecord(value) &&
+      (value.overview === undefined || validOverview(value.overview)) &&
       Array.isArray(value.sections) &&
       value.sections.length <= 12 &&
       value.sections.every(
@@ -157,5 +163,107 @@ export function validCoordination(value: unknown): value is BusState["coordinati
               (entry.agent === undefined || string(entry.agent)),
           ),
       ))
+  );
+}
+
+function observation(value: unknown) {
+  return value === "available" || value === "partial" || value === "unavailable";
+}
+function counter(value: unknown) {
+  return value === null || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
+}
+function metric(value: unknown, keys: string[]) {
+  return (
+    busRecord(value) &&
+    observation(value.status) &&
+    keys.every(
+      (key) => counter(value[key]) && (value.status !== "unavailable" || value[key] === null),
+    )
+  );
+}
+function bounded(value: unknown, limit: number): value is string {
+  return typeof value === "string" && value.length <= limit;
+}
+function detailList(value: unknown, limit: number, check: (row: unknown) => boolean) {
+  return (
+    busRecord(value) &&
+    observation(value.status) &&
+    typeof value.truncated === "boolean" &&
+    Array.isArray(value.rows) &&
+    value.rows.length <= limit &&
+    value.rows.every(check)
+  );
+}
+function attentionRow(value: unknown) {
+  return (
+    busRecord(value) &&
+    messageId(value.id) &&
+    typeof value.sentAt === "number" &&
+    Number.isFinite(value.sentAt) &&
+    Array.isArray(value.reasons) &&
+    value.reasons.length > 0 &&
+    value.reasons.length <= MAX_REASONS &&
+    new Set(value.reasons).size === value.reasons.length &&
+    value.reasons.every(
+      (reason: unknown) => reason === "unacknowledged" || reason === FAILED_REASON,
+    )
+  );
+}
+function resourceRow(value: unknown) {
+  return (
+    busRecord(value) &&
+    bounded(value.resource, LABEL_CHARS) &&
+    (value.scope === "shared" || value.scope === "repository") &&
+    (value.holder === undefined || bounded(value.holder, ADDRESS_CHARS)) &&
+    number(value.acquiredAt) &&
+    number(value.expiresAt) &&
+    number(value.checkAt) &&
+    validWaiters(value.waiters)
+  );
+}
+function validWaiters(value: unknown) {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_WINDOW &&
+    value.every(
+      (waiter: unknown) =>
+        busRecord(waiter) && bounded(waiter.agent, ADDRESS_CHARS) && number(waiter.requestedAt),
+    )
+  );
+}
+function validAwaiting(value: unknown) {
+  return (
+    metric(value, ["count"]) &&
+    busRecord(value) &&
+    number(value.oldestAt) &&
+    (value.status !== "unavailable" || value.oldestAt === null)
+  );
+}
+function validWakes(value: unknown) {
+  return busRecord(value) && metric(value.pending, ["count"]) && metric(value.failed, ["count"]);
+}
+export function validOverview(
+  value: unknown,
+): value is NonNullable<BusState["coordination"]>["overview"] {
+  return (
+    busRecord(value) &&
+    typeof value.asOf === "number" &&
+    Number.isFinite(value.asOf) &&
+    metric(value.agents, ["codex", "claude"]) &&
+    metric(value.messages, ["total", "local", "remote"]) &&
+    validAwaiting(value.awaiting) &&
+    validWakes(value.wakes) &&
+    detailList(value.attention, MAX_WINDOW, attentionRow) &&
+    detailList(value.resources, MAX_WINDOW, resourceRow) &&
+    detailList(
+      value.remoteActivity,
+      MAX_MACHINES,
+      (row) =>
+        busRecord(row) &&
+        bounded(row.machine, MACHINE_CHARS) &&
+        typeof row.sentAt === "number" &&
+        Number.isFinite(row.sentAt) &&
+        relayState(row.state),
+    )
   );
 }
