@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-0jt | Fix Codex native child identity and nested discovery | T1 approved; aggregate verification passed after documented core repeat; PR review and CI pending | [261101-0jt](./quick/261101-0jt-fix-codex-native-child-identity-and-nest/) |
+| 261101-0jt | Fix Codex native child identity and nested discovery | PR #31 R1 adapter finding corrected; fresh static/build and 298 core tests passed; full-branch re-review/CI pending | [261101-0jt](./quick/261101-0jt-fix-codex-native-child-identity-and-nest/) |
 
 ## Quick Tasks Completed
 
