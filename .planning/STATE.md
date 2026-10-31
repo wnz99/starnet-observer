@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261031-sut | Bus metrics panel and room double-click toggle | T1/T2 independently clean; T3 acceptance verified, review pending | [261031-sut](./quick/261031-sut-bus-metrics-panel-and-room-double-click-/) |
+| 261031-sut | Bus metrics panel and room double-click toggle | Implementation, task reviews, conformance and local verification complete; aggregate PR review, CI and merge pending | [261031-sut](./quick/261031-sut-bus-metrics-panel-and-room-double-click-/) |
 
 ## Quick Tasks Completed
 
