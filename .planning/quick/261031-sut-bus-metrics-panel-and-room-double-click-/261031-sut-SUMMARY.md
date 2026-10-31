@@ -1,6 +1,6 @@
 # Quick Task 261031-sut: Execution progress
 
-Status: Implementation, independent task reviews, revision-3 conformance and local verification complete. Aggregate PR review, CI and merge remain pending. This is not a completion or merge record.
+Status: Implementation, independent task reviews, revision-3 conformance and local verification complete. [PR #29](https://github.com/wnz99/starnet-observer/pull/29) targets main. Aggregate PR review, CI and merge remain pending. This is not a completion or merge record.
 
 Task 1 supplies the reviewed metadata overview contract, including independent availability and bounded detail observations. Task 2 renders four metric cards, grouped supporting observations and collapsed diagnostics. It retains the existing read/reply authorization and full transported parent lookup while displaying ten messages.
 
