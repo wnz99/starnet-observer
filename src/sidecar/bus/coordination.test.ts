@@ -74,6 +74,59 @@ test("overview excludes SQLite-relative timestamps consistently before aggregati
   }
 });
 
+test("overview rejects normalized calendar dates and hours while retaining real leap days", () => {
+  const database = new Database(":memory:");
+  try {
+    database.run(`CREATE TABLE agents(kind TEXT,last_seen TEXT);
+      CREATE TABLE messages(id INTEGER,sender TEXT,recipient TEXT,sent_at TEXT,acknowledged_at TEXT,wake_status TEXT);
+      CREATE TABLE remote_outbox(local_id INTEGER,state TEXT);
+      CREATE TABLE remote_imports(local_id INTEGER);
+      INSERT INTO remote_outbox VALUES (1,'queued_local');`);
+    const cases: [string, string, boolean][] = [
+      ["2026-02-30T12:00:00Z", "2026-03-02T12:00:00Z", false],
+      ["2026-04-31T12:00:00Z", "2026-05-01T12:00:00Z", false],
+      ["2026-02-29T12:00:00Z", "2026-03-01T12:00:00Z", false],
+      ["2100-02-29T12:00:00Z", "2100-03-01T12:00:00Z", false],
+      ["2026-10-30T24:00:00Z", "2026-10-31T00:00:00Z", false],
+      ["2026-02-30 14:00:00.123456+02:00", "2026-03-02T12:00:00.123Z", false],
+      ["2024-02-29T12:00:00Z", "2024-02-29T12:00:00Z", true],
+      ["2000-02-29 14:00:00.123456+02:00", "2000-02-29T12:00:00.123Z", true],
+      ["2024-02-29T23:30:00-02:00", "2024-03-01T01:30:00Z", true],
+      ["9999-12-31T12:00:00Z", "9999-12-31T12:00:00Z", true],
+    ];
+    for (const [timestamp, instant, accepted] of cases) {
+      database.run("DELETE FROM agents; DELETE FROM messages;");
+      database.run("INSERT INTO agents VALUES ('codex',?)", [timestamp]);
+      database.run(
+        "INSERT INTO messages VALUES (1,'codex:private','machine/repo/codex:private',?,NULL,'failed')",
+        [timestamp],
+      );
+      const asOf = Date.parse(instant);
+      const overview = must(selectBusOverview(database, asOf));
+      const count = accepted ? 1 : 0;
+      const status = accepted ? "available" : "partial";
+      assert.deepEqual(overview.agents, { status, codex: count, claude: 0 }, timestamp);
+      assert.deepEqual(
+        overview.messages,
+        { status, total: count, local: 0, remote: count },
+        timestamp,
+      );
+      assert.deepEqual(
+        overview.awaiting,
+        { status, count, oldestAt: accepted ? asOf : null },
+        timestamp,
+      );
+      assert.deepEqual(overview.wakes.failed, { status, count }, timestamp);
+      assert.equal(overview.attention.rows.length, count, timestamp);
+      assert.equal(overview.remoteActivity.rows.length, count, timestamp);
+      assert.equal(overview.attention.status, status, timestamp);
+      assert.equal(overview.remoteActivity.status, status, timestamp);
+    }
+  } finally {
+    database.close();
+  }
+});
+
 test("optional schemas degrade independently; remote grouping and resource waiters stay bounded", () => {
   const database = new Database(":memory:");
   const asOf = Date.parse("2026-10-31T12:00:00Z");
