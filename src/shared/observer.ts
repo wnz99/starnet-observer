@@ -149,12 +149,55 @@ interface Coverage {
   unavailable: number;
   stale: number;
 }
+type BusObservationStatus = "available" | "partial" | "unavailable";
 interface PublicBus {
   health: Health;
   reason: string | null;
   observedAt: number | null;
   window: number;
   coordination?: {
+    overview?: {
+      asOf: number;
+      agents: { status: BusObservationStatus; codex: number | null; claude: number | null };
+      messages: {
+        status: BusObservationStatus;
+        total: number | null;
+        local: number | null;
+        remote: number | null;
+      };
+      awaiting: { status: BusObservationStatus; count: number | null; oldestAt: number | null };
+      wakes: {
+        pending: { status: BusObservationStatus; count: number | null };
+        failed: { status: BusObservationStatus; count: number | null };
+      };
+      attention: {
+        status: BusObservationStatus;
+        truncated: boolean;
+        rows: { id: number; sentAt: number; reasons: ("unacknowledged" | "wake-failed")[] }[];
+      };
+      resources: {
+        status: BusObservationStatus;
+        truncated: boolean;
+        rows: {
+          resource: string;
+          scope: "shared" | "repository";
+          holder?: string;
+          acquiredAt: number | null;
+          expiresAt: number | null;
+          checkAt: number | null;
+          waiters: { agent: string; requestedAt: number | null }[];
+        }[];
+      };
+      remoteActivity: {
+        status: BusObservationStatus;
+        truncated: boolean;
+        rows: {
+          machine: string;
+          sentAt: number;
+          state: NonNullable<PublicBus["messages"][number]["relay"]>["state"];
+        }[];
+      };
+    };
     sections: {
       title: string;
       available: boolean;

@@ -1834,13 +1834,55 @@ test("observer-view regression contracts", async () => {
       Scene.focusPlatform(scene, present(platform).key, { width: 600, height: 500 }),
       "a resize keeps the platform target",
     );
+    dbl(floor());
+    assert.equal(view.mode(), "overview", "the fitted floor returns to overview after resize");
+    assert.equal(view.platform(), null);
+    assert.equal(platforms.length, 1, "toggle-out does not emit onPlatform");
+    dbl(floor());
+    assert.equal(view.mode(), "platform", "the floor fits again");
     const other = Model.createLayout();
+    other.reconcile([root, { ...root, id: "obs_x", project: "Other", projectId: "other" }]);
+    const twoRooms = Scene.build(other.onPage(0), 0);
+    view.update(twoRooms, {});
+    assert(view.focusPlatform(present(platform).key));
+    view.paint(64);
+    const otherRoom = present(
+      twoRooms.platforms.find((room) => room.key !== present(platform).key),
+    );
+    dbl(
+      Scene.toScreen(
+        { x: otherRoom.rect.x + 1.5, y: otherRoom.rect.y + 24.5, z: 0 },
+        view.camera(),
+      ),
+    );
+    assert.equal(view.mode(), "platform", "another room fits directly");
+    assert.equal(view.platform(), otherRoom.key);
+    assert(view.focusPlatform(present(platform).key));
+    view.paint(80);
+    const oldHeading = Scene.toScreen(present(platform).sign, view.camera());
+    const oldEvent = {
+      clientX: oldHeading.x,
+      clientY: oldHeading.y - 12,
+      pointerId: 1,
+      pointerType: "mouse",
+    };
+    node.handlers.get("pointerdown")(oldEvent);
+    node.handlers.get("pointerup")(oldEvent);
+    node.handlers.get("click")({ ...oldEvent, detail: 1 });
     other.reconcile([{ ...root, id: "obs_x", project: "Other", projectId: "other" }]);
     const next = Scene.build(other.onPage(0), 0);
     view.update(next, {});
     assert.equal(view.mode(), "overview", "a removed platform returns to the overview");
     assert.deepEqual(view.camera(), Scene.fit(next.bounds, { width: 600, height: 500 }));
     assert.equal(present(modes.at(-1)).mode, "overview");
+    const fitsBeforeRemovedClick = platforms.length;
+    node.handlers.get("dblclick")({ ...oldEvent, detail: 2 });
+    assert.equal(
+      view.mode(),
+      "overview",
+      "a remembered removed room never substitutes another room",
+    );
+    assert.equal(platforms.length, fitsBeforeRemovedClick);
     assert.deepEqual(
       { value: view.focusPlatform("missing") },
       { value: false },
@@ -2368,20 +2410,23 @@ test("observer-view regression contracts", async () => {
       node.handlers.get("pointerup")(event);
       node.handlers.get("click")({ ...event, detail });
     };
-    const camera = view.camera(),
-      mode = view.mode();
+    const camera = view.camera();
     click(at);
     assert.deepEqual(repoToggles, ["repo_a"], "a drawn sign toggles its exact repository");
     assert.deepEqual([selected, toggles], [[], []], "and neither focuses nor opens a worker");
     click(at, 2);
     node.handlers.get("dblclick")({ ...at, detail: 2 });
     assert.deepEqual(repoToggles, ["repo_a"], "a sign double-click toggles once");
-    assert.deepEqual(platforms, [present(scene.platforms[0]).key], "and focuses its room");
-    assert.deepEqual(
-      [view.camera(), view.mode()],
-      [camera, mode],
-      "an already fitted room stays fitted",
-    );
+    assert.deepEqual(platforms, [], "toggle-out does not report a room fit");
+    assert.equal(view.mode(), "overview", "the fitted repository sign returns to overview");
+    assert.equal(view.platform(), null);
+    assert(view.focusPlatform(present(scene.platforms[0]).key));
+    view.zoomBy(1);
+    view.paint(++now);
+    const refitSign = clear(present(view.signRegions().find((sign) => sign.repo === "repo_a")));
+    assert(refitSign);
+    node.handlers.get("dblclick")({ ...refitSign, detail: 2 });
+    assert.equal(view.mode(), "platform", "the repository sign refits after manual navigation");
     // The highlight is read per paint: rings across every repo_a worker, a double ring across the freshly working one, and the
     // selected sign recoloured without moving.
     const strokes: [ViewContext<Resource>["strokeStyle"], number][] = [],
@@ -2445,6 +2490,23 @@ test("observer-view regression contracts", async () => {
     node.handlers.get("dblclick")({ ...headingEvent, detail: 2 });
     assert.equal(view.mode(), "platform", "the room heading also fits its room");
     assert.deepEqual(view.camera(), camera);
+    view.paint(++now);
+    const fittedHeading = Scene.toScreen(present(scene.platforms[0]).sign, view.camera());
+    const fittedEvent = { ...at, clientX: fittedHeading.x, clientY: fittedHeading.y - 12 };
+    click(fittedEvent);
+    click(fittedEvent, 2);
+    node.handlers.get("dblclick")({ ...fittedEvent, detail: 2 });
+    assert.equal(view.mode(), "overview", "the fitted heading returns to overview");
+    assert.equal(view.platform(), null);
+    view.paint(++now);
+    const overviewHeading = Scene.toScreen(present(scene.platforms[0]).sign, view.camera());
+    node.handlers.get("dblclick")({
+      ...at,
+      clientX: overviewHeading.x,
+      clientY: overviewHeading.y - 12,
+      detail: 2,
+    });
+    assert.equal(view.mode(), "platform", "the heading fits again from overview");
     assert.deepEqual(
       repoToggles,
       ["repo_a", "repo_a"],

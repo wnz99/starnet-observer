@@ -183,6 +183,12 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     if (key) this.focusPlatform(key);
   }
   private focusPlatform(key: string) {
+    const scene = this.view.activeScene;
+    if (!scene.platforms.some((platform) => platform.key === key)) return;
+    if (this.view.mode === "platform" && this.view.platform === key) {
+      this.view.cameraControl.overview();
+      return;
+    }
     if (this.view.cameraControl.focusPlatform(key)) this.view.callbacks.onPlatform(key);
   }
   private handledDoubleClick(point: Point, known: Tap | null) {

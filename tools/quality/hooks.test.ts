@@ -1,6 +1,14 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+  chmodSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -28,6 +36,7 @@ function runHook(root: string, mode: "hygiene" | "pre-commit" | "pre-push", inpu
     input,
     env: {
       ...gitEnvironment,
+      TMPDIR: realpathSync(tmpdir()),
       PATH: `${root}/bin:${process.env.PATH ?? ""}`,
       OBSERVER_HOOK_COMMANDS: join(root, ".git/commands"),
     },
@@ -35,7 +44,7 @@ function runHook(root: string, mode: "hygiene" | "pre-commit" | "pre-push", inpu
 }
 
 function createFixture() {
-  const root = mkdtempSync(join(tmpdir(), "observer-staged-hygiene-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "observer-staged-hygiene-")));
   fixtureGit(root, ["init", "--quiet"]);
   mkdirSync(join(root, "tools/quality"), { recursive: true });
   // Stub the external formatter in this disposable checkout; staged-format tests replace it.

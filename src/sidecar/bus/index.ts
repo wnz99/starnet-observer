@@ -52,7 +52,8 @@ class BusReader {
     return (
       this.reusable &&
       current.join("|") === this.reusable.join("|") &&
-      (!this.state.remote || (this.now() >= this.selectedAt && this.now() < this.expiresAt))
+      this.now() >= this.selectedAt &&
+      this.now() < this.expiresAt
     );
   }
   // A failed read keeps the last good rows and their observedAt, so the browser sees them as stale.

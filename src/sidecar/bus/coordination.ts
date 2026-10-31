@@ -1,6 +1,7 @@
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
 import type { BusState } from "./types.js";
 import { busRecord } from "./types.js";
+import { selectBusOverview } from "./overview.js";
 
 const LIMIT = 100;
 // Fixed queries deliberately exclude bodies, envelopes, sockets, paths and credentials.
@@ -39,7 +40,10 @@ function readSection(database: SnapshotDatabase, title: string, sql: string): Se
     return { title, available: false, truncated: false, rows: [] };
   }
 }
-export function selectCoordination(database: SnapshotDatabase): BusState["coordination"] {
+export function selectCoordination(
+  database: SnapshotDatabase,
+  asOf: number,
+): BusState["coordination"] {
   const sections: Section[] = [];
   const select = (title: string, sql: string) => sections.push(readSection(database, title, sql));
   select(
@@ -82,9 +86,17 @@ export function selectCoordination(database: SnapshotDatabase): BusState["coordi
     "Human-only monitor",
     "SELECT 'Retained messages' AS label, CAST(COUNT(*) AS TEXT) || ' · text stays outside agent inboxes' AS detail FROM remote_monitor",
   );
-  select(
+  sections.push(reportSubmissions(database));
+  return { sections, ...overviewFields(database, asOf) };
+}
+function reportSubmissions(database: SnapshotDatabase) {
+  return readSection(
+    database,
     "Report submissions",
     "SELECT 'Awaiting synchronization' AS label, CAST(COUNT(*) AS TEXT) AS detail FROM remote_report_submissions WHERE synced=0",
   );
-  return { sections };
+}
+function overviewFields(database: SnapshotDatabase, asOf: number) {
+  const overview = selectBusOverview(database, asOf);
+  return overview ? { overview } : {};
 }

@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** Show local agent activity truthfully without changing observed sessions or exposing private content beyond the local observation boundary.
-**Current focus:** Helper formation recovery and occupied desk links, quick task 261019-28k.
+**Current focus:** Bus metrics panel and room double-click toggle, quick task 261031-sut; implementation/review/required verification complete, delivery through PR #29.
 
 ## Current Position
 
@@ -59,6 +59,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 | 261015-vno | Sync PR 11 and fix host, relay and mail defects | 2026-10-15 | [PR #11](https://github.com/wnz99/starnet-observer/pull/11) | Complete; verified; independent final review clean | [261015-vno](./quick/261015-vno-sync-pr-11-with-main-preserving-existing/) |
 | 261018-wb7 | Helper visibility, formation, quarters and truthful crew statistics | 2026-10-19 | [PR #20](https://github.com/wnz99/starnet-observer/pull/20) | Implementation/review complete; 269 native tests, production-first installed/browser consumers and source Ubuntu CI passed; final tracking-head checks and merge pending | [261018-wb7](./quick/261018-wb7-helper-visibility-formation-quarters-and/) |
 | 261019-m2e | Outward-docked project annexes | 2026-10-19 | [PR #24](https://github.com/wnz99/starnet-observer/pull/24) | Implementation/review complete; revision-1 conformance clean; 281 native tests and installed/browser consumers passed; final tracking-head review, CI and merge pending | [261019-m2e-outward-docked-project-annexes](./quick/261019-m2e-outward-docked-project-annexes/) |
+| 261031-sut | Bus metrics panel and room double-click toggle | 2026-10-31 | [PR #29](https://github.com/wnz99/starnet-observer/pull/29) | Complete: implementation, independent source review and required verification; PR #29 records final tracking-head gates and delivery; local macOS synthetic-build timeout remains documented | [261031-sut-bus-metrics-panel-and-room-double-click-](./quick/261031-sut-bus-metrics-panel-and-room-double-click-/) |
 
 ## Accumulated Context
 

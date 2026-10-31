@@ -338,12 +338,15 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
       assert.equal(roster(initial).agents, 1);
       assert.equal(roster(initial).list.length, 1);
       assert.equal(publication(initial).length, 1);
+      clock = NOW + 999;
+      expiring.read();
+      assert.equal(expiryOpens, 1, "overview selection reuses its one-second window");
       clock = NOW + 59999;
       expiring.read();
       assert.equal(
         expiryOpens,
-        1,
-        "unchanged selection reuses its private snapshot before the next evidence boundary",
+        2,
+        "unchanged source refreshes aggregate selection after one second",
       );
       clock++;
       const futureEligible = expiring.read();
@@ -352,10 +355,10 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         NOW + 120000,
         "future activity becomes eligible at the existing skew boundary without DB writes",
       );
-      assert.equal(expiryOpens, 2);
+      assert.equal(expiryOpens, 3);
       clock = NOW + 3600000 - 1;
       assert.equal(roster(expiring.read()).agents, 1);
-      assert.equal(expiryOpens, 2);
+      assert.equal(expiryOpens, 4);
       clock++;
       const expired = expiring.read();
       assert.equal(
@@ -374,7 +377,7 @@ CREATE TABLE remote_imports (id TEXT PRIMARY KEY, local_id INTEGER NOT NULL REFE
         initial.observedAt,
         "time-only relay selection does not renew immutable message observation time",
       );
-      assert.equal(expiryOpens, 3);
+      assert.equal(expiryOpens, 5);
       clock = NOW + 2 * 3600000;
       assert.deepEqual(
         expiring.read().remote,

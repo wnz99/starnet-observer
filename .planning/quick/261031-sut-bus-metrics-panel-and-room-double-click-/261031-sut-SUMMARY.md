@@ -1,0 +1,15 @@
+# Quick Task 261031-sut: Bus metrics panel and room double-click toggle
+
+Status: Complete for implementation, independent source review and required verification. Delivery: [PR #29](https://github.com/wnz99/starnet-observer/pull/29). Prepared before merge; PR #29 records the final tracking-head review, CI and merge outcome.
+
+Task 1 supplies the reviewed metadata overview contract, including independent availability and bounded detail observations. Task 2 renders four metric cards, grouped supporting observations and collapsed diagnostics. It retains the existing read/reply authorization and full transported parent lookup while displaying ten messages.
+
+Task evidence: `/tmp/starnet-bus-panel-room-toggle/T2-IMPLEMENTATION.md` and `/tmp/starnet-bus-panel-room-toggle/T3-COMPLETION.md`. Independent task reviews are clean in `T1-REVIEW-R4.md`, `T2-REVIEW-R3.md` and `T3-REVIEW-R1.md` under the same directory. Revision-3 conformance reports no implementation gaps in `FINAL-CONFORMANCE-R3.md`. Aggregate `PR-REVIEW-R2.md` covers all 27 changed files through source commit `fc14c80243a820dbfdf951d85f867fc5bf528ee1`, with both verdicts Approved and no findings. The timestamp finding is closed across all eight numeric overview timestamp fields; focused regression covers 56 boundary cases.
+
+Task 3 adds fit/overview/refit room double-clicks while preserving programmatic focus and other target precedence. Two bounded prerequisite test corrections preserve staged-index bytes and source observation time while allowing the approved aggregate calculation clock to advance.
+
+Required verification at that source commit is recorded in `CURRENT-CI-VERIFICATION.md` and `PR-FIX-R1.md`. Local static checks (including build), focused tests (14/14), pre-push lint and five compiler projects, production-only installed startup (1/1), and installed-server/Chromium consumers (2/2) passed. [Configured Ubuntu CI](https://github.com/wnz99/starnet-observer/actions/runs/41239831694) passed for that exact PR head: native/core 280 passed, 13 skipped, zero failed; production-only installed startup 1/1 and installed-server/Chromium consumers 2/2. CI tested the PR integration merge into main. Current Chromium proof covers four cards, recent activity, disclosures, focus, reply authorization, narrow layout and native room fit/overview/refit input. Limited screenshot inspection is separate from automated acceptance.
+
+The local macOS full native run remains 292 passed and one failed: the unchanged import-free synthetic executable in `tools/build.test.ts` timed out after 3000ms, also on focused retry. Root cause remains unproven; no timeout or test was weakened. Ubuntu success does not establish the 13 skipped macOS checks, live desktop or SSH integration.
+
+No live controls, provider calls or deployment performed. Final tracking changes preserve the application tree. The source-head review and CI above do not preapprove the later tracking head: final full-branch review and configured CI are recorded on PR #29 before merge. Detailed executor evidence remains outside the tracked repository under `/tmp/starnet-bus-panel-room-toggle/`.
