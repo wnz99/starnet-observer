@@ -837,7 +837,8 @@ input::placeholder {
   border-left-color: var(--blocked);
   background: var(--row-selected);
 }
-.mail-item {
+.mail-item,
+.mail-controls {
   position: relative;
   min-width: 0;
 }
@@ -878,19 +879,35 @@ input::placeholder {
 .bus-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 4px;
 }
 .bus-card,
 .bus-group {
-  padding: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--line);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .bus-card h3,
 .bus-card p {
-  margin: 0 0 4px;
+  margin: 0;
+}
+.bus-overview h3 {
+  margin: 4px 0;
+  font-size: inherit;
+}
+.bus-overview p {
+  margin: 4px 0;
+}
+.bus-card {
+  margin-bottom: 0;
+}
+.bus-overview {
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
+  white-space: normal;
 }
 .bus-card p,
 .bus-observation {
@@ -906,17 +923,16 @@ input::placeholder {
   }
 }
 .bus-messages {
-  padding-left: 22px;
+  padding: 0;
+  margin: 4px 0 8px;
+  list-style: none;
+  display: grid;
+  gap: 3px;
   white-space: normal;
 }
 .bus-message {
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
+  min-width: 0;
 }
-.bus-message p {
-  white-space: pre-wrap;
-}
-.bus-message button,
 .mail-reply {
   margin: 4px;
 }

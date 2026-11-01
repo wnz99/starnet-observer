@@ -1605,6 +1605,17 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
     assert.deepEqual(reads, [], "mailroom open does not inspect bodies");
     await expect(panel.locator(".bus-card")).toHaveCount(4);
     await expect(panel.locator(".bus-message")).toHaveCount(10);
+    const replyRow = panel
+      .locator(".bus-message")
+      .filter({ has: page.locator(".mail-reply:not([hidden])") })
+      .first();
+    const rowBox = await replyRow.locator(".mail-row").boundingBox();
+    const readBox = await replyRow.locator(".row-inspect").boundingBox();
+    assert(rowBox && readBox);
+    assert(
+      Math.abs(rowBox.y + rowBox.height / 2 - readBox.y - readBox.height / 2) <= 1,
+      "reply links must not shift the magnifier away from its message row",
+    );
     await expect(panel).toContainText("120 total");
     await capture(page, path.join(artifacts, "mailroom-cards.png"));
     const diagnostics = panel

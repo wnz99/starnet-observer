@@ -1247,7 +1247,9 @@ test("observer-ui regression contracts", async () => {
       "2 pending · 1 acknowledged · in recent 100",
       "counts are within the recent window",
     );
-    const ledger = present(elements["mail-ledger"]).children.map((item) => item.children[0]);
+    const ledger = present(elements["mail-ledger"]).children.map((item) =>
+      child(child(item, 0), 0),
+    );
     assert.deepEqual(
       ledger.map((button) => present(button).dataset.messageId),
       ["3", "2", "1"],
@@ -1274,14 +1276,14 @@ test("observer-ui regression contracts", async () => {
     );
     assert.equal(frame.drones.length, 3, "parked drones fill the hub pads");
     assert(present(elements["mail-detail"]).textContent.includes("not acknowledged · wake failed"));
-    child(child(present(elements["mail-ledger"]), 1), 0).emit("click");
+    child(child(child(present(elements["mail-ledger"]), 1), 0), 0).emit("click");
     assert.equal(focuses.at(-1), "obs_2");
     assert(
       present(elements["mail-detail"]).textContent.includes(
         "recipient is not an observed pane; showing sender",
       ),
     );
-    child(child(present(elements["mail-ledger"]), 0), 0).emit("click");
+    child(child(child(present(elements["mail-ledger"]), 0), 0), 0).emit("click");
     assert(
       present(elements["mail-detail"]).textContent.includes(
         "from Outside the observer · to Ambiguous session",
@@ -1293,7 +1295,7 @@ test("observer-ui regression contracts", async () => {
     assert(!/received|read by/i.test(present(elements["mail-detail"]).textContent));
     // The open detail follows its message id across polls: a later ACK replaces the stale wake text, and a row that
     // leaves the recent window says so instead of showing its old state.
-    child(child(present(elements["mail-ledger"]), 2), 0).emit("click");
+    child(child(child(present(elements["mail-ledger"]), 2), 0), 0).emit("click");
     assert(
       present(elements["mail-detail"]).textContent.startsWith("Message #1 ") &&
         present(elements["mail-detail"]).textContent.includes("not acknowledged · wake failed"),
@@ -1339,7 +1341,7 @@ test("observer-ui regression contracts", async () => {
       "canvas mailroom opens the same panel",
     );
     present(events.keydown)({ key: "Escape", preventDefault() {} });
-    const read = child(present(elements["mail-ledger"]), 2).children[1];
+    const read = child(child(present(elements["mail-ledger"]), 2), 0).children[1];
     assert.equal(present(read).className, "row-inspect");
     assert.equal(present(read).attributes.get("aria-label"), "Read message #1");
     assert.equal(present(read).attributes.get("aria-expanded"), "false");
@@ -1352,11 +1354,13 @@ test("observer-ui regression contracts", async () => {
     assert.equal(document.activeElement, mailPart("mail-inspector-title"));
     assert(present(mailPart("mail-inspector-meta")).textContent.startsWith("from Codex"));
     assert.equal(
-      child(child(present(elements["mail-ledger"]), 2), 1).attributes.get("aria-expanded"),
+      child(child(child(present(elements["mail-ledger"]), 2), 0), 1).attributes.get(
+        "aria-expanded",
+      ),
       "true",
     );
     assert.equal(
-      child(child(present(elements["mail-ledger"]), 2), 1).attributes.get("aria-label"),
+      child(child(child(present(elements["mail-ledger"]), 2), 0), 1).attributes.get("aria-label"),
       "Close message #1",
     );
     notify(listener, proved({ ...snapshot.data, observedAt: Date.now(), bus: ackedMail }));
@@ -1366,11 +1370,11 @@ test("observer-ui regression contracts", async () => {
     assert.equal(present(elements.panels).children.length, 0, "Escape closes the mail panel first");
     assert.equal(
       document.activeElement,
-      child(present(elements["mail-ledger"]), 2).children[1],
+      child(child(present(elements["mail-ledger"]), 2), 0).children[1],
       "focus returns to the live magnifier",
     );
     // Mail and agent panels stack: opening one never closes the other; closing the top reveals the lower one.
-    child(child(present(elements["mail-ledger"]), 2), 1).emit("click");
+    child(child(child(present(elements["mail-ledger"]), 2), 0), 1).emit("click");
     await new Promise((resolve) => setImmediate(resolve));
     const sessionInspect = sessionItems(child(present(elements.sessions), 0))
       .map((item) => item.children[2])
@@ -1943,7 +1947,9 @@ test("observer-ui regression contracts", async () => {
         ),
       );
       assert.equal(present(own["mail-ledger"]).children[0], mailNode);
-      assert(child(child(present(mailNode), 0), 1).textContent.startsWith("acknowledged"));
+      assert(
+        child(child(child(present(mailNode), 0), 0), 1).textContent.startsWith("acknowledged"),
+      );
       notify(
         live,
         settled(
@@ -3596,7 +3602,7 @@ test("observer-ui regression contracts", async () => {
         present(docEvents.keydown)({ key: "Escape", preventDefault() {} });
         notify(live, settled(inventory()));
         // Mail is proved by the current transport: an old unchanged copy time and down agent sources still allow reading.
-        const ledgerRead = () => child(present(own["mail-ledger"]), 0).children[1];
+        const ledgerRead = () => child(child(present(own["mail-ledger"]), 0), 0).children[1];
         notify(
           live,
           settled(

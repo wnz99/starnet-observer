@@ -303,7 +303,7 @@ test("control-ui-hosts regression contracts", async () => {
     };
     collidingMail();
     present(viewOptions.onShip)(null);
-    child(child(present(elements["mail-ledger"]), 0), 0).emit("click");
+    child(child(child(present(elements["mail-ledger"]), 0), 0), 0).emit("click");
     present(viewOptions.onSelect)(present(sessions[0]).id);
     assert.equal(
       present(elements["mail-detail"]).hidden,
@@ -311,7 +311,7 @@ test("control-ui-hosts regression contracts", async () => {
       "same-host canvas selection preserves mail selection",
     );
     assert.equal(
-      child(child(present(elements["mail-ledger"]), 0), 0).attributes.get("aria-pressed"),
+      child(child(child(present(elements["mail-ledger"]), 0), 0), 0).attributes.get("aria-pressed"),
       "true",
     );
     present(viewOptions.onSelect)(blocked.id);
@@ -322,7 +322,7 @@ test("control-ui-hosts regression contracts", async () => {
       "canvas host switch clears the previous host mail detail",
     );
     assert.equal(
-      child(child(present(elements["mail-ledger"]), 0), 0).attributes.get("aria-pressed"),
+      child(child(child(present(elements["mail-ledger"]), 0), 0), 0).attributes.get("aria-pressed"),
       "false",
       "colliding remote ledger id is not selected",
     );
@@ -435,15 +435,12 @@ test("control-ui-hosts regression contracts", async () => {
       present(elements["mail-counts"]).textContent,
       "1 pending · 1 acknowledged · 2 expired · in recent 37",
     );
-    const ledgerState = (id: number) =>
-      child(
-        present(
-          present(elements["mail-ledger"]).children.find(
-            (item) => child(item, 0).dataset.messageId === String(id),
-          ),
-        ),
-        0,
-      ).children[1];
+    const ledgerState = (id: number) => {
+      const item = present(elements["mail-ledger"]).children.find(
+        (row) => child(child(row, 0), 0).dataset.messageId === String(id),
+      );
+      return child(child(child(present(item), 0), 0), 1);
+    };
     for (const id of [11, 12]) {
       assert.equal(
         present(ledgerState(id)).className,
@@ -465,11 +462,11 @@ test("control-ui-hosts regression contracts", async () => {
     child(
       present(
         present(elements["mail-ledger"]).children.find(
-          (item) => child(item, 0).dataset.messageId === "13",
+          (item) => child(child(item, 0), 0).dataset.messageId === "13",
         ),
       ),
       0,
-    ).emit("click");
+    ).children[0]?.emit("click");
     assert.equal(
       present(viewOptions.hostSelection)(),
       "herdr-dev-2",
