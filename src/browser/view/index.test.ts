@@ -39,6 +39,7 @@ import { palette, resolveLook } from "./look.js";
 import { officeFurnishing } from "./office-furnishing.js";
 import { OfficeFloor } from "./office-floor.js";
 import { Surfaces } from "./surfaces.js";
+import { StartupAssembly } from "./startup-assembly.js";
 import { officePaintersFor } from "./office.js";
 import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
@@ -57,6 +58,134 @@ const Model = createModel(canonicalTheme());
 const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
 
 for (const office of [false, true]) {
+  test(
+    (office ? "office" : "station") + " static presentation preserves whole draws and hides owners",
+    () => {
+      const layout = Model.createLayout();
+      layout.reconcile([
+        {
+          id: "static-worker",
+          project: "Static",
+          projectId: "static",
+          projectKind: "group",
+          repo: "static",
+          repoId: "static",
+          provider: "codex",
+          status: "working",
+          worktree: "static",
+        },
+      ]);
+      const scene = Scene.build(layout.onPage(0), 0);
+      const assembly = new StartupAssembly();
+      assembly.begin(scene, 0);
+      const calls: unknown[][] = [];
+      const alphas: number[] = [];
+      const stack: number[] = [];
+      const ctx = drawing({
+        save: () => {
+          stack.push(ctx.globalAlpha);
+        },
+        restore: () => {
+          ctx.globalAlpha = present(stack.pop());
+        },
+        fill: () => {
+          calls.push(["fill", ctx.fillStyle]);
+          alphas.push(ctx.globalAlpha);
+        },
+        stroke: () => {
+          calls.push(["stroke", ctx.strokeStyle]);
+          alphas.push(ctx.globalAlpha);
+        },
+        drawImage: (...args: Parameters<ViewContext<Resource>["drawImage"]>) => {
+          calls.push(["image", ...args]);
+          alphas.push(ctx.globalAlpha);
+        },
+        clip: () => {
+          calls.push(["clip"]);
+        },
+        lineTo: (...args: Parameters<ViewContext<Resource>["lineTo"]>) => {
+          calls.push(["lineTo", ...args]);
+        },
+        fillText: (...args: Parameters<ViewContext<Resource>["fillText"]>) => {
+          calls.push(["text", ...args]);
+        },
+      });
+      const images = Object.fromEntries(
+        SCENE_ART_ROLE_NAMES.map((role) => [role, new OfficeImageFixture()]),
+      ) as Record<SceneArtRoleName, OfficeImageFixture>;
+      const composition = createOffice({
+        images,
+        colors: canonicalLook.colors,
+        project: Scene.project,
+        crewHeight: 60,
+      });
+      const painter = office
+        ? officePaintersFor(canonicalLook, composition)
+        : paintersFor<Resource>(canonicalLook);
+      painter.paintStatic(ctx, scene);
+      const ordinary = [...calls];
+      calls.length = 0;
+      const stages = new Map<string, unknown[][]>();
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (owner, stage, draw) => {
+          const start = calls.length;
+          draw();
+          const key = owner + ":" + stage;
+          stages.set(key, [...(stages.get(key) ?? []), ...calls.slice(start)]);
+        },
+      });
+      assert.deepEqual(
+        calls,
+        ordinary,
+        "omitted hook and fully visible art preserve operation ordering and geometry",
+      );
+      assert.ok(present(stages.get("mail:floor")).length > 0);
+      assert.ok(
+        present(stages.get("mail:content")).length > 0,
+        "tall mail props have a separate content pass",
+      );
+      assert.ok(stages.has("platform:" + present(scene.platforms[0]).key + ":content"));
+      calls.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (owner, stage, draw) => {
+          if (owner === "mail" && stage === "floor") draw();
+        },
+      });
+      assert.deepEqual(
+        calls,
+        stages.get("mail:floor"),
+        "mail floor reveals without its tall props or other owners",
+      );
+      calls.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint() {},
+      });
+      assert.deepEqual(calls, [], "hidden owners produce no drawing or clipping");
+      alphas.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (_owner, _stage, draw) => {
+          ctx.save();
+          ctx.globalAlpha *= 0.25;
+          draw();
+          ctx.restore();
+        },
+      });
+      assert.ok(alphas.length > 0);
+      assert.ok(
+        alphas.every((alpha) => alpha > 0 && alpha <= 0.25),
+        "nested lines, grids, walls and pools compose opacity",
+      );
+      assert.equal(ctx.globalAlpha, 1);
+    },
+  );
   test((office ? "office" : "station") + " annex bridge trim preserves existing surfaces", () => {
     const strokes: { color: unknown; from: Point; to: Point }[] = [];
     let from = { x: 0, y: 0 },
@@ -426,6 +555,474 @@ test("observer-view regression contracts", async () => {
   }
   const regionOf = (view: ViewInstance, id: string) =>
     present(view.hitRegions().find((region) => region.id === id));
+
+  function verifyAssemblyLifecycle() {
+    let reduced = false;
+    const create = ({ eligible = false } = {}) => {
+      const runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: canvas(1440, 1000),
+          reducedMotion: () => reduced,
+          env: {
+            raf: () => 1,
+            caf() {},
+            now: () => 0,
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      );
+      runtime.lifecycle.start();
+      runtime.update(Scene.build([], 0), { stale: () => true, startupEligible: eligible });
+      return runtime;
+    };
+    const firstData = create({ eligible: true });
+    firstData.framePaint.paint(0);
+    assert.equal(
+      firstData.assembly.state,
+      "playing",
+      "initial measurement does not consume eligible intro",
+    );
+    firstData.lifecycle.stop();
+    const runtime = create(),
+      scene = runtime.activeScene;
+    runtime.framePaint.paint(0);
+    assert.equal(runtime.assembly.state, "pending", "absent data cannot consume intro");
+    const revision = scene.revision;
+    runtime.update(scene, { startupEligible: true });
+    assert.equal(runtime.framePaint.paint(10), true, "stale frames still schedule the intro");
+    assert.equal(runtime.assembly.state, "playing", "late empty snapshot starts on reused scene");
+    const start = { ...runtime.camera };
+    runtime.update(scene);
+    assert.deepEqual(runtime.camera, start, "equal revisions do not reset intro camera");
+    runtime.framePaint.paint(1410);
+    assert(runtime.camera.zoom <= start.zoom);
+    runtime.framePaint.paint(2810);
+    assert.equal(runtime.assembly.state, "complete");
+    assert.equal(scene.revision, revision);
+    assert.deepEqual(runtime.camera, Scene.fit(scene.bounds, runtime.viewport));
+    const layer = runtime.staticLayer;
+    runtime.framePaint.paint(2900);
+    assert.equal(runtime.staticLayer, layer, "completed intro resumes ordinary cache reuse");
+    runtime.lifecycle.stop();
+    runtime.lifecycle.start();
+    runtime.update(scene, { startupEligible: true });
+    runtime.framePaint.paint(3000);
+    assert.equal(runtime.assembly.state, "complete", "resume cannot replay");
+    runtime.lifecycle.stop();
+
+    const interrupted = create();
+    interrupted.update(interrupted.activeScene, { startupEligible: true });
+    interrupted.framePaint.paint(0);
+    assert.equal(interrupted.plateFrame, null);
+    interrupted.interaction.select({ x: -100, y: -100 });
+    assert.equal(interrupted.assembly.state, "complete");
+    assert(
+      interrupted.interaction.paintedFrameCurrent(),
+      "input paints final targets synchronously",
+    );
+    interrupted.cameraControl.zoomBy(1.1);
+    const requested = { ...interrupted.camera };
+    interrupted.framePaint.paint(1000);
+    assert.deepEqual(interrupted.camera, requested, "intro cannot override requested zoom");
+    interrupted.lifecycle.stop();
+
+    const waiting = create();
+    waiting.office = { state: "pending", composition: null };
+    waiting.update(waiting.activeScene, { startupEligible: true });
+    assert.equal(waiting.framePaint.paint(0), true);
+    waiting.framePaint.paint(499);
+    assert.equal(waiting.assembly.state, "pending");
+    waiting.framePaint.paint(500);
+    assert.equal(waiting.assembly.state, "playing", "fallback deadline bounds resource wait");
+    waiting.office.state = "failed";
+    waiting.framePaint.paint(600);
+    assert.equal(waiting.assembly.state, "playing", "failed fallback keeps same art mode");
+    reduced = true;
+    waiting.framePaint.paint(601);
+    assert.equal(waiting.assembly.state, "complete", "reduced motion transition finishes");
+    waiting.lifecycle.stop();
+
+    const skipped = create();
+    skipped.office = { state: "pending", composition: null };
+    skipped.update(skipped.activeScene, { startupEligible: true });
+    skipped.framePaint.paint(0);
+    assert.equal(skipped.assembly.state, "complete", "reduced motion skips resource wait");
+    skipped.lifecycle.stop();
+    reduced = false;
+    const disabled = create();
+    const startupEnabled = false;
+    disabled.lifecycle.setStartupAnimation(startupEnabled);
+    disabled.update(disabled.activeScene, { startupEligible: true });
+    disabled.framePaint.paint(0);
+    assert.equal(disabled.assembly.state, "complete");
+    disabled.lifecycle.stop();
+
+    for (const interrupt of [
+      "revision",
+      "resize",
+      "stop",
+      "disable",
+      "wheel",
+      "key",
+      "pan",
+      "sidebar",
+    ]) {
+      const view = create();
+      view.update(view.activeScene, { startupEligible: true });
+      view.framePaint.paint(0);
+      view.interaction.gestures.pointerMove({ clientX: 10, clientY: 10 });
+      assert.equal(view.assembly.state, "playing", "hover alone never interrupts");
+      switch (interrupt) {
+        case "revision":
+          view.update(Scene.build([], 1));
+          break;
+        case "resize":
+          Object.defineProperty(view.canvas, "clientWidth", { value: view.canvas.clientWidth + 1 });
+          view.cameraControl.measure();
+          break;
+        case "stop":
+          view.lifecycle.stop();
+          break;
+        case "disable":
+          view.lifecycle.setStartupAnimation(startupEnabled);
+          break;
+        case "wheel":
+          view.interaction.wheel({ deltaY: -50 });
+          break;
+        case "key":
+          view.interaction.keyDown({ key: "ArrowLeft" });
+          break;
+        case "pan":
+          view.cameraControl.panBy({ x: 20, y: 10 });
+          break;
+        case "sidebar":
+          view.cameraControl.overview();
+          break;
+      }
+      assert.equal(view.assembly.state, "complete", interrupt + " completes intro");
+      const camera = { ...view.camera };
+      view.framePaint.paint(1400);
+      assert.deepEqual(view.camera, camera, interrupt + " keeps requested camera");
+      view.lifecycle.stop();
+      assert.equal(view.frame, null);
+    }
+    const ready = create();
+    ready.office = { state: "pending", composition: null };
+    ready.update(ready.activeScene, { startupEligible: true });
+    ready.framePaint.paint(0);
+    ready.office.state = "ready";
+    ready.lifecycle.advanceAssembly(100);
+    assert.equal(ready.assembly.state, "playing", "ready office starts before deadline");
+    ready.office.state = "failed";
+    ready.lifecycle.advanceAssembly(200);
+    assert.equal(ready.assembly.state, "complete", "changed art mode completes before paint");
+    ready.lifecycle.stop();
+    const failed = create();
+    failed.office = { state: "failed", composition: null };
+    failed.update(failed.activeScene, { startupEligible: true });
+    failed.framePaint.paint(0);
+    assert.equal(
+      failed.assembly.state,
+      "playing",
+      "failed office starts truthful fallback immediately",
+    );
+    failed.lifecycle.stop();
+    const stopped = create();
+    stopped.lifecycle.stop();
+    stopped.update(stopped.activeScene, { startupEligible: true });
+    assert.equal(stopped.assembly.state, "pending", "stopped eligibility stays latched");
+    stopped.lifecycle.start();
+    stopped.framePaint.paint(0);
+    assert.equal(stopped.assembly.state, "playing");
+    stopped.lifecycle.stop();
+    const earlyInput = create();
+    earlyInput.update(earlyInput.activeScene, { startupEligible: true });
+    earlyInput.cameraControl.panBy({ x: 10, y: 10 });
+    assert.equal(
+      earlyInput.assembly.state,
+      "complete",
+      "input before first eligible paint consumes intro",
+    );
+    earlyInput.lifecycle.stop();
+  }
+  verifyAssemblyLifecycle();
+
+  function verifyAssemblyLiveArt() {
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        reducedMotion: () => true,
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile([
+      { id: "assembly-worker", projectId: "assembly", repoId: "assembly", status: "working" },
+    ]);
+    const scene = Scene.build(layout.onPage(0), 0),
+      count = scene.workers.length;
+    runtime.update(scene);
+    runtime.actors = runtime.movement.step(0, { stale: () => false, reduced: true });
+    runtime.framePaint.onStage = () => true;
+    const realCrew = runtime.crew.paintCrew.bind(runtime.crew);
+    let auras = 0;
+    runtime.aura.paintBackdrop = () => {
+      auras++;
+    };
+    runtime.aura.paintMotes = () => {
+      auras++;
+    };
+    runtime.fx = true;
+    runtime.assembly.begin(scene, 0);
+    const probe = new StartupAssembly();
+    probe.begin(scene, 0);
+    runtime.assemblyFrame = probe.frame(740);
+    const worker = present(scene.workers[0]),
+      actor = present(runtime.actors[0]);
+    const alphas: number[] = [],
+      stack: number[] = [];
+    const ctx = runtime.ctx;
+    ctx.save = () => {
+      stack.push(ctx.globalAlpha);
+    };
+    ctx.restore = () => {
+      ctx.globalAlpha = present(stack.pop());
+    };
+    ctx.fill = () => {
+      alphas.push(ctx.globalAlpha);
+    };
+    runtime.framePaint.paintAssembly(runtime.assemblyOwners.worker(worker), "content", () => {
+      const reduced = true;
+      realCrew(worker, actor, 740, reduced);
+    });
+    assert.equal(auras, 0, "intro suppresses crew ambient aura");
+    assert.ok(
+      alphas.some((alpha) => alpha > 0 && alpha < 0.85),
+      "silhouette composes parent fade",
+    );
+    assert.equal(ctx.globalAlpha, 1);
+    const viewer = present(scene.observatory.viewer),
+      viewerProbe = new StartupAssembly();
+    viewerProbe.begin(scene, 0);
+    for (const now of [460, 560, 660, 2800]) {
+      runtime.assemblyFrame = viewerProbe.frame(now);
+      alphas.length = 0;
+      const progress = runtime.assemblyFrame.progress("observatory", "content");
+      if (now === 560) assert.equal(progress, 0.5, "probe reaches partial content opacity");
+      const animate = false;
+      const item = present(
+        runtime.framePaint.items
+          .observatory(runtime.stationArt, now, animate)
+          .find((item) => item.tie === viewer.id),
+      );
+      item.draw();
+      assert.deepEqual(
+        alphas,
+        progress === 0 ? [] : [progress, progress * 0.8, progress * 0.8],
+        `real viewer shadow, body and head compose observatory content at ${String(now)}ms`,
+      );
+      assert.equal(ctx.globalAlpha, 1, "viewer restores parent alpha");
+    }
+    runtime.assemblyFrame = probe.frame(740);
+    let desks = 0,
+      crew = 0,
+      caches = 0;
+    runtime.stationArt.desk = () => {
+      desks++;
+    };
+    runtime.crew.paintCrew = (worker) => {
+      crew++;
+      const region = {
+        id: worker.id,
+        left: 0,
+        top: 0,
+        width: 20,
+        height: 40,
+        depth: 0,
+        head: { x: 10, y: 0 },
+        foot: 40,
+      };
+      runtime.anchors.push(region);
+      runtime.regions.push(region);
+    };
+    const cached = runtime.cache.staticFor;
+    runtime.cache.staticFor = () => {
+      caches++;
+      return cached();
+    };
+    runtime.assembly.begin(scene, 0);
+    const paint = (now: number) => {
+      runtime.regions = [];
+      runtime.anchors = [];
+      runtime.assemblyFrame = runtime.assembly.frame(now);
+      const { A } = runtime.framePaint.worldLayer();
+      runtime.framePaint.paintItems({ A, now, animate: false, ambient: false });
+    };
+    paint(0);
+    assert.equal(desks, 0);
+    assert.equal(crew, 0);
+    assert.equal(caches, 0);
+    assert.equal(runtime.regions.length, 0);
+    paint(740);
+    assert.notEqual(desks, 0);
+    assert.notEqual(crew, 0);
+    assert.equal(runtime.regions.length, 0, "fading bodies cannot register targets");
+    paint(840);
+    assert.notEqual(runtime.regions.length, 0, "complete content restores body targets");
+    assert.equal(caches, 0);
+    const ancillary: string[] = [];
+    runtime.mail.paintMail = () => {
+      ancillary.push("mail");
+    };
+    runtime.framePaint.overlays.repository = () => {
+      ancillary.push("repository");
+    };
+    runtime.framePaint.overlays.focus = () => {
+      ancillary.push("focus");
+    };
+    runtime.platformEffects.paintPlatformGlow = () => {
+      ancillary.push("ambient");
+    };
+    runtime.framePaint.paint(840);
+    assert.deepEqual(
+      ancillary,
+      [],
+      "active paint suppresses couriers, focus, repository and ambient passes",
+    );
+    runtime.assembly.complete();
+    paint(2800);
+    paint(2816);
+    const reduced = true;
+    realCrew(worker, actor, 2816, reduced);
+    assert.equal(auras, 2, "ordinary crew restores both aura passes");
+    assert.equal(caches, 2, "completed frames use ordinary cached path");
+    runtime.framePaint.paint(2816);
+    assert.deepEqual(ancillary, ["ambient", "repository", "focus", "mail"]);
+    assert.equal(scene.workers.length, count);
+  }
+  verifyAssemblyLiveArt();
+
+  function verifyAssemblyLabels() {
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        onShip() {},
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile([
+      {
+        id: "label-worker",
+        projectId: "labels",
+        repoId: "labels",
+        repo: "Labels",
+        status: "blocked",
+      },
+    ]);
+    const scene = Scene.build(layout.onPage(0), 0);
+    scene.ships = [{ id: null, local: true, health: "available", rect: scene.mail.rect }];
+    runtime.lifecycle.start();
+    runtime.update(scene, { repositorySelection: () => "labels", inspected: () => "label-worker" });
+    const before = JSON.stringify(scene),
+      worker = present(scene.workers[0]),
+      options = {
+        tier: "detail",
+        selectedRepo: "labels",
+        isStale: false,
+        staleKeys: new Set<string>(),
+      } as const;
+    runtime.anchors = [
+      {
+        id: worker.id,
+        left: 690,
+        top: 400,
+        width: 20,
+        height: 60,
+        depth: 0,
+        head: { x: 700, y: 400 },
+        foot: 460,
+      },
+    ];
+    runtime.hovered = worker.id;
+    const targets = () => [
+      runtime.titleRegions,
+      runtime.signRegions,
+      runtime.platformRegions,
+      runtime.shipRegions,
+      runtime.badgeRegions,
+      runtime.attentionRegions,
+      runtime.observatoryRegion,
+    ];
+    runtime.plates.paintPlates(options.isStale, new Set());
+    const ordinary = structuredClone(targets());
+    assert(runtime.plates.platformLabels.collect(options).length > 0);
+    assert(runtime.plates.workerLabels.collect(options).length > 0);
+    assert(runtime.plates.hostLabels.ships(options).length > 0);
+    assert(runtime.plates.stationLabels.hub().length > 0);
+    assert(runtime.plates.stationLabels.observatory(options).length > 0);
+    let dots = 0;
+    runtime.ctx.arc = () => {
+      dots++;
+    };
+    runtime.assembly.begin(scene, 0);
+    for (const now of [0, 740]) {
+      runtime.assemblyFrame = runtime.assembly.frame(now);
+      assert.deepEqual(runtime.plates.platformLabels.collect(options), []);
+      assert.deepEqual(runtime.plates.workerLabels.collect(options), []);
+      runtime.plates.paintPlates(options.isStale, new Set());
+      assert.deepEqual(runtime.titleRegions, []);
+      assert.deepEqual(runtime.signRegions, []);
+      assert.deepEqual(runtime.platformRegions, []);
+      assert.deepEqual(runtime.badgeRegions, []);
+      assert.deepEqual(runtime.attentionRegions, []);
+      assert.equal(dots, 0, "hidden or fading workers have no status dots");
+      assert.equal(
+        runtime.plateFrame,
+        null,
+        "partial frames cannot reuse ordinary target validity",
+      );
+      if (now === 0) {
+        assert.deepEqual(runtime.plates.hostLabels.ships(options), []);
+        assert.deepEqual(runtime.plates.stationLabels.hub(), []);
+        assert.deepEqual(runtime.plates.stationLabels.observatory(options), []);
+        assert.deepEqual(targets(), [[], [], [], [], [], [], null], "old target boxes cleared");
+      }
+    }
+    runtime.assemblyFrame = runtime.assembly.frame(840);
+    assert(
+      runtime.plates.workerLabels.collect(options).length > 0,
+      "settled content restores labels before finish",
+    );
+    runtime.assembly.complete();
+    runtime.assemblyFrame = runtime.assembly.frame(2800);
+    runtime.plates.paintPlates(options.isStale, new Set());
+    assert.deepEqual(targets(), ordinary, "completion restores exactly accepted ordinary targets");
+    assert(dots > 0);
+    assert(runtime.plateFrame);
+    assert.equal(JSON.stringify(scene), before, "label filtering leaves full geometry unchanged");
+    runtime.lifecycle.stop();
+  }
+  verifyAssemblyLabels();
 
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),

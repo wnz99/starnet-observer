@@ -135,13 +135,15 @@ export class Plates<R extends SpriteResource, B extends R = R> {
       ? { left: obsPlate.x, top: obsPlate.y, width: obsPlate.w, height: obsPlate.h }
       : null;
 
-    this.view.plateFrame = {
-      scene: this.view.activeScene,
-      zoom: this.view.camera.zoom,
-      tx: this.view.camera.tx,
-      ty: this.view.camera.ty,
-      selectedRepo,
-    };
+    this.view.plateFrame = this.view.assemblyFrame.active
+      ? null
+      : {
+          scene: this.view.activeScene,
+          zoom: this.view.camera.zoom,
+          tx: this.view.camera.tx,
+          ty: this.view.camera.ty,
+          selectedRepo,
+        };
     this.hoverBrackets();
   };
   recordTargets = (accepted: TextPlate[]) => {
@@ -213,7 +215,12 @@ export class Plates<R extends SpriteResource, B extends R = R> {
 
     for (const region of this.view.anchors) {
       const worker = this.view.workerIndex.get(region.id);
-      if (!worker || !needsAttention(worker, this.view.workerStale(worker))) continue;
+      if (
+        !worker ||
+        !this.view.assemblyVisible(this.view.assemblyOwners.worker(worker)) ||
+        !needsAttention(worker, this.view.workerStale(worker))
+      )
+        continue;
       const bob =
         animate && !this.view.callbacks.reducedMotion()
           ? Math.round(

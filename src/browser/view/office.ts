@@ -13,7 +13,7 @@ import type { SpriteResource } from "../sprites/types.js";
 import { GeometryPainter } from "./geometry-painter.js";
 import { statusColor } from "./look.js";
 import { OfficeFloor } from "./office-floor.js";
-import type { ArtPainters, Drone, Look, ViewContext } from "./types.js";
+import type { ArtPainters, Drone, Look, StaticPresentation, ViewContext } from "./types.js";
 const OFFICE_TRIM = { partitionHeight: 0.6, partitionAlpha: 0.55, viewerShadow: 0.28 };
 
 const DESK_LAMP = { x: 1.85, y: 0.9, height: 0.6, radius: 0.09 };
@@ -27,8 +27,8 @@ const PARCEL = { shadow: 0.25, left: 4, top: 5, spacing: 3, width: 8, height: 2 
 // Pure placement: the role and its extent rect (origin = role foot), fitted against the wall, never past the unit.
 
 class OfficePainter<R extends SpriteResource> {
-  paintStatic(scene: Scene) {
-    this.floors.paintStatic(scene);
+  paintStatic(scene: Scene, presentation?: StaticPresentation) {
+    this.floors.paintStatic(scene, presentation);
   }
   readonly geometry;
   readonly floors;
@@ -139,8 +139,8 @@ export function officePaintersFor<R extends SpriteResource>(
     return owner;
   };
   return {
-    paintStatic: (ctx, scene) => {
-      forContext(ctx).paintStatic(scene);
+    paintStatic: (ctx, scene, presentation) => {
+      forContext(ctx).paintStatic(scene, presentation);
     },
     ...officeFurniture(forContext),
   };

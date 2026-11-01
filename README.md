@@ -153,6 +153,8 @@ bun run start --config themes/helioforge.json
 
 `presentation` explicitly controls privacy masking. Colors and FX do not enable masking on their own. The Helioforge preset sets `presentation: true`; the basic preset sets it to `false`.
 
+Visual settings contains independent Startup animation and Ambient FX switches, saved in this browser. Startup animation defaults to on: the first observer snapshot assembles the station and pulls back to its overview within 2.8 seconds. Reduced motion skips the sequence. Camera input or selection completes it immediately; subsequent polls and tab resumes do not replay it. Reloading can replay it when the saved switch and motion preference permit. Ambient FX controls the existing scene effects independently of the assembly sequence. Escape closes Visual settings and returns focus to its trigger.
+
 To make your own theme, copy the example:
 
 ```sh
@@ -170,7 +172,7 @@ The configuration fields are:
 | `repoPrefix`   | Prefix for generated repo aliases. With built-in room lists, it also updates the built-in aliases. Explicit `rooms[].repos` names stay verbatim.                                             |
 | `rooms`        | Ordered room objects with `name` and optional `repos` arrays. Overrides the built-in room list. Aliases are allocated by opaque source IDs; allocation stays stable during one server run.   |
 | `theme.pack`   | Installed data-only pack ID; omitted selects `starnet`. Restart and reload after changing it.                                                                                                |
-| `theme.fx`     | Boolean; initial sky/station FX. CLI overrides configuration; omitted defaults to off. The FX button changes the current page without browser persistence.                                   |
+| `theme.fx`     | Boolean; initial sky/station FX. CLI overrides configuration; omitted defaults to off. A saved Ambient FX browser preference takes precedence over this initial value.                       |
 | `theme.colors` | Optional interface colors: `accent`, `background`, `panel`, `text`, each a six-digit hex color. Omitted colors inherit the selected pack. These four overrides change interface colors only. |
 
 Names must be nonempty text without control characters, at most 80 characters. Room names and explicit repo names must be unique, ignoring case. `repoPrefix` is 1–32 lowercase letters, digits, or hyphens, starting with a letter or digit. Additional rooms/repos get unique generated names. Unknown fields, invalid values, missing explicit files, and malformed JSON stop startup instead of silently applying a different mode. Files are limited to 64 KiB.

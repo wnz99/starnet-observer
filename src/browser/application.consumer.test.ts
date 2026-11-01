@@ -15,6 +15,7 @@ import type { ActorFrame } from "./scene/motion-types.js";
 import type { makeObserver as ObserverFactory } from "../sidecar/observer/index.js";
 import type { makeIdentityResolver as IdentityFactory } from "../sidecar/identity/index.js";
 import type { Inventory, ObserverInputRow } from "../sidecar/observer/contracts.js";
+import { SCENE_ART_ROLES } from "../shared/scene-art-roles.js";
 import type { readShellEntry as ShellEntryReader } from "../sidecar/tool-workdirs/store.js";
 const NO_OVERSEER_MATCH = false;
 interface FixtureOptions {
@@ -32,6 +33,9 @@ interface HttpModule {
 }
 const TOKEN = "synthetic-browser-consumer-token";
 interface CanvasProbe {
+  office: { state: string } | null;
+  assembly: { state: "pending" | "playing" | "complete" };
+  assemblyFrame: { active: boolean; progress(owner: string, stage: string): number };
   activeScene: SceneGeometry;
   camera: { zoom: number; tx: number; ty: number };
   viewport: { width: number; height: number };
@@ -948,9 +952,11 @@ async function crewBehavior(page: Page, close: () => void, birth: () => void, ar
   const room = quarters[0];
   assert.ok(room && room.quarters.rect.w === 3 && room.quarters.rect.h === 1);
   assert.equal(room.quarters.rect.x - room.rect.x, 14);
-  if ((await page.locator("#fx-toggle").getAttribute("aria-pressed")) === "true")
+  await page.locator("#visual-settings").click();
+  if ((await page.locator("#fx-toggle").getAttribute("aria-checked")) === "true")
     await page.locator("#fx-toggle").click();
-  await expect(page.locator("#fx-toggle")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#fx-toggle")).toHaveAttribute("aria-checked", "false");
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Zoom to the Fixture project platform" }).click();
   await capture(page, path.join(artifacts, "helper-quarters.png"));
   assert.equal(
@@ -1164,12 +1170,25 @@ async function ui(page: Page) {
   await page.keyboard.press("Escape");
   await expect(page.locator("#controls-help")).toHaveAttribute("aria-expanded", "false");
   await keyboardCamera(page);
+  await page.locator("#visual-settings").click();
+  await expect(page.locator("#startup-animation-toggle")).toBeFocused();
+  await expect(page.locator("#startup-animation-toggle")).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Space");
+  await expect(page.locator("#startup-animation-toggle")).toHaveAttribute("aria-checked", "false");
   await page.locator("#fx-toggle").click();
+  await expect(page.locator("#startup-animation-toggle")).toHaveAttribute("aria-checked", "false");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#visual-settings")).toBeFocused();
   const preference = await page.evaluate(() => localStorage.getItem("observer.fx"));
   assert.ok(preference === "0" || preference === "1");
   await page.reload();
   await expect(page.locator("#sessions")).toContainText("Synthetic browser fixture");
   assert.equal(await page.evaluate(() => localStorage.getItem("observer.fx")), preference);
+  await page.locator("#visual-settings").click();
+  await expect(page.locator("#startup-animation-toggle")).toHaveAttribute("aria-checked", "false");
+  await page.locator("#search").click();
+  await expect(page.locator("#visual-settings")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#search")).toBeFocused();
   await page.locator('[data-host="remote"]').click();
   assert.equal(await page.evaluate(() => localStorage.getItem("observer.host")), "remote");
   await page.locator('[data-host=""]').click();
@@ -2003,6 +2022,360 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
     );
   }
 }
+async function assemblyInput(
+  page: Page,
+  fresh: () => Promise<void>,
+  paint: (time: number) => Promise<{ state: string; camera: CanvasProbe["camera"] }>,
+) {
+  await fresh();
+  await paint(0);
+  const overview = await paint(2800);
+  const target = await page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    const region = view.observatoryRegion;
+    const platform = view.activeScene.platforms.find((room) => room.projectId === "Left");
+    if (!region || !platform) throw new Error("Missing interruption targets");
+    return {
+      x: region.left + region.width / 2,
+      y: region.top + region.height / 2,
+      platform: platform.key,
+    };
+  });
+  for (const input of ["click", "wheel", "drag", "key", "sidebar"] as const) {
+    await fresh();
+    await paint(0);
+    await paint(600);
+    const box = await page.locator("canvas").boundingBox();
+    assert.ok(box);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    if (input === "click") {
+      await page.evaluate(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        const original = view.callbacks.onObservatory;
+        Reflect.set(window, "__observatorySelections", 0);
+        view.callbacks.onObservatory = () => {
+          Reflect.set(window, "__observatorySelections", 1);
+          original();
+        };
+      });
+      await page.mouse.click(box.x + target.x, box.y + target.y);
+      assert.equal(
+        await page.evaluate(() => Number(Reflect.get(window, "__observatorySelections"))),
+        1,
+      );
+    } else if (input === "wheel") await page.mouse.wheel(0, -100);
+    else if (input === "drag") {
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 70, box.y + box.height / 2 + 30);
+      await page.mouse.up();
+    } else if (input === "key") {
+      await page.locator("canvas").focus();
+      await page.keyboard.press("+");
+    } else
+      await page.getByRole("button", { name: "Zoom to the Left platform", exact: true }).click();
+    let interrupted = await paint(700);
+    assert.equal(interrupted.state, "complete", input);
+    if (input === "wheel" || input === "key")
+      assert.ok(interrupted.camera.zoom > overview.camera.zoom, input + " zooms in from overview");
+    if (input === "drag") {
+      assert.ok(Math.abs(interrupted.camera.zoom - overview.camera.zoom) < 1e-12);
+      // Overview fits both axes, so camera bounds correctly prevent panning there.
+      assert.ok(Math.abs(interrupted.camera.tx - overview.camera.tx) < 0.01);
+      assert.ok(Math.abs(interrupted.camera.ty - overview.camera.ty) < 0.01);
+      assert.equal(
+        await page.evaluate(() => (Reflect.get(window, "__view") as CanvasProbe).mode),
+        "manual",
+        "drag takes control from assembly",
+      );
+      // Once zoomed beyond the fit, the same native gesture must visibly pan.
+      await page.mouse.wheel(0, -1500);
+      const zoomed = await paint(700);
+      assert.ok(zoomed.camera.zoom > overview.camera.zoom * 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 140, box.y + box.height / 2 + 60);
+      await page.mouse.up();
+      interrupted = await paint(700);
+      assert.ok(Math.abs(interrupted.camera.zoom - zoomed.camera.zoom) < 1e-12);
+      assert.ok(Math.abs(interrupted.camera.tx - zoomed.camera.tx - 70) < 0.01, "drag pans x");
+      assert.ok(Math.abs(interrupted.camera.ty - zoomed.camera.ty - 30) < 0.01, "drag pans y");
+    }
+    if (input === "sidebar") {
+      const focus = await page.evaluate(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        return { mode: view.mode, platform: view.platform };
+      });
+      assert.deepEqual(focus, { mode: "platform", platform: target.platform });
+      assert.ok(
+        interrupted.camera.zoom > overview.camera.zoom,
+        "sidebar focuses the selected room",
+      );
+    }
+    assert.deepEqual((await paint(2800)).camera, interrupted.camera, input + " camera persists");
+  }
+}
+async function assemblyWorkloads<T extends { platforms: number; allocations: number }>(
+  fresh: (count: number) => Promise<void>,
+  paint: (time: number) => Promise<T>,
+) {
+  const workloads = [];
+  for (const count of [1, 12, 48]) {
+    await fresh(count);
+    const frames = [];
+    for (let elapsed = 0; elapsed <= 2800; elapsed += 100) frames.push(await paint(elapsed));
+    assert.equal(frames[0]?.platforms, count);
+    assert.equal(
+      frames[0].allocations,
+      frames[27]?.allocations,
+      "intro does not allocate canvases per frame",
+    );
+    const steady = [];
+    for (let elapsed = 2900; elapsed <= 3800; elapsed += 100) steady.push(await paint(elapsed));
+    assert.equal(steady[0]?.allocations, steady[9]?.allocations, "completed cache remains stable");
+    workloads.push({ rooms: count, frames, steady });
+  }
+  return workloads;
+}
+async function startupAssembly(
+  browser: Browser,
+  root: string,
+  http: HttpModule,
+  artifacts: string,
+) {
+  const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
+  const substitutions = [
+    [
+      "framePaint = new FramePaint(this);",
+      "framePaint = (window.__view = this, new FramePaint(this));",
+    ],
+    ["this.raf = environment.raf;", "this.raf = () => 0;"],
+    [
+      "this.clock = environment.clock;",
+      "this.clock = () => Number(window.__assemblyNow ?? 10000);",
+    ],
+    [
+      "this.makeCanvas = environment.makeCanvas;",
+      "this.makeCanvas = (...args) => (window.__canvasAllocations = (window.__canvasAllocations ?? 0) + 1, environment.makeCanvas(...args));",
+    ],
+  ];
+  const injected = substitutions.reduce((current, [marker, replacement]) => {
+    assert.ok(marker && replacement);
+    assert.equal(current.split(marker).length, 2, "one emitted clock/probe entry");
+    return current.replace(marker, replacement);
+  }, original);
+  let art = "station";
+  let roomCount: number | null = null;
+  const compactAnnexFixture = false;
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: {
+      get: () => {
+        if (roomCount === null) return annexSnapshot(49, compactAnnexFixture);
+        const data = snapshot();
+        const first = data.sessions[0];
+        assert.ok(first);
+        data.sessions = Array.from({ length: roomCount }, (_, index) => ({
+          ...first,
+          id: "load_" + String(index),
+          project: "Workload " + String(index),
+          projectId: "workload_" + String(index),
+          repo: "workload_" + String(index),
+          repoId: "workload_" + String(index),
+          ...(index >= 6 ? { host: "workload-" + String(Math.floor(index / 6)) } : {}),
+        }));
+        for (let index = 1; index < Math.ceil(roomCount / 6); index++) {
+          Reflect.set(data.sources.hosts, "workload-" + String(index), {
+            health: "available",
+            observedAt: data.observedAt,
+            reason: null,
+            agents: 6,
+          });
+        }
+        return data;
+      },
+      inspect: () => ({ health: "unavailable", turns: [] }),
+    },
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "no-preference",
+  });
+  const errors = observeErrors(page);
+  const paint = (elapsed: number) =>
+    page.evaluate((time) => {
+      Reflect.set(window, "__assemblyNow", 10000 + time);
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const begin = performance.now();
+      view.framePaint.paint(10000 + time);
+      const duration = performance.now() - begin;
+      const hiddenTargets = view.regions.filter((region) => {
+        const worker = view.activeScene.workers.find((entry) => entry.id === region.id);
+        if (!worker || !view.assemblyFrame.active) return false;
+        const owner = worker.role === "overseer" ? "observatory" : "platform:" + worker.platformKey;
+        return view.assemblyFrame.progress(owner, "content") < 1;
+      }).length;
+      if (hiddenTargets) throw new Error("Hidden assembly owners registered worker targets");
+      return {
+        state: view.assembly.state,
+        camera: { ...view.camera },
+        platforms: view.activeScene.platforms.length,
+        workers: view.activeScene.workers.length,
+        labels: view.platformRegions.length,
+        targets: view.regions.length,
+        mailFloor: view.assemblyFrame.progress("mail", "floor"),
+        mailContent: view.assemblyFrame.progress("mail", "content"),
+        builds: view.staticLayer?.builds ?? 0,
+        allocations: Number(Reflect.get(window, "__canvasAllocations") ?? 0),
+        duration,
+      };
+    }, elapsed);
+  const fresh = async () => {
+    await page.goto(fixture.url);
+    await page.waitForFunction(
+      () =>
+        (Reflect.get(window, "__view") as CanvasProbe | undefined)?.activeScene.platforms.length,
+    );
+    await page.evaluate(() => document.fonts.ready);
+  };
+  try {
+    const artAssets = Object.fromEntries(
+      Object.keys(SCENE_ART_ROLES).map((role) => [
+        role,
+        "/assets/themes/starnet/scene/" + role.toLowerCase() + ".png",
+      ]),
+    );
+    const syntheticImages = await page.evaluate(
+      (roles) =>
+        Object.fromEntries(
+          Object.entries(roles).map(([role, spec]) => {
+            const canvas = document.createElement("canvas");
+            canvas.width = spec.source.width;
+            canvas.height = spec.source.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Synthetic office canvas unavailable");
+            ctx.fillStyle = spec.depthPass === "surface" ? "#344650" : "#ba9567";
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.lineTo(0, canvas.height / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = "#94a8ae";
+            ctx.stroke();
+            return [role.toLowerCase(), canvas.toDataURL().split(",")[1]];
+          }),
+        ),
+      SCENE_ART_ROLES,
+    );
+    await page.route("**/assets/themes/starnet/scene/*.png", (route) => {
+      const role = path.basename(new URL(route.request().url()).pathname, ".png");
+      const encoded = syntheticImages[art === "failed" ? "floor" : role];
+      if (!encoded) throw new Error("Missing synthetic office role: " + role);
+      return route.fulfill({ contentType: "image/png", body: Buffer.from(encoded, "base64") });
+    });
+    await page.route("**/app/main.js", (route) => {
+      const setup =
+        art === "station"
+          ? ""
+          : `window.__OBSERVER_THEME_PACK__ = {...window.__OBSERVER_THEME_PACK__, scene: {...window.__OBSERVER_THEME_PACK__.scene, backgroundFx: "none", ambientFx: "none", art: {style: "home-office", assets: ${JSON.stringify(artAssets)}}}};`;
+      return route.fulfill({ body: setup + injected, contentType: "text/javascript" });
+    });
+    await fresh();
+    const start = await paint(0);
+    assert.equal(start.state, "playing");
+    assert.equal(start.mailFloor, 0);
+    assert.equal(start.labels, 0);
+    assert.equal(start.targets, 0);
+    await page.screenshot({ path: path.join(artifacts, "assembly-start.png") });
+    await paint(50);
+    await page.screenshot({ path: path.join(artifacts, "assembly-outline.png") });
+    const floor = await paint(200);
+    assert.ok(floor.mailFloor > 0 && floor.mailFloor < 1);
+    assert.equal(floor.mailContent, 0);
+    await page.screenshot({ path: path.join(artifacts, "assembly-floor.png") });
+    const middle = await paint(1400);
+    await page.screenshot({ path: path.join(artifacts, "assembly-mid.png") });
+    const beforeEnd = await paint(2799);
+    assert.equal(beforeEnd.state, "playing");
+    const end = await paint(2800);
+    assert.equal(end.state, "complete");
+    assert.ok(start.camera.zoom >= middle.camera.zoom && middle.camera.zoom >= end.camera.zoom);
+    for (const frame of [floor, middle, beforeEnd, end]) {
+      assert.equal(frame.platforms, start.platforms);
+      assert.equal(frame.workers, start.workers);
+    }
+    await page.screenshot({ path: path.join(artifacts, "assembly-end.png") });
+    const completed = await paint(2900);
+    assert.equal(
+      (await paint(3000)).builds,
+      completed.builds,
+      "completed frames reuse the static cache",
+    );
+    const workloads = await assemblyWorkloads(async (count) => {
+      roomCount = count;
+      await fresh();
+    }, paint);
+    roomCount = null;
+    await assemblyInput(page, fresh, paint);
+    await fresh();
+    await paint(0);
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, value: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    assert.equal((await paint(100)).state, "complete", "hiding completes playback");
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, value: false });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await page.waitForResponse((response) => response.url().includes("/api/observer/sessions"));
+    assert.equal((await paint(200)).state, "complete", "resume and poll do not replay");
+    await page.locator("#visual-settings").click();
+    await page.locator("#startup-animation-toggle").click();
+    await fresh();
+    assert.equal((await paint(0)).state, "complete", "saved switch skips reload");
+    await page.locator("#visual-settings").click();
+    await page.locator("#startup-animation-toggle").click();
+    await fresh();
+    assert.equal((await paint(0)).state, "playing", "enabled reload replays");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal((await paint(100)).state, "complete", "runtime reduced motion interrupts");
+    await fresh();
+    assert.equal((await paint(0)).state, "complete", "reduced motion skips reload");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    for (const mode of ["ready", "failed"]) {
+      art = mode;
+      await fresh();
+      await page.waitForFunction(
+        (state) => (Reflect.get(window, "__view") as CanvasProbe).office?.state === state,
+        mode,
+      );
+      assert.equal((await paint(0)).state, "playing", mode + " office starts");
+      await paint(200);
+      await page.screenshot({
+        path: path.join(artifacts, "assembly-office-" + mode + "-floor.png"),
+      });
+      await paint(1400);
+      await page.screenshot({ path: path.join(artifacts, "assembly-office-" + mode + "-mid.png") });
+      assert.equal((await paint(2800)).state, "complete");
+      await page.screenshot({ path: path.join(artifacts, "assembly-office-" + mode + "-end.png") });
+    }
+    assert.deepEqual(errors, []);
+    await fs.writeFile(
+      path.join(artifacts, "assembly-receipt.json"),
+      JSON.stringify({ start, floor, middle, beforeEnd, end, completed, workloads }, null, 2) +
+        "\n",
+    );
+  } finally {
+    await page.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}
 async function runBrowserConsumer(root: string) {
   const artifacts = await fs.mkdtemp(path.join(os.tmpdir(), "observer-browser-evidence-"));
   const http = (await import(
@@ -2026,6 +2399,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
+    await startupAssembly(browser, root, http, artifacts);
     await checkoutLifecycle(browser, root, http);
     const stableRefresh = await refreshContinuity(browser, root, http, artifacts);
     const annexes = await nativeCanvas(browser, root, http, artifacts);

@@ -68,7 +68,7 @@ export class GeometryPainter<R extends SpriteResource> {
       from = project(a),
       to = project(b);
     c.save();
-    c.globalAlpha = alpha;
+    c.globalAlpha *= alpha;
     c.strokeStyle = color;
     c.lineWidth = width;
     c.beginPath();
@@ -91,7 +91,7 @@ export class GeometryPainter<R extends SpriteResource> {
   }
   grid(rect: Rect, { step, alpha, color }: GridStyle) {
     this.context.save();
-    this.context.globalAlpha = alpha;
+    this.context.globalAlpha *= alpha;
     for (let x = rect.x + step; x < rect.x + rect.w; x += step)
       this.line({ x, y: rect.y }, { x, y: rect.y + rect.h }, { color });
     for (let y = rect.y + step; y < rect.y + rect.h; y += step)
@@ -175,7 +175,7 @@ export class GeometryPainter<R extends SpriteResource> {
     gradient.addColorStop(0, color);
     gradient.addColorStop(1, transparent);
     c.save();
-    c.globalAlpha = alpha;
+    c.globalAlpha *= alpha;
     c.globalCompositeOperation = "lighter";
     c.fillStyle = gradient;
     c.beginPath();

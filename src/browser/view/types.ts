@@ -17,6 +17,12 @@ import type {
   SpriteResource,
 } from "../sprites/types.js";
 import type { RuntimeThemeWarning } from "../theme/dom.js";
+import type {
+  AssemblyFrame,
+  AssemblyOwner,
+  AssemblyStage,
+  StartupAssembly,
+} from "./startup-assembly.js";
 export type Colors = ThemeContents["scene"]["colors"];
 type StatusColors = Pick<Colors, "working" | "blocked" | "idle" | "done" | "unknown">;
 export interface Look {
@@ -194,6 +200,7 @@ export interface MailFrame {
   envelopes: Envelope[];
 }
 export interface UpdateOptions {
+  startupEligible?: boolean;
   onHelperSettled?: (id: string, phase: "entering" | "returning") => void;
   stale?: () => boolean;
   rowStale?: (worker: Worker) => boolean;
@@ -262,8 +269,13 @@ export interface ViewDefaults {
   defaults: ThemeDefault;
   themeStatus: ViewThemeStatus;
 }
+export interface StaticPresentation {
+  owners: StartupAssembly["owners"];
+  frame: AssemblyFrame;
+  paint(owner: AssemblyOwner, stage: AssemblyStage, draw: () => void): void;
+}
 export interface ArtPainters<R extends SpriteResource> {
-  paintStatic(ctx: ViewContext<R>, scene: Scene): void;
+  paintStatic(ctx: ViewContext<R>, scene: Scene, presentation?: StaticPresentation): void;
   desk(ctx: ViewContext<R>, worker: Worker, now: number, animate: boolean): void;
   helperDesk(ctx: ViewContext<R>, worker: Worker, now: number, animate: boolean): void;
   chair(ctx: ViewContext<R>, worker: { chair: Point; scale?: number }): void;

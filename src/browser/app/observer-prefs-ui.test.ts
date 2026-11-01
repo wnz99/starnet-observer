@@ -23,14 +23,19 @@ test("observer-prefs-ui regression contracts", async () => {
     for (const [key, value] of Object.entries(saved)) storage.values.set(key, value);
     page.window.storage.throwing = broken;
     const updates: Scene[] = [],
-      fx: boolean[] = [];
+      eligibility: boolean[] = [],
+      fx: boolean[] = [],
+      startup: boolean[] = [];
     let fxOn = false;
     let listener: Deliver = () => {
       throw new Error("Inventory not subscribed");
     };
-    page.mount({
+    const mounted = page.mount({
       createView: () =>
         viewSpy({
+          setStartupAnimation(on) {
+            startup.push(on);
+          },
           setFx(on) {
             fxOn = on;
             fx.push(on);
@@ -38,8 +43,9 @@ test("observer-prefs-ui regression contracts", async () => {
           fx() {
             return fxOn;
           },
-          update(scene) {
+          update(scene, options) {
             updates.push(scene);
+            eligibility.push(options.startupEligible ?? false);
           },
           focus() {},
           overview() {},
@@ -48,23 +54,32 @@ test("observer-prefs-ui regression contracts", async () => {
           stop() {},
           invalidate() {},
         }),
-      query: querySpy({
-        define() {},
-        invalidate: () => {
-          listener({});
-          return Promise.resolve();
-        },
-        subscribe(key, fn) {
-          if (key === "observer.sessions") listener = fn;
-          return () => {};
-        },
-      }),
+      query: {
+        ...querySpy({
+          define() {},
+          invalidate: () => {
+            listener({});
+            return Promise.resolve();
+          },
+          subscribe(key, fn) {
+            if (key === "observer.sessions") listener = fn;
+            return () => {};
+          },
+        }),
+        dispose() {},
+      },
     });
     return {
       get: page.get,
+      document: page.document,
+      dispose: () => {
+        mounted.dispose();
+      },
       updates,
+      eligibility,
       stored: page.window.storage.writes,
       fx,
+      startup,
       poll: (data: unknown) => {
         listener({ data });
       },
@@ -105,11 +120,26 @@ test("observer-prefs-ui regression contracts", async () => {
       .platforms.map((platform) => platform.name)
       .sort()
       .join(",");
+  const empty = boot();
+  await settle();
+  assert.deepEqual(empty.eligibility, [false]);
+  const initialScene = empty.updates[0];
+  empty.poll({ health: "available", observedAt: Date.now(), sessions: [] });
+  assert.deepEqual(empty.eligibility, [false, true]);
+  assert.equal(empty.updates[1], initialScene, "first valid empty data reuses geometry");
+  empty.poll({ health: "available", observedAt: Date.now(), sessions: [] });
+  assert.deepEqual(empty.eligibility, [false, true], "ordinary polls do not redeliver eligibility");
+  empty.dispose();
   await (async () => {
     const fresh = boot();
     await settle();
     fresh.poll(data());
     assert.deepEqual(fresh.fx, [false], "built-in default: FX off");
+    assert.deepEqual(fresh.startup, [true], "startup animation defaults on");
+    fresh.get("startup-animation-toggle").emit("click");
+    assert.deepEqual(fresh.startup, [true, false]);
+    assert.equal(fresh.get("startup-animation-toggle").attributes.get("aria-checked"), "false");
+    assert.deepEqual(fresh.fx, [false], "startup and FX are independent");
     assert.deepEqual(pressed(fresh), ["all"], "built-in default: all sessions");
     const firstDeck = names(fresh);
     fresh.get("fx-toggle").emit("click");
@@ -117,7 +147,7 @@ test("observer-prefs-ui regression contracts", async () => {
     fresh.get("next-page").emit("click");
     assert.deepEqual(
       fresh.stored.map(([key]) => key),
-      ["observer.fx", "observer.filter", "observer.page"],
+      ["observer.startupAnimation", "observer.fx", "observer.filter", "observer.page"],
       "each change is remembered under observer.*",
     );
     assert(
@@ -125,11 +155,17 @@ test("observer-prefs-ui regression contracts", async () => {
       "only toggles and positions are stored, never session data",
     );
     const restored = boot({
-      saved: { "observer.fx": "1", "observer.filter": "working", "observer.page": "1" },
+      saved: {
+        "observer.fx": "1",
+        "observer.startupAnimation": "0",
+        "observer.filter": "working",
+        "observer.page": "1",
+      },
     });
     await settle();
     restored.poll(data());
     assert.deepEqual(restored.fx, [true], "saved FX comes back");
+    assert.deepEqual(restored.startup, [false], "saved startup off comes back");
     assert.deepEqual(pressed(restored), ["working"], "saved filter comes back");
     assert.notEqual(names(restored), firstDeck, "saved deck page comes back");
     const precedence = boot({ theme: { fx: true, arrange: true }, saved: { "observer.fx": "0" } });
@@ -142,21 +178,60 @@ test("observer-prefs-ui regression contracts", async () => {
       "theme default applies when nothing is saved",
     );
     const invalid = boot({
-      saved: { "observer.filter": "everything", "observer.page": "-3", "observer.fx": "yes" },
+      saved: {
+        "observer.filter": "everything",
+        "observer.page": "-3",
+        "observer.fx": "yes",
+        "observer.startupAnimation": "yes",
+      },
     });
     await settle();
     invalid.poll(data());
     assert.deepEqual(pressed(invalid), ["all"]);
     assert.deepEqual(invalid.fx, [false]);
+    assert.deepEqual(invalid.startup, [true]);
     assert.equal(names(invalid), firstDeck, "invalid saved values fall back");
     const broken = boot({ theme: { fx: true }, broken: true });
     await settle();
     broken.poll(data());
     assert.deepEqual(broken.fx, [true], "unreadable storage falls back to the theme default");
     broken.get("fx-toggle").emit("click");
+    broken.get("startup-animation-toggle").emit("click");
+    assert.deepEqual(broken.startup, [true, false], "startup works with broken storage");
     child(broken.get("filters"), 2).emit("click");
     assert.deepEqual(broken.fx, [true, false], "controls still work when storage throws");
     assert.deepEqual(pressed(broken), ["blocked"]);
+    const settings = broken.get("visual-settings"),
+      popover = broken.get("visual-settings-popover"),
+      help = broken.get("controls-help"),
+      helpPopover = broken.get("controls-help-popover");
+    helpPopover.hidden = true;
+    settings.emit("click");
+    assert.equal(popover.hidden, false);
+    assert.equal(broken.document.activeElement, broken.get("startup-animation-toggle"));
+    broken.document.emit("keydown", { key: "Escape", preventDefault() {} });
+    assert.equal(popover.hidden, true);
+    assert.equal(broken.document.activeElement, settings);
+    help.emit("click");
+    settings.emit("click");
+    assert.equal(helpPopover.hidden, true, "settings closes help");
+    help.emit("click");
+    assert.equal(popover.hidden, true, "help closes settings");
+    settings.emit("click");
+    broken.document.emit("pointerdown", { target: broken.get("fx-toggle"), preventDefault() {} });
+    assert.equal(popover.hidden, false, "inside press retains settings");
+    broken.get("search").focus();
+    broken.document.emit("focusin", { target: broken.get("search"), preventDefault() {} });
+    assert.equal(popover.hidden, true, "focus leaving dismisses settings");
+    assert.equal(broken.document.activeElement, broken.get("search"));
+    settings.emit("click");
+    broken.document.emit("pointerdown", { target: broken.get("world"), preventDefault() {} });
+    assert.equal(popover.hidden, true, "outside press dismisses settings");
+    broken.dispose();
+    settings.emit("click");
+    broken.get("startup-animation-toggle").emit("click");
+    assert.equal(popover.hidden, true, "disposed trigger stays inactive");
+    assert.deepEqual(broken.startup, [true, false], "disposed switch stays inactive");
     console.log(
       "observer view settings: restore on load, observer.* keys, saved over theme over built-in, invalid values and throwing storage OK",
     );

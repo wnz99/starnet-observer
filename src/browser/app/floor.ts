@@ -35,6 +35,7 @@ export class Floor {
   private candidates: AppRow[] = [];
   private presentationKey = "";
   private generation = 0;
+  private startupEligibilityDelivered = false;
   private resumedAt: number | null = null;
   constructor(private readonly options: FloorOptions) {
     this.presentation = new HelperPresentation(options.state);
@@ -160,6 +161,7 @@ export class Floor {
     };
     // Row freshness is read from the current roster by id: the cached scene's row objects can be older.
     view.update(scene, {
+      startupEligible: !!state.latest?.data,
       stale: () => state.isStale(),
       rowStale: (worker) => rowStale(worker.id),
       onHelperSettled: (id, phase) => {
@@ -174,6 +176,7 @@ export class Floor {
         this.options.repositoryToggle(repo);
       },
     });
+    if (state.latest?.data) this.startupEligibilityDelivered = true;
     if (state.zoomed) this.options.showZoom(state.zoomed);
   }
   private content(snapshot: AppQuerySnapshot) {
@@ -253,6 +256,9 @@ export class Floor {
       }
     }
   }
+  private needsEligibility(snapshot: AppQuerySnapshot) {
+    return !!snapshot.data && !this.startupEligibilityDelivered;
+  }
   render(snapshot: AppQuerySnapshot, hosts: RemoteHost[], refresh: boolean) {
     const { state, view } = this.options;
     let rows = this.candidates;
@@ -275,7 +281,8 @@ export class Floor {
       state.scene = this.buildScene(snapshot, sceneHosts, nets, overseer);
       this.phases(state.scene);
       this.update(state.scene);
-    } else if (refresh || content !== this.contentKey) view.invalidate();
+    } else if (this.needsEligibility(snapshot)) this.update(state.scene);
+    else if (refresh || content !== this.contentKey) view.invalidate();
     this.contentKey = content;
     const onFloor = this.crew(rows, overseer);
     return {

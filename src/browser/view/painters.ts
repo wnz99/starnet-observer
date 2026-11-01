@@ -14,7 +14,7 @@ import { Props } from "./props.js";
 import { staticPass } from "./static.js";
 import { Stations } from "./stations.js";
 import { Surfaces } from "./surfaces.js";
-import type { Drone, Look, ViewContext } from "./types.js";
+import type { Drone, Look, StaticPresentation, ViewContext } from "./types.js";
 const STATUS_POOL = {
   chairForward: 0.4,
   radius: 44,
@@ -51,37 +51,45 @@ class StationArt<R extends SpriteResource> {
     this.furniture.furnishing(kind, unit, edge);
   furnishings = (platform: Platform, region: Decoration, index: number) =>
     this.furniture.furnishings(platform, region, index);
-  paintStatic = (ctx: ViewContext<R>, scene: Scene) => {
+  paintStatic = (ctx: ViewContext<R>, scene: Scene, presentation?: StaticPresentation) => {
     const { surfaces, stations } = this.forContext(ctx);
-    staticPass(ctx, scene, {
-      deck: (_ctx, platform) => {
-        surfaces.paintDeck(
-          platform.rect,
-          platform.accent,
-          platform.sections.map((s) => s.rect),
-        );
+    staticPass(
+      ctx,
+      scene,
+      {
+        deck: (_ctx, platform) => {
+          surfaces.paintDeck(
+            platform.rect,
+            platform.accent,
+            platform.sections.map((s) => s.rect),
+          );
+        },
+        walkway: (_ctx, walkway) => {
+          surfaces.paintWalkway(walkway);
+        },
+        hub: (_ctx, mail) => {
+          surfaces.paintHub(mail);
+        },
+        hubProps: (_ctx, mail) => {
+          surfaces.paintHubProps(mail);
+        },
+        observatory: (_ctx, observatory) => {
+          surfaces.paintObservatoryDeck(observatory);
+        },
+        walls: (_ctx, rect) => {
+          surfaces.paintRearWalls(rect);
+        },
+        region: this.furniture.paintWallRegion,
+        pool:
+          this.look.ambientFx === "station"
+            ? (_ctx, worker) => {
+                paintPool(worker, stations);
+              }
+            : null,
+        colors: this.look.colors,
       },
-      walkway: (_ctx, walkway) => {
-        surfaces.paintWalkway(walkway);
-      },
-      hub: (_ctx, mail) => {
-        surfaces.paintHub(mail);
-      },
-      observatory: (_ctx, observatory) => {
-        surfaces.paintObservatoryDeck(observatory);
-      },
-      walls: (_ctx, rect) => {
-        surfaces.paintRearWalls(rect);
-      },
-      region: this.furniture.paintWallRegion,
-      pools:
-        this.look.ambientFx === "station"
-          ? (_ctx, scene) => {
-              paintPools(scene, stations);
-            }
-          : null,
-      colors: this.look.colors,
-    });
+      presentation,
+    );
   };
   paintObservatoryScreen = (
     ctx: ViewContext<R>,
@@ -129,31 +137,29 @@ export function paintersFor<R extends SpriteResource>(look: Look) {
   return new StationArt<R>(look);
 }
 // Status-driven light pools: the screen glow on a seated worker, never title or timestamp driven.
-function paintPools<R extends SpriteResource>(scene: Scene, station: Stations<R>) {
+function paintPool<R extends SpriteResource>(worker: Worker, station: Stations<R>) {
   const C = station.look.colors,
     S = station.look.status;
-  for (const worker of scene.workers) {
-    const status = worker.row.status,
-      scale = worker.scale || 1;
+  const status = worker.row.status,
+    scale = worker.scale || 1;
+  station.glow(
+    { ...worker.chair, y: worker.chair.y + STATUS_POOL.chairForward },
+    STATUS_POOL.radius * scale,
+    C.cyan,
+    status === "working"
+      ? STATUS_POOL.working
+      : status === "blocked"
+        ? STATUS_POOL.blocked
+        : STATUS_POOL.idle,
+  );
+  if (status === "blocked")
     station.glow(
-      { ...worker.chair, y: worker.chair.y + STATUS_POOL.chairForward },
-      STATUS_POOL.radius * scale,
-      C.cyan,
-      status === "working"
-        ? STATUS_POOL.working
-        : status === "blocked"
-          ? STATUS_POOL.blocked
-          : STATUS_POOL.idle,
+      {
+        x: worker.desk.x + worker.desk.w - STATUS_POOL.deskInset,
+        y: worker.desk.y + STATUS_POOL.deskInset,
+      },
+      STATUS_POOL.blockedRadius * scale,
+      S.blocked,
+      STATUS_POOL.blockedAlpha,
     );
-    if (status === "blocked")
-      station.glow(
-        {
-          x: worker.desk.x + worker.desk.w - STATUS_POOL.deskInset,
-          y: worker.desk.y + STATUS_POOL.deskInset,
-        },
-        STATUS_POOL.blockedRadius * scale,
-        S.blocked,
-        STATUS_POOL.blockedAlpha,
-      );
-  }
 }

@@ -147,6 +147,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   };
 
   select(point: Point, continuation = false) {
+    this.view.lifecycle.completeAssemblyForInput();
     const repeat = continuation && this.nearTap(point);
     const target = repeat ? required(this.tap) : this.targetsAt(point);
     const { id } = target;
@@ -164,6 +165,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   }
 
   doubleClick = (event: ViewEvent) => {
+    this.view.lifecycle.completeAssemblyForInput();
     if (
       !this.view.scene ||
       this.view.clock() - this.gestures.lastMovedAt < GESTURE.doubleClickPause
@@ -256,6 +258,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
         O: this.view.callbacks.onObservatory,
       };
     if (!keys[event.key ?? ""] || event.altKey || event.ctrlKey || event.metaKey) return;
+    this.view.lifecycle.completeAssemblyForInput();
     event.preventDefault?.();
     keys[event.key ?? ""]?.();
   };

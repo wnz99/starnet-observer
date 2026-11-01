@@ -900,7 +900,7 @@ test("observer-ui regression contracts", async () => {
       "without a selected snapshot the view paints the canonical default",
     );
     assert.equal(fxState, false, "explicit theme FX wins over saved browser preference");
-    assert.equal(present(elements["fx-toggle"]).attributes.get("aria-pressed"), "false");
+    assert.equal(present(elements["fx-toggle"]).attributes.get("aria-checked"), "false");
     assert(themeOwnedStyles.size > 0, "the actual theme owner applies its interface styles");
     assert.equal(
       themedStyles.size,

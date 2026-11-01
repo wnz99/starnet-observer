@@ -61,7 +61,8 @@ export class Crew<R extends SpriteResource, B extends R = R> {
     body.working = actor.pose === "working";
     body.sitting = actor.pose === "working";
     const art = this.view.resources.artMode(),
-      aura = this.view.fx && this.view.decor && art === "station";
+      aura =
+        this.view.fx && this.view.decor && art === "station" && !this.view.assemblyFrame.active;
     if (aura) this.view.aura.paintBackdrop(worker, foot, { now, live: !reduced });
     const frame = {
       worker,
@@ -189,7 +190,7 @@ export class Crew<R extends SpriteResource, B extends R = R> {
     const h = CREW_HEIGHT * size,
       w = SILHOUETTE.width * size;
     ctx.save();
-    ctx.globalAlpha = SILHOUETTE.alpha;
+    ctx.globalAlpha *= SILHOUETTE.alpha;
     ctx.fillStyle = worker.accent;
     ctx.strokeStyle = this.view.C["body-outline"];
     if (tint !== "none" && "filter" in ctx) ctx.filter = tint;

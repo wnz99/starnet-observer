@@ -138,7 +138,7 @@ export class Surfaces<R extends SpriteResource> {
     this.geometry.poly(wall.x, this.look.colors.hullRight);
     this.geometry.poly(wall.y, this.look.colors.wall);
     this.context.save();
-    this.context.globalAlpha = WALL.alpha;
+    this.context.globalAlpha *= WALL.alpha;
     for (let y = rect.y + WALL.seamStep; y < rect.y + rect.h; y += WALL.seamStep)
       this.geometry.line(
         { x: rect.x, y, z: 0 },
@@ -215,9 +215,10 @@ export class Surfaces<R extends SpriteResource> {
       if (this.look.ambientFx === "station")
         this.glow(pad, HUB.glow, this.look.colors.amber, HUB.glowAlpha);
     }
-    // The pod rack and outbound launch rail serve routes outside the deck.
-    this.paintPod(required(mail.pod[0]));
-    this.paintChute(r, required(mail.chute[0]));
+  };
+  paintHubProps = (mail: Mailroom) => {
+    this.paintPod(required(mail.pod[0])); // The pod rack and outbound launch rail serve routes outside the deck.
+    this.paintChute(mail.rect, required(mail.chute[0]));
     this.paintTower(mail.tower);
   };
   private paintPod(pod: Point) {

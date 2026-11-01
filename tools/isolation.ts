@@ -88,7 +88,7 @@ const consumers = [
 ];
 async function copyConsumers(sandbox: string) {
   // Only these actual owners enter the sandbox. Reject links at every path component.
-  for (const source of consumers) {
+  for (const source of [...consumers, "src/shared/scene-art-roles.ts"]) {
     let current = root;
     for (const part of source.split("/")) {
       current = join(current, part);

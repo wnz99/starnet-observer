@@ -10,9 +10,11 @@ import type {
   Walkway,
 } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
+import type { AssemblyOwner, AssemblyStage } from "./startup-assembly.js";
 import { GeometryPainter } from "./geometry-painter.js";
 import { center, middle, rectPoly, withAlpha } from "./primitives.js";
-import type { Colors, ViewContext } from "./types.js";
+import type { Colors, StaticPresentation, ViewContext } from "./types.js";
+import { present } from "./values.js";
 const HULL = {
   height: -2.4,
   shadowAlpha: 0.7,
@@ -46,24 +48,43 @@ class StationFloor<R extends SpriteResource> {
     readonly context: ViewContext<R>,
     readonly scene: Scene,
     readonly art: StaticArt<R>,
+    readonly presentation?: StaticPresentation,
   ) {
     this.geometry = new GeometryPainter(context);
   }
   paint() {
-    for (const ship of this.scene.ships || []) this.hull(ship);
+    for (const ship of this.scene.ships || [])
+      this.paintOwned(this.presentation?.owners.ship(ship.id), "floor", () => {
+        this.hull(ship);
+      });
     const pieces = this.pieces();
     pieces.sort((a, b) => a.key - b.key);
     for (const piece of pieces) piece.paint();
     this.walls();
     this.dimShips();
-    this.art.pools?.(this.context, this.scene);
+    for (const worker of this.scene.workers)
+      this.paintOwned(this.presentation?.owners.worker(worker), "content", () =>
+        this.art.pool?.(this.context, worker),
+      );
+  }
+  private paintOwned(owner: AssemblyOwner | undefined, stage: AssemblyStage, draw: () => void) {
+    if (!this.presentation) draw();
+    else if (owner) this.presentation.paint(owner, stage, draw);
+  }
+  private hub(mail: Mailroom, owner: AssemblyOwner | undefined) {
+    this.paintOwned(owner, "floor", () => {
+      this.art.hub(this.context, mail);
+    });
+    this.paintOwned(owner, "content", () => {
+      this.art.hubProps(this.context, mail);
+    });
   }
   private hull(ship: Ship) {
     const ctx = this.context,
       C = this.art.colors;
     if (ship.shadow) {
       ctx.save();
-      ctx.globalAlpha = HULL.shadowAlpha;
+      ctx.globalAlpha *= HULL.shadowAlpha;
       ctx.setLineDash(HULL.shadowDash);
       ctx.lineWidth = HULL.shadowWidth;
       this.geometry.poly(
@@ -81,7 +102,7 @@ class StationFloor<R extends SpriteResource> {
       withAlpha(rim, ship.local ? HULL.localFill : live ? HULL.remoteFill : HULL.downFill),
     );
     ctx.save();
-    ctx.globalAlpha = ship.local
+    ctx.globalAlpha *= ship.local
       ? live
         ? HULL.localAlpha
         : HULL.localDownAlpha
@@ -92,7 +113,7 @@ class StationFloor<R extends SpriteResource> {
     ctx.restore();
     if (!ship.local) {
       ctx.save();
-      ctx.globalAlpha = HULL.deckAlpha;
+      ctx.globalAlpha *= HULL.deckAlpha;
       ctx.lineWidth = HULL.deckWidth;
       this.geometry.poly(rectPoly(ship.rect, 0), null, rim);
       ctx.restore();
@@ -104,34 +125,42 @@ class StationFloor<R extends SpriteResource> {
       ...this.scene.platforms.map((platform) => ({
         key: center(platform.rect).x + center(platform.rect).y,
         paint: () => {
-          this.art.deck(this.context, platform);
-          this.quarters(platform);
+          this.paintOwned(this.presentation?.owners.platform(platform.key), "floor", () => {
+            this.art.deck(this.context, platform);
+            this.quarters(platform);
+          });
         },
       })),
       ...this.scene.walkways.map((walkway) => this.walkway(walkway)),
       {
         key: center(hub).x + center(hub).y + DEPTH.hub,
         paint: () => {
-          this.art.hub(this.context, this.scene.mail);
+          this.hub(this.scene.mail, "mail");
         },
       },
-      ...[
-        ...(this.scene.ships || []).flatMap((ship) =>
-          !ship.local && ship.mail ? [ship.mail] : [],
-        ),
-        ...(this.scene.relays || []).map((relay) => relay.mail),
-      ].map((mail) => {
-        return {
-          key: center(mail.rect).x + center(mail.rect).y + DEPTH.hub,
-          paint: () => {
-            this.art.hub(this.context, mail);
-          },
-        };
-      }),
+      ...(this.scene.ships || [])
+        .filter((ship) => !ship.local && ship.mail)
+        .map((ship) => {
+          const mail = present(ship.mail);
+          return {
+            key: center(mail.rect).x + center(mail.rect).y + DEPTH.hub,
+            paint: () => {
+              this.hub(mail, this.presentation?.owners.ship(ship.id));
+            },
+          };
+        }),
+      ...(this.scene.relays || []).map((relay) => ({
+        key: middle(relay.mail.rect) + DEPTH.hub,
+        paint: () => {
+          this.hub(relay.mail, this.presentation?.owners.relay(relay.key));
+        },
+      })),
       {
         key: middle(this.scene.observatory.rect),
         paint: () => {
-          this.art.observatory(this.context, this.scene.observatory);
+          this.paintOwned("observatory", "floor", () => {
+            this.art.observatory(this.context, this.scene.observatory);
+          });
         },
       },
     ];
@@ -167,42 +196,58 @@ class StationFloor<R extends SpriteResource> {
     return {
       key: center(rect).x + center(rect).y + (walkway.kind === "connector" ? DEPTH.connector : 0),
       paint: () => {
-        if (rect.w > 0) this.art.walkway(this.context, { ...walkway, rect });
+        if (
+          rect.w > 0 &&
+          (!this.presentation ||
+            this.presentation.owners.walkwayReady(walkway, this.presentation.frame))
+        )
+          this.paintOwned(this.presentation?.owners.walkway(walkway), "floor", () => {
+            this.art.walkway(this.context, { ...walkway, rect });
+          });
       },
     };
   }
   private walls() {
     for (const platform of this.scene.platforms) {
-      this.art.walls(this.context, platform.rect);
+      const owner = this.presentation?.owners.platform(platform.key);
+      this.paintOwned(owner, "floor", () => {
+        this.art.walls(this.context, platform.rect);
+      });
       platform.decorationRegions.forEach((region, index) => {
         if (region.kind === "wall" || region.kind === "corner")
-          this.art.region(this.context, platform, region, index);
+          this.paintOwned(owner, "content", () => {
+            this.art.region(this.context, platform, region, index);
+          });
       });
     }
   }
   private dimShips() {
     for (const ship of this.scene.ships || [])
       if (!ship.local && !shipLive(ship))
-        this.geometry.poly(
-          rectPoly(ship.rect, 0),
-          withAlpha(this.art.colors["body-outline"], ship.shadow ? HULL.shadowDim : HULL.downDim),
-        );
+        this.paintOwned(this.presentation?.owners.ship(ship.id), "floor", () => {
+          this.geometry.poly(
+            rectPoly(ship.rect, 0),
+            withAlpha(this.art.colors["body-outline"], ship.shadow ? HULL.shadowDim : HULL.downDim),
+          );
+        });
   }
 }
 export function staticPass<R extends SpriteResource>(
   context: ViewContext<R>,
   scene: Scene,
   art: StaticArt<R>,
+  presentation?: StaticPresentation,
 ) {
-  new StationFloor(context, scene, art).paint();
+  new StationFloor(context, scene, art, presentation).paint();
 }
 interface StaticArt<R extends SpriteResource> {
   colors: Colors;
   deck(ctx: ViewContext<R>, platform: Platform): void;
   walkway(ctx: ViewContext<R>, walkway: Walkway): void;
   hub(ctx: ViewContext<R>, mail: Mailroom): void;
+  hubProps(ctx: ViewContext<R>, mail: Mailroom): void;
   observatory(ctx: ViewContext<R>, observatory: Observatory): void;
   walls(ctx: ViewContext<R>, rect: Rect): void;
   region(ctx: ViewContext<R>, platform: Platform, region: Decoration, index: number): void;
-  pools: ((ctx: ViewContext<R>, scene: Scene) => void) | null;
+  pool: ((ctx: ViewContext<R>, worker: Scene["workers"][number]) => void) | null;
 }

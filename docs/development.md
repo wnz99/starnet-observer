@@ -47,6 +47,8 @@ bun node_modules/@playwright/test/cli.js install --with-deps chromium
 
 `PLAYWRIGHT_BROWSERS_PATH` can select an existing browser cache per command. Browser checks write screenshots and an assertion receipt under a temporary `observer-browser-evidence-*` directory. Automated assertions and manual visual judgment are separate evidence.
 
+The startup assembly scenario opts into normal motion while older fixtures retain reduced motion. It instruments the emitted view clock and RAF locally, captures outline/floor/content/completed states, and exercises native camera input, saved settings, reduced-motion changes and visibility resume. Synthetic office PNGs exercise both ready art and dimension-failure fallback. `assembly-receipt.json` records frame costs and canvas allocations for 1, 12 and 48 actual rooms, distributed across synthetic hosts to respect the per-host deck limit. Compare intro frames with cached completed frames; screenshot inspection remains required for tall silhouettes and opacity composition.
+
 ## Policy and local tools
 
 `eslint.config.mjs`, `knip.json`, `.fallowrc.json` and the TypeScript projects own executable quality policy. The baseline was adapted from [repo-starters at c37e2b33f4c957575ad13c6512bdb555aa932b54](https://github.com/wnz99/repo-starters/tree/c37e2b33f4c957575ad13c6512bdb555aa932b54/profiles/typescript); reusable starter helpers carry CC0-1.0 notices. Project and bundled-resource attribution lives in LICENSE and NOTICE.

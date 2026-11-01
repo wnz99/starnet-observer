@@ -3,6 +3,76 @@ import type { WatchTarget } from "./types.js";
 import type { ViewRuntime } from "./runtime.js";
 export class Lifecycle<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
+  startupEligible = false;
+  private resourceWaitAt: number | null = null;
+  private assemblyArt: string | null = null;
+  private readonly resourceWaitMs = 500;
+
+  advanceAssembly(now: number) {
+    const view = this.view;
+    if (!this.startupEligible) return view.assemblyFrame.active;
+    if (this.canBeginAssembly() && this.beginAssembly(now)) return true;
+    if (view.assembly.state === "playing") {
+      if (view.callbacks.reducedMotion() || this.assemblyArt !== view.resources.artMode())
+        this.completeAssembly();
+      else view.cameraControl.advanceAssemblyCamera(now);
+    }
+    view.assemblyFrame = view.assembly.frame(now);
+    if (!view.assemblyFrame.active && view.assembly.state === "complete") {
+      this.resourceWaitAt = null;
+      this.assemblyArt = null;
+    }
+    return view.assemblyFrame.active;
+  }
+  private canBeginAssembly() {
+    return (
+      this.view.assembly.state === "pending" &&
+      this.view.running &&
+      this.view.canvas.clientWidth > 0 &&
+      this.view.canvas.clientHeight > 0
+    );
+  }
+  private beginAssembly(now: number) {
+    const view = this.view;
+    if (!view.startupAnimation || view.callbacks.reducedMotion()) {
+      view.assembly.complete();
+      return false;
+    }
+    this.resourceWaitAt ??= now;
+    if (view.office?.state === "pending" && now - this.resourceWaitAt < this.resourceWaitMs)
+      return true;
+    view.assembly.begin(view.activeScene, now);
+    this.assemblyArt = view.resources.artMode();
+    view.cameraControl.beginAssemblyCamera(now);
+    return false;
+  }
+
+  completeAssembly = () => {
+    if (this.view.assembly.state !== "playing" && this.resourceWaitAt === null) return false;
+    this.view.assembly.complete();
+    this.view.assemblyFrame = this.view.assembly.frame(this.view.clock());
+    this.view.cameraControl.finishAssemblyCamera();
+    this.resourceWaitAt = null;
+    this.assemblyArt = null;
+    this.view.plateFrame = null;
+    this.invalidate();
+    return true;
+  };
+
+  completeAssemblyForInput = () => {
+    if (this.startupEligible && this.view.assembly.state === "pending") {
+      this.view.assembly.complete();
+      this.view.assemblyFrame = this.view.assembly.frame(this.view.clock());
+      this.view.plateFrame = null;
+    }
+    this.completeAssembly();
+    if (
+      this.view.scene &&
+      this.view.assembly.state === "complete" &&
+      !this.view.interaction.paintedFrameCurrent()
+    )
+      this.view.framePaint.paint(this.view.clock());
+  };
 
   private scheduled() {
     return this.view.frame !== null;
@@ -78,6 +148,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
   };
 
   stop = () => {
+    this.completeAssembly();
     this.view.clearSettlements();
     if (!this.view.running) return;
     this.view.running = false;
@@ -108,5 +179,9 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     this.view.fx = enabled;
     this.invalidate();
     return this.view.fx;
+  };
+  setStartupAnimation = (on: boolean): void => {
+    this.view.startupAnimation = on;
+    if (!on) this.completeAssembly();
   };
 }

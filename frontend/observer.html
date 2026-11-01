@@ -58,20 +58,19 @@
             ><button id="next-page" type="button" aria-label="Next station deck">›</button
             ><button
               id="arrange-toggle"
-              class="fx-toggle arrange-toggle"
+              class="arrange-toggle"
               type="button"
               aria-pressed="false"
               title="Dynamic arrangement: group by project (repository, organisation, rooms file) instead of parent folder"
             >
               ARRANGE</button
             ><button
-              id="fx-toggle"
-              class="fx-toggle"
+              id="visual-settings"
               type="button"
-              aria-pressed="false"
-              title="Toggle Matrix pixie sky"
+              aria-expanded="false"
+              aria-controls="visual-settings-popover"
             >
-              FX</button
+              Visual settings</button
             ><button
               id="controls-help"
               class="controls-help"
@@ -81,6 +80,21 @@
               aria-controls="controls-help-popover"
             >
               ?
+            </button>
+          </div>
+          <div
+            id="visual-settings-popover"
+            class="controls-popover visual-settings-popover"
+            role="group"
+            aria-labelledby="visual-settings-title"
+            hidden
+          >
+            <h3 id="visual-settings-title">Visual settings</h3>
+            <button id="startup-animation-toggle" type="button" role="switch" aria-checked="true">
+              Startup animation
+            </button>
+            <button id="fx-toggle" type="button" role="switch" aria-checked="false">
+              Ambient FX
             </button>
           </div>
           <div

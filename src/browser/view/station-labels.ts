@@ -10,6 +10,7 @@ const VIEWER_SIGN = { height: 2, size: 12, priority: 6 };
 export class StationLabels<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
   hub(): TextPlate[] {
+    if (!this.view.assemblyVisible("mail")) return [];
     const mail = this.view.activeScene.mail;
     const tower = mail.tower;
     const at = toScreen({ ...center(tower), z: MAIL_SIGN.height }, this.view.camera);
@@ -23,6 +24,7 @@ export class StationLabels<R extends SpriteResource, B extends R = R> {
     ];
   }
   observatory(options: LabelContext): TextPlate[] {
+    if (!this.view.assemblyVisible("observatory")) return [];
     const observatory = this.view.activeScene.observatory,
       rect = observatory.rect;
     const at = toScreen(
