@@ -35,6 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
+| 261101-l00 | Record exact-session tool checkout observations and source-qualified desk badges | Approved revision 4 registered; three sequential tasks pending; no source implementation or shell integration installed | [261101-l00](./quick/261101-l00-record-exact-session-tool-checkout-obser/) |
 
 ## Quick Tasks Completed
 
