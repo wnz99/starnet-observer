@@ -1,5 +1,4 @@
 import { strip } from "./geometry.js";
-import { mailroomAt } from "./site.js";
 import { tunnelPath } from "./tunnel-path.js";
 import { element, required } from "../model/types.js";
 import type { ShipLocations } from "./site.js";
@@ -28,8 +27,6 @@ type Network = NonNullable<BuildOptions["relays"]>[number];
 const ROUTE = {
   laneGap: 3,
   localExit: 5,
-  clearance: 6,
-  relaySpacing: 24,
   insideHub: 3,
   margin: 3,
   sides: 2,
@@ -41,19 +38,6 @@ class Highways {
     const { mail, locations } = this.input;
     return host === null ? mail : (locations.mailrooms.get(host) ?? null);
   }
-  private rightEdge() {
-    const { mail, observatory, geometry, locations } = this.input;
-    return (
-      Math.max(
-        ...[
-          mail.rect,
-          observatory.rect,
-          ...geometry.platforms.map((platform) => platform.rect),
-          ...[...locations.mailrooms.values()].map((value) => value.rect),
-        ].map((rect) => rect.x + rect.w),
-      ) + ROUTE.clearance
-    );
-  }
   private exit(host: Host, mail: Mailroom): Point[] {
     if (host !== null)
       return [
@@ -64,21 +48,15 @@ class Highways {
     const x = mail.rect.x + mail.rect.w + ROUTE.localExit;
     return [mail.hub, { x: mail.rect.x + mail.rect.w, y: mail.hub.y }, { x, y: mail.hub.y }];
   }
-  private relayMail(index: number) {
-    const { mail, locations } = this.input;
-    const mailrooms = [mail, ...locations.mailrooms.values()];
-    const top = mailrooms.reduce((sum, mail) => sum + mail.rect.y, 0) / mailrooms.length;
-    return mailroomAt(top + index * ROUTE.relaySpacing, this.rightEdge() + ROUTE.relaySpacing);
-  }
   private obstacles(host: Host) {
-    const { observatory, geometry, mail, locations, ships, extras } = this.input;
+    const { observatory, geometry, mail, locations, ships } = this.input;
     return [
       observatory.rect,
       ...geometry.platforms.map((platform) => platform.rect),
       mail.rect,
       ...[...locations.mailrooms.values()].map((value) => value.rect),
       ...ships.filter((ship) => ship.id !== host).map((ship) => ship.rect),
-      ...(extras.relays ?? []).map((_net, index) => this.relayMail(index).rect),
+      ...[...locations.relayMailrooms.values()].map((relay) => relay.rect),
     ].map((rect) => ({
       x: rect.x - ROUTE.margin,
       y: rect.y - ROUTE.margin,
@@ -86,24 +64,18 @@ class Highways {
       h: rect.h + ROUTE.margin * ROUTE.sides,
     }));
   }
-  private spoke(
-    member: Pick<RelaySpoke, "host" | "machine">,
-    index: number,
-    count: number,
-    hub: Mailroom,
-  ): RelaySpoke {
+  private spoke(member: Pick<RelaySpoke, "host" | "machine">, hub: Mailroom): RelaySpoke {
     const { host, machine } = member;
-    const exit = this.exit(host, requiredMail(this.hubOf(host)));
-    const portY = hub.rect.y + (hub.rect.h * (index + 1)) / (count + 1);
-    const approach = { x: hub.rect.x - ROUTE.margin, y: portY };
-    const routed = tunnelPath(element(exit, exit.length - 1), approach, this.obstacles(host));
-    const path = [
-      ...exit,
-      ...routed.slice(1),
-      { x: hub.rect.x, y: portY },
-      { x: hub.hub.x, y: portY },
-      hub.hub,
-    ];
+    const own = requiredMail(this.hubOf(host));
+    const exit = this.exit(host, own);
+    const port = { x: hub.hub.x, y: hub.rect.y + (host === null ? 0 : hub.rect.h) };
+    const approach = { x: port.x, y: port.y + (host === null ? -ROUTE.margin : ROUTE.margin) };
+    const junction = { x: own.hub.x, y: approach.y };
+    const routed =
+      host === null
+        ? tunnelPath(element(exit, exit.length - 1), approach, this.obstacles(host))
+        : [element(exit, exit.length - 1), junction, approach];
+    const path = [...exit, ...routed.slice(1), port, { x: hub.hub.x, y: port.y }, hub.hub];
     return {
       host,
       machine,
@@ -113,6 +85,7 @@ class Highways {
       carried: [...this.input.relayMembers.values()].filter(
         (member) => (member.host ?? null) === host,
       ).length,
+      ...(host === null ? {} : { junction }),
       path,
     };
   }
@@ -123,6 +96,12 @@ class Highways {
       const from = element(path, index),
         to = element(path, index + 1);
       if (from.x === to.x && from.y === to.y) continue;
+      if (
+        spoke.junction &&
+        ((from.y === spoke.junction.y && to.y === spoke.junction.y) ||
+          index === path.length - ROUTE.insideHub - 1)
+      )
+        continue;
       geometry.walkways.push({
         ...strip(from, to, "relay-highway"),
         host: "relay",
@@ -130,14 +109,15 @@ class Highways {
       });
     }
   }
-  network(net: Network, index: number): SceneRelay | null {
+  network(net: Network): SceneRelay | null {
     const members = net.members.filter((member) => this.hubOf(member.host));
     const shadows = (net.shadows ?? []).filter((shadow) => this.hubOf(shadow.host));
     if (members.length === 0) return null;
     const participants = [...members, ...shadows];
-    const mail = this.relayMail(index);
-    const spokes = participants.map((member, spokeIndex) => {
-      const spoke = this.spoke(member, spokeIndex, participants.length, mail);
+    const { locations } = this.input;
+    const mail = required(locations.relayMailrooms, net.relay);
+    const spokes = participants.map((member) => {
+      const spoke = this.spoke(member, mail);
       const observed = members.find((value) => value.host === member.host);
       return {
         ...spoke,
@@ -151,6 +131,7 @@ class Highways {
     spokes.forEach((spoke) => {
       this.draw(spoke);
     });
+    this.drawSpine(spokes, mail);
     return {
       key: "relay:" + net.relay,
       relay: net.relay,
@@ -165,6 +146,34 @@ class Highways {
       links: courierLinks(members, shadows, spokes),
     };
   }
+  private drawSpine(spokes: RelaySpoke[], mail: Mailroom) {
+    const { walkways } = this.input.geometry;
+    const branches = spokes.filter((spoke) => spoke.junction);
+    if (branches.length > 0) {
+      const y = mail.rect.y + mail.rect.h + ROUTE.margin;
+      const xs = [mail.hub.x, ...branches.map((spoke) => requiredJunction(spoke).x)];
+      const verified = branches.some((spoke) => spoke.verified);
+      for (const [from, to] of [
+        [
+          { x: Math.min(...xs), y },
+          { x: Math.max(...xs), y },
+        ],
+        [
+          { x: mail.hub.x, y },
+          { x: mail.hub.x, y: mail.rect.y + mail.rect.h },
+        ],
+      ] as const)
+        walkways.push({
+          ...strip(from, to, "relay-highway"),
+          host: "relay",
+          relay: verified ? "verified" : "unverified",
+        });
+    }
+  }
+}
+function requiredJunction(spoke: RelaySpoke): Point {
+  if (!spoke.junction) throw new Error("Relay branch has no spine junction");
+  return spoke.junction;
 }
 function requiredMail(mail: Mailroom | null): Mailroom {
   if (!mail) throw new Error("Relay participant has no mailroom");
@@ -195,8 +204,8 @@ function courierLinks(
 }
 export function buildHighways(input: HighwayInput) {
   const highways = new Highways(input);
-  return (input.extras.relays ?? []).flatMap((net, index) => {
-    const value = highways.network(net, index);
+  return (input.extras.relays ?? []).flatMap((net) => {
+    const value = highways.network(net);
     return value ? [value] : [];
   });
 }

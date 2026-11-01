@@ -20,6 +20,20 @@ test("observer-hosts-view regression contracts", () => {
   function context() {
     const target = drawing({
       texts: emptyStrings(),
+      paths: [] as { color: ViewContext<Resource>["strokeStyle"]; points: Point[] }[],
+      points: [] as Point[],
+      beginPath() {
+        target.points = [];
+      },
+      moveTo(x: number, y: number) {
+        target.points.push({ x, y });
+      },
+      lineTo(x: number, y: number) {
+        target.points.push({ x, y });
+      },
+      stroke() {
+        target.paths.push({ color: target.strokeStyle, points: target.points.slice() });
+      },
       fillText(text: string) {
         target.texts.push(text);
       },
@@ -44,6 +58,7 @@ test("observer-hosts-view regression contracts", () => {
       width: 0,
       height: 0,
       style: {},
+      title: "",
       getContext: () => ctx,
       addEventListener(name: string, fn: (event: ViewEvent) => void) {
         handlers.set(name, fn);
@@ -249,20 +264,17 @@ test("observer-hosts-view regression contracts", () => {
 
   // The remote ship's own label is drawn at overview and still when zoomed onto its room (it outranks room signs and is
   // clamped into view when the hull is on screen).
-  const labelled = () => node.ctx.texts.some((text) => /^● VM · 2 agents/.test(text));
+  const labelled = () => node.ctx.texts.includes("● VM");
   view.overview();
   node.ctx.texts.length = 0;
   now += 16;
   view.paint(now);
   assert.ok(labelled(), "remote ship label at overview");
   const drawn = (text: string) => node.ctx.texts.includes(text);
-  assert.ok(drawn("RELAY MAILROOM · relay.example.dev"), "the external mailroom has its own sign");
-  assert.ok(drawn("vm · ssh · observing"), "a live host's observation link names its destination");
+  assert.ok(drawn("RELAY MAILROOM"), "the external mailroom has its own sign");
+  assert.equal(drawn("vm · ssh · observing"), false, "unselected connection details stay hidden");
   verifyWireTunnelLabels();
-  assert.ok(
-    drawn("empty · ssh · stale"),
-    "a stale host's link shows its destination and real state",
-  );
+  assert.equal(drawn("empty · ssh · stale"), false);
   function verifyWireTunnelLabels() {
     const labelLayout = Model.createLayout();
     labelLayout.reconcile([
@@ -289,6 +301,7 @@ test("observer-hosts-view regression contracts", () => {
     const labelView = View.create({
       canvas: labelCanvas,
       nameFor: (id) => id,
+      hostSelection: () => "label1",
       env: {
         raf: () => 1,
         caf() {},
@@ -301,16 +314,38 @@ test("observer-hosts-view regression contracts", () => {
     labelView.start();
     labelView.update(labelScene, { mailFrame: () => ({ drones: [], envelopes: [] }) });
     labelView.paint(0);
-    for (const host of ["label1", "label2"]) {
-      assert.ok(
-        labelCanvas.ctx.texts.includes(host + " · ssh · observing"),
-        "SSH label is visible",
-      );
-    }
+    assert.ok(
+      labelCanvas.ctx.texts.includes("label1 · ssh · observing"),
+      "selected SSH details are visible",
+    );
+    assert.equal(
+      labelCanvas.ctx.texts.includes("label2 · ssh · observing"),
+      false,
+      "other connection labels stay hidden",
+    );
     assert.ok(
       labelCanvas.ctx.texts.some((text) => text.startsWith("label1 · live · roster only")),
       "a tunnel label and its SSH label remain visible together",
     );
+    const highlights = labelCanvas.ctx.paths.filter(
+      (path) => path.color === canonicalTheme().scene.colors.focus,
+    );
+    const remote = present(present(labelScene.ships).find((ship) => ship.id === "label1"));
+    for (const hub of [labelScene.mail.hub, present(remote.mail).hub]) {
+      const point = Scene.project(hub);
+      assert.ok(
+        highlights.some((path) =>
+          path.points.some((at) => Math.hypot(at.x - point.x, at.y - point.y) < 4),
+        ),
+        "selection highlights both the local and remote mailroom endpoints",
+      );
+    }
+    const wire = present(present(labelScene.links).find((link) => link.host === "label1"));
+    const at = Scene.toScreen(present(wire.path.at(-2)), labelView.camera());
+    labelCanvas.handlers.get("pointermove")({ clientX: at.x, clientY: at.y, pointerType: "mouse" });
+    labelView.paint(16);
+    assert.match(labelCanvas.title, /SSH observing/);
+    assert.match(labelCanvas.title, /roster only/);
     labelView.stop();
   }
   function verifyShadowLabelsAndHighways() {
@@ -321,10 +356,8 @@ test("observer-hosts-view regression contracts", () => {
     now += 16;
     view.paint(now);
     assert.ok(
-      node.ctx.texts.some((text) =>
-        /^◌ WHITENOISE · 2 agents · via relay · not observed/.test(text),
-      ),
-      "a shadow ship names its machine and says it is not observed",
+      node.ctx.texts.includes("◌ WHITENOISE"),
+      "a shadow ship keeps its machine name visible",
     );
     assert.ok(node.ctx.texts.includes("LLM-BUS · 2 · ⇄ relay"), "a relay room says so on its sign");
     view.overview();

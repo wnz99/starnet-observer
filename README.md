@@ -310,9 +310,9 @@ llm-bus is per host, so each remote ship has its own mailroom showing that host'
 on their own ship for local mail, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
 host's numeric id and also carry a hub-wide `key` (`5@vm1`). Thin cyan SSH wires connect this machine directly to
 each observed remote. Where both machines share a relay, the wires run beside its tunnels and bypass the external
-relay mailroom. Each wire names its destination and stream health; it never carries mail couriers.
+relay mailroom. Wire appearance distinguishes live, stale and unavailable SSH observations; it never carries mail couriers.
 
-Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and shadow ships move east when needed to keep hulls separate. Shadow crew remain hover-only.
+Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and machine rows leave enough space for those actual hulls. Shadow crew remain hover-only.
 
 ### llm-bus relays
 
@@ -323,15 +323,18 @@ host name and this machine's id, each relayed message's direction, peer machine,
 the relay's cached roster per machine (agent provider, shared repo and last activity). It never reads tokens, URL paths,
 native session ids or message bodies for this.
 
-- Every machine the relay's roster names that this observer does not watch becomes a **shadow ship**, docked beside
-  the observed ship it links to. It has its own mailroom (that machine's own llm-bus), a room per shared repo, and a
-  ghosted desk for each agent the roster lists as active in the last day. The ship is labelled "via relay · not
-  observed". Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
+- Every machine the relay's roster names that this observer does not watch becomes a **shadow ship**, occupying its
+  own row on the external spine. It has its own mailroom (that machine's own llm-bus), a room per shared repo, and a
+  ghosted desk for each agent the roster lists as active in the last day. Hover details identify it as not observed.
+  Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
   observed machine (this one, or a configured remote bound to the same relay) is never a shadow.
-- Each relay has one **external relay mailroom**, outside the machine hulls. Every member and shadow machine has
-  its own tunnel to this room. Mail between machines passes through the external room and never through an
-  intermediate machine. Tunnels avoid room floors and other machine hulls. Their labels show the endpoint's observed
-  activity (live after relay activity within 15 minutes, otherwise quiet with its age, or bus unreadable) and agent count.
+- Each relay has one **external relay mailroom**, anchored just beyond this station's front edge, outside the machine hulls.
+  Remote machines form parallel rows beside an external connection spine, with a marked junction for each branch.
+  Adding machines or growing their rooms does not move the relay relative to this station.
+  Every member and shadow machine has its own branch onto the spine. Mail between machines passes through the
+  external room and never through an intermediate machine. Tunnels avoid room floors and other machine hulls.
+  Selecting a machine highlights its complete mail route through the relay. Machine names and the relay sign stay
+  visible; connection details appear on hover or selection. SSH observation health and relay activity remain separate.
 - A tunnel has dim, **roster only** rails until a message has demonstrably crossed that machine's relay connection.
   The relay roster alone proves the far machine
   published to the same relay at some point, not that it is reachable now.
@@ -352,7 +355,7 @@ native session ids or message bodies for this.
 With `OBSERVER_CONTROL=1`, control actions also work on remote agents: `⇱`, `✕` and the project `+` run `herdr` on
 that host over the same non-interactive ssh (every argument validated and single-quoted; hosts not listed in
 `remotes` are refused), and attaching opens a Terminal running `ssh -t <host> 'herdr agent attach <pane> --takeover'`.
-Remote ships sit in a line below this machine's station. Clicking a ship (or a host tab above the Live sessions list)
+Remote ships form parallel rows along the external relay spine when one is present. Clicking a ship (or a host tab above the Live sessions list)
 switches the list to that host's crew; the chosen tab is remembered across reloads. On a remote host the list starts
 with a "New agent in ~" row whose `+` starts Claude in that host's home folder, even on a host with no agents yet,
 reusing the Herdr workspace named after the folder or creating it. Starting an agent never opens a terminal: the new
