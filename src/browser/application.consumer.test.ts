@@ -1607,7 +1607,7 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
     await expect(panel.locator(".bus-message")).toHaveCount(10);
     const replyRow = panel
       .locator(".bus-message")
-      .filter({ has: panel.locator(".mail-reply:not([hidden])") })
+      .filter({ has: page.locator(".mail-reply:not([hidden])") })
       .first();
     const rowBox = await replyRow.locator(".mail-row").boundingBox();
     const readBox = await replyRow.locator(".row-inspect").boundingBox();

@@ -435,15 +435,12 @@ test("control-ui-hosts regression contracts", async () => {
       present(elements["mail-counts"]).textContent,
       "1 pending · 1 acknowledged · 2 expired · in recent 37",
     );
-    const ledgerState = (id: number) =>
-      child(
-        present(
-          present(elements["mail-ledger"]).children.find(
-            (item) => child(child(item, 0), 0).dataset.messageId === String(id),
-          ),
-        ),
-        0,
-      ).children[0]?.children[1];
+    const ledgerState = (id: number) => {
+      const item = present(elements["mail-ledger"]).children.find(
+        (row) => child(child(row, 0), 0).dataset.messageId === String(id),
+      );
+      return child(child(child(present(item), 0), 0), 1);
+    };
     for (const id of [11, 12]) {
       assert.equal(
         present(ledgerState(id)).className,

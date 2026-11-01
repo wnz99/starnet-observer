@@ -1247,8 +1247,8 @@ test("observer-ui regression contracts", async () => {
       "2 pending · 1 acknowledged · in recent 100",
       "counts are within the recent window",
     );
-    const ledger = present(elements["mail-ledger"]).children.map(
-      (item) => item.children[0]?.children[0],
+    const ledger = present(elements["mail-ledger"]).children.map((item) =>
+      child(child(item, 0), 0),
     );
     assert.deepEqual(
       ledger.map((button) => present(button).dataset.messageId),
