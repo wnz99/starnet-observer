@@ -311,6 +311,8 @@ on their own ship for local mail, and the Live sessions mailroom section lists t
 host's numeric id and also carry a hub-wide `key` (`5@vm1`). Thin cyan SSH wires connect this machine directly to
 each observed remote. Where both machines share a relay, the wires run beside its tunnels and bypass the external
 relay mailroom. Wire appearance distinguishes live, stale and unavailable SSH observations; it never carries mail couriers.
+Mail route highlights and SSH cables follow corridor edges. Portions passing beneath a corridor or room floor are dimmed;
+exposed portions retain their normal brightness.
 
 Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and machine rows leave enough space for those actual hulls. Shadow crew remain hover-only.
 

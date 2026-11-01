@@ -1,5 +1,5 @@
 import type { Worker, RelaySpoke } from "../scene/types.js";
-import { project } from "../scene/index.js";
+import { CABLE_HEIGHT, mailCablePath, cableSurfaces } from "../scene/cables.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { rectPoly } from "./primitives.js";
 import { shipLive } from "./static.js";
@@ -8,7 +8,7 @@ const REPOSITORY_RING = { glowRadius: 40, glowAlpha: 0.4, workingWidth: 3, width
 const FOCUS_RING = { period: 450, radius: 0.55, width: 2 };
 const PLATFORM_RING = { height: 0.02 };
 const HOST_RING = { minimumZoom: 0.25, period: 700, height: 2.4 };
-const CONNECTION = { height: 0.12, width: 2, junctionRadius: 0.35 };
+const CONNECTION = { height: CABLE_HEIGHT, width: 2, junctionRadius: 0.35, alpha: 0.9 };
 
 export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   private readonly agentColors = new Map<string, string>();
@@ -147,14 +147,10 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
     const ctx = this.view.ctx;
     ctx.lineWidth = CONNECTION.width / zoom;
     ctx.strokeStyle = this.view.C.focus;
-    ctx.globalAlpha = 0.9;
-    ctx.beginPath();
-    for (const [index, point] of spoke.path.entries()) {
-      const at = project({ ...point, z: CONNECTION.height });
-      if (index === 0) ctx.moveTo(at.x, at.y);
-      else ctx.lineTo(at.x, at.y);
-    }
-    ctx.stroke();
+    this.view.geometry.cable(mailCablePath(spoke.path), cableSurfaces(this.view.activeScene), {
+      alpha: CONNECTION.alpha,
+      height: CONNECTION.height,
+    });
   }
   stale = () => {
     {

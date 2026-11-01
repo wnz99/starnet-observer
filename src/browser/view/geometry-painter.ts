@@ -3,13 +3,37 @@ import type { Point, Rect } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { BoxColors } from "./primitives.js";
 import { center, corners, visibleFaces } from "./primitives.js";
+import { cableRuns } from "../scene/cables.js";
 import type { ViewContext } from "./types.js";
 const FLOOR_ELLIPSE = { x: 34, y: 17 };
 const FULL_TURN = Math.PI * 2;
 const GLOW_ASPECT = 2;
 const WALKWAY_TRIM_HEIGHT = 0.01;
+const UNDERPASS_ALPHA = 0.22;
 export class GeometryPainter<R extends SpriteResource> {
   constructor(readonly context: ViewContext<R>) {}
+  cable(
+    path: readonly Point[],
+    surfaces: readonly Rect[],
+    options: { alpha: number; height: number },
+  ) {
+    const ctx = this.context,
+      dash = ctx.lineDashOffset;
+    let distance = 0;
+    for (const run of cableRuns(path, surfaces)) {
+      const from = project({ ...run.from, z: options.height }),
+        to = project({ ...run.to, z: options.height });
+      ctx.globalAlpha = options.alpha * (run.covered ? UNDERPASS_ALPHA : 1);
+      ctx.lineDashOffset = dash - distance;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      distance += Math.hypot(to.x - from.x, to.y - from.y);
+    }
+    ctx.globalAlpha = options.alpha;
+    ctx.lineDashOffset = dash;
+  }
   poly(points: readonly Point[], fill?: string | null, stroke?: string | null) {
     const c = this.context;
     c.beginPath();

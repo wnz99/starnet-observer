@@ -1,6 +1,7 @@
 import { toScreen, fromScreen } from "../scene/index.js";
 import { contains } from "../scene/geometry.js";
 import type { Camera, Host, Point, Scene } from "../scene/types.js";
+import { CABLE_HEIGHT, mailCablePath } from "../scene/cables.js";
 
 const HIT_RADIUS = 6;
 const RELAY_ACTIVITY: Record<string, string> = {
@@ -13,8 +14,13 @@ export function connectionHostAt(scene: Scene, camera: Camera, point: Point): Ho
   const shadow = scene.ships?.find((ship) => ship.shadow && contains(ship.rect, floor));
   if (shadow) return shadow.id;
   const paths = [
-    ...(scene.links ?? []).map((link) => ({ host: link.host, path: link.path })),
-    ...(scene.relays ?? []).flatMap((relay) => relay.spokes),
+    ...(scene.links ?? []).map((link) => ({
+      host: link.host,
+      path: link.path.map((point) => ({ ...point, z: CABLE_HEIGHT })),
+    })),
+    ...(scene.relays ?? []).flatMap((relay) =>
+      relay.spokes.map((spoke) => ({ host: spoke.host, path: mailCablePath(spoke.path) })),
+    ),
   ];
   let distance = HIT_RADIUS;
   let host: Host | undefined;
