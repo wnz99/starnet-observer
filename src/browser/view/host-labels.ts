@@ -23,7 +23,7 @@ const SHIP_SIGN = {
 const MAIL_SIGN = { height: 3.4, size: 16, priority: 44 };
 const OBSERVATION_SIGN = {
   height: 0.6,
-  lift: 4,
+  lift: 14,
   size: 12,
   priority: 46,
   dash: [2, 2],
@@ -34,7 +34,7 @@ const RELAY_SIGN = {
   height: 0.6,
   widthRatio: 0.7,
   size: 12,
-  lift: 6,
+  lift: -12,
   priority: 46,
   dash: [3, 3],
 };

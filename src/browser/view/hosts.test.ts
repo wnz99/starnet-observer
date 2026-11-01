@@ -258,10 +258,61 @@ test("observer-hosts-view regression contracts", () => {
   const drawn = (text: string) => node.ctx.texts.includes(text);
   assert.ok(drawn("RELAY MAILROOM · relay.example.dev"), "the external mailroom has its own sign");
   assert.ok(drawn("vm · ssh · observing"), "a live host's observation link names its destination");
+  verifyWireTunnelLabels();
   assert.ok(
     drawn("empty · ssh · stale"),
     "a stale host's link shows its destination and real state",
   );
+  function verifyWireTunnelLabels() {
+    const labelLayout = Model.createLayout();
+    labelLayout.reconcile([
+      row("label-local", {}),
+      row("label-one", { host: "label1" }),
+      row("label-two", { host: "label2" }),
+    ]);
+    const labelScene = Scene.build(labelLayout.onPage(0), 0, {
+      hosts: ["label1", "label2"].map((id) => ({ id, health: "available", agents: 1 })),
+      relays: [
+        {
+          relay: "labels.example",
+          members: [null, "label1", "label2"].map((host) => ({
+            host,
+            machine: host ?? "local",
+            state: "active",
+            lastActivityAt: 0,
+          })),
+          shadows: [],
+        },
+      ],
+    });
+    const labelCanvas = canvas(1600, 1000);
+    const labelView = View.create({
+      canvas: labelCanvas,
+      nameFor: (id) => id,
+      env: {
+        raf: () => 1,
+        caf() {},
+        now: () => 0,
+        dpr: () => 1,
+        createCanvas: () => canvas(),
+        sprites: { drawBody: () => null },
+      },
+    });
+    labelView.start();
+    labelView.update(labelScene, { mailFrame: () => ({ drones: [], envelopes: [] }) });
+    labelView.paint(0);
+    for (const host of ["label1", "label2"]) {
+      assert.ok(
+        labelCanvas.ctx.texts.includes(host + " · ssh · observing"),
+        "SSH label is visible",
+      );
+    }
+    assert.ok(
+      labelCanvas.ctx.texts.some((text) => text.startsWith("label1 · live · roster only")),
+      "a tunnel label and its SSH label remain visible together",
+    );
+    labelView.stop();
+  }
   function verifyShadowLabelsAndHighways() {
     // Zoomed onto the shadow ship's room: its ghost crew, its own label and the relay link's label are on screen.
     const shadowRoom = scene.platforms.find((platform) => platform.host === "relay:whitenoise");
