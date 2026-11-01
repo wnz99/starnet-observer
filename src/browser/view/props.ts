@@ -189,7 +189,7 @@ export class Props<R extends SpriteResource> {
       fill: this.look.colors["contact-shadow"],
     });
     this.context.save();
-    this.context.globalAlpha = VIEWER.alpha;
+    this.context.globalAlpha *= VIEWER.alpha;
     this.context.fillStyle = this.look.colors["viewer-body"];
     this.context.strokeStyle = this.look.colors["body-outline"];
     this.context.beginPath();

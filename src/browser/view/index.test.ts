@@ -812,6 +812,29 @@ test("observer-view regression contracts", async () => {
       "silhouette composes parent fade",
     );
     assert.equal(ctx.globalAlpha, 1);
+    const viewer = present(scene.observatory.viewer),
+      viewerProbe = new StartupAssembly();
+    viewerProbe.begin(scene, 0);
+    for (const now of [460, 560, 660, 2800]) {
+      runtime.assemblyFrame = viewerProbe.frame(now);
+      alphas.length = 0;
+      const progress = runtime.assemblyFrame.progress("observatory", "content");
+      if (now === 560) assert.equal(progress, 0.5, "probe reaches partial content opacity");
+      const animate = false;
+      const item = present(
+        runtime.framePaint.items
+          .observatory(runtime.stationArt, now, animate)
+          .find((item) => item.tie === viewer.id),
+      );
+      item.draw();
+      assert.deepEqual(
+        alphas,
+        progress === 0 ? [] : [progress, progress * 0.8, progress * 0.8],
+        `real viewer shadow, body and head compose observatory content at ${String(now)}ms`,
+      );
+      assert.equal(ctx.globalAlpha, 1, "viewer restores parent alpha");
+    }
+    runtime.assemblyFrame = probe.frame(740);
     let desks = 0,
       crew = 0,
       caches = 0;
