@@ -1,8 +1,20 @@
 import { strip } from "./geometry.js";
-import { element } from "../model/types.js";
+import { mailroomAt } from "./site.js";
+import { tunnelPath } from "./tunnel-path.js";
+import { element, required } from "../model/types.js";
 import type { ShipLocations } from "./site.js";
 import type { RoomsGeometry } from "./rooms.js";
-import type { BuildOptions, Mailroom, Observatory, SceneRelay, RelayLink, Host } from "./types.js";
+import type {
+  BuildOptions,
+  Mailroom,
+  Observatory,
+  SceneRelay,
+  RelayLink,
+  RelaySpoke,
+  Host,
+  Point,
+  Ship,
+} from "./types.js";
 interface HighwayInput {
   locations: ShipLocations;
   geometry: RoomsGeometry;
@@ -10,132 +22,181 @@ interface HighwayInput {
   observatory: Observatory;
   extras: BuildOptions;
   relayMembers: NonNullable<BuildOptions["relayMembers"]>;
+  ships: Ship[];
 }
-const ROUTE = { laneGap: 3, localExit: 5, stripOffset: 2 };
-/* Relay highways: llm-bus relays mail mailroom to mailroom, so each network joins its members' mailrooms to each
-     other and to every shadow ship's mailroom with a ground walkway routed around the floors. A member-to-member highway
-     runs down the column's centre line (between the room banks); a highway to a shadow ship climbs to a lane just
-     north of both ships' top rows, crosses, and comes down into the shadow mailroom. Couriers carrying relayed mail follow
-     it. A highway's state is its observed member's (active, quiet or unknown); it is 'verified' only once a relayed
-     message actually crossed it (delivered to, or received from, that machine), otherwise only the roster is seen. */
+type Network = NonNullable<BuildOptions["relays"]>[number];
+const ROUTE = {
+  laneGap: 3,
+  localExit: 5,
+  clearance: 6,
+  relaySpacing: 24,
+  insideHub: 3,
+  margin: 3,
+  sides: 2,
+};
+// A relay is an external mailroom. Each machine owns one spoke to it; pairwise courier routes join there.
 class Highways {
   constructor(private input: HighwayInput) {}
   private hubOf(host: Host) {
     const { mail, locations } = this.input;
     return host === null ? mail : (locations.mailrooms.get(host) ?? null);
   }
-  private topsOf(host: Host) {
-    const { mail, observatory, geometry } = this.input;
-    return host === null
-      ? [
-          mail.rect.y,
-          observatory.rect.y,
-          ...geometry.platforms.filter((p) => !p.host).map((p) => p.rect.y),
-        ]
-      : [
-          (this.hubOf(host) ?? mail).rect.y,
-          ...geometry.platforms.filter((p) => p.host === host).map((p) => p.rect.y),
-        ];
+  private rightEdge() {
+    const { mail, observatory, geometry, locations } = this.input;
+    return (
+      Math.max(
+        ...[
+          mail.rect,
+          observatory.rect,
+          ...geometry.platforms.map((platform) => platform.rect),
+          ...[...locations.mailrooms.values()].map((value) => value.rect),
+        ].map((rect) => rect.x + rect.w),
+      ) + ROUTE.clearance
+    );
   }
-  private highwayPath(from: Host, to: Host, shadow: boolean) {
-    const A = this.hubOf(from) ?? this.input.mail,
-      B = this.hubOf(to) ?? this.input.mail,
-      up = A.rect.y <= B.rect.y;
-    if (!shadow) {
-      // Down the centre line between the room banks: front edge of the upper mailroom to the back edge of the lower one.
-      const [top, bottom] = up ? ([A, B] as const) : ([B, A] as const),
-        path = [
-          top.hub,
-          { x: top.hub.x, y: top.rect.y + top.rect.h, z: 0 },
-          { x: bottom.hub.x, y: bottom.rect.y, z: 0 },
-          bottom.hub,
-        ];
-      return {
-        path: up ? path : path.slice().reverse(),
-        strips: [[element(path, 1), element(path, ROUTE.stripOffset)]],
-      };
-    }
-    const lane = Math.min(...this.topsOf(from), ...this.topsOf(to)) - ROUTE.laneGap;
-    // This machine's mailroom is boxed in by the observatory to its north, so its highway leaves east to the gap
-    // before the right-hand room bank and climbs there; a remote mailroom leaves straight off its back edge.
-    const exit =
-      from === null
-        ? [
-            { x: A.rect.x + A.rect.w, y: A.hub.y, z: 0 },
-            { x: A.rect.x + A.rect.w + ROUTE.localExit, y: A.hub.y, z: 0 },
-          ]
-        : [{ x: A.hub.x, y: A.rect.y, z: 0 }];
-    const climb = element(exit, exit.length - 1),
-      path = [
-        A.hub,
-        ...exit,
-        { x: climb.x, y: lane, z: 0 },
-        { x: B.hub.x, y: lane, z: 0 },
-        { x: B.hub.x, y: B.rect.y, z: 0 },
-        B.hub,
+  private exit(host: Host, mail: Mailroom): Point[] {
+    if (host !== null)
+      return [
+        mail.hub,
+        { x: mail.hub.x, y: mail.rect.y },
+        { x: mail.hub.x, y: mail.rect.y - ROUTE.laneGap },
       ];
+    const x = mail.rect.x + mail.rect.w + ROUTE.localExit;
+    return [mail.hub, { x: mail.rect.x + mail.rect.w, y: mail.hub.y }, { x, y: mail.hub.y }];
+  }
+  private relayMail(index: number) {
+    const { mail, locations } = this.input;
+    const mailrooms = [mail, ...locations.mailrooms.values()];
+    const top = mailrooms.reduce((sum, mail) => sum + mail.rect.y, 0) / mailrooms.length;
+    return mailroomAt(top + index * ROUTE.relaySpacing, this.rightEdge() + ROUTE.relaySpacing);
+  }
+  private obstacles(host: Host) {
+    const { observatory, geometry, mail, locations, ships, extras } = this.input;
+    return [
+      observatory.rect,
+      ...geometry.platforms.map((platform) => platform.rect),
+      mail.rect,
+      ...[...locations.mailrooms.values()].map((value) => value.rect),
+      ...ships.filter((ship) => ship.id !== host).map((ship) => ship.rect),
+      ...(extras.relays ?? []).map((_net, index) => this.relayMail(index).rect),
+    ].map((rect) => ({
+      x: rect.x - ROUTE.margin,
+      y: rect.y - ROUTE.margin,
+      w: rect.w + ROUTE.margin * ROUTE.sides,
+      h: rect.h + ROUTE.margin * ROUTE.sides,
+    }));
+  }
+  private spoke(
+    member: Pick<RelaySpoke, "host" | "machine">,
+    index: number,
+    count: number,
+    hub: Mailroom,
+  ): RelaySpoke {
+    const { host, machine } = member;
+    const exit = this.exit(host, requiredMail(this.hubOf(host)));
+    const portY = hub.rect.y + (hub.rect.h * (index + 1)) / (count + 1);
+    const approach = { x: hub.rect.x - ROUTE.margin, y: portY };
+    const routed = tunnelPath(element(exit, exit.length - 1), approach, this.obstacles(host));
+    const path = [
+      ...exit,
+      ...routed.slice(1),
+      { x: hub.rect.x, y: portY },
+      { x: hub.hub.x, y: portY },
+      hub.hub,
+    ];
     return {
+      host,
+      machine,
+      state: "unknown",
+      lastActivityAt: null,
+      verified: false,
+      carried: [...this.input.relayMembers.values()].filter(
+        (member) => (member.host ?? null) === host,
+      ).length,
       path,
-      strips: path
-        .slice(1, -ROUTE.stripOffset)
-        .map((point, index) => [point, element(path, index + ROUTE.stripOffset)]),
     };
   }
-  network(net: NonNullable<BuildOptions["relays"]>[number]): SceneRelay | null {
-    const { geometry, relayMembers } = this.input;
-    const members = net.members.filter((member) => this.hubOf(member.host)),
-      shadows = (net.shadows || []).filter((shadow) => this.hubOf(shadow.host));
+  private draw(spoke: RelaySpoke) {
+    const { geometry } = this.input;
+    const path = spoke.path;
+    for (let index = 1; index < path.length - ROUTE.insideHub; index++) {
+      const from = element(path, index),
+        to = element(path, index + 1);
+      if (from.x === to.x && from.y === to.y) continue;
+      geometry.walkways.push({
+        ...strip(from, to, "relay-highway"),
+        host: "relay",
+        relay: spoke.verified ? "verified" : "unverified",
+      });
+    }
+  }
+  network(net: Network, index: number): SceneRelay | null {
+    const members = net.members.filter((member) => this.hubOf(member.host));
+    const shadows = (net.shadows ?? []).filter((shadow) => this.hubOf(shadow.host));
     if (members.length === 0) return null;
-    const links: RelayLink[] = [];
-    members.forEach((member, index) => {
-      for (const other of [
-        ...members
-          .slice(index + 1)
-          .map((value) => ({ host: value.host, machine: value.machine, shadow: false })),
-        ...shadows.map((value) => ({ host: value.host, machine: value.machine, shadow: true })),
-      ]) {
-        const { path, strips } = this.highwayPath(member.host, other.host, other.shadow);
-        const verified = (member.crossed || []).includes(other.machine);
-        for (const segment of strips)
-          geometry.walkways.push({
-            ...strip(element(segment, 0), element(segment, 1), "relay-highway"),
-            host: "relay",
-            relay: verified ? "verified" : "unverified",
-          });
-        links.push({
-          from: member.host,
-          to: other.host,
-          machine: other.machine,
-          shadow: other.shadow,
-          state: member.state,
-          lastActivityAt: member.lastActivityAt,
-          verified,
-          path,
-        });
-      }
+    const participants = [...members, ...shadows];
+    const mail = this.relayMail(index);
+    const spokes = participants.map((member, spokeIndex) => {
+      const spoke = this.spoke(member, spokeIndex, participants.length, mail);
+      const observed = members.find((value) => value.host === member.host);
+      return {
+        ...spoke,
+        state: observed?.state ?? "unknown",
+        lastActivityAt: observed?.lastActivityAt ?? null,
+        verified: observed
+          ? (observed.crossed ?? []).length > 0
+          : members.some((value) => (value.crossed ?? []).includes(member.machine)),
+      };
     });
-    // Each highway counts the agents on the relay at its observed end.
-    for (const link of links)
-      link.carried = [...relayMembers.values()].filter(
-        (member) => (member.host ?? null) === link.from,
-      ).length;
+    spokes.forEach((spoke) => {
+      this.draw(spoke);
+    });
     return {
       key: "relay:" + net.relay,
       relay: net.relay,
-      members: members.map((member) => ({
-        host: member.host,
-        machine: member.machine,
-        state: member.state,
-        lastActivityAt: member.lastActivityAt,
+      mail,
+      spokes,
+      members: members.map(({ host, machine, state, lastActivityAt }) => ({
+        host,
+        machine,
+        state,
+        lastActivityAt,
       })),
-      links,
+      links: courierLinks(members, shadows, spokes),
     };
   }
 }
+function requiredMail(mail: Mailroom | null): Mailroom {
+  if (!mail) throw new Error("Relay participant has no mailroom");
+  return mail;
+}
+function courierLinks(
+  members: Network["members"],
+  shadows: NonNullable<Network["shadows"]>,
+  spokes: RelaySpoke[],
+): RelayLink[] {
+  const byHost = new Map(spokes.map((spoke) => [spoke.host, spoke]));
+  return members.flatMap((member, index) =>
+    [
+      ...members.slice(index + 1).map((value) => ({ ...value, shadow: false })),
+      ...shadows.map((value) => ({ ...value, shadow: true })),
+    ].map((other) => ({
+      from: member.host,
+      to: other.host,
+      machine: other.machine,
+      shadow: other.shadow,
+      verified: (member.crossed ?? []).includes(other.machine),
+      path: [
+        ...required(byHost, member.host).path,
+        ...required(byHost, other.host).path.slice().reverse().slice(1),
+      ],
+    })),
+  );
+}
 export function buildHighways(input: HighwayInput) {
   const highways = new Highways(input);
-  return (Array.isArray(input.extras.relays) ? input.extras.relays : []).flatMap((net) => {
-    const value = highways.network(net);
+  return (input.extras.relays ?? []).flatMap((net, index) => {
+    const value = highways.network(net, index);
     return value ? [value] : [];
   });
 }

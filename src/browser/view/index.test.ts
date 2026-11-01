@@ -3468,7 +3468,11 @@ test("observer-view regression contracts", async () => {
       const distinct = [...new Set(lines)];
       assert.equal(distinct.length, 2, "equal-basename badges retain distinct full text");
       for (const suffix of suffixes)
-        assert(distinct.some((text) => text === name + " · " + suffix));
+        assert(
+          distinct.some(
+            (text) => text === name + " · " + suffix + " · terminal\nTerminal checkout",
+          ),
+        );
     }
   }
   verifyCheckoutDiscriminators();
@@ -3480,16 +3484,78 @@ test("observer-view regression contracts", async () => {
       ...original,
       arrangement: { roomId: "p", room: "Room", sectionId: "r", section: "Section" },
     });
+    const observedAt = Date.now();
+    const observation = {
+      source: "shell-entry" as const,
+      state: "observed" as const,
+      observedAt,
+      repoId: original.repoId || null,
+      repo: "api",
+      checkoutId: "tool_abcd",
+      checkoutKind: "worktree" as const,
+      worktree: "linked-tool-checkout-with-a-long-name",
+    };
+    const toolRow = { ...original, worktree: null, checkoutObservation: observation };
+    const toolText =
+      observation.worktree +
+      " · abcd · tool\napi · " +
+      observation.worktree +
+      " · abcd\nLast recorded shell entry: " +
+      new Date(observedAt).toISOString();
+    const toolArranged = Model.arranged({ ...toolRow, arrangement: arranged.arrangement });
     for (const [row, expected] of [
-      [arranged, "api · main"],
-      [Model.arranged(arranged), "api · main"],
+      [toolRow, toolText],
+      [toolArranged, toolText],
+      [Model.arranged(toolArranged), toolText],
+      [
+        { ...toolRow, checkoutObservation: { ...observation, repoId: "different-repo" } },
+        toolText.replace(observation.worktree + " · abcd · tool", "Other repo · tool"),
+      ],
+      [{ ...toolRow, observedRepoId: null }, "api · main · terminal\nTerminal checkout"],
+      [
+        { ...toolRow, checkoutObservation: { ...observation, source: "invalid" as "shell-entry" } },
+        "api · main · terminal\nTerminal checkout",
+      ],
+      [
+        {
+          ...toolRow,
+          checkoutObservation: { ...observation, observedAt: observedAt - 86_400_001 },
+        },
+        "api · main · terminal\nTerminal checkout",
+      ],
+      [
+        {
+          ...toolRow,
+          checkoutObservation: { ...observation, checkoutKind: "main" as const, worktree: null },
+        },
+        "api · main · tool\napi · api · main\nLast recorded shell entry: " +
+          new Date(observedAt).toISOString(),
+      ],
+      [
+        { ...toolRow, checkoutObservation: { ...observation, state: "stale" as const } },
+        toolText.replace(" · tool\n", " · tool · stale\n") + " · stale",
+      ],
+    ] as const) {
+      worker.row = row;
+      const candidate = runtime.plates.workerLabels
+        .collect({ tier: lodFor(zoom), selectedRepo: "r", isStale: false, staleKeys: new Set() })
+        .find((entry) => entry.badge?.id === worker.id);
+      assert.equal(candidate?.badge?.fullText, expected);
+      assert(
+        candidate.text.length < expected.length,
+        "painted badge clips separately from full provenance",
+      );
+    }
+    for (const [row, expected] of [
+      [arranged, "api · main · terminal\nTerminal checkout"],
+      [Model.arranged(arranged), "api · main · terminal\nTerminal checkout"],
       [{ ...original, repo: "" }, "Checkout unavailable"],
       [
         Model.arranged({ ...original, repo: "", arrangement: arranged.arrangement }),
         "Checkout unavailable",
       ],
       [{ ...original, checkoutId: null }, "Checkout unavailable"],
-      [{ ...original, checkoutKind: "folder" }, "Local folder"],
+      [{ ...original, checkoutKind: "folder" }, "Local folder · terminal\nTerminal checkout"],
       [{ ...original, checkoutKind: null }, "Checkout unavailable"],
       [{ ...original, checkoutKind: "worktree" }, "Checkout unavailable"],
     ] as const) {
@@ -3665,8 +3731,14 @@ test("observer-view regression contracts", async () => {
             "badge begins four CSS pixels below the floor footprint",
           );
           if (worker.row.checkoutId === null) assert.equal(badge.text, "Checkout unavailable");
-          else if (worker.row.checkoutKind === "main") assert.equal(badge.text, "api · main");
-          else assert(badge.text.endsWith(" · " + present(worker.row.checkoutId).slice(-4)));
+          else if (worker.row.checkoutKind === "main")
+            assert.equal(badge.text, "api · main · terminal\nTerminal checkout");
+          else
+            assert(
+              badge.text.endsWith(
+                " · " + present(worker.row.checkoutId).slice(-4) + " · terminal\nTerminal checkout",
+              ),
+            );
         }
         const hoveredBadge = present(
           runtime.interaction.badgeAt(present(runtime.interaction.gestures.pointer)),

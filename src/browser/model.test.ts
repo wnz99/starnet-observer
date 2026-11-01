@@ -12,6 +12,24 @@ function at<T>(values: readonly T[], index: number): T {
 const fresh = false,
   stale = true;
 const Model = createModel(canonicalTheme());
+test("ARRANGE preserves actual repository proof independently of display sections", () => {
+  for (const repoId of ["actual-repo", null, undefined]) {
+    const row: DisplayRow = {
+      ...(repoId === undefined ? {} : { repoId }),
+      repo: "Original",
+      arrangement: {
+        roomId: "room",
+        room: "Room",
+        sectionId: "section",
+        section: "Section",
+      },
+    };
+    const once = Model.arranged(row);
+    assert.equal(once.repoId, "section");
+    assert.equal(once.observedRepoId, repoId || null);
+    assert.equal(Model.arranged(once).observedRepoId, repoId || null);
+  }
+});
 test("annexes keep project deck anchors across sparse sections and helpers", () => {
   const layout = Model.createLayout();
   const projects: LayoutRow[] = Array.from({ length: 9 }, (_, index) => ({

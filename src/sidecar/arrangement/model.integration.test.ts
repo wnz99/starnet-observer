@@ -74,6 +74,7 @@ test("arrangement browser toggle groups actual rows and preserves seats", () => 
   assert.deepEqual(Model.arranged(row), {
     ...row,
     observedRepo: "bq-web",
+    observedRepoId: "repo_1",
     projectId: "room_1",
     project: "banqora",
     projectKind: "group",

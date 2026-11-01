@@ -173,6 +173,12 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     const scene = this.view.activeScene;
     this.assemblyEdge("mail", scene.mail.rect, this.view.C.amber);
     this.assemblyEdge("observatory", scene.observatory.rect, this.view.C.cyan);
+    for (const relay of scene.relays ?? [])
+      this.assemblyEdge(
+        this.view.assemblyOwners.relay(relay.key),
+        relay.mail.rect,
+        this.view.C.amber,
+      );
     for (const platform of scene.platforms)
       this.assemblyEdge(
         this.view.assemblyOwners.platform(platform.key),

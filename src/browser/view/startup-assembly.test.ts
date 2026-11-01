@@ -127,7 +127,7 @@ test("walkways derive latest endpoint ownership; detached geometry remains unkno
   );
 });
 
-test("remote and shadow hubs precede rooms; relay highways wait for both ships' content", () => {
+test("remote and shadow hubs precede rooms; relay spokes wait for their host's content", () => {
   const scene = build([], 0, { hosts: [{ id: "remote" }, { id: "shadow", shadow: true }] });
   scene.platforms = [
     { ...platform("remote-room"), host: "remote" },
@@ -140,12 +140,13 @@ test("remote and shadow hubs precede rooms; relay highways wait for both ships' 
       key: "relay",
       relay: "relay",
       members: [],
-      links: [
+      mail: scene.mail,
+      links: [],
+      spokes: [
         {
-          from: "remote",
-          to: "shadow",
+          host: "shadow",
+          carried: 1,
           machine: "shadow",
-          shadow: true,
           state: "live",
           lastActivityAt: null,
           verified: true,
@@ -161,8 +162,10 @@ test("remote and shadow hubs precede rooms; relay highways wait for both ships' 
   assembly.begin(scene, 0);
   assert.equal(assembly.owners.ship("remote"), "ship:remote");
   assert.equal(assembly.owners.ship("shadow"), "ship:shadow");
+  assert.equal(assembly.frame(0).progress(assembly.owners.relay("relay"), "floor"), 0);
   assert(assembly.frame(359).outline("ship:remote") > 0);
   assert.equal(assembly.frame(359).outline("platform:remote-room"), 0);
+  assert.equal(assembly.frame(700).progress(assembly.owners.relay("relay"), "content"), 1);
   assert.equal(assembly.owners.walkwayReady(highway, assembly.frame(1000)), false);
   assert.equal(assembly.owners.walkwayReady(highway, assembly.frame(2680)), true);
 });

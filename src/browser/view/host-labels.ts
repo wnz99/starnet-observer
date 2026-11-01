@@ -1,9 +1,10 @@
 import { age } from "../model/description.js";
 import { toScreen } from "../scene/index.js";
-import type { ObservationLink, Point, RelayLink, SceneRelay, Ship } from "../scene/types.js";
+import { longestSegmentMidpoint } from "../scene/geometry.js";
+import type { ObservationLink, Point, RelaySpoke, Ship } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { LabelContext } from "./label-types.js";
-import { center, midpoint } from "./primitives.js";
+import { center } from "./primitives.js";
 import type { ViewRuntime } from "./runtime.js";
 import { shipLive } from "./static.js";
 import type { TextPlate } from "./types.js";
@@ -20,16 +21,20 @@ const SHIP_SIGN = {
   dash: [3, 3],
 };
 const MAIL_SIGN = { height: 3.4, size: 16, priority: 44 };
-const OBSERVATION_SIGN = { height: 2.2, lift: 4, size: 12, priority: 46, dash: [2, 2] };
+const OBSERVATION_SIGN = {
+  height: 0.6,
+  lift: 14,
+  size: 12,
+  priority: 46,
+  dash: [2, 2],
+};
 const RELAY_SIGN = {
-  longPath: 3,
-  bend: 2,
-  near: -3,
-  far: -4,
+  roomTail: 3,
+  hubPriority: 60,
   height: 0.6,
   widthRatio: 0.7,
   size: 12,
-  lift: 6,
+  lift: -12,
   priority: 46,
   dash: [3, 3],
 };
@@ -49,17 +54,10 @@ function shipText(ship: Ship) {
       : " · " + (ship.reason || "unreachable");
   return `${live ? "● " : "○ "}${String(ship.id).toUpperCase()} · ${agentCount(ship)}${state}`;
 }
-function relayLane(link: RelayLink): Point {
-  if (link.path.length > RELAY_SIGN.longPath) {
-    const near = present(link.path.at(RELAY_SIGN.near)),
-      far = present(link.path.at(RELAY_SIGN.far));
-    return { x: midpoint(near, far).x, y: near.y };
-  }
-  const from = present(link.path[1]),
-    to = present(link.path[RELAY_SIGN.bend]);
-  return { x: from.x, y: midpoint(from, to).y };
+function relayLane(link: RelaySpoke): Point {
+  return longestSegmentMidpoint(link.path.slice(1, -RELAY_SIGN.roomTail));
 }
-function relayNote(link: RelayLink) {
+function relayNote(link: RelaySpoke) {
   if (link.state === RELAY_ACTIVE) return "live";
   if (link.state === "unknown") return "bus unreadable";
   return Number.isFinite(link.lastActivityAt) ? "quiet " + age(link.lastActivityAt) : "quiet";
@@ -154,36 +152,49 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
   }
   private observationLink(link: ObservationLink) {
     const mid = this.screen({
-        x: link.from.x,
-        y: midpoint(link.from, link.to).y,
+        ...link.label,
         z: OBSERVATION_SIGN.height,
       }),
       live = link.health === "available";
-    const text = live
+    const state = live
         ? "ssh · observing"
         : link.health === "stale"
           ? "ssh · stale"
           : "ssh · unreachable",
       color = live ? this.view.C.cyan : this.view.C.idle;
-    return this.view.plates.textPlate(text, mid.x, mid.y - OBSERVATION_SIGN.lift, {
-      accent: color,
-      size: OBSERVATION_SIGN.size,
-      color,
-      priority: OBSERVATION_SIGN.priority,
-      dash: OBSERVATION_SIGN.dash,
-    });
+    return this.view.plates.textPlate(
+      link.host + " · " + state,
+      mid.x,
+      mid.y - OBSERVATION_SIGN.lift,
+      {
+        accent: color,
+        size: OBSERVATION_SIGN.size,
+        color,
+        priority: OBSERVATION_SIGN.priority,
+        dash: OBSERVATION_SIGN.dash,
+      },
+    );
   }
   relays(): TextPlate[] {
     if (this.view.assemblyFrame.active) return [];
-    return (this.view.activeScene.relays || []).flatMap((relay) =>
-      relay.links.map((link) => this.relayLink(relay, link)),
-    );
+    return (this.view.activeScene.relays || []).flatMap((relay) => {
+      const at = this.screen({ ...center(relay.mail.tower), z: MAIL_SIGN.height });
+      return [
+        this.view.plates.textPlate("RELAY MAILROOM · " + relay.relay, at.x, at.y, {
+          accent: this.view.C.amber,
+          color: this.view.C.amber,
+          size: this.view.plates.signSize(MAIL_SIGN.size),
+          priority: RELAY_SIGN.hubPriority,
+        }),
+        ...relay.spokes.map((link) => this.relayLink(link)),
+      ];
+    });
   }
-  private relayLink(relay: SceneRelay, link: RelayLink) {
+  private relayLink(link: RelaySpoke) {
     const mid = this.screen({ ...relayLane(link), z: RELAY_SIGN.height }),
       live = link.state === RELAY_ACTIVE;
-    const proof = link.verified ? "mail has crossed" : "unverified · roster only, no mail yet";
-    const label = `RELAY ${relay.relay} · ${relayNote(link)} · ${proof} · ${String(link.carried)} agents here on it`;
+    const proof = link.verified ? "mail has crossed" : "roster only";
+    const label = `${link.machine} · ${relayNote(link)} · ${proof} · ${String(link.carried)} agents`;
     return this.view.plates.textPlate(
       this.view.plates.clipText(
         label,

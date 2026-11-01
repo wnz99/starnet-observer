@@ -92,6 +92,7 @@ function rowProjection(row: Row, aliases: Aliases, checkout: (row: Row) => Check
     repo,
     repoKind: row.repoKind,
     ...checkout(row),
+    ...observationProjection(row, aliases, checkout),
     paneId: typeof row.paneId === "string" && PANE.test(row.paneId) ? row.paneId : null,
     role: row.role === "overseer" && row.source === "herdr" ? "overseer" : null,
     title: titleOf(row, helper),
@@ -108,6 +109,30 @@ function rowProjection(row: Row, aliases: Aliases, checkout: (row: Row) => Check
     tool: toolOf(row),
     ...(arrangement ? { arrangement } : {}),
     ...(helper ? helperEvidence(row) : {}),
+  };
+}
+function observationProjection(row: Row, aliases: Aliases, checkout: (row: Row) => Checkout) {
+  const value = row.checkoutObservation;
+  if (!value) return {};
+  const names = checkout({
+    id: row.id,
+    checkoutId: value.checkoutId,
+    checkoutKind: value.checkoutKind,
+  });
+  return {
+    checkoutObservation: {
+      source: value.source,
+      observedAt: value.observedAt,
+      state: value.state,
+      repoId: value.repoId,
+      repo: aliases.repo(
+        { id: row.id, repoId: value.repoId, projectId: row.projectId },
+        aliases.project(row.projectId),
+      ),
+      checkoutId: names.checkoutId,
+      checkoutKind: names.checkoutKind,
+      worktree: names.worktree || null,
+    },
   };
 }
 export function makeRows(aliases: Aliases) {

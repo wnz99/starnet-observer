@@ -37,7 +37,8 @@ export class Snapshots {
     };
   }
   private sessions(at: number) {
-    return this.state.lastGood.map((row) => {
+    return this.state.lastGood.map((original) => {
+      const row = this.state.workdirs.project(original, at);
       const observedAt =
         row.usage?.observedAt ??
         (row.source === "herdr" ? this.state.summaries.get(row.id)?.observedAt : row.observedAt);

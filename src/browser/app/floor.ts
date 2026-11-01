@@ -4,7 +4,9 @@ import type { MailFrame } from "../view/types.js";
 import type { AppView } from "./contracts.js";
 import type { AppBus, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppState } from "./state.js";
-import { geometryField, HelperPresentation } from "./helper-presentation.js";
+import { HelperPresentation } from "./helper-presentation.js";
+import { geometryField, refreshSceneRows } from "./floor-rows.js";
+
 interface FloorOptions {
   state: AppState;
   view: AppView;
@@ -224,6 +226,7 @@ export class Floor {
   }
   private crew(rows: AppRow[], overseer: AppRow | null) {
     const { state } = this.options;
+    refreshSceneRows(state.scene, [...rows, ...this.shadows.values()]);
     const observed = (ids: readonly string[]) => {
       const represented = new Set(ids);
       return rows.filter((row) => represented.has(row.id));

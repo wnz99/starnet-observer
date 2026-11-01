@@ -27,6 +27,8 @@ export function revisionFor(input: {
       ? [
           relays.map((relay) => [
             relay.key,
+            relay.mail.rect,
+            relay.spokes.map((spoke) => [spoke.host, spoke.verified, spoke.path]),
             relay.links.map((link) => [link.from, link.to, link.verified]),
           ]),
         ]

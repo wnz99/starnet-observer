@@ -18,6 +18,8 @@ Use `bun run format` or `bun run fix` for explicit edits. Ordinary checks do not
 
 ## Build, package and CI
 
+Shell-entry recorder tests require `/bin/zsh` for synthetic login and nonlogin startup coverage. macOS supplies it; Ubuntu CI explicitly installs the `zsh` system package. Linux developers running these tests must install that package too. This is a test prerequisite, not a new requirement for normal observer operation. Optional tool-checkout recording does not require changing your default shell.
+
 Ubuntu CI runs for pull requests and pushes to main. It installs frozen dependencies and Chromium, then runs `bun run check` once. These cover formatting, shell checks, lint, strict types, unused code/dependencies, duplicate code, builds, native Bun tests, installed-package consumers and real browser fixtures. Test and build commands remain available for CI and deliberate maintenance work:
 
 ```sh
@@ -30,6 +32,8 @@ bun run test:browser
 ```
 
 `build` emits runtime JavaScript to `dist/runtime` and browser resources to `dist/public`. Local startup includes installed private theme packs. `package` stages only tracked distributable sources and canonical assets in a temporary directory, builds there and emits `dist/starnet-observer.tgz`. Package privacy tests reject local configuration, private packs, presets, planning files and development dependencies. LICENSE, NOTICE, Swift source and canonical browser resources travel with the archive.
+
+The optional `scripts/observe-workdir.ts` entrypoint is emitted as `dist/runtime/scripts/observe-workdir.js` by the runtime compiler and included in the package. Its only option, `--preview-zsh`, prints shell setup without writing configuration. With no arguments it quietly records native cwd and `CODEX_THREAD_ID`; no identity means no state directory. See [Privacy and limits](../README.md#privacy-and-limits) for opt-in coverage. Focused tests use temporary `ZDOTDIR` fixtures and never edit real startup files. The store reads at most 128 entries and 4096 bytes per event, rejects unsafe or malformed state, and retains the newest 64 validated observations within 24 hours on writes. Normal reads never prune. State directories are private (0700), event files are exclusive creations (0600), and concurrent records use unique immutable filenames.
 
 `bun run test` builds runtime/public assets, runs core regressions and verifies the installed package. `bun run test:core` runs regressions against existing build output, excluding the two application consumers. Both the full test command and CI run those consumers through `dependency-isolation`, so the full Chromium acceptance suite runs once against the installed archive. `bun run test:browser` remains available for a focused browser run against existing local build output.
 

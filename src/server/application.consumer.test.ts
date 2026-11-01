@@ -34,6 +34,38 @@ test("installed application starts without development dependencies", async () =
     pathToFileURL(path.join(path.dirname(bin), "http.js")).href
   )) as InstalledHttp;
   await installedResources(root);
+  const shellHome = await fs.mkdtemp(path.join(os.tmpdir(), "installed-recorder-"));
+  try {
+    const cli = path.join(root, "dist/runtime/scripts/observe-workdir.js");
+    const preview = await execute(process.execPath, ["--no-env-file", cli, "--preview-zsh"]);
+    await fs.writeFile(path.join(shellHome, ".zshenv"), preview.stdout);
+    const session = "12345678-1234-1234-1234-123456789abc";
+    const shell = await execute("/bin/zsh", ["-c", "print sentinel"], {
+      cwd: shellHome,
+      env: {
+        HOME: shellHome,
+        ZDOTDIR: shellHome,
+        CODEX_THREAD_ID: session,
+        CODEX_SESSION_ID: "parent",
+      },
+    });
+    assert.equal(shell.stdout, "sentinel\n");
+    assert.equal(shell.stderr, "");
+    const events = path.join(
+      shellHome,
+      ".local/share/starnet-observer/tool-workdirs/v1/codex",
+      session,
+    );
+    const files = await fs.readdir(events);
+    assert.equal(files.length, 1);
+    const event = JSON.parse(
+      await fs.readFile(path.join(events, files[0] || "missing"), "utf8"),
+    ) as { cwd: string; sessionId: string };
+    assert.equal(event.cwd, await fs.realpath(shellHome));
+    assert.equal(event.sessionId, session);
+  } finally {
+    await fs.rm(shellHome, { recursive: true, force: true });
+  }
   const server = http.createServer({
     token: "consumer-fixture",
     observer: { get: () => ({ health: "available", sessions: [] }) },

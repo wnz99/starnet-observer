@@ -1,6 +1,7 @@
 import type { Host, Platform, Point, Rect, Scene, Walkway, Worker } from "../scene/types.js";
 
-export type AssemblyOwner = "mail" | "observatory" | `platform:${string}` | `ship:${string}`;
+export type AssemblyOwner =
+  "mail" | "observatory" | `platform:${string}` | `ship:${string}` | `relay:${string}`;
 export type AssemblyStage = "floor" | "content";
 export interface AssemblyFrame {
   active: boolean;
@@ -64,7 +65,7 @@ function connectedWalkways(scene: Scene, anchors: readonly { rect: Rect; host: s
 function relayHosts(scene: Scene, walkway: Walkway) {
   const hosts = new Set<Host>();
   for (const relay of scene.relays ?? [])
-    for (const link of relay.links) {
+    for (const link of relay.spokes) {
       if (
         link.path.slice(1).some((point, index) => {
           const from = link.path[index];
@@ -79,8 +80,7 @@ function relayHosts(scene: Scene, walkway: Walkway) {
           );
         })
       ) {
-        hosts.add(link.from);
-        hosts.add(link.to);
+        hosts.add(link.host);
       }
     }
   return hosts;
@@ -100,6 +100,9 @@ class AssemblyOwnership {
   }
   ship(host: Host): AssemblyOwner | undefined {
     return this.ships.get(host);
+  }
+  relay(key: string): AssemblyOwner {
+    return `relay:${key}`;
   }
   walkway(walkway: Walkway): AssemblyOwner | undefined {
     return this.walkways.get(walkway);
@@ -216,6 +219,8 @@ export class StartupAssembly {
     this.state = "playing";
     this.starts.set("mail", 0);
     this.starts.set("observatory", TIMING.observatory);
+    for (const relay of scene.relays ?? [])
+      this.starts.set(this.owners.relay(relay.key), TIMING.observatory);
     const rooms = orderedPlatforms(scene),
       groups = Math.min(TIMING.groups, rooms.length);
     rooms.forEach((p, index) => {

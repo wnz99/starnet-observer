@@ -149,6 +149,12 @@ class StationFloor<R extends SpriteResource> {
             },
           };
         }),
+      ...(this.scene.relays || []).map((relay) => ({
+        key: middle(relay.mail.rect) + DEPTH.hub,
+        paint: () => {
+          this.hub(relay.mail, this.presentation?.owners.relay(relay.key));
+        },
+      })),
       {
         key: middle(this.scene.observatory.rect),
         paint: () => {

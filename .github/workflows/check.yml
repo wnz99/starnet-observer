@@ -30,5 +30,10 @@ jobs:
           node --version
           uv --version
       - run: bun install --frozen-lockfile
+      - name: Install shell test prerequisite
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y zsh
+          /bin/zsh --version
       - run: bun node_modules/@playwright/test/cli.js install --with-deps chromium
       - run: bun run check

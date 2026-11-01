@@ -307,9 +307,10 @@ transcript or message inspection never reaches a remote.
 For explicit source development, use `bun --no-env-file scripts/stream.ts` after installing development tooling.
 
 llm-bus is per host, so each remote ship has its own mailroom showing that host's own bus; its couriers and crew stay
-on their own ship, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
-host's numeric id and also carry a hub-wide `key` (`5@vm1`). The ships are joined only by a dashed "ssh · observing"
-line: the hub's observation stream, coloured by its real health, never a mail path.
+on their own ship for local mail, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
+host's numeric id and also carry a hub-wide `key` (`5@vm1`). Thin cyan SSH wires connect this machine directly to
+each observed remote. Where both machines share a relay, the wires run beside its tunnels and bypass the external
+relay mailroom. Each wire names its destination and stream health; it never carries mail couriers.
 
 Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and shadow ships move east when needed to keep hulls separate. Shadow crew remain hover-only.
 
@@ -327,23 +328,23 @@ native session ids or message bodies for this.
   ghosted desk for each agent the roster lists as active in the last day. The ship is labelled "via relay · not
   observed". Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
   observed machine (this one, or a configured remote bound to the same relay) is never a shadow.
-- Relay highways join mailrooms: each observed member's mailroom to the other members' and to each shadow mailroom.
-  A highway is an ordinary ground walkway routed around the floors. Between observed ships it runs down the centre line
-  between the room banks; to a shadow ship it climbs to a lane north of both ships' top rows, crosses, and comes down.
-  Its label gives the relay, the observed end's state (live while that bus saw relay activity in the last 15 minutes,
-  otherwise quiet with its age, or bus unreadable), and how many agents at that end are on it.
-- A highway is **unverified** (dim rails, "roster only, no mail yet") until a relayed message has actually crossed it:
-  received from that machine, or synchronised as delivered to it. The relay roster alone proves the far machine
+- Each relay has one **external relay mailroom**, outside the machine hulls. Every member and shadow machine has
+  its own tunnel to this room. Mail between machines passes through the external room and never through an
+  intermediate machine. Tunnels avoid room floors and other machine hulls. Their labels show the endpoint's observed
+  activity (live after relay activity within 15 minutes, otherwise quiet with its age, or bus unreadable) and agent count.
+- A tunnel has dim, **roster only** rails until a message has demonstrably crossed that machine's relay connection.
+  The relay roster alone proves the far machine
   published to the same relay at some point, not that it is reachable now.
 - Which agents use the relay: the bridge publishes exactly the sessions of the repositories its config maps and records
   them in `remote_publications`. The observer joins those records to panes exactly (live, under a day old). Rooms holding
   a relay-carried agent, and every shadow room, get amber walkways to their mailroom and "⇄ relay" on their sign. Their
   agents read "on relay (repo)" on hover. Every other room is local to its own bus.
-- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, along the relay highway, the far mailroom,
-  then the far agent's desk, along the highway. The far agent is matched by an opaque hash of its relay address, never its session id.
-  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the mailroom while `queued_local`, halfway along
-  the highway once `accepted_remote`, and at the far agent's desk once `delivered_local`. When both ends are
-  observed, each ship shows only its own half of the crossing.
+- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, its tunnel, the external relay room,
+  the destination's tunnel and mailroom,
+  then the far agent's desk. The far agent is matched by an opaque hash of its relay address, never its session id.
+  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the machine's mailroom while `queued_local`,
+  in the external relay room once `accepted_remote`, and at the far agent's desk once `delivered_local`.
+  Each observed host's bus supplies its own delivery observations.
 - Ledger rows name the far side, for example "Codex on whitenoise · llm-bus (via relay)", with the synchronised relay
   state ("held at the relay", "delivered to the far machine, not acknowledged"). The bus status names the binding.
 - Presentation mode replaces relay hosts, machine ids and shared repo ids with fictional names.
@@ -360,6 +361,13 @@ a "!" badge on the station and "waiting for input" in its row; press `⇱` to at
 
 ## Privacy and limits
 
+The **terminal checkout** is the checkout proved from the agent's terminal directory. A **tool checkout** is the checkout proved from the directory where a recorded tool shell started. For example, a Codex terminal can stay in the primary checkout `/work/project` while a shell command explicitly starts in the linked worktree `/work/project-feature`. With a valid shell-entry observation, the selected desk badge shows `project-feature · … · tool`; otherwise it uses the terminal checkout. The `main` checkout label means the primary Git checkout, regardless of its branch name. It does not mean that the agent is on the branch named `main`.
+
+Normal observer operation requires no new installation or shell changes for tool-checkout support; the [existing dependencies](#dependencies) still apply. Recording is an optional addition for local Codex zsh tool shells. It captures the actual thread identity and working directory when the shell starts, not later `cd` commands or the working directory for an entire task.
+
+- After `bun run build`, run `bun --no-env-file dist/runtime/scripts/observe-workdir.js --preview-zsh` to print a proposed addition to your effective `ZDOTDIR/.zshenv` (normally `~/.zshenv`). This command installs nothing and never modifies shell configuration automatically. The opt-in uses `.zshenv` because non-interactive zsh shells load it too; it is not required system setup. Review the absolute Bun and recorder paths before enabling it. Removing that addition disables recording.
+- Selected desk badges prefer a proven shell-entry checkout and append `· tool`; hover shows the complete checkout, source and original UTC timestamp. Observations older than five minutes show `· stale`; after 24 hours they no longer take precedence. `Other repo · tool` identifies a different proven repository. Missing or invalid tool evidence falls back to `· terminal`, or `Checkout unavailable` when terminal checkout proof is absent. ARRANGE changes display grouping while preserving the actual repository comparison.
+- The recorder stores only version, provider, exact `CODEX_THREAD_ID`, canonical shell-entry cwd, source and original observation time under `~/.local/share/starnet-observer/tool-workdirs/v1/codex/`. It never substitutes `CODEX_SESSION_ID`, captures commands or reads transcripts. Records describe the most recent recorded shell entry, not a task-wide current checkout or later directory changes. Same-user code can impersonate this opt-in local signal. Claude, other shells, `zsh -f`, startup snapshots and overridden startup locations are outside verified coverage. Recording is synchronous and adds local process/filesystem work to shell startup; failures are quiet and leave shell execution available.
 - Observation is read-only unless you opt in with `OBSERVER_CONTROL=1`: no agent launching, provider setup, message sending, acknowledgments, or session edits. With control on, the page can start, attach to and close Herdr agent panes, on this machine and on configured remotes, and nothing else.
 - The server may prepare bounded, redacted transcript projections locally in memory before you open an inspector: at most 32 identities per enrichment sweep, with two background detail jobs at once. Opening an inspector still checks current session ownership and source contents. Message bodies and desktop text remain on demand; presentation mode disables transcript preparation. Recognized credential patterns are redacted; private prose and file paths may still be visible. Share the code, not your session data.
 - The local API requires a per-launch token delivered to the local page. Foreign origins and hostnames are rejected. Do not expose the server through a public proxy.
