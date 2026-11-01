@@ -28,3 +28,13 @@ The worker remained visible while its repository label disappeared at overview. 
 - Limits: finite viewport and glyph capacity can shorten or omit colliding signs and badges; full hover text exists only for accepted painted badges. No paid/live verification was run.
 - Delivery: [PR #33](https://github.com/wnz99/starnet-observer/pull/33) targets main. Required pre-push lint and all five compiler projects passed for PR preparation; executable source, configuration and tests remain identical to cd79f91.
 - Next: complete independent full-branch review and required CI on the delivery head before merge. Final SUMMARY and completed-work reconciliation remain pending those gates.
+
+## Main-checkout identity follow-up
+
+PR #33 merged into main at 1d7129cf97703b2ec4242ebaa77a44df24445644. Its historical delivery and review evidence above remains unchanged. A subsequent report identified main-checkout badges incorrectly showing unavailable: observed main identities carry `worktree: null`, and scene arrangement replaces the repository display name.
+
+The bounded correction on fix/main-checkout-badges preserves the observed repository basename through arrangement and accepts proved main-checkout identity with a null worktree. Linked checkout names and discriminators, missing identity, folder fallbacks, badge geometry and selection behavior retain their existing contracts. No server or API extension is involved.
+
+Implementation head: 27244fded163435a8e8d5c32eba8d7fee251ab62. The implementation report, checkout-fix-implementation.md under the canonical execution report directory, records 19 focused tests, one presentation integration test, two pinned Chromium consumers, build, lint, five compiler projects, format, Knip and Fallow passing. These are implementation receipts, not independent approval of this correction.
+
+Status: follow-up PR preparation. Independent full-branch review, required CI on the delivery head and merge remain pending. The original completed-work entry for PR #33 remains historical; Registered Work tracks this correction separately. No running observer restart or paid/live verification was performed.
