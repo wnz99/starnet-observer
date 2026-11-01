@@ -72,6 +72,8 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
   ships(options: LabelContext): TextPlate[] {
     const plates: TextPlate[] = [];
     for (const ship of this.view.activeScene.ships || []) {
+      if (!this.view.assemblyVisible(this.view.assemblyOwners.ship(ship.local ? null : ship.id)))
+        continue;
       plates.push(this.ship(ship));
       if (!ship.local && ship.mail && options.tier !== "overview") plates.push(this.mailroom(ship));
     }
@@ -147,6 +149,7 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
     });
   }
   observation(): TextPlate[] {
+    if (this.view.assemblyFrame.active) return [];
     return (this.view.activeScene.links || []).map((link) => this.observationLink(link));
   }
   private observationLink(link: ObservationLink) {
@@ -171,6 +174,7 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
     });
   }
   relays(): TextPlate[] {
+    if (this.view.assemblyFrame.active) return [];
     return (this.view.activeScene.relays || []).flatMap((relay) =>
       relay.links.map((link) => this.relayLink(relay, link)),
     );

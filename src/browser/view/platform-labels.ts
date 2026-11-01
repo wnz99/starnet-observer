@@ -20,23 +20,27 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
   collect(options: LabelContext): TextPlate[] {
     const scene = this.view.activeScene;
     const seen = new Set<string>();
-    return scene.platforms.flatMap((platform) => [
-      ...this.heading(platform, options),
-      ...platform.sections.flatMap((section) => {
-        const point = toScreen(section.sign, this.view.camera);
-        if (
-          seen.has(section.repo) ||
-          !this.view.repositories.has(section.repo) ||
-          point.x < 0 ||
-          point.x > this.view.viewport.width ||
-          point.y < 0 ||
-          point.y > this.view.viewport.height
-        )
-          return [];
-        seen.add(section.repo);
-        return this.section(platform, section, options);
-      }),
-    ]);
+    return scene.platforms
+      .filter((platform) =>
+        this.view.assemblyVisible(this.view.assemblyOwners.platform(platform.key)),
+      )
+      .flatMap((platform) => [
+        ...this.heading(platform, options),
+        ...platform.sections.flatMap((section) => {
+          const point = toScreen(section.sign, this.view.camera);
+          if (
+            seen.has(section.repo) ||
+            !this.view.repositories.has(section.repo) ||
+            point.x < 0 ||
+            point.x > this.view.viewport.width ||
+            point.y < 0 ||
+            point.y > this.view.viewport.height
+          )
+            return [];
+          seen.add(section.repo);
+          return this.section(platform, section, options);
+        }),
+      ]);
   }
   private heading(platform: Platform, options: LabelContext): TextPlate[] {
     const at = toScreen(platform.sign, this.view.camera);

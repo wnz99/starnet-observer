@@ -696,6 +696,117 @@ test("observer-view regression contracts", async () => {
   }
   verifyAssemblyLiveArt();
 
+  function verifyAssemblyLabels() {
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        onShip() {},
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile([
+      {
+        id: "label-worker",
+        projectId: "labels",
+        repoId: "labels",
+        repo: "Labels",
+        status: "blocked",
+      },
+    ]);
+    const scene = Scene.build(layout.onPage(0), 0);
+    scene.ships = [{ id: null, local: true, health: "available", rect: scene.mail.rect }];
+    runtime.lifecycle.start();
+    runtime.update(scene, { repositorySelection: () => "labels", inspected: () => "label-worker" });
+    const before = JSON.stringify(scene),
+      worker = present(scene.workers[0]),
+      options = {
+        tier: "detail",
+        selectedRepo: "labels",
+        isStale: false,
+        staleKeys: new Set<string>(),
+      } as const;
+    runtime.anchors = [
+      {
+        id: worker.id,
+        left: 690,
+        top: 400,
+        width: 20,
+        height: 60,
+        depth: 0,
+        head: { x: 700, y: 400 },
+        foot: 460,
+      },
+    ];
+    runtime.hovered = worker.id;
+    const targets = () => [
+      runtime.titleRegions,
+      runtime.signRegions,
+      runtime.platformRegions,
+      runtime.shipRegions,
+      runtime.badgeRegions,
+      runtime.attentionRegions,
+      runtime.observatoryRegion,
+    ];
+    runtime.plates.paintPlates(options.isStale, new Set());
+    const ordinary = structuredClone(targets());
+    assert(runtime.plates.platformLabels.collect(options).length > 0);
+    assert(runtime.plates.workerLabels.collect(options).length > 0);
+    assert(runtime.plates.hostLabels.ships(options).length > 0);
+    assert(runtime.plates.stationLabels.hub().length > 0);
+    assert(runtime.plates.stationLabels.observatory(options).length > 0);
+    let dots = 0;
+    runtime.ctx.arc = () => {
+      dots++;
+    };
+    runtime.assembly.begin(scene, 0);
+    for (const now of [0, 740]) {
+      runtime.assemblyFrame = runtime.assembly.frame(now);
+      assert.deepEqual(runtime.plates.platformLabels.collect(options), []);
+      assert.deepEqual(runtime.plates.workerLabels.collect(options), []);
+      runtime.plates.paintPlates(options.isStale, new Set());
+      assert.deepEqual(runtime.titleRegions, []);
+      assert.deepEqual(runtime.signRegions, []);
+      assert.deepEqual(runtime.platformRegions, []);
+      assert.deepEqual(runtime.badgeRegions, []);
+      assert.deepEqual(runtime.attentionRegions, []);
+      assert.equal(dots, 0, "hidden or fading workers have no status dots");
+      assert.equal(
+        runtime.plateFrame,
+        null,
+        "partial frames cannot reuse ordinary target validity",
+      );
+      if (now === 0) {
+        assert.deepEqual(runtime.plates.hostLabels.ships(options), []);
+        assert.deepEqual(runtime.plates.stationLabels.hub(), []);
+        assert.deepEqual(runtime.plates.stationLabels.observatory(options), []);
+        assert.deepEqual(targets(), [[], [], [], [], [], [], null], "old target boxes cleared");
+      }
+    }
+    runtime.assemblyFrame = runtime.assembly.frame(840);
+    assert(
+      runtime.plates.workerLabels.collect(options).length > 0,
+      "settled content restores labels before finish",
+    );
+    runtime.assembly.complete();
+    runtime.assemblyFrame = runtime.assembly.frame(2800);
+    runtime.plates.paintPlates(options.isStale, new Set());
+    assert.deepEqual(targets(), ordinary, "completion restores exactly accepted ordinary targets");
+    assert(dots > 0);
+    assert(runtime.plateFrame);
+    assert.equal(JSON.stringify(scene), before, "label filtering leaves full geometry unchanged");
+    runtime.lifecycle.stop();
+  }
+  verifyAssemblyLabels();
+
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),
       runtime = new ViewRuntime(

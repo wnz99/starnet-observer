@@ -49,7 +49,7 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       plates: TextPlate[] = [];
     for (const region of this.view.anchors) {
       const worker = this.view.workerIndex.get(region.id);
-      if (!worker) continue;
+      if (!worker || !this.view.assemblyVisible(this.view.assemblyOwners.worker(worker))) continue;
       const title = this.title(worker, region, options);
       if (title) plates.push(title);
       if (region.id === inspectedId) plates.push(this.inspection(region));
@@ -60,7 +60,10 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
     const scene = this.view.activeScene;
     const desks = scene.workers
       .filter(
-        (worker) => options.selectedRepo !== null && worker.row.repoId === options.selectedRepo,
+        (worker) =>
+          options.selectedRepo !== null &&
+          worker.row.repoId === options.selectedRepo &&
+          this.view.assemblyVisible(this.view.assemblyOwners.worker(worker)),
       )
       .map((worker) => {
         const { x, y, w, h } = worker.desk;
@@ -133,7 +136,8 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
   paintStatusDots() {
     for (const region of this.view.anchors) {
       const worker = this.view.workerIndex.get(region.id);
-      if (worker) this.statusDot(worker, region);
+      if (worker && this.view.assemblyVisible(this.view.assemblyOwners.worker(worker)))
+        this.statusDot(worker, region);
     }
   }
   private statusDot(worker: Worker, region: Anchor) {
