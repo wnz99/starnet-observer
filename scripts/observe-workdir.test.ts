@@ -52,17 +52,21 @@ test("synthetic login and nonlogin zsh capture native cwd and child identity", a
       cli,
       "--preview-zsh",
     ]).stdout.toString();
-    await fs.writeFile(path.join(directory, ".zshenv"), preview);
     for (const flags of ["-lc", "-c"]) {
+      const home = await fs.mkdtemp(path.join(directory, "startup-"));
+      const root = path.join(home, ".local/share/starnet-observer/tool-workdirs");
+      const child = "abcdef01-1234-1234-1234-123456789abc";
+      expect(await readShellEntry({ root, sessionId: child, now: Date.now })).toBeNull();
+      await fs.writeFile(path.join(home, ".zshenv"), preview);
       const result = Bun.spawnSync(
         ["/bin/zsh", flags, "print -r -- sentinel:$PWD:$options[errexit]"],
         {
           cwd: directory,
           env: {
-            HOME: directory,
-            ZDOTDIR: directory,
-            CODEX_THREAD_ID: sessionId,
-            CODEX_SESSION_ID: "87654321-1234-1234-1234-123456789abc",
+            HOME: home,
+            ZDOTDIR: home,
+            CODEX_THREAD_ID: child,
+            CODEX_SESSION_ID: sessionId,
             PWD: "/incorrect",
           },
         },
@@ -70,25 +74,33 @@ test("synthetic login and nonlogin zsh capture native cwd and child identity", a
       expect(result.exitCode).toBe(0);
       expect(result.stderr.toString()).toBe("");
       expect(result.stdout.toString()).toBe(`sentinel:${await fs.realpath(directory)}:off\n`);
-      const root = path.join(directory, ".local/share/starnet-observer/tool-workdirs");
-      expect((await readShellEntry({ root, sessionId, now: Date.now }))?.cwd).toBe(
+      expect((await readShellEntry({ root, sessionId: child, now: Date.now }))?.cwd).toBe(
         await fs.realpath(directory),
       );
+      expect(await readShellEntry({ root, sessionId, now: Date.now })).toBeNull();
+      expect(await fs.readdir(path.join(root, "v1/codex"))).toEqual([child]);
     }
-    for (const missing of [
-      process.execPath,
-      path.resolve(import.meta.dirname, "../dist/runtime/scripts/observe-workdir.js"),
+    const emitted = path.resolve(import.meta.dirname, "../dist/runtime/scripts/observe-workdir.js");
+    const broken = path.join(directory, "broken.js");
+    await fs.writeFile(broken, 'throw new Error("fixture failure");');
+    for (const [target, replacement] of [
+      [process.execPath, "/nonexistent/file"],
+      [emitted, "/nonexistent/file"],
+      [emitted, broken],
     ]) {
+      const home = await fs.mkdtemp(path.join(directory, "missing-"));
       await fs.writeFile(
-        path.join(directory, ".zshenv"),
-        preview.replaceAll(missing, "/nonexistent/file"),
+        path.join(home, ".zshenv"),
+        preview.replaceAll(target ?? "", replacement ?? ""),
       );
       const result = Bun.spawnSync(["/bin/zsh", "-c", "print sentinel:$options[errexit]"], {
         cwd: directory,
-        env: { ZDOTDIR: directory, CODEX_THREAD_ID: sessionId },
+        env: { HOME: home, ZDOTDIR: home, CODEX_THREAD_ID: sessionId },
       });
       expect(result.stdout.toString()).toBe("sentinel:off\n");
       expect(result.exitCode).toBe(0);
+      expect(result.stderr.length).toBe(0);
+      expect(await fs.exists(path.join(home, ".local"))).toBeFalsy();
     }
   } finally {
     await fs.rm(directory, { recursive: true, force: true });

@@ -76,6 +76,57 @@ test("invalid inputs create no state", async () => {
     expect(await fs.exists(root)).toBeFalsy();
   });
 });
+test("partial write failure removes only its own event and allows retry", async () => {
+  await fixture(async (root, cwd) => {
+    const open = fs.open.bind(fs);
+    const mock = spyOn(fs, "open").mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (args[1] === "wx") {
+        const write = handle.writeFile.bind(handle);
+        handle.writeFile = async () => {
+          await write("{");
+          throw new Error("Injected partial write failure");
+        };
+      }
+      return handle;
+    });
+    try {
+      expect(await recordShellEntry(options(root, cwd))).toBeFalsy();
+      expect(await fs.readdir(eventDirectory(root))).toEqual([]);
+    } finally {
+      mock.mockRestore();
+    }
+    expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
+    expect((await readShellEntry(options(root, cwd)))?.cwd).toBe(await fs.realpath(cwd));
+  });
+});
+test("failed writer preserves a replacement event path", async () => {
+  await fixture(async (root, cwd) => {
+    const open = fs.open.bind(fs);
+    const mock = spyOn(fs, "open").mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (args[1] === "wx") {
+        handle.writeFile = async () => {
+          const file = String(args[0]);
+          await fs.unlink(file);
+          await fs.writeFile(file, "replacement", { mode: 0o600 });
+          throw new Error("Injected path replacement");
+        };
+      }
+      return handle;
+    });
+    try {
+      expect(await recordShellEntry(options(root, cwd))).toBeFalsy();
+      const names = await fs.readdir(eventDirectory(root));
+      expect(names).toHaveLength(1);
+      expect(await fs.readFile(path.join(eventDirectory(root), names[0] ?? ""), "utf8")).toBe(
+        "replacement",
+      );
+    } finally {
+      mock.mockRestore();
+    }
+  });
+});
 test("writes remove expired observations before retaining fresh evidence", async () => {
   await fixture(async (root, cwd) => {
     expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
@@ -145,10 +196,26 @@ test("sequential retention, equal-time ordering and simultaneous distinct cwds",
     expect((await readShellEntry(options(root, cwd, now + 140)))?.observedAt).toBe(now + 139);
     const other = path.join(cwd, "other");
     await fs.mkdir(other);
-    await Promise.all(
+    const results = await Promise.all(
       [cwd, other].map((directory) => recordShellEntry(options(root, directory, now + 150))),
     );
+    expect(results).toEqual([true, true]);
     const files = (await fs.readdir(eventDirectory(root))).sort().reverse();
+    const captured = await Promise.all(
+      files.map(
+        async (file) =>
+          JSON.parse(await fs.readFile(path.join(eventDirectory(root), file), "utf8")) as {
+            cwd: string;
+            observedAt: number;
+          },
+      ),
+    );
+    expect(
+      captured
+        .filter((event) => event.observedAt === now + 150)
+        .map((event) => event.cwd)
+        .sort(),
+    ).toEqual([await fs.realpath(cwd), await fs.realpath(other)].sort());
     const latest = JSON.parse(
       await fs.readFile(path.join(eventDirectory(root), files[0] ?? ""), "utf8"),
     ) as { cwd: string };

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import type { Stats } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { observation, validSession } from "./contracts.js";
@@ -14,6 +15,29 @@ async function verifyWrite(file: string, handle: fs.FileHandle) {
     descriptor.size !== current.size
   )
     throw new Error("Observation write path changed");
+}
+async function writeEvent(
+  components: Awaited<ReturnType<typeof sessionDirectory>>,
+  file: string,
+  data: string,
+) {
+  const handle = await fs.open(file, "wx", FILE_MODE);
+  let created: Stats | undefined;
+  try {
+    created = await handle.stat();
+    await verifyDirectories(components);
+    await handle.writeFile(data);
+    await verifyDirectories(components);
+    await verifyWrite(file, handle);
+  } catch (error) {
+    await verifyDirectories(components);
+    const current = await fs.lstat(file);
+    if (created && current.ino === created.ino && current.dev === created.dev && current.isFile())
+      await fs.unlink(file);
+    throw error;
+  } finally {
+    await handle.close();
+  }
 }
 
 export async function recordShellEntry(options: {
@@ -47,15 +71,7 @@ export async function recordShellEntry(options: {
     if (!directory) return false;
     await verifyDirectories(components);
     const file = path.join(directory, `${String(now)}-${randomUUID()}.json`);
-    const handle = await fs.open(file, "wx", FILE_MODE);
-    try {
-      await verifyDirectories(components);
-      await handle.writeFile(data);
-      await verifyDirectories(components);
-      await verifyWrite(file, handle);
-    } finally {
-      await handle.close();
-    }
+    await writeEvent(components, file, data);
     await prune(components, options.sessionId, now);
     return true;
   } catch {
