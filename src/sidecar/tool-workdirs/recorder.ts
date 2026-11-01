@@ -21,22 +21,31 @@ async function writeEvent(
   file: string,
   data: string,
 ) {
-  const handle = await fs.open(file, "wx", FILE_MODE);
+  const root = components[0]?.file;
+  if (!root) throw new Error("Missing observation root");
+  // Stage outside the enumerable event directory. link publishes the completed
+  // inode atomically without replacing an existing event.
+  const pending = path.join(root, `.pending-${randomUUID()}`);
+  const handle = await fs.open(pending, "wx", FILE_MODE);
   let created: Stats | undefined;
   try {
     created = await handle.stat();
     await verifyDirectories(components);
     await handle.writeFile(data);
     await verifyDirectories(components);
-    await verifyWrite(file, handle);
-  } catch (error) {
+    await verifyWrite(pending, handle);
+    await fs.link(pending, file);
     await verifyDirectories(components);
-    const current = await fs.lstat(file);
-    if (created && current.ino === created.ino && current.dev === created.dev && current.isFile())
-      await fs.unlink(file);
-    throw error;
+    await verifyWrite(file, handle);
   } finally {
-    await handle.close();
+    try {
+      await verifyDirectories(components);
+      const current = await fs.lstat(pending);
+      if (created && current.ino === created.ino && current.dev === created.dev && current.isFile())
+        await fs.unlink(pending);
+    } finally {
+      await handle.close();
+    }
   }
 }
 

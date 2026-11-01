@@ -103,11 +103,13 @@ test("partial write failure removes only its own event and allows retry", async 
 test("failed writer preserves a replacement event path", async () => {
   await fixture(async (root, cwd) => {
     const open = fs.open.bind(fs);
+    let replaced = "";
     const mock = spyOn(fs, "open").mockImplementation(async (...args) => {
       const handle = await open(...args);
       if (args[1] === "wx") {
         handle.writeFile = async () => {
           const file = String(args[0]);
+          replaced = file;
           await fs.unlink(file);
           await fs.writeFile(file, "replacement", { mode: 0o600 });
           throw new Error("Injected path replacement");
@@ -117,14 +119,66 @@ test("failed writer preserves a replacement event path", async () => {
     });
     try {
       expect(await recordShellEntry(options(root, cwd))).toBeFalsy();
-      const names = await fs.readdir(eventDirectory(root));
-      expect(names).toHaveLength(1);
-      expect(await fs.readFile(path.join(eventDirectory(root), names[0] ?? ""), "utf8")).toBe(
-        "replacement",
-      );
+      expect(await fs.readdir(eventDirectory(root))).toEqual([]);
+      expect(await fs.readFile(replaced, "utf8")).toBe("replacement");
     } finally {
       mock.mockRestore();
     }
+  });
+});
+test("paused unpublished writer cannot hide valid events or block a newer writer", async () => {
+  await fixture(async (root, cwd) => {
+    expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
+    const other = path.join(cwd, "newer");
+    await fs.mkdir(other);
+    const paused = Promise.withResolvers<undefined>();
+    const release = Promise.withResolvers<undefined>();
+    const open = fs.open.bind(fs);
+    let intercepted = false;
+    const mock = spyOn(fs, "open").mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (args[1] === "wx" && !intercepted) {
+        intercepted = true;
+        const write = handle.writeFile.bind(handle);
+        handle.writeFile = async (data) => {
+          if (typeof data !== "string") throw new Error("Expected JSON string");
+          await write("{");
+          paused.resolve(undefined);
+          await release.promise;
+          await handle.truncate(0);
+          await handle.write(data, 0, "utf8");
+        };
+      }
+      return handle;
+    });
+    const older = recordShellEntry(options(root, cwd, now + 1));
+    try {
+      await paused.promise;
+      expect(await fs.readdir(eventDirectory(root))).toHaveLength(1);
+      expect((await readShellEntry(options(root, cwd)))?.observedAt).toBe(now);
+      expect(await recordShellEntry(options(root, other, now + 2))).toBeTruthy();
+      expect((await readShellEntry(options(root, cwd, now + 2)))?.cwd).toBe(
+        await fs.realpath(other),
+      );
+      release.resolve(undefined);
+      expect(await older).toBeTruthy();
+      expect(await fs.readdir(eventDirectory(root))).toHaveLength(3);
+      expect((await readShellEntry(options(root, cwd, now + 2)))?.observedAt).toBe(now + 2);
+    } finally {
+      release.resolve(undefined);
+      await older;
+      mock.mockRestore();
+    }
+  });
+});
+test("interrupted unpublished payload cannot poison subsequent reads or writes", async () => {
+  await fixture(async (root, cwd) => {
+    expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
+    // A killed process leaves precisely its private staging inode behind.
+    await fs.writeFile(path.join(root, ".pending-abandoned"), "{", { mode: 0o600 });
+    expect((await readShellEntry(options(root, cwd)))?.observedAt).toBe(now);
+    expect(await recordShellEntry(options(root, cwd, now + 1))).toBeTruthy();
+    expect((await readShellEntry(options(root, cwd, now + 1)))?.observedAt).toBe(now + 1);
   });
 });
 test("writes remove expired observations before retaining fresh evidence", async () => {
