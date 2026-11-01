@@ -180,6 +180,13 @@ function checkoutLabels(value: Record<string, unknown>) {
     nullableText(value.worktree)
   );
 }
+export function ageCheckoutObservation(
+  value: ObserverRow["checkoutObservation"],
+  now: number,
+): ObserverRow["checkoutObservation"] {
+  if (!value || !validEventTime(value.observedAt, now)) return undefined;
+  return { ...value, state: now - value.observedAt > EVENT_STALE ? "stale" : value.state };
+}
 function remoteCheckout(
   host: string,
   value: unknown,
@@ -194,16 +201,19 @@ function remoteCheckout(
     !checkoutLabels(value)
   )
     return undefined;
-  return {
-    source: "shell-entry",
-    observedAt: value.observedAt,
-    state: now - value.observedAt > EVENT_STALE ? "stale" : value.state,
-    repoId: opaque(prefixOf(value.repoId, "dir_"), host, value.repoId),
-    repo: text(value.repo, LIMITS.LABEL) || "Unassigned",
-    checkoutId: opaque("checkout_", host, value.checkoutId),
-    checkoutKind: oneOf(value.checkoutKind, new Set(["main", "worktree", "folder"] as const)),
-    worktree: text(value.worktree, LIMITS.LABEL),
-  };
+  return ageCheckoutObservation(
+    {
+      source: "shell-entry",
+      observedAt: value.observedAt,
+      state: value.state,
+      repoId: opaque(prefixOf(value.repoId, "dir_"), host, value.repoId),
+      repo: text(value.repo, LIMITS.LABEL) || "Unassigned",
+      checkoutId: opaque("checkout_", host, value.checkoutId),
+      checkoutKind: oneOf(value.checkoutKind, new Set(["main", "worktree", "folder"] as const)),
+      worktree: text(value.worktree, LIMITS.LABEL),
+    },
+    now,
+  );
 }
 
 function optionalFields(row: Record<string, unknown>) {
