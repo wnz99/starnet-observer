@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-r27 | Station assembly and saved visual settings | Revision 2 approved; registered; three sequential tasks pending | [261101-r27](./quick/261101-r27-station-assembly-and-saved-visual-settin/) |
+| 261101-r27 | Station assembly and saved visual settings | Tasks 1–2 independently reviewed; Task 3 browser proof collected; review and CI pending | [261101-r27](./quick/261101-r27-station-assembly-and-saved-visual-settin/) |
 
 ## Quick Tasks Completed
 
