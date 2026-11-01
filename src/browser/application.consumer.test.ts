@@ -1799,6 +1799,20 @@ async function assemblyInput(
   fresh: () => Promise<void>,
   paint: (time: number) => Promise<{ state: string; camera: CanvasProbe["camera"] }>,
 ) {
+  await fresh();
+  await paint(0);
+  const overview = await paint(2800);
+  const target = await page.evaluate(() => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    const region = view.observatoryRegion;
+    const platform = view.activeScene.platforms.find((room) => room.projectId === "Left");
+    if (!region || !platform) throw new Error("Missing interruption targets");
+    return {
+      x: region.left + region.width / 2,
+      y: region.top + region.height / 2,
+      platform: platform.key,
+    };
+  });
   for (const input of ["click", "wheel", "drag", "key", "sidebar"] as const) {
     await fresh();
     await paint(0);
@@ -1806,8 +1820,22 @@ async function assemblyInput(
     const box = await page.locator("canvas").boundingBox();
     assert.ok(box);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    if (input === "click") await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    else if (input === "wheel") await page.mouse.wheel(0, -100);
+    if (input === "click") {
+      await page.evaluate(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        const original = view.callbacks.onObservatory;
+        Reflect.set(window, "__observatorySelections", 0);
+        view.callbacks.onObservatory = () => {
+          Reflect.set(window, "__observatorySelections", 1);
+          original();
+        };
+      });
+      await page.mouse.click(box.x + target.x, box.y + target.y);
+      assert.equal(
+        await page.evaluate(() => Number(Reflect.get(window, "__observatorySelections"))),
+        1,
+      );
+    } else if (input === "wheel") await page.mouse.wheel(0, -100);
     else if (input === "drag") {
       await page.mouse.down();
       await page.mouse.move(box.x + box.width / 2 + 70, box.y + box.height / 2 + 30);
@@ -1816,12 +1844,27 @@ async function assemblyInput(
       await page.locator("canvas").focus();
       await page.keyboard.press("+");
     } else
-      await page
-        .getByRole("button", { name: /^Zoom to the/ })
-        .first()
-        .click();
+      await page.getByRole("button", { name: "Zoom to the Left platform", exact: true }).click();
     const interrupted = await paint(700);
     assert.equal(interrupted.state, "complete", input);
+    if (input === "wheel" || input === "key")
+      assert.ok(interrupted.camera.zoom > overview.camera.zoom, input + " zooms in from overview");
+    if (input === "drag") {
+      assert.ok(Math.abs(interrupted.camera.zoom - overview.camera.zoom) < 1e-12);
+      assert.ok(Math.abs(interrupted.camera.tx - overview.camera.tx - 70) < 0.01, "drag pans x");
+      assert.ok(interrupted.camera.ty >= overview.camera.ty, "drag does not pan against y input");
+    }
+    if (input === "sidebar") {
+      const focus = await page.evaluate(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        return { mode: view.mode, platform: view.platform };
+      });
+      assert.deepEqual(focus, { mode: "platform", platform: target.platform });
+      assert.ok(
+        interrupted.camera.zoom > overview.camera.zoom,
+        "sidebar focuses the selected room",
+      );
+    }
     assert.deepEqual((await paint(2800)).camera, interrupted.camera, input + " camera persists");
   }
 }
