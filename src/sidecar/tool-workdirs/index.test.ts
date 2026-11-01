@@ -2,6 +2,7 @@ import { test, expect, spyOn } from "bun:test";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { recordShellEntry } from "./recorder.js";
 import { readShellEntry } from "./store.js";
 
@@ -22,6 +23,19 @@ const options = (root: string, cwd: string, time = now) => ({
   now: () => time,
 });
 const eventDirectory = (root: string) => path.join(root, "v1/codex", sessionId);
+async function seedHistory(root: string, cwd: string, count: number) {
+  expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
+  const event = await readShellEntry(options(root, cwd));
+  expect(event).not.toBeNull();
+  // Seed valid private history directly: repeated writer calls would rescan
+  // the same retained files thousands of times before reaching this boundary.
+  for (let index = 1; index < count; index++)
+    await fs.writeFile(
+      path.join(eventDirectory(root), `${String(now + index)}-${randomUUID()}.json`),
+      JSON.stringify({ ...event, observedAt: now + index }),
+      { mode: 0o600, flag: "wx" },
+    );
+}
 test("foreign owner and changed directory identity withdraw authority", async () => {
   await fixture(async (root, cwd) => {
     expect(await recordShellEntry(options(root, cwd))).toBeTruthy();
@@ -242,12 +256,30 @@ test("bounded listing fails closed and does not prune unexpected files", async (
     expect((await fs.readdir(directory)).length).toBe(130);
   });
 });
-test("sequential retention, equal-time ordering and simultaneous distinct cwds", async () => {
+test("writes prune a full bounded directory and retain the newest 64 events", async () => {
   await fixture(async (root, cwd) => {
-    for (let index = 0; index < 140; index++)
-      expect(await recordShellEntry(options(root, cwd, now + index))).toBeTruthy();
-    expect((await fs.readdir(eventDirectory(root))).length).toBe(64);
-    expect((await readShellEntry(options(root, cwd, now + 140)))?.observedAt).toBe(now + 139);
+    await seedHistory(root, cwd, 128);
+    expect((await fs.readdir(eventDirectory(root))).length).toBe(128);
+    for (const time of [now + 128, now + 129]) {
+      expect(await recordShellEntry(options(root, cwd, time))).toBeTruthy();
+      const retained = await Promise.all(
+        (await fs.readdir(eventDirectory(root))).map(async (file) => {
+          const captured = JSON.parse(
+            await fs.readFile(path.join(eventDirectory(root), file), "utf8"),
+          ) as { observedAt: number };
+          return captured.observedAt;
+        }),
+      );
+      expect(retained.sort((a, b) => a - b)).toEqual(
+        Array.from({ length: 64 }, (_, index) => time - 63 + index),
+      );
+      expect((await readShellEntry(options(root, cwd, time)))?.observedAt).toBe(time);
+    }
+  });
+});
+test("equal-time ordering and simultaneous distinct cwds preserve both writers", async () => {
+  await fixture(async (root, cwd) => {
+    await seedHistory(root, cwd, 64);
     const other = path.join(cwd, "other");
     await fs.mkdir(other);
     const results = await Promise.all(
