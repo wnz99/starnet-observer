@@ -35,12 +35,12 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-l00 | Record exact-session tool checkout observations and source-qualified desk badges | Three tasks implemented and independently reviewed; conformance and aggregate verification passed at b831d49; full-branch PR review, current-head CI and merge pending; shell integration uninstalled | [261101-l00](./quick/261101-l00-record-exact-session-tool-checkout-obser/) |
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261101-l00 | Record exact-session tool checkout observations and source-qualified desk badges | 2026-11-01 | [PR #35](https://github.com/wnz99/starnet-observer/pull/35) | Code implementation, independent full-branch review and verification complete at f86e66a; final tracking-head CI and guarded merge pending at summary preparation; optional shell setup remains uninstalled | [261101-l00](./quick/261101-l00-record-exact-session-tool-checkout-obser/) |
 | 261101-ggo follow-up | Correct main-checkout desk badge identity after PR #33 | 2026-11-01 | [PR #34](https://github.com/wnz99/starnet-observer/pull/34) | Implementation, independent full-branch review and required local verification complete; final tracking-head CI and guarded merge pending at summary preparation | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
 | 261101-ggo | Deliver one repository sign and selected flat desk badges | 2026-11-01 | [PR #33](https://github.com/wnz99/starnet-observer/pull/33) | Implementation, independent full-branch review and required local verification complete; final tracking-head CI and merge pending at summary preparation | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
 | 261101-0jt | Fix Codex native child identity and nested discovery | 2026-11-01 | [PR #31](https://github.com/wnz99/starnet-observer/pull/31) | Implementation, independent source review and required verification complete; 24 focused/298 core tests and source Ubuntu CI passed; final tracking-head CI and merge pending at summary preparation | [261101-0jt](./quick/261101-0jt-fix-codex-native-child-identity-and-nest/) |
