@@ -4,8 +4,9 @@ import type { SpriteResource } from "../sprites/types.js";
 import { hash } from "./primitives.js";
 import type { SparkOptions } from "./state-types.js";
 import type { ViewRuntime } from "./runtime.js";
+import { CABLE_HEIGHT, cableSurfaces } from "../scene/cables.js";
 const OBSERVATION = {
-  height: 0.1,
+  height: CABLE_HEIGHT,
   liveWidth: 1.2,
   downWidth: 0.8,
   endRadius: 4,
@@ -41,13 +42,10 @@ export class Effects<R extends SpriteResource, B extends R = R> {
     this.view.ctx.globalAlpha = style.alpha;
     this.view.ctx.setLineDash(live ? [] : OBSERVATION.dash);
     this.view.ctx.lineDashOffset = live && animate ? -(now / 60) % 8 : 0;
-    this.view.ctx.beginPath();
-    this.view.ctx.moveTo(a.x, a.y);
-    for (const point of link.path.slice(1)) {
-      const at = P({ ...point, z: OBSERVATION.height });
-      this.view.ctx.lineTo(at.x, at.y);
-    }
-    this.view.ctx.stroke();
+    this.view.geometry.cable(link.path, cableSurfaces(this.view.activeScene), {
+      alpha: style.alpha,
+      height: OBSERVATION.height,
+    });
     this.view.ctx.setLineDash([]);
     for (const end of [a, b]) {
       this.view.ctx.fillStyle = color;

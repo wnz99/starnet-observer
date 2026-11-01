@@ -71,12 +71,12 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
       this.paintAssembly("mail", "content", () => {
         this.radar(now, animate);
       });
-    this.observations(now, animate);
     this.measureVisibleArea();
 
     if (ambient) this.ambient(now, animate);
     const staleKeys = this.paintItems({ A, now, animate, ambient });
     if (!this.view.assemblyFrame.active) {
+      this.observations(now, animate);
       this.overlays.repository(stationArt);
       this.overlays.focus(now, animate);
       this.overlays.platform(this.view.camera.zoom);
@@ -94,7 +94,6 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     return animate || assemblyAnimating;
   };
   private observations(now: number, animate: boolean) {
-    if (this.view.assemblyFrame.active) return;
     for (const link of this.view.activeScene.links || [])
       this.view.effects.paintObservation(link, now, animate);
   }
