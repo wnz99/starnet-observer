@@ -25,6 +25,7 @@ export type Row = Pick<InventoryRow, "id"> &
       | "lineageState"
       | "host"
       | "checkoutId"
+      | "checkoutObservation"
       | "checkoutKind"
       | "worktree"
       | "folder"
@@ -105,6 +106,7 @@ export type ProjectedRow = Pick<Row, "id"> & {
   project: string;
   repo: string;
   checkoutId: string | null;
+  checkoutObservation?: InventoryRow["checkoutObservation"];
   checkoutKind: "main" | "worktree" | "folder" | null;
   worktree: string | null | undefined;
   folder: string | undefined;

@@ -5,6 +5,32 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { makePresentationObserver } from "../presentation/index.js";
 import { createServer } from "../../server/http.js";
+test("presentation aliases nested checkout labels and preserves provenance", async () => {
+  const checkoutObservation = {
+    source: "shell-entry" as const,
+    observedAt: 123456,
+    state: "stale" as const,
+    repoId: "repo_private",
+    repo: "PRIVATE_REPO",
+    checkoutId: "checkout_private",
+    checkoutKind: "worktree" as const,
+    worktree: "PRIVATE_WORKTREE",
+  };
+  const observer = makePresentationObserver({
+    get: () => ({
+      sessions: [
+        { id: "session", repoId: "repo_private", projectId: "project", checkoutObservation },
+      ],
+    }),
+  });
+  const result = await observer.get();
+  const nested = result.sessions[0]?.checkoutObservation;
+  assert.equal(nested?.source, "shell-entry");
+  assert.equal(nested.observedAt, 123456);
+  assert.equal(nested.state, "stale");
+  assert.equal(nested.repo, result.sessions[0]?.repo);
+  assert.equal(JSON.stringify(result).includes("PRIVATE_"), false);
+});
 
 test("presentation regression contracts", async () => {
   await (async () => {

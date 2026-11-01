@@ -41,5 +41,6 @@ export class Publisher {
     this.state.rowsBySource.helper = children;
     this.state.lastGood = [...roots, ...this.state.rowsBySource.desktop, ...children];
     this.retain();
+    this.state.workdirs.schedule();
   }
 }

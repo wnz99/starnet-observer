@@ -3,6 +3,7 @@ import type { Remote, RemoteChild, RemoteOptions, Targets, HostSource, Schedule 
 import { FRESH_MS, CONTROL_FRESH_MS, BACKOFF } from "./fields.js";
 import { sshArgs, reasonFrom } from "./command.js";
 import { sanitizeSnapshot } from "./snapshot.js";
+import { ageCheckoutObservation } from "./rows.js";
 import { SnapshotLines } from "./framing.js";
 const MAX_STDERR = 8192;
 const STOP_SIGNAL = "SIGTERM";
@@ -124,9 +125,14 @@ export class RemoteHost {
   snapshot(at: number) {
     const fresh = this.fresh(at);
     // Stale rows stay on screen (the last truthful observation) but are never presented as live.
-    const rows = this.rows.map((row) =>
-      fresh ? row : { ...row, inventoryHealth: "unavailable" as const },
-    );
+    const rows = this.rows.map((row) => {
+      const current = { ...row };
+      delete current.checkoutObservation;
+      const observation = ageCheckoutObservation(row.checkoutObservation, at);
+      if (observation) current.checkoutObservation = observation;
+      if (!fresh) current.inventoryHealth = "unavailable";
+      return current;
+    });
     // A quiet host's mail is its last observation: kept in the ledger, never presented as an active bus.
     const bus =
       this.bus &&

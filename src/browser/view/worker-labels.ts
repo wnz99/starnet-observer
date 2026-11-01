@@ -1,6 +1,7 @@
 import type { Worker } from "../scene/types.js";
 import { toScreen } from "../scene/index.js";
 import { checkoutSuffix } from "../model/identity.js";
+import { CHECKOUT_AGE as OBSERVATION_AGE } from "../model/checkout-age.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { LabelContext } from "./label-types.js";
 import { statusColor } from "./look.js";
@@ -98,11 +99,11 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
     );
     this.view.ctx.font = String(size) + "px VT323, monospace";
     if (space < inset + this.view.ctx.measureText("…").width) return [];
-    const fullText = this.checkoutText(desk.worker, desks);
+    const { text, fullText } = this.checkoutText(desk.worker, desks);
     const overlays = this.view.framePaint.overlays;
     const color = overlays.repositoryColor(desk.worker.id);
     const plate = this.view.plates.textPlate(
-      this.view.plates.clipText(fullText, space - inset, size),
+      this.view.plates.clipText(text, space - inset, size),
       desk.x,
       desk.y + height,
       { size, accent: color, color, priority },
@@ -117,17 +118,75 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       },
     ];
   }
-  private checkoutText(worker: Worker, desks: DeskAnchor[]): string {
+  private checkoutText(worker: Worker, desks: DeskAnchor[]) {
     const row = worker.row;
+    const observation = row.checkoutObservation;
+    const actualRepoId = row.observedRepoId === undefined ? row.repoId : row.observedRepoId;
+    const age = observation ? Date.now() - observation.observedAt : Infinity;
+    if (this.eligibleObservation(observation, age) && actualRepoId && observation.repoId) {
+      const ids = desks.map(({ worker: entry }) => entry.row.checkoutObservation?.checkoutId);
+      const checkout = this.checkoutName(observation, observation.repo, ids);
+      if (checkout !== "Checkout unavailable") {
+        return this.toolBadge(observation, actualRepoId, checkout, age);
+      }
+    }
+    const repo = row.observedRepo === undefined ? row.repo : row.observedRepo;
+    const ids = desks.map(({ worker: entry }) => entry.row.checkoutId);
+    const checkout = this.checkoutName(row, repo, ids);
+    if (checkout === "Checkout unavailable") return { text: checkout, fullText: checkout };
+    const text = checkout + " · terminal";
+    return { text, fullText: text + "\nTerminal checkout" };
+  }
+  private toolBadge(
+    observation: NonNullable<Worker["row"]["checkoutObservation"]>,
+    actualRepoId: string,
+    checkout: string,
+    age: number,
+  ) {
+    const stale = observation.state === "stale" || age > OBSERVATION_AGE.stale ? " · stale" : "";
+    const name =
+      observation.checkoutKind === "folder"
+        ? "Local folder"
+        : actualRepoId === observation.repoId
+          ? checkout
+          : "Other repo";
+    const text = name + " · tool" + stale;
+    return {
+      text,
+      fullText:
+        text +
+        "\n" +
+        observation.repo +
+        " · " +
+        checkout +
+        "\nLast recorded shell entry: " +
+        new Date(observation.observedAt).toISOString() +
+        stale,
+    };
+  }
+  private eligibleObservation(
+    observation:
+      | (Omit<NonNullable<Worker["row"]["checkoutObservation"]>, "source"> & { source: string })
+      | undefined,
+    age: number,
+  ): observation is NonNullable<Worker["row"]["checkoutObservation"]> {
+    if (!observation || observation.source !== "shell-entry") return false;
+    return (
+      Number.isSafeInteger(observation.observedAt) &&
+      observation.observedAt > 0 &&
+      age >= OBSERVATION_AGE.future &&
+      age <= OBSERVATION_AGE.expiry
+    );
+  }
+  private checkoutName(
+    row: Pick<Worker["row"], "checkoutId" | "checkoutKind" | "worktree">,
+    repo: string | null | undefined,
+    ids: readonly (string | null | undefined)[],
+  ) {
     if (!row.checkoutId) return "Checkout unavailable";
     if (row.checkoutKind === "folder") return "Local folder";
-    if (row.checkoutKind === "main") {
-      const name = row.observedRepo === undefined ? row.repo : row.observedRepo;
-      return name ? name + " · main" : "Checkout unavailable";
-    }
-    if (!row.worktree) return "Checkout unavailable";
-    if (row.checkoutKind !== "worktree") return "Checkout unavailable";
-    const ids = desks.map(({ worker: entry }) => entry.row.checkoutId);
+    if (row.checkoutKind === "main") return repo ? repo + " · main" : "Checkout unavailable";
+    if (row.checkoutKind !== "worktree" || !row.worktree) return "Checkout unavailable";
     return row.worktree + " · " + checkoutSuffix(row.checkoutId, ids);
   }
   paintStatusDots() {

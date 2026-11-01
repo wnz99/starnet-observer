@@ -85,6 +85,16 @@ test("observer-arrange-ui regression contracts", async () => {
     projectKind: "group",
     repoId,
     repo: repoId,
+    checkoutObservation: {
+      source: "shell-entry",
+      observedAt: Date.now(),
+      state: "observed",
+      repoId,
+      repo: repoId,
+      checkoutId: "tool_" + id,
+      checkoutKind: "worktree",
+      worktree: "linked",
+    },
     folder: "",
     observedAt: Date.now(),
     inventoryHealth: "available",
@@ -133,9 +143,30 @@ test("observer-arrange-ui regression contracts", async () => {
     const arranged = page.updates.at(-1);
     assert.equal(present(arranged).platforms.length, 1, "on: one arranged room");
     assert.equal(present(present(arranged).platforms[0]).name, "banqora");
+    assert.deepEqual(
+      present(arranged).workers.map((worker) => worker.row.observedRepoId),
+      ["repo_web", "repo_infra"],
+      "arranged scene retains actual repository proof",
+    );
+    assert(
+      present(arranged).workers.every(
+        (worker) => worker.row.checkoutObservation?.repoId === worker.row.observedRepoId,
+      ),
+      "same-repository tool evidence survives the real toggle",
+    );
     const chairs = present(arranged).workers.map(
       (worker) => String(worker.chair.x) + "," + String(worker.chair.y),
     );
+    const arrivals = data();
+    present(arrivals.sessions[0]).checkoutObservation.worktree = "replacement";
+    page.poll(arrivals);
+    assert.equal(page.updates.at(-1), arranged, "observation changes retain scene geometry");
+    const retainedWorker = present(arranged).workers[0];
+    assert.equal(retainedWorker?.row.checkoutObservation?.worktree, "replacement");
+    const withdrawn = data();
+    Reflect.deleteProperty(present(withdrawn.sessions[0]), "checkoutObservation");
+    page.poll(withdrawn);
+    assert.equal(retainedWorker.row.checkoutObservation, undefined);
     page.poll(data());
     assert.deepEqual(
       present(page.updates.at(-1)).workers.map(

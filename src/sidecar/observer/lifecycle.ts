@@ -6,6 +6,7 @@ export class Lifecycle {
   close() {
     if (!this.state.closePromise) {
       this.state.closed = true;
+      this.state.workdirs.clear();
       this.state.enrichmentTarget = null;
       this.state.warmQueue.clear();
       this.state.closePromise = (async () => {

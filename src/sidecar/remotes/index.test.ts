@@ -14,6 +14,128 @@ import {
 } from "./index.js";
 import { startStream } from "../../../scripts/stream.js";
 import { UUID, row, fakeSpawn, fakeTimers, safeRow, required } from "./remotes.fixture.js";
+test("remote checkout allowlist preserves event age and scopes checkout identities", () => {
+  const base = row();
+  const value = {
+    source: "shell-entry",
+    observedAt: 1000000,
+    state: "observed",
+    repoId: base.repoId,
+    repo: "Repository",
+    checkoutId: "checkout_private",
+    checkoutKind: "main",
+    worktree: null,
+    cwd: "/secret",
+    sessionId: "secret",
+  };
+  const safe = sanitizeRow("host", { ...base, checkoutObservation: value }, 1400000);
+  const nested = safe?.checkoutObservation;
+  assert.equal(nested?.observedAt, 1000000);
+  assert.equal(nested.state, "stale");
+  assert.equal(nested.repoId, safe?.repoId);
+  assert.notEqual(nested.checkoutId, value.checkoutId);
+  assert.equal(JSON.stringify(nested).includes("secret"), false);
+  for (const patch of [
+    { source: "terminal" },
+    { observedAt: 1500000 },
+    { checkoutKind: "unknown" },
+  ])
+    assert.equal(
+      sanitizeRow("host", { ...base, checkoutObservation: { ...value, ...patch } }, 1400000)
+        ?.checkoutObservation,
+      undefined,
+    );
+});
+test("quiet and disconnected remote checkout observations age without renewing cached evidence", () => {
+  let clock = 1000000;
+  const observedAt = clock;
+  const { spawn, children } = fakeSpawn();
+  const timers = fakeTimers();
+  const hosts = makeRemoteHosts({
+    remotes: [{ id: "vm", ssh: "nick@host" }],
+    spawn,
+    now: () => clock,
+    setTimer: timers.setTimer,
+    clearTimer: timers.clearTimer,
+  });
+  const child = required(children[0]);
+  const send = () =>
+    child.stdout.emit(
+      "data",
+      JSON.stringify({
+        health: "available",
+        sessions: [
+          row({
+            checkoutObservation: {
+              source: "shell-entry",
+              observedAt,
+              state: "observed",
+              repoId: row().repoId,
+              repo: "Repository",
+              checkoutId: "checkout_private",
+              checkoutKind: "main",
+              worktree: null,
+            },
+          }),
+        ],
+      }) + "\n",
+    );
+  try {
+    send();
+    const initial = required(hosts.snapshot().rows[0]);
+    const observation = required(initial.checkoutObservation);
+    const check = (state: "observed" | "stale" | null) => {
+      for (let repeat = 0; repeat < 2; repeat++) {
+        const current = required(hosts.snapshot().rows[0]);
+        assert.equal(current.id, initial.id);
+        assert.equal(current.repoId, initial.repoId);
+        assert.equal(current.projectId, initial.projectId);
+        assert.deepEqual(
+          current.checkoutObservation,
+          state ? { ...observation, state } : undefined,
+        );
+        assert.equal(required(hosts.snapshot().sources.vm).observedAt, observedAt);
+      }
+    };
+    check("observed");
+    clock = observedAt + 300000;
+    check("observed");
+    clock++;
+    check("stale");
+    child.emit("close", 1);
+    assert.equal(required(hosts.snapshot().sources.vm).health, "unavailable");
+    check("stale");
+    clock = observedAt + 86400000;
+    check("stale");
+    clock++;
+    check(null);
+    assert.equal(observation.state, "observed", "snapshot aging does not mutate cached evidence");
+    timers.run();
+    required(children[1]).stdout.emit(
+      "data",
+      JSON.stringify({
+        health: "available",
+        sessions: [
+          row({
+            checkoutObservation: {
+              ...observation,
+              observedAt: clock,
+              repoId: row().repoId,
+              checkoutId: "checkout_private",
+            },
+          }),
+        ],
+      }) + "\n",
+    );
+    const replacement = required(required(hosts.snapshot().rows[0]).checkoutObservation);
+    assert.equal(replacement.observedAt, clock);
+    assert.equal(replacement.state, "observed");
+    assert.equal(replacement.repoId, observation.repoId);
+    assert.equal(replacement.checkoutId, observation.checkoutId);
+  } finally {
+    hosts.close();
+  }
+});
 test("observer-remotes regression contracts", async () => {
   // ── ssh argv and remote command: fixed, quoted, and option-injection proof.
   {
