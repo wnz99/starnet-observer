@@ -1,22 +1,20 @@
 import * as Scene from "../scene/index.js";
+import { projectedBounds } from "../scene/geometry.js";
 import type { Camera, Point } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { ViewRuntime } from "./runtime.js";
+import { ASSEMBLY_CAMERA_DURATION } from "./startup-assembly.js";
 import { present as required } from "./values.js";
 const ZOOM_LIMIT = { maxFactor: 1e6, minFactor: 1e-6 };
-const HALVES = 2;
 
 export class CameraControl<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
   private assemblyCamera: { start: Camera; end: Camera; at: number; elapsed: number } | null = null;
-  private readonly assemblyDuration = 2800;
   beginAssemblyCamera(now: number) {
-    const scene = this.view.activeScene,
-      rect = scene.mail.rect;
+    const scene = this.view.activeScene;
     this.assemblyCamera = {
-      start: Scene.focus(
-        { x: rect.x + rect.w / HALVES, y: rect.y + rect.h / HALVES },
-        scene.bounds,
+      start: Scene.fit(
+        projectedBounds([{ rect: scene.mail.rect }, { rect: scene.observatory.rect }]),
         this.view.viewport,
       ),
       end: Scene.fit(scene.bounds, this.view.viewport),
@@ -28,8 +26,8 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
   advanceAssemblyCamera(now: number) {
     const camera = this.assemblyCamera;
     if (!camera) return;
-    camera.elapsed = Math.max(camera.elapsed, Math.min(this.assemblyDuration, now - camera.at));
-    const t = camera.elapsed / this.assemblyDuration,
+    camera.elapsed = Math.max(camera.elapsed, Math.min(ASSEMBLY_CAMERA_DURATION, now - camera.at));
+    const t = camera.elapsed / ASSEMBLY_CAMERA_DURATION,
       eased = t * t * (3 - 2 * t);
     const zoom = camera.start.zoom + (camera.end.zoom - camera.start.zoom) * eased;
     const middle = this.viewportCenter();
@@ -39,7 +37,7 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
       return middle[axis] - (start + (end - start) * eased) * zoom;
     };
     this.setCamera({ zoom, tx: center("x", "tx"), ty: center("y", "ty") });
-    if (camera.elapsed === this.assemblyDuration) this.assemblyCamera = null;
+    if (camera.elapsed === ASSEMBLY_CAMERA_DURATION) this.assemblyCamera = null;
   }
   finishAssemblyCamera() {
     if (!this.assemblyCamera) return;

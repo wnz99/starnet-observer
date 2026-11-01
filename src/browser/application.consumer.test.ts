@@ -2223,6 +2223,12 @@ async function startupAssembly(
         targets: view.regions.length,
         mailFloor: view.assemblyFrame.progress("mail", "floor"),
         mailContent: view.assemblyFrame.progress("mail", "content"),
+        observatoryContent: view.assemblyFrame.progress("observatory", "content"),
+        roomFloor: Math.max(
+          ...view.activeScene.platforms.map((room) =>
+            view.assemblyFrame.progress(`platform:${room.key}`, "floor"),
+          ),
+        ),
         builds: view.staticLayer?.builds ?? 0,
         allocations: Number(Reflect.get(window, "__canvasAllocations") ?? 0),
         duration,
@@ -2283,15 +2289,22 @@ async function startupAssembly(
     await fresh();
     const start = await paint(0);
     assert.equal(start.state, "playing");
-    assert.equal(start.mailFloor, 0);
+    assert.equal(start.mailFloor, 1);
+    assert.equal(start.mailContent, 1);
+    assert.equal(start.observatoryContent, 1);
+    assert.equal(start.roomFloor, 0);
     assert.equal(start.labels, 0);
-    assert.equal(start.targets, 0);
     await page.screenshot({ path: path.join(artifacts, "assembly-start.png") });
-    await paint(50);
+    const pullback = await paint(450);
+    assert.equal(pullback.roomFloor, 0);
+    assert.equal(pullback.labels, 0);
+    const positioned = await paint(900);
+    assert.equal(positioned.roomFloor, 0);
+    assert.equal(positioned.labels, 0);
+    await paint(1050);
     await page.screenshot({ path: path.join(artifacts, "assembly-outline.png") });
-    const floor = await paint(200);
-    assert.ok(floor.mailFloor > 0 && floor.mailFloor < 1);
-    assert.equal(floor.mailContent, 0);
+    const floor = await paint(1200);
+    assert.ok(floor.roomFloor > 0 && floor.roomFloor < 1);
     await page.screenshot({ path: path.join(artifacts, "assembly-floor.png") });
     const middle = await paint(1400);
     await page.screenshot({ path: path.join(artifacts, "assembly-mid.png") });
@@ -2299,6 +2312,12 @@ async function startupAssembly(
     assert.equal(beforeEnd.state, "playing");
     const end = await paint(2800);
     assert.equal(end.state, "complete");
+    assert.deepEqual(
+      positioned.camera,
+      end.camera,
+      "camera settles before surrounding rooms build",
+    );
+    assert.deepEqual(middle.camera, end.camera, "camera stays fixed during room construction");
     assert.ok(start.camera.zoom >= middle.camera.zoom && middle.camera.zoom >= end.camera.zoom);
     for (const frame of [floor, middle, beforeEnd, end]) {
       assert.equal(frame.platforms, start.platforms);
@@ -2351,7 +2370,7 @@ async function startupAssembly(
         mode,
       );
       assert.equal((await paint(0)).state, "playing", mode + " office starts");
-      await paint(200);
+      await paint(1200);
       await page.screenshot({
         path: path.join(artifacts, "assembly-office-" + mode + "-floor.png"),
       });
