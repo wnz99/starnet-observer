@@ -35,7 +35,7 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-ggo | Deliver one repository sign and selected flat desk badges | Approved revision 2 registered; implementation, independent review and verification pending | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
+| 261101-ggo | Deliver one repository sign and selected flat desk badges | In review: implementation, task review R2 and aggregate verification passed; full-branch PR review, CI and merge pending | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
 
 ## Quick Tasks Completed
 
