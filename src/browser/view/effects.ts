@@ -1,12 +1,13 @@
 import { project as P } from "../scene/index.js";
-import * as Scene from "../scene/index.js";
 import type { ObservationLink, Point, Rect } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { hash } from "./primitives.js";
 import type { SparkOptions } from "./state-types.js";
 import type { ViewRuntime } from "./runtime.js";
 const OBSERVATION = {
-  height: 2.2,
+  height: 0.1,
+  liveWidth: 1.2,
+  downWidth: 0.8,
   endRadius: 4,
   glowRadius: 14,
   glowBase: 0.3,
@@ -25,17 +26,21 @@ export class Effects<R extends SpriteResource, B extends R = R> {
   paintObservation = (link: ObservationLink, now: number, animate: boolean) => {
     const live = link.health === "available",
       color = live ? this.view.C.cyan : this.view.C.idle;
-    const a = Scene.project({ ...link.from, z: OBSERVATION.height }),
+    const a = P({ ...link.from, z: OBSERVATION.height }),
       b = P({ ...link.to, z: OBSERVATION.height });
     this.view.ctx.save();
     this.view.ctx.strokeStyle = color;
-    this.view.ctx.lineWidth = live ? 1.6 : 1.2;
+    this.view.ctx.lineWidth =
+      (live ? OBSERVATION.liveWidth : OBSERVATION.downWidth) / this.view.camera.zoom;
     this.view.ctx.globalAlpha = live ? 0.85 : 0.45;
-    this.view.ctx.setLineDash(OBSERVATION.dash);
+    this.view.ctx.setLineDash(live ? [] : OBSERVATION.dash);
     this.view.ctx.lineDashOffset = live && animate ? -(now / 60) % 8 : 0;
     this.view.ctx.beginPath();
     this.view.ctx.moveTo(a.x, a.y);
-    this.view.ctx.lineTo(b.x, b.y);
+    for (const point of link.path.slice(1)) {
+      const at = P({ ...point, z: OBSERVATION.height });
+      this.view.ctx.lineTo(at.x, at.y);
+    }
     this.view.ctx.stroke();
     this.view.ctx.setLineDash([]);
     for (const end of [a, b]) {
@@ -48,16 +53,19 @@ export class Effects<R extends SpriteResource, B extends R = R> {
       this.view.ctx.closePath();
       this.view.ctx.fill();
     }
-    if (live)
-      this.view.geometry.glow({ ...link.to, z: OBSERVATION.height }, OBSERVATION.glowRadius, {
-        color: this.view.C.cyan,
-        alpha: animate
-          ? OBSERVATION.glowBase + OBSERVATION.glowRange * Math.sin(now / OBSERVATION.glowPeriod)
-          : OBSERVATION.glowStill,
-        transparent: this.view.C["glow-transparent"],
-      });
+    if (live) this.observationGlow(link, now, animate);
     this.view.ctx.restore();
   };
+
+  private observationGlow(link: ObservationLink, now: number, animate: boolean) {
+    this.view.geometry.glow({ ...link.to, z: OBSERVATION.height }, OBSERVATION.glowRadius, {
+      color: this.view.C.cyan,
+      alpha: animate
+        ? OBSERVATION.glowBase + OBSERVATION.glowRange * Math.sin(now / OBSERVATION.glowPeriod)
+        : OBSERVATION.glowStill,
+      transparent: this.view.C["glow-transparent"],
+    });
+  }
 
   sparks = (point: Point, key: string, now: number, options: SparkOptions = {}) => {
     const { x, y } = point;

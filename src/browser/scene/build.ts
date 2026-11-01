@@ -6,6 +6,7 @@ import { finishCrew } from "./crew-topology.js";
 import { buildHulls } from "./hulls.js";
 import { buildHighways } from "./highways.js";
 import { revisionFor } from "./revision.js";
+import { observationLinks } from "./observation.js";
 import type { SceneRooms, BuildOptions, Scene, Host, Extent } from "./types.js";
 export function build(rooms: SceneRooms, page: number, extras: BuildOptions = {}): Scene {
   const locations = locateShips(rooms, extras);
@@ -15,17 +16,23 @@ export function build(rooms: SceneRooms, page: number, extras: BuildOptions = {}
   const geometry = populateRooms(rooms, locations, mail, relayMembers);
   const { platforms, walkways, workers, helperOverflow } = geometry;
   const observatory = finishCrew(geometry, mail, observatoryFor(), extras);
-  const { ships, links } = buildHulls({ locations, geometry, mail, observatory, extras });
-  const relays = buildHighways({ locations, geometry, mail, observatory, extras, relayMembers });
-  const extents = [
-    mail.rect,
-    ...platforms.map((p) => p.rect),
-    ...walkways.map((w) => w.rect),
-    ...ships.map((ship) => ship.rect),
-  ]
-    .map((rect): Extent => ({ rect }))
-    .concat(observatory.extents);
-  const bounds = projectedBounds(extents);
+  const { ships, links: plainLinks } = buildHulls({
+    locations,
+    geometry,
+    mail,
+    observatory,
+    extras,
+  });
+  const relays = buildHighways({
+    locations,
+    geometry,
+    mail,
+    observatory,
+    extras,
+    relayMembers,
+    ships,
+  });
+  const links = observationLinks(plainLinks, relays);
   const revision = revisionFor({
     page,
     observatory,
@@ -45,8 +52,27 @@ export function build(rooms: SceneRooms, page: number, extras: BuildOptions = {}
     helperOverflow,
     observatory,
     mail,
-    bounds,
+    bounds: sceneBounds({ mail, platforms, walkways, ships, links, observatory, relays }),
     ...(ships.length > 0 ? { ships, links } : {}),
     ...(relays.length > 0 ? { relays } : {}),
   };
+}
+
+function sceneBounds(
+  input: Pick<
+    Scene,
+    "mail" | "platforms" | "walkways" | "ships" | "links" | "observatory" | "relays"
+  >,
+) {
+  const extents = [
+    input.mail.rect,
+    ...input.platforms.map((p) => p.rect),
+    ...input.walkways.map((walkway) => walkway.rect),
+    ...(input.ships ?? []).map((ship) => ship.rect),
+    ...(input.relays ?? []).map((relay) => relay.mail.rect),
+    ...(input.links ?? []).flatMap((link) => link.path.map((point) => ({ ...point, w: 0, h: 0 }))),
+  ]
+    .map((rect): Extent => ({ rect }))
+    .concat(input.observatory.extents);
+  return projectedBounds(extents);
 }

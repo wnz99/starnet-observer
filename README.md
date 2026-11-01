@@ -305,9 +305,10 @@ transcript or message inspection never reaches a remote.
 For explicit source development, use `bun --no-env-file scripts/stream.ts` after installing development tooling.
 
 llm-bus is per host, so each remote ship has its own mailroom showing that host's own bus; its couriers and crew stay
-on their own ship, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
-host's numeric id and also carry a hub-wide `key` (`5@vm1`). The ships are joined only by a dashed "ssh · observing"
-line: the hub's observation stream, coloured by its real health, never a mail path.
+on their own ship for local mail, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
+host's numeric id and also carry a hub-wide `key` (`5@vm1`). Thin cyan SSH wires connect this machine directly to
+each observed remote. Where both machines share a relay, the wires run beside its tunnels and bypass the external
+relay mailroom. Each wire names its destination and stream health; it never carries mail couriers.
 
 Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and shadow ships move east when needed to keep hulls separate. Shadow crew remain hover-only.
 
@@ -325,23 +326,23 @@ native session ids or message bodies for this.
   ghosted desk for each agent the roster lists as active in the last day. The ship is labelled "via relay · not
   observed". Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
   observed machine (this one, or a configured remote bound to the same relay) is never a shadow.
-- Relay highways join mailrooms: each observed member's mailroom to the other members' and to each shadow mailroom.
-  A highway is an ordinary ground walkway routed around the floors. Between observed ships it runs down the centre line
-  between the room banks; to a shadow ship it climbs to a lane north of both ships' top rows, crosses, and comes down.
-  Its label gives the relay, the observed end's state (live while that bus saw relay activity in the last 15 minutes,
-  otherwise quiet with its age, or bus unreadable), and how many agents at that end are on it.
-- A highway is **unverified** (dim rails, "roster only, no mail yet") until a relayed message has actually crossed it:
-  received from that machine, or synchronised as delivered to it. The relay roster alone proves the far machine
+- Each relay has one **external relay mailroom**, outside the machine hulls. Every member and shadow machine has
+  its own tunnel to this room. Mail between machines passes through the external room and never through an
+  intermediate machine. Tunnels avoid room floors and other machine hulls. Their labels show the endpoint's observed
+  activity (live after relay activity within 15 minutes, otherwise quiet with its age, or bus unreadable) and agent count.
+- A tunnel has dim, **roster only** rails until a message has demonstrably crossed that machine's relay connection.
+  The relay roster alone proves the far machine
   published to the same relay at some point, not that it is reachable now.
 - Which agents use the relay: the bridge publishes exactly the sessions of the repositories its config maps and records
   them in `remote_publications`. The observer joins those records to panes exactly (live, under a day old). Rooms holding
   a relay-carried agent, and every shadow room, get amber walkways to their mailroom and "⇄ relay" on their sign. Their
   agents read "on relay (repo)" on hover. Every other room is local to its own bus.
-- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, along the relay highway, the far mailroom,
-  then the far agent's desk, along the highway. The far agent is matched by an opaque hash of its relay address, never its session id.
-  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the mailroom while `queued_local`, halfway along
-  the highway once `accepted_remote`, and at the far agent's desk once `delivered_local`. When both ends are
-  observed, each ship shows only its own half of the crossing.
+- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, its tunnel, the external relay room,
+  the destination's tunnel and mailroom,
+  then the far agent's desk. The far agent is matched by an opaque hash of its relay address, never its session id.
+  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the machine's mailroom while `queued_local`,
+  in the external relay room once `accepted_remote`, and at the far agent's desk once `delivered_local`.
+  Each observed host's bus supplies its own delivery observations.
 - Ledger rows name the far side, for example "Codex on whitenoise · llm-bus (via relay)", with the synchronised relay
   state ("held at the relay", "delivered to the far machine, not acknowledged"). The bus status names the binding.
 - Presentation mode replaces relay hosts, machine ids and shared repo ids with fictional names.
