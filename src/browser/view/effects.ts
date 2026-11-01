@@ -17,6 +17,11 @@ const OBSERVATION = {
   dash: [3, 5],
 };
 const PARTICLE = { diameter: 2, driftPeriod: 300, driftAmplitude: 1.5 };
+const OBSERVATION_HEALTH: Record<string, { color: "cyan" | "idle"; alpha: number }> = {
+  available: { color: "cyan", alpha: 0.85 },
+  stale: { color: "cyan", alpha: 0.55 },
+};
+const UNAVAILABLE_WIRE = { color: "idle", alpha: 0.3 } as const;
 const RIM = { period: 1800, halfTurns: 2, beadHalf: 1.5, beadSize: 3 };
 
 const SPARK = { count: 6, rise: 18, spread: 14, life: 1400, size: 2 };
@@ -25,14 +30,15 @@ export class Effects<R extends SpriteResource, B extends R = R> {
 
   paintObservation = (link: ObservationLink, now: number, animate: boolean) => {
     const live = link.health === "available",
-      color = live ? this.view.C.cyan : this.view.C.idle;
+      style = OBSERVATION_HEALTH[link.health] ?? UNAVAILABLE_WIRE,
+      color = this.view.C[style.color];
     const a = P({ ...link.from, z: OBSERVATION.height }),
       b = P({ ...link.to, z: OBSERVATION.height });
     this.view.ctx.save();
     this.view.ctx.strokeStyle = color;
     this.view.ctx.lineWidth =
       (live ? OBSERVATION.liveWidth : OBSERVATION.downWidth) / this.view.camera.zoom;
-    this.view.ctx.globalAlpha = live ? 0.85 : 0.45;
+    this.view.ctx.globalAlpha = style.alpha;
     this.view.ctx.setLineDash(live ? [] : OBSERVATION.dash);
     this.view.ctx.lineDashOffset = live && animate ? -(now / 60) % 8 : 0;
     this.view.ctx.beginPath();

@@ -204,6 +204,7 @@ export interface RelaySpoke {
   lastActivityAt: number | null;
   verified: boolean;
   carried: number;
+  junction?: Point;
   path: Point[];
 }
 export interface SceneRelay {

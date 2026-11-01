@@ -1,16 +1,15 @@
 import { required } from "../model/types.js";
 import { roomRect } from "./room-placement.js";
 import { observatoryFor } from "./observatory.js";
-import type { Rect, SceneRooms, BuildOptions, Mailroom } from "./types.js";
-/* Remote ships sit in a line below the flagship (this machine), with a clear gap between hulls. llm-bus is per host,
+import type { Rect, SceneRooms, BuildOptions, Mailroom, RemoteHost } from "./types.js";
+/* Remote ships occupy parallel rows below a relay dock beside the flagship (this machine), with clear hull gaps. llm-bus is per host,
    so each remote ship has its OWN mailroom (same furniture as the flagship's) on its top edge, with its rooms flanking
-   it and a short spine down from it; that host's crew and couriers stay inside its own ship. Nothing physical joins
-   the ships: an observation link (the hub's ssh stream, not a mail path) spans the gap. Cross-machine mail exists only
-   through an llm-bus relay, drawn from each bus's own relay binding (see relayNetworks below), never from config. */
+   it and a short spine down from it; that host's crew stay inside its own ship. An external mail spine connects
+   ships only through an llm-bus relay, drawn from each bus's own relay binding, never from SSH config. */
 const SHIP_GAP_Y = 8,
   HULL_MARGIN = 3,
   REMOTE_MARGIN = 2;
-// `dx` shifts a whole ship sideways: zero in the column of observed ships, positive on a shadow ship docked beside one.
+// `dx` shifts a whole ship sideways, keeping its rooms, mailroom and crew in the same host coordinate frame.
 export const mailroomAt = (top: number, dx = 0) => ({
   rect: { x: dx, y: top, w: SITE.mailWidth, h: SITE.mailHeight },
   hub: { x: dx + SITE.hubX, y: top + SITE.hubY, z: 0 },
@@ -27,9 +26,8 @@ export const mailroomAt = (top: number, dx = 0) => ({
     { x: dx + SITE.hubX, y: top + SITE.hubY, z: 0 },
   ],
 });
-const SHADOW_GAP = 14,
-  REMOTE_LEFT = -24,
-  REMOTE_RIGHT = 38;
+const SHADOW_GAP = 14;
+const RELAY_DOCK = { x: 24, gap: 8 };
 export const hullAround = (rects: readonly Rect[], margin = HULL_MARGIN) => {
   const minX = Math.min(...rects.map((r) => r.x)),
     minY = Math.min(...rects.map((r) => r.y));
@@ -71,8 +69,9 @@ function envelope(rooms: SceneRooms, host: string | null, top = 0, dx = 0) {
     ...(host === null ? [observatoryFor().rect] : []),
   ];
   const hull = hullAround(parts, host === null ? HULL_MARGIN : REMOTE_MARGIN);
-  const left = Math.min(hull.x, dx + (host === null ? SITE.localLeft : REMOTE_LEFT)),
-    right = Math.max(hull.x + hull.w, dx + (host === null ? SITE.localRight : REMOTE_RIGHT));
+  if (host !== null) return hull;
+  const left = Math.min(hull.x, dx + SITE.localLeft),
+    right = Math.max(hull.x + hull.w, dx + SITE.localRight);
   return { ...hull, x: left, w: right - left };
 }
 export function locateShips(rooms: SceneRooms, extras: BuildOptions) {
@@ -87,35 +86,63 @@ export function locateShips(rooms: SceneRooms, extras: BuildOptions) {
     return index;
   };
   for (const room of rooms) if (room.host) shipIndex(room.host);
-  // Ship tops: below the flagship hull's bottom edge (its lowest connector), then below each remote hull in turn.
+  // The relay dock belongs to this station's front edge, independent of remote count and remote room growth.
   const local = envelope(rooms, null);
+  const relayMailrooms = relayDocks(local, extras.relays);
+  const relayRects = [...relayMailrooms.values()].map((mail) => mail.rect);
+  const dock = relayRects.length > 0 ? hullAround(relayRects, 0) : null;
+  const participants = dock ? remoteHosts : remoteHosts.filter((host) => !host.shadow);
+  const positions = placeShips(rooms, participants, local, dock);
+  const locations = { remoteHosts, ...positions, relayMailrooms };
+  if (!dock) dockShadows(rooms, locations);
+  return locations;
+}
+export type ShipLocations = ReturnType<typeof locateShips>;
+
+function placeShips(rooms: SceneRooms, hosts: RemoteHost[], local: Rect, dock: Rect | null) {
   let cursor = local.y + local.h;
   const tops = new Map<string, number>(),
     mailrooms = new Map<string, Mailroom>(),
     dxs = new Map<string, number>();
-  for (const host of remoteHosts.filter((host) => !host.shadow)) {
-    const top = cursor + SHIP_GAP_Y + REMOTE_MARGIN;
+  let right: number | null = null;
+  for (const host of hosts) {
+    const own = envelope(rooms, host.id);
+    const top = (dock ? dock.y + dock.h : cursor) + SHIP_GAP_Y + REMOTE_MARGIN;
+    const dx = dock
+      ? (right === null ? dock.x - SHIP_GAP_Y - own.w : right + SHIP_GAP_Y) - own.x
+      : 0;
     tops.set(host.id, top);
-    mailrooms.set(host.id, mailroomAt(top));
-    dxs.set(host.id, 0);
-    const hull = envelope(rooms, host.id, top);
+    mailrooms.set(host.id, mailroomAt(top, dx));
+    dxs.set(host.id, dx);
+    const hull = envelope(rooms, host.id, top, dx);
     cursor = hull.y + hull.h;
+    right = hull.x + hull.w;
   }
-  dockShadows(rooms, { remoteHosts, tops, mailrooms, dxs });
-
-  return { remoteHosts, tops, mailrooms, dxs };
+  return { tops, mailrooms, dxs };
 }
-export type ShipLocations = ReturnType<typeof locateShips>;
+
+function relayDocks(local: Rect, relays: BuildOptions["relays"]) {
+  return new Map(
+    (relays ?? []).map((relay, index) => [
+      relay.relay,
+      mailroomAt(
+        local.y + local.h + RELAY_DOCK.gap,
+        RELAY_DOCK.x + index * (SITE.mailWidth + RELAY_DOCK.gap),
+      ),
+    ]),
+  );
+}
 
 function dockShadows(rooms: SceneRooms, locations: ShipLocations) {
   const { remoteHosts, tops, mailrooms, dxs } = locations;
   /* A shadow ship (an unobserved machine on a relay) docks beside the observed ship it is linked to, level with that
-     ship's mailroom, so the column of observed ships and their ssh links never change; several shadows line up east. */
+     ship's mailroom, without moving the observed branches or their SSH endpoints; several shadows line up east. */
   const occupied = [
     envelope(rooms, null),
     ...remoteHosts
       .filter((host) => !host.shadow)
-      .map((host) => envelope(rooms, host.id, required(tops, host.id))),
+      .map((host) => envelope(rooms, host.id, required(tops, host.id), required(dxs, host.id))),
+    ...[...locations.relayMailrooms.values()].map((mail) => mail.rect),
   ];
   for (const host of remoteHosts.filter((host) => host.shadow)) {
     const member =

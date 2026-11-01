@@ -1,12 +1,13 @@
 import { PointerGestures } from "./pointer-gestures.js";
 import type { Listener, Tap } from "./state-types.js";
 import * as Scene from "../scene/index.js";
-import type { Point } from "../scene/types.js";
+import type { Host, Point } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { ZOOM_STEP } from "./helpers.js";
 import type { ViewEvent } from "./types.js";
 import type { ViewRuntime } from "./runtime.js";
 import { present as required } from "./values.js";
+import { connectionHostAt } from "./connection-details.js";
 const GESTURE = { doubleClickPause: 500, wheelScale: 0.0015, keyStep: 48 };
 
 export class Interaction<R extends SpriteResource, B extends R = R> {
@@ -64,6 +65,16 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     );
     return hit ? { host: hit.local ? null : hit.id } : null;
   };
+  connectionHost(): Host | undefined {
+    const { pointer } = this.gestures;
+    if (pointer && !this.view.hovered && this.paintedFrameCurrent()) {
+      const ship = this.shipAt(pointer);
+      if (ship) return ship.host;
+      const connection = connectionHostAt(this.view.activeScene, this.view.camera, pointer);
+      if (connection !== undefined) return connection;
+    }
+    return this.view.callbacks.hostSelection();
+  }
 
   observatoryAt = (point: Point) =>
     this.paintedFrameCurrent() &&

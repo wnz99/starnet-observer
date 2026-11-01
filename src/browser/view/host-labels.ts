@@ -38,21 +38,10 @@ const RELAY_SIGN = {
   priority: 46,
   dash: [3, 3],
 };
-function agentCount(ship: Ship) {
-  return `${String(ship.agents || 0)} agent${ship.agents === 1 ? "" : "s"}`;
-}
 function shipText(ship: Ship) {
-  if (ship.shadow)
-    return `◌ ${String(ship.machine).toUpperCase()} · ${agentCount(ship)} · via relay · not observed`;
+  if (ship.shadow) return "◌ " + String(ship.machine).toUpperCase();
   if (ship.local) return "● THIS MACHINE";
-  const live = shipLive(ship),
-    seen = !live && ship.observedAt ? " · last seen " + age(ship.observedAt) : "";
-  const state = live
-    ? ""
-    : ship.health === "stale"
-      ? " · STALE" + seen
-      : " · " + (ship.reason || "unreachable");
-  return `${live ? "● " : "○ "}${String(ship.id).toUpperCase()} · ${agentCount(ship)}${state}`;
+  return `${shipLive(ship) ? "● " : "○ "}${String(ship.id).toUpperCase()}`;
 }
 function relayLane(link: RelaySpoke): Point {
   return longestSegmentMidpoint(link.path.slice(1, -RELAY_SIGN.roomTail));
@@ -73,7 +62,13 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
       if (!this.view.assemblyVisible(this.view.assemblyOwners.ship(ship.local ? null : ship.id)))
         continue;
       plates.push(this.ship(ship));
-      if (!ship.local && ship.mail && options.tier !== "overview") plates.push(this.mailroom(ship));
+      if (
+        !ship.local &&
+        ship.mail &&
+        options.tier !== "overview" &&
+        ship.id === this.view.interaction.connectionHost()
+      )
+        plates.push(this.mailroom(ship));
     }
     return plates;
   }
@@ -148,7 +143,10 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
   }
   observation(): TextPlate[] {
     if (this.view.assemblyFrame.active) return [];
-    return (this.view.activeScene.links || []).map((link) => this.observationLink(link));
+    const host = this.view.interaction.connectionHost();
+    return (this.view.activeScene.links || [])
+      .filter((link) => link.host === host)
+      .map((link) => this.observationLink(link));
   }
   private observationLink(link: ObservationLink) {
     const mid = this.screen({
@@ -177,16 +175,17 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
   }
   relays(): TextPlate[] {
     if (this.view.assemblyFrame.active) return [];
+    const host = this.view.interaction.connectionHost();
     return (this.view.activeScene.relays || []).flatMap((relay) => {
       const at = this.screen({ ...center(relay.mail.tower), z: MAIL_SIGN.height });
       return [
-        this.view.plates.textPlate("RELAY MAILROOM · " + relay.relay, at.x, at.y, {
+        this.view.plates.textPlate("RELAY MAILROOM", at.x, at.y, {
           accent: this.view.C.amber,
           color: this.view.C.amber,
           size: this.view.plates.signSize(MAIL_SIGN.size),
           priority: RELAY_SIGN.hubPriority,
         }),
-        ...relay.spokes.map((link) => this.relayLink(link)),
+        ...relay.spokes.filter((link) => link.host === host).map((link) => this.relayLink(link)),
       ];
     });
   }

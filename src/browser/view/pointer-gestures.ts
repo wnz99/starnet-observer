@@ -7,6 +7,7 @@ import type { ViewRuntime } from "./runtime.js";
 import type { Drag } from "./state-types.js";
 import type { ViewEvent } from "./types.js";
 import { present as required } from "./values.js";
+import { connectionDetails, connectionHostAt } from "./connection-details.js";
 const GESTURE = { touchSlop: 6, mouseSlop: 4, touchMs: 300 };
 export class PointerGestures<R extends SpriteResource, B extends R = R> {
   pointer: Point | null = null;
@@ -144,8 +145,24 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
   };
   updateBadgeHover() {
     const badge = this.pointer && this.selection.badgeAt(this.pointer);
-    this.view.canvas.title = badge ? badge.text : "";
+    this.view.canvas.title = badge ? badge.text : this.connectionTitle();
     return badge;
+  }
+  private connectionTitle() {
+    if (!this.pointer || !this.selection.paintedFrameCurrent()) return "";
+    if (
+      this.selection.titleAt(this.pointer) ||
+      this.selection.signAt(this.pointer) ||
+      Scene.hitTest(this.pointer, this.view.regions)
+    )
+      return "";
+    const ship = this.selection.shipAt(this.pointer);
+    const host = ship
+      ? ship.host
+      : connectionHostAt(this.view.activeScene, this.view.camera, this.pointer);
+    if (host === undefined) return "";
+    const details = connectionDetails(this.view.activeScene, host);
+    return this.view.stale() ? "Last observed · " + details : details;
   }
   reset() {
     this.view.canvas.title = "";

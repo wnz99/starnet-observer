@@ -1,4 +1,5 @@
-import type { Worker } from "../scene/types.js";
+import type { Worker, RelaySpoke } from "../scene/types.js";
+import { project } from "../scene/index.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { rectPoly } from "./primitives.js";
 import { shipLive } from "./static.js";
@@ -7,6 +8,7 @@ const REPOSITORY_RING = { glowRadius: 40, glowAlpha: 0.4, workingWidth: 3, width
 const FOCUS_RING = { period: 450, radius: 0.55, width: 2 };
 const PLATFORM_RING = { height: 0.02 };
 const HOST_RING = { minimumZoom: 0.25, period: 700, height: 2.4 };
+const CONNECTION = { height: 0.12, width: 2, junctionRadius: 0.35 };
 
 export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   private readonly agentColors = new Map<string, string>();
@@ -93,6 +95,7 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
     // The host whose crew the panel lists: its hull rim is drawn solid and bright over the dashed static rim.
     const ships = this.view.activeScene.ships;
     const chosenHost = ships ? this.view.callbacks.hostSelection() : undefined;
+    this.connections(chosenHost, zoom);
 
     const chosenShip =
       chosenHost !== undefined &&
@@ -114,6 +117,45 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
       this.view.ctx.restore();
     }
   };
+  private connections(host: string | null | undefined, zoom: number) {
+    const relays = this.view.activeScene.relays;
+    if (!relays || relays.length === 0) return;
+    const ctx = this.view.ctx;
+    ctx.save();
+    ctx.lineWidth = CONNECTION.width / zoom;
+    ctx.strokeStyle = this.view.C.focus;
+    for (const relay of relays) {
+      const selected = host !== undefined && relay.spokes.some((spoke) => spoke.host === host);
+      for (const spoke of relay.spokes) {
+        this.connection(spoke, selected && (spoke.host === host || spoke.host === null), zoom);
+      }
+    }
+    ctx.restore();
+  }
+  private connection(spoke: RelaySpoke, selected: boolean, zoom: number) {
+    if (spoke.junction)
+      this.view.geometry.isoEllipse(
+        { ...spoke.junction, z: CONNECTION.height },
+        CONNECTION.junctionRadius,
+        {
+          stroke: this.view.C.amber,
+          fill: this.view.C.ink,
+          width: CONNECTION.width / zoom,
+        },
+      );
+    if (!selected) return;
+    const ctx = this.view.ctx;
+    ctx.lineWidth = CONNECTION.width / zoom;
+    ctx.strokeStyle = this.view.C.focus;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (const [index, point] of spoke.path.entries()) {
+      const at = project({ ...point, z: CONNECTION.height });
+      if (index === 0) ctx.moveTo(at.x, at.y);
+      else ctx.lineTo(at.x, at.y);
+    }
+    ctx.stroke();
+  }
   stale = () => {
     {
       this.view.ctx.setTransform(this.view.dpr, 0, 0, this.view.dpr, 0, 0);

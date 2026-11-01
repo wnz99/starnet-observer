@@ -173,7 +173,7 @@ test("observer-relay-scene regression contracts", () => {
     );
   }
 
-  // This machine on a relay with one unobserved machine: a shadow ship docks beside the flagship, ghost crew at desks.
+  // An unobserved machine occupies its own row on the external relay spine, with ghost crew at desks.
   {
     const nets = Scene.relayNetworks(
       [
@@ -201,8 +201,8 @@ test("observer-relay-scene regression contracts", () => {
       shadow = present(scene.ships).find((ship) => ship.shadow);
     assert.equal(plain.relays, undefined, "no relay without a bus that reports one");
     assert.ok(
-      present(shadow).rect.x > present(flagship).rect.x + present(flagship).rect.w,
-      "the shadow ship docks east of the flagship",
+      present(shadow).rect.y > present(flagship).rect.y + present(flagship).rect.h,
+      "the shadow ship docks outside the flagship on its own row",
     );
     assert.equal(present(scene.links).length, 0, "a shadow ship has no ssh observation link");
     const crew = scene.workers.filter((worker) => worker.row.shadow);
