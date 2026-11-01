@@ -142,7 +142,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
             : "grab";
     }
   };
-  private updateBadgeHover() {
+  updateBadgeHover() {
     const badge = this.pointer && this.selection.badgeAt(this.pointer);
     this.view.canvas.title = badge ? badge.text : "";
     return badge;

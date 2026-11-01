@@ -275,6 +275,9 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   refreshHover() {
     this.gestures.updateHover();
   }
+  refreshBadgeHover() {
+    this.gestures.updateBadgeHover();
+  }
   reset() {
     this.gestures.reset();
     this.tap = null;

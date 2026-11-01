@@ -3036,6 +3036,22 @@ test("observer-view regression contracts", async () => {
           else if (worker.row.checkoutKind === "main") assert.equal(badge.text, "api · main");
           else assert(badge.text.endsWith(" · " + present(worker.row.checkoutId).slice(-4)));
         }
+        const hoveredBadge = present(
+          runtime.interaction.badgeAt(present(runtime.interaction.gestures.pointer)),
+        );
+        runtime.update(scene, { repositorySelection: () => selected });
+        assert.equal(runtime.canvas.title, "", "scene update retires the prior badge title");
+        assert.equal(runtime.framePaint.paint(0), false, "reduced motion needs only one frame");
+        assert.equal(
+          runtime.canvas.title,
+          hoveredBadge.text,
+          "stationary pointer receives the newly painted badge title in the same frame",
+        );
+        selected = null;
+        runtime.framePaint.paint(0);
+        assert.equal(runtime.canvas.title, "", "the same frame retires a removed badge title");
+        selected = "r";
+        runtime.framePaint.paint(0);
         const stationary = runtime.badgeRegions.map((badge) => ({ ...badge }));
         runtime.anchors = runtime.anchors.map((anchor) => ({
           ...anchor,
