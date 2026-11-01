@@ -16,6 +16,7 @@ export type DisplayRow = Partial<
   >
 > & {
   observedRepo?: string | null;
+  observedRepoId?: string | null;
   observedAt?: number | string | null;
   provider?: string;
   source?: string;

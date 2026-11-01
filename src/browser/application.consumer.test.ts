@@ -15,6 +15,7 @@ import type { ActorFrame } from "./scene/motion-types.js";
 import type { makeObserver as ObserverFactory } from "../sidecar/observer/index.js";
 import type { makeIdentityResolver as IdentityFactory } from "../sidecar/identity/index.js";
 import type { Inventory, ObserverInputRow } from "../sidecar/observer/contracts.js";
+import type { readShellEntry as ShellEntryReader } from "../sidecar/tool-workdirs/store.js";
 const NO_OVERSEER_MATCH = false;
 interface FixtureOptions {
   observer: {
@@ -549,7 +550,7 @@ async function nativeDeskBadges(page: Page, artifacts: string) {
     );
     const badge = evidence.badges[0];
     assert.ok(badge);
-    assert.equal(badge.text, "fixture-repo · main");
+    assert.equal(badge.text, "fixture-repo · main · terminal\nTerminal checkout");
     const box = await page.locator("canvas").boundingBox();
     assert.ok(box);
     await page.mouse.move(
@@ -558,6 +559,65 @@ async function nativeDeskBadges(page: Page, artifacts: string) {
     );
     await expect(page.locator("canvas")).toHaveAttribute("title", badge.text);
     await capture(page, path.join(artifacts, "desk-badges-" + String(zoom) + ".png"));
+    const tool = await page.evaluate((id) => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const worker = view.activeScene.workers.find((entry) => entry.id === id);
+      if (!worker) throw new Error("Synthetic selected worker missing");
+      const observedAt = Date.now();
+      worker.row.checkoutObservation = {
+        source: "shell-entry",
+        state: "observed",
+        observedAt,
+        repoId:
+          worker.row.observedRepoId === undefined
+            ? worker.row.repoId || null
+            : worker.row.observedRepoId,
+        repo: "fixture-repo",
+        checkoutId: "tool_abcdef",
+        checkoutKind: "worktree",
+        worktree: "full-linked-tool-checkout-name-at-minimum-zoom",
+      };
+      view.framePaint.paint(1001);
+      return {
+        observation: worker.row.checkoutObservation,
+        badge: view.badgeRegions.find((entry) => entry.id === id),
+      };
+    }, badge.id);
+    assert.ok(tool.badge);
+    assert.match(tool.badge.text, /full-linked-tool-checkout-name-at-minimum-zoom · cdef · tool/);
+    assert.ok(tool.badge.text.includes(new Date(tool.observation.observedAt).toISOString()));
+    await page.mouse.move(
+      box.x + tool.badge.left + tool.badge.width / 2,
+      box.y + tool.badge.top + tool.badge.height / 2,
+    );
+    await expect(page.locator("canvas")).toHaveAttribute("title", tool.badge.text);
+    await capture(page, path.join(artifacts, "tool-desk-badges-" + String(zoom) + ".png"));
+    for (const actual of ["actual-repository", "different-repository", null]) {
+      const title = await page.evaluate(
+        ({ id, actual }) => {
+          const view = Reflect.get(window, "__view") as CanvasProbe;
+          const worker = view.activeScene.workers.find((entry) => entry.id === id);
+          if (!worker?.row.checkoutObservation) throw new Error("Tool fixture missing");
+          worker.row.observedRepoId = actual;
+          worker.row.checkoutObservation.repoId = "actual-repository";
+          view.framePaint.paint(1002);
+          return view.badgeRegions.find((entry) => entry.id === id)?.text;
+        },
+        { id: badge.id, actual },
+      );
+      if (actual === null) assert.match(title || "", /· terminal\nTerminal checkout/);
+      else if (actual === "actual-repository") assert.match(title || "", /cdef · tool/);
+      else assert.match(title || "", /^Other repo · tool/);
+    }
+    await page.evaluate((id) => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const worker = view.activeScene.workers.find((entry) => entry.id === id);
+      if (!worker) throw new Error("Synthetic selected worker missing");
+      delete worker.row.checkoutObservation;
+      delete worker.row.observedRepoId;
+      view.framePaint.paint(1002);
+    }, badge.id);
+    await expect(page.locator("canvas")).not.toHaveAttribute("title", tool.badge.text);
   }
   await page.evaluate((camera) => {
     const view = Reflect.get(window, "__view") as CanvasProbe;
@@ -1165,6 +1225,29 @@ async function outputFixture(root: string) {
     sweeps: 0,
     revision: 8,
   };
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "observer-tool-shell-"));
+  const cli = path.join(root, "dist/runtime/scripts/observe-workdir.js");
+  const preview = Bun.spawnSync([process.execPath, "--no-env-file", cli, "--preview-zsh"]);
+  assert.equal(preview.exitCode, 0);
+  await fs.writeFile(path.join(home, ".zshenv"), preview.stdout);
+  const shell = Bun.spawnSync(["/bin/zsh", "-c", "print sentinel"], {
+    cwd: home,
+    env: {
+      HOME: home,
+      ZDOTDIR: home,
+      CODEX_THREAD_ID: state.session,
+      CODEX_SESSION_ID: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    },
+  });
+  assert.equal(shell.exitCode, 0);
+  assert.equal(shell.stdout.toString(), "sentinel\n");
+  const { readShellEntry } = (await import(
+    pathToFileURL(path.join(root, "dist/runtime/src/sidecar/tool-workdirs/store.js")).href
+  )) as { readShellEntry: typeof ShellEntryReader };
+  const toolRoot = path.join(home, ".local/share/starnet-observer/tool-workdirs");
+  const event = await readShellEntry({ root: toolRoot, sessionId: state.session, now: Date.now });
+  assert.ok(event);
+  state.now = event.observedAt;
   const pane = { pane_id: "w1:p1", agent: "codex" as const, terminal_id: "terminal_one" };
   const identities = makeIdentityResolver({
     now: () => state.now,
@@ -1212,6 +1295,7 @@ async function outputFixture(root: string) {
   const observer = makeObserver({
     now: () => state.now,
     warmDetails: false,
+    workdirs: (options) => readShellEntry({ ...options, root: toolRoot }),
     identities,
     endpoint: "synthetic-output",
     overseerState: {
@@ -1223,12 +1307,22 @@ async function outputFixture(root: string) {
         stdout: JSON.stringify({
           result: {
             agents: state.present
-              ? [{ ...pane, agent_status: "working", title: "Output fixture" }]
+              ? [{ ...pane, cwd: "/terminal", agent_status: "working", title: "Output fixture" }]
               : [],
           },
         }),
       }),
     projects: {
+      resolveMany: (cwds) =>
+        cwds.map((cwd) => ({
+          projectId: "project_fixture",
+          project: "Fixture project",
+          repoId: "repo_fixture",
+          repo: "fixture-repo",
+          checkoutId: cwd === "/terminal" ? "terminal_main" : "tool_abcd",
+          checkoutKind: cwd === "/terminal" ? "main" : "worktree",
+          worktree: cwd === "/terminal" ? null : "shell-entry-linked-checkout",
+        })),
       resolve: () =>
         Promise.resolve({
           projectId: "project_fixture",
@@ -1334,6 +1428,8 @@ async function outputFixture(root: string) {
   return {
     state,
     observer,
+    event,
+    cleanup: () => fs.rm(home, { recursive: true, force: true }),
     hold: () => {
       pending = new Promise<void>((resolve) => {
         release = resolve;
@@ -1373,6 +1469,13 @@ async function refreshContinuity(
   const parent = loaded.sessions.find((row) => row.source === "herdr");
   const helper = loaded.sessions.find((row) => row.source === "helper");
   assert.ok(parent?.inspectionIdentity && helper);
+  await expect
+    .poll(
+      async () =>
+        (await observer.get()).sessions.find((row) => row.id === parent.id)?.checkoutObservation
+          ?.observedAt,
+    )
+    .toBe(output.event.observedAt);
   const fixture = await listen(http, { token: TOKEN, observer });
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
@@ -1393,6 +1496,31 @@ async function refreshContinuity(
     await page.goto(fixture.url);
     const row = page.locator('[data-session-id="' + parent.id + '"]');
     await expect(row).toBeVisible();
+    const sign = await page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const platform = view.activeScene.platforms[0];
+      if (!platform) throw new Error("Synthetic platform missing");
+      view.cameraControl.focusPlatform(platform.key);
+      view.framePaint.paint(1000);
+      return view.signRegions[0];
+    });
+    assert.ok(sign);
+    const canvasBox = await page.locator("canvas").boundingBox();
+    assert.ok(canvasBox);
+    await page.mouse.click(
+      canvasBox.x + sign.left + sign.width / 2,
+      canvasBox.y + sign.top + sign.height / 2,
+    );
+    await page.clock.runFor(100);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const view = Reflect.get(window, "__view") as CanvasProbe;
+          return view.badgeRegions.map((badge) => badge.text).join("\n");
+        }),
+      )
+      .toContain("shell-entry-linked-checkout · abcd · tool");
+    await capture(page, path.join(artifacts, "shell-recorder-service-ui.png"));
     await page.locator(".row-inspect").first().click();
     const log = page.locator(".inspector-log");
     const health = page.locator(".inspector-health");
@@ -1584,6 +1712,7 @@ async function refreshContinuity(
     output.release();
     await page.close();
     await observer.close();
+    await output.cleanup();
     fixture.server.closeAllConnections();
     await new Promise<void>((resolve) =>
       fixture.server.close(() => {
