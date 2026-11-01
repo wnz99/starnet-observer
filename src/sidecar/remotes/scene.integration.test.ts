@@ -180,7 +180,7 @@ test("remote ships preserve actual model and scene integration", () => {
   }
   verifyCouriers();
   function verifyLinks() {
-    // Observation links: one per remote, hull to hull across the gap, state = stream health; absent without remotes.
+    // Each observation stream runs directly from this Mac's mail hub to its remote host's hub.
     assert.equal(single.links, undefined);
     assert.equal(single.relays, undefined);
     const links = required(multi.links);
@@ -194,10 +194,22 @@ test("remote ships preserve actual model and scene integration", () => {
       ],
       "link state is the real stream health",
     );
-    assert.equal(vmLink.from.y, flag.y + flag.h);
-    assert.equal(vmLink.to.y, vmShip.rect.y);
-    assert.equal(emptyLink.from.y, vmShip.rect.y + vmShip.rect.h);
-    assert.equal(emptyLink.to.y, emptyShip.rect.y);
+    assert.deepEqual(vmLink.from, multi.mail.hub);
+    assert.deepEqual(vmLink.to, vmMail.hub);
+    assert.deepEqual(emptyLink.from, multi.mail.hub);
+    assert.deepEqual(emptyLink.to, required(emptyShip.mail).hub);
+    for (const link of links) {
+      assert.deepEqual(link.path[0], link.from);
+      assert.deepEqual(link.path.at(-1), link.to);
+      for (const ship of [vmShip, emptyShip]) {
+        if (ship.id === link.host) continue;
+        for (const point of link.path)
+          assert.ok(
+            !inside({ x: point.x, y: point.y, w: 0, h: 0 }, ship.rect),
+            "an observation path never transits an intermediate remote ship",
+          );
+      }
+    }
     assert.equal(multi.relays, undefined, "no relay without a bus that reports one");
     assert.ok(multi.bounds.maxY > single.bounds.maxY, "the camera fits every ship");
     const localCrew = required(multi.workers.find((worker) => !worker.row.host));

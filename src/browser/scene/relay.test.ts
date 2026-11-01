@@ -406,6 +406,25 @@ test("observer-relay-scene regression contracts", () => {
       "incoming delivery remains pending locally until acknowledgement",
     );
 
+    const accepted: SceneMessage = {
+      ...message,
+      relay: { ...present(message.relay), state: "accepted_remote" },
+    };
+    assert.ok(
+      inside(present(Scene.pending(empty, layout, [accepted])[0]).point, empty.mail.rect),
+      "accepted mail without a binding retains the local fallback",
+    );
+    const missingRoster = Scene.build([], 0, {
+      relays: Scene.relayNetworks([[null, { health: "available", remote: remote("mac") }]], NOW),
+    });
+    assert.ok(
+      inside(
+        present(Scene.pending(missingRoster, layout, [accepted])[0]).point,
+        present(present(missingRoster.relays)[0]).mail.rect,
+      ),
+      "accepted mail waits in its bound relay even without a destination roster",
+    );
+
     const nets = Scene.relayNetworks(
       [
         [
@@ -434,6 +453,17 @@ test("observer-relay-scene regression contracts", () => {
       relays: nets,
       hosts: present(nets[0]).shadows.map((shadow) => shadowHost(present(nets[0]), shadow, null)),
     });
+    assert.ok(
+      inside(
+        present(
+          Scene.pending(capped, layout, [
+            { ...accepted, relay: { ...present(accepted.relay), machine: omitted } },
+          ])[0],
+        ).point,
+        present(present(capped.relays)[0]).mail.rect,
+      ),
+      "accepted mail waits in the relay when its destination is capped from rendering",
+    );
     assert.deepEqual(
       Scene.pending(capped, layout, [
         { ...message, relay: { ...present(message.relay), machine: omitted } },

@@ -162,7 +162,7 @@ class Highways {
         state,
         lastActivityAt,
       })),
-      links: courierLinks(members, shadows, spokes, mail.hub),
+      links: courierLinks(members, shadows, spokes),
     };
   }
 }
@@ -174,7 +174,6 @@ function courierLinks(
   members: Network["members"],
   shadows: NonNullable<Network["shadows"]>,
   spokes: RelaySpoke[],
-  relayHub: Point,
 ): RelayLink[] {
   const byHost = new Map(spokes.map((spoke) => [spoke.host, spoke]));
   return members.flatMap((member, index) =>
@@ -186,10 +185,7 @@ function courierLinks(
       to: other.host,
       machine: other.machine,
       shadow: other.shadow,
-      state: member.state,
-      lastActivityAt: member.lastActivityAt,
       verified: (member.crossed ?? []).includes(other.machine),
-      relayHub,
       path: [
         ...required(byHost, member.host).path,
         ...required(byHost, other.host).path.slice().reverse().slice(1),

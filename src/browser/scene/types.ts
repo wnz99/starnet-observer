@@ -194,11 +194,8 @@ export interface RelayLink {
   to: Host;
   machine: string;
   shadow: boolean;
-  state: string;
-  lastActivityAt: number | null;
   verified: boolean;
   path: Point[];
-  relayHub: Point;
 }
 export interface RelaySpoke {
   host: Host;

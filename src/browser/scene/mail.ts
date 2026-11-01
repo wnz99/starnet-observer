@@ -79,15 +79,11 @@ function relayEnd(scene: Scene, message: SceneMessage, host: Host) {
         key: ghost.id,
         points: [...(ghost.route ?? []).slice(0, -1), ...across],
         desk: true,
-        link,
-        across,
       }
     : {
         key: `ship:${String(farHost)}`,
         points: across,
         desk: false,
-        link,
-        across,
         observed: !link.shadow,
       };
 }
@@ -138,7 +134,6 @@ function relayPending(
   state: string | undefined,
 ): MailEnd {
   if (state === "queued_local") return { key: "queued", points: [element(own.chute, 0)] };
-  if (state === "accepted_remote") return { key: `relay:${far.key}`, points: [far.link.relayHub] };
   return { key: far.key, points: far.points };
 }
 /* Outgoing relayed mail waits where llm-bus last proved it is: this mailroom when queued, in the external relay
@@ -146,6 +141,13 @@ function relayPending(
    its own copy, so none is drawn here). Expired mail is not waiting anywhere. */
 function pendingGone(state: string | undefined, far: RelayEnd | null) {
   return state === "expired" || (state === "delivered_local" && far?.observed);
+}
+function acceptedEnd(scene: Scene, message: SceneMessage, host: Host): MailEnd | null {
+  if (message.relay?.direction !== "out" || message.relay.state !== "accepted_remote") return null;
+  const relay = scene.relays?.find((network) =>
+    network.members.some((member) => member.host === host),
+  );
+  return relay ? { key: relay.key, points: [relay.mail.hub] } : null;
 }
 function pendingEnd(
   scene: Scene,
@@ -156,6 +158,8 @@ function pendingEnd(
   const far = message.relay?.direction === "out" ? relayEnd(scene, message, host) : null;
   const state = message.relay?.state;
   if (pendingGone(state, far)) return null;
+  const accepted = acceptedEnd(scene, message, host);
+  if (accepted) return accepted;
   if (far) return relayPending(mailOf(scene, host) || scene.mail, far, state);
   return endpoint(scene, layout, message.to ?? "", host);
 }
