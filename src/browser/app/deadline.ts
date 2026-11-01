@@ -1,6 +1,7 @@
 import type { AppQuerySnapshot, AppSnapshot } from "./data.js";
 import type { AppScheduler } from "./dom.js";
 import { FRESH_MS, type AppState } from "./state.js";
+import { CHECKOUT_AGE } from "../model/checkout-age.js";
 
 function observationTimes(data: AppSnapshot) {
   const sources = data.sources;
@@ -12,6 +13,19 @@ function observationTimes(data: AppSnapshot) {
     ...data.sessions.flatMap((row) => [row.observedAt, row.tool?.observedAt]),
     data.aggregate?.usageObservedAt,
   ];
+}
+function checkoutDeadlines(data: AppSnapshot, now: number) {
+  return data.sessions.flatMap(({ checkoutObservation: observation }) => {
+    if (
+      observation?.source !== "shell-entry" ||
+      !Number.isSafeInteger(observation.observedAt) ||
+      observation.observedAt <= 0
+    )
+      return [];
+    return [CHECKOUT_AGE.future, CHECKOUT_AGE.stale + 1, CHECKOUT_AGE.expiry + 1]
+      .map((age) => observation.observedAt + age)
+      .filter((due) => due > now);
+  });
 }
 /* One deadline per observation: the moment it turns stale, even during the entire time its next request remains pending. */
 export class FreshnessDeadline {
@@ -35,13 +49,19 @@ export class FreshnessDeadline {
     const { state } = this.options;
     // An open mail panel depends on the transport proof, which expires on the same clock even with every agent source down.
     const mail = state.busLive(snapshot) && this.options.hasMailPanel();
-    if (!state.active || !snapshot.data || (state.isStale(snapshot) && !mail)) return;
+    if (!state.active || !snapshot.data) return;
     // Inventory, optional tools, counted usage and mail proofs expire on their original source clocks.
-    const times = state.isStale(snapshot)
-      ? [snapshot.updatedAt]
-      : [...observationTimes(snapshot.data), ...(mail ? [snapshot.updatedAt] : [])].filter(
-          (at): at is number => state.fresh(at),
-        );
+    const times = [
+      ...(state.isStale(snapshot) ? [] : observationTimes(snapshot.data)),
+      ...(mail ? [snapshot.updatedAt] : []),
+    ].filter((at): at is number => state.fresh(at));
+    const now = this.options.now();
+    const deadlines = [
+      ...times.map((at) => at + FRESH_MS + 1),
+      ...checkoutDeadlines(snapshot.data, now),
+    ];
+    // Checkout evidence keeps its own source clock after inventory animation has frozen.
+    if (deadlines.length === 0) return;
     const generation = this.generation;
     const cancel = this.options.scheduler.timeout(
       () => {
@@ -49,7 +69,7 @@ export class FreshnessDeadline {
         this.cancel = null;
         if (!state.disposed && state.active && state.latest) this.options.render();
       },
-      Math.max(0, Math.min(...times) + FRESH_MS + 1 - this.options.now()),
+      Math.max(0, Math.min(...deadlines) - now),
     );
     if (this.current(generation)) this.cancel = cancel;
     else cancel();

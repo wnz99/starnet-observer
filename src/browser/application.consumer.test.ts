@@ -1454,6 +1454,105 @@ function assertHistoricalEvidence(aged: Inventory, helper: ObserverInputRow) {
   assert.equal(aged.sources.desktop.health, "available");
 }
 
+async function checkoutLifecycle(browser: Browser, root: string, http: HttpModule) {
+  const data = snapshot();
+  const row: AppRow | undefined = data.sessions[0] as AppRow | undefined;
+  assert.ok(row);
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: { get: () => data, inspect: () => ({ health: "unavailable" }) },
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "reduce",
+  });
+  try {
+    await page.clock.install({ time: data.observedAt });
+    const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
+    await page.route("**/app/main.js", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: original.replace(
+          "framePaint = new FramePaint(this);",
+          "framePaint = (window.__view = this, new FramePaint(this));",
+        ),
+      }),
+    );
+    await page.goto(fixture.url);
+    await expect(page.locator("[data-session-id]").first()).toBeVisible();
+    const sign = await page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const platform = view.activeScene.platforms[0];
+      if (!platform) throw new Error("Missing platform");
+      view.cameraControl.focusPlatform(platform.key);
+      view.framePaint.paint(1000);
+      Reflect.set(window, "__checkoutScene", view.activeScene);
+      return view.signRegions[0];
+    });
+    const box = await page.locator("canvas").boundingBox();
+    assert.ok(sign && box);
+    await page.mouse.click(box.x + sign.left + sign.width / 2, box.y + sign.top + sign.height / 2);
+    await page.clock.runFor(100);
+    const badge = await page.evaluate(
+      () => (Reflect.get(window, "__view") as CanvasProbe).badgeRegions[0],
+    );
+    assert.ok(badge);
+    await page.mouse.move(
+      box.x + badge.left + badge.width / 2,
+      box.y + badge.top + badge.height / 2,
+    );
+    const canvas = page.locator("canvas");
+    await expect(canvas).toHaveAttribute("title", /terminal/);
+    for (const name of ["arrival", "replacement", null, "aging"]) {
+      if (name)
+        row.checkoutObservation = {
+          source: "shell-entry",
+          state: "observed",
+          observedAt: data.observedAt,
+          repoId: row.repoId ?? null,
+          repo: row.repo ?? "fixture-repo",
+          checkoutId: "tool_abcd",
+          checkoutKind: "worktree",
+          worktree: name,
+        };
+      else delete row.checkoutObservation;
+      await page.clock.runFor(2200);
+      await expect(canvas).toHaveAttribute(
+        "title",
+        name ? new RegExp(name + " · abcd · tool") : /terminal/,
+      );
+      assert.equal(
+        await page.evaluate(
+          () =>
+            (Reflect.get(window, "__view") as CanvasProbe).activeScene ===
+            Reflect.get(window, "__checkoutScene"),
+        ),
+        true,
+      );
+    }
+    // No successful queries, pointer movement or explicit paint across either source-age boundary.
+    await page.route("**/api/observer/sessions", (route) => route.abort());
+    await page.clock.runFor(300_001);
+    await page.clock.runFor(50);
+    await expect(canvas).toHaveAttribute("title", /aging · abcd · tool · stale/);
+    // Jump before expiry, then execute normally across it so the armed timeout fires on its own clock.
+    const beforeExpiry =
+      data.observedAt + 86_400_000 - (await page.evaluate(() => Date.now())) - 1000;
+    await page.clock.fastForward(beforeExpiry);
+    await page.clock.runFor(2000);
+    await page.clock.runFor(50);
+    await expect(canvas).toHaveAttribute("title", /terminal/);
+  } finally {
+    await page.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      fixture.server.close(() => {
+        resolve();
+      });
+    });
+  }
+}
+
 async function refreshContinuity(
   browser: Browser,
   root: string,
@@ -1927,6 +2026,7 @@ async function runBrowserConsumer(root: string) {
     },
   });
   try {
+    await checkoutLifecycle(browser, root, http);
     const stableRefresh = await refreshContinuity(browser, root, http, artifacts);
     const annexes = await nativeCanvas(browser, root, http, artifacts);
     await mailroomDetails(browser, http, artifacts);

@@ -1,11 +1,11 @@
 import { build, relayNetworks, shadowRows, representedRows } from "../scene/index.js";
 import type { RemoteHost, Scene, RelayNetwork } from "../scene/types.js";
-import { record } from "../theme/validation.js";
 import type { MailFrame } from "../view/types.js";
 import type { AppView } from "./contracts.js";
 import type { AppBus, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppState } from "./state.js";
 import { HelperPresentation } from "./helper-presentation.js";
+import { geometryField, refreshSceneRows } from "./floor-rows.js";
 
 interface FloorOptions {
   state: AppState;
@@ -23,21 +23,6 @@ interface FloorOptions {
 const MINUTE_MS = 60000;
 type ShadowRow = ReturnType<typeof shadowRows>[number];
 type RelayMember = { host: string | null; repo: string };
-function geometryField(name: string, value: unknown) {
-  if (name !== "row" || !record(value)) return value;
-  const lifecycle = record(value.lifecycleEvidence) ? value.lifecycleEvidence : null;
-  return [
-    value.id,
-    value.status,
-    value.provider,
-    value.worktree,
-    value.checkoutId,
-    value.checkoutKind,
-    value.folder,
-    value.lineageState,
-    lifecycle?.state,
-  ];
-}
 /* llm-bus relays come from each observed bus's own binding. Each unobserved machine on a relay becomes a shadow ship
    of ghost crew from the relay roster: on the floor only, never in byId, so nothing selects, inspects or controls it. */
 export class Floor {
@@ -238,6 +223,7 @@ export class Floor {
   }
   private crew(rows: AppRow[], overseer: AppRow | null) {
     const { state } = this.options;
+    refreshSceneRows(state.scene, [...rows, ...this.shadows.values()]);
     const observed = (ids: readonly string[]) => {
       const represented = new Set(ids);
       return rows.filter((row) => represented.has(row.id));

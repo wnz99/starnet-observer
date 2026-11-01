@@ -157,6 +157,16 @@ test("observer-arrange-ui regression contracts", async () => {
     const chairs = present(arranged).workers.map(
       (worker) => String(worker.chair.x) + "," + String(worker.chair.y),
     );
+    const arrivals = data();
+    present(arrivals.sessions[0]).checkoutObservation.worktree = "replacement";
+    page.poll(arrivals);
+    assert.equal(page.updates.at(-1), arranged, "observation changes retain scene geometry");
+    const retainedWorker = present(arranged).workers[0];
+    assert.equal(retainedWorker?.row.checkoutObservation?.worktree, "replacement");
+    const withdrawn = data();
+    Reflect.deleteProperty(present(withdrawn.sessions[0]), "checkoutObservation");
+    page.poll(withdrawn);
+    assert.equal(retainedWorker.row.checkoutObservation, undefined);
     page.poll(data());
     assert.deepEqual(
       present(page.updates.at(-1)).workers.map(

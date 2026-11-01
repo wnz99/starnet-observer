@@ -1,6 +1,7 @@
 import type { Worker } from "../scene/types.js";
 import { toScreen } from "../scene/index.js";
 import { checkoutSuffix } from "../model/identity.js";
+import { CHECKOUT_AGE as OBSERVATION_AGE } from "../model/checkout-age.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { LabelContext } from "./label-types.js";
 import { statusColor } from "./look.js";
@@ -8,7 +9,6 @@ import { shade } from "./primitives.js";
 import type { ViewRuntime } from "./runtime.js";
 import type { Anchor, TextPlate } from "./types.js";
 const STATUS_DOT = { lift: 5, radius: 2.5, turn: Math.PI * 2 };
-const OBSERVATION_AGE = { future: -30_000, expiry: 86_400_000, stale: 300_000 };
 const TITLE = {
   lift: 12,
   margin: 24,
