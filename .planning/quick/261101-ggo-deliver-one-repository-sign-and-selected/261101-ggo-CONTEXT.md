@@ -26,4 +26,5 @@ The worker remained visible while its repository label disappeared at overview. 
 - Status: in review. Implementation at cd79f9161c0bc94b07a0c3de3cf3c99ec0782f3b passed independent task review R2 and revision-2 plan conformance. Aggregate verification passed build, 299 core tests, one production-only installed consumer and two pinned-harness consumers including Chromium.
 - Evidence: task-review-r2.md, final-conformance.md and aggregate-verification.md under the canonical execution report directory above. Static and focused/browser evidence is indexed by hover-fix.md.
 - Limits: finite viewport and glyph capacity can shorten or omit colliding signs and badges; full hover text exists only for accepted painted badges. No paid/live verification was run.
-- Next: prepare the PR to main, then complete independent full-branch review and required CI on the delivery head before merge. Final SUMMARY and completed-work reconciliation remain pending those gates.
+- Delivery: [PR #33](https://github.com/wnz99/starnet-observer/pull/33) targets main. Required pre-push lint and all five compiler projects passed for PR preparation; executable source, configuration and tests remain identical to cd79f91.
+- Next: complete independent full-branch review and required CI on the delivery head before merge. Final SUMMARY and completed-work reconciliation remain pending those gates.
