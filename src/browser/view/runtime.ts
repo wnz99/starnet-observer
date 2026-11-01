@@ -286,6 +286,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
     this.clearSettlements();
     this.onHelperSettled = options.onHelperSettled;
     const revised = !this.scene || this.activeScene.revision !== next.revision;
+    if (revised) this.lifecycle.completeAssembly();
+    if (options.startupEligible) this.lifecycle.startupEligible = true;
     this.scene = next;
     this.indexWorkers();
     this.cameraControl.measure();

@@ -1,6 +1,23 @@
 import type { HelperPhase } from "../scene/types.js";
+import { record } from "../theme/validation.js";
 import type { AppQuerySnapshot, AppRow } from "./data.js";
 import { FRESH_MS, type AppState } from "./state.js";
+
+export function geometryField(name: string, value: unknown) {
+  if (name !== "row" || !record(value)) return value;
+  const lifecycle = record(value.lifecycleEvidence) ? value.lifecycleEvidence : null;
+  return [
+    value.id,
+    value.status,
+    value.provider,
+    value.worktree,
+    value.checkoutId,
+    value.checkoutKind,
+    value.folder,
+    value.lineageState,
+    lifecycle?.state,
+  ];
+}
 
 interface Domain {
   at: number;

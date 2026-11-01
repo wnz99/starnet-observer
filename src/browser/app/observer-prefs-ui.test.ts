@@ -23,6 +23,7 @@ test("observer-prefs-ui regression contracts", async () => {
     for (const [key, value] of Object.entries(saved)) storage.values.set(key, value);
     page.window.storage.throwing = broken;
     const updates: Scene[] = [],
+      eligibility: boolean[] = [],
       fx: boolean[] = [],
       startup: boolean[] = [];
     let fxOn = false;
@@ -42,8 +43,9 @@ test("observer-prefs-ui regression contracts", async () => {
           fx() {
             return fxOn;
           },
-          update(scene) {
+          update(scene, options) {
             updates.push(scene);
+            eligibility.push(options.startupEligible ?? false);
           },
           focus() {},
           overview() {},
@@ -74,6 +76,7 @@ test("observer-prefs-ui regression contracts", async () => {
         mounted.dispose();
       },
       updates,
+      eligibility,
       stored: page.window.storage.writes,
       fx,
       startup,
@@ -117,6 +120,16 @@ test("observer-prefs-ui regression contracts", async () => {
       .platforms.map((platform) => platform.name)
       .sort()
       .join(",");
+  const empty = boot();
+  await settle();
+  assert.deepEqual(empty.eligibility, [false]);
+  const initialScene = empty.updates[0];
+  empty.poll({ health: "available", observedAt: Date.now(), sessions: [] });
+  assert.deepEqual(empty.eligibility, [false, true]);
+  assert.equal(empty.updates[1], initialScene, "first valid empty data reuses geometry");
+  empty.poll({ health: "available", observedAt: Date.now(), sessions: [] });
+  assert.deepEqual(empty.eligibility, [false, true], "ordinary polls do not redeliver eligibility");
+  empty.dispose();
   await (async () => {
     const fresh = boot();
     await settle();

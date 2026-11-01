@@ -4,9 +4,49 @@ import type { SpriteResource } from "../sprites/types.js";
 import type { ViewRuntime } from "./runtime.js";
 import { present as required } from "./values.js";
 const ZOOM_LIMIT = { maxFactor: 1e6, minFactor: 1e-6 };
+const HALVES = 2;
 
 export class CameraControl<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
+  private assemblyCamera: { start: Camera; end: Camera; at: number; elapsed: number } | null = null;
+  private readonly assemblyDuration = 2800;
+  beginAssemblyCamera(now: number) {
+    const scene = this.view.activeScene,
+      rect = scene.mail.rect;
+    this.assemblyCamera = {
+      start: Scene.focus(
+        { x: rect.x + rect.w / HALVES, y: rect.y + rect.h / HALVES },
+        scene.bounds,
+        this.view.viewport,
+      ),
+      end: Scene.fit(scene.bounds, this.view.viewport),
+      at: now,
+      elapsed: 0,
+    };
+    this.advanceAssemblyCamera(now);
+  }
+  advanceAssemblyCamera(now: number) {
+    const camera = this.assemblyCamera;
+    if (!camera) return;
+    camera.elapsed = Math.max(camera.elapsed, Math.min(this.assemblyDuration, now - camera.at));
+    const t = camera.elapsed / this.assemblyDuration,
+      eased = t * t * (3 - 2 * t);
+    const zoom = camera.start.zoom + (camera.end.zoom - camera.start.zoom) * eased;
+    const middle = this.viewportCenter();
+    const center = (axis: "x" | "y", offset: "tx" | "ty") => {
+      const start = (middle[axis] - camera.start[offset]) / camera.start.zoom;
+      const end = (middle[axis] - camera.end[offset]) / camera.end.zoom;
+      return middle[axis] - (start + (end - start) * eased) * zoom;
+    };
+    this.setCamera({ zoom, tx: center("x", "tx"), ty: center("y", "ty") });
+    if (camera.elapsed === this.assemblyDuration) this.assemblyCamera = null;
+  }
+  finishAssemblyCamera() {
+    if (!this.assemblyCamera) return;
+    const end = this.assemblyCamera.end;
+    this.assemblyCamera = null;
+    this.setCamera(end);
+  }
 
   private viewportCenter() {
     return { x: this.view.viewport.width / 2, y: this.view.viewport.height / 2 };
@@ -33,6 +73,7 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
       ratio === this.view.dpr
     )
       return false;
+    this.view.lifecycle.completeAssembly();
     this.view.viewport = { width, height };
     this.view.dpr = ratio;
     this.view.canvas.width = Math.max(1, Math.round(width * this.view.dpr));
@@ -122,6 +163,7 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
   };
 
   focus = (id: string) => {
+    this.view.lifecycle.completeAssemblyForInput();
     if (!this.view.scene) return;
     const worker = this.view.workerIndex.get(id);
     if (!worker) return;
@@ -138,6 +180,7 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
   };
 
   focusPlatform = (key: string) => {
+    this.view.lifecycle.completeAssemblyForInput();
     if (!this.view.scene) return false;
     this.measure();
     const next = Scene.focusPlatform(this.view.activeScene, key, this.view.viewport);
@@ -149,12 +192,14 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
   };
 
   overview = () => {
+    this.view.lifecycle.completeAssemblyForInput();
     this.view.focused = null;
     this.setMode("overview");
     this.reframe();
   };
 
   zoomBy = (factor: number, at?: Point) => {
+    this.view.lifecycle.completeAssemblyForInput();
     if (!this.view.scene) return;
     this.measure();
     this.setMode("manual");
@@ -170,6 +215,7 @@ export class CameraControl<R extends SpriteResource, B extends R = R> {
   };
 
   panBy = (delta: Point) => {
+    this.view.lifecycle.completeAssemblyForInput();
     if (!this.view.scene) return;
     this.measure();
     this.setMode("manual");

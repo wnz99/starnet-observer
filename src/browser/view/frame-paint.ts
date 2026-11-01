@@ -54,6 +54,7 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
       return;
     }
 
+    const assemblyAnimating = this.view.lifecycle.advanceAssembly(now);
     const isStale = this.view.stale(),
       reduced = this.view.callbacks.reducedMotion(),
       animate = !isStale && !reduced;
@@ -90,7 +91,7 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     this.view.plates.paintPlates(isStale, staleKeys, now, animate);
     this.view.interaction.refreshBadgeHover();
 
-    return animate;
+    return animate || assemblyAnimating;
   };
   private observations(now: number, animate: boolean) {
     if (this.view.assemblyFrame.active) return;

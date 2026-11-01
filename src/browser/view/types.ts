@@ -200,6 +200,7 @@ export interface MailFrame {
   envelopes: Envelope[];
 }
 export interface UpdateOptions {
+  startupEligible?: boolean;
   onHelperSettled?: (id: string, phase: "entering" | "returning") => void;
   stale?: () => boolean;
   rowStale?: (worker: Worker) => boolean;

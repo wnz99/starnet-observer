@@ -556,6 +556,200 @@ test("observer-view regression contracts", async () => {
   const regionOf = (view: ViewInstance, id: string) =>
     present(view.hitRegions().find((region) => region.id === id));
 
+  function verifyAssemblyLifecycle() {
+    let reduced = false;
+    const create = ({ eligible = false } = {}) => {
+      const runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: canvas(1440, 1000),
+          reducedMotion: () => reduced,
+          env: {
+            raf: () => 1,
+            caf() {},
+            now: () => 0,
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      );
+      runtime.lifecycle.start();
+      runtime.update(Scene.build([], 0), { stale: () => true, startupEligible: eligible });
+      return runtime;
+    };
+    const firstData = create({ eligible: true });
+    firstData.framePaint.paint(0);
+    assert.equal(
+      firstData.assembly.state,
+      "playing",
+      "initial measurement does not consume eligible intro",
+    );
+    firstData.lifecycle.stop();
+    const runtime = create(),
+      scene = runtime.activeScene;
+    runtime.framePaint.paint(0);
+    assert.equal(runtime.assembly.state, "pending", "absent data cannot consume intro");
+    const revision = scene.revision;
+    runtime.update(scene, { startupEligible: true });
+    assert.equal(runtime.framePaint.paint(10), true, "stale frames still schedule the intro");
+    assert.equal(runtime.assembly.state, "playing", "late empty snapshot starts on reused scene");
+    const start = { ...runtime.camera };
+    runtime.update(scene);
+    assert.deepEqual(runtime.camera, start, "equal revisions do not reset intro camera");
+    runtime.framePaint.paint(1410);
+    assert(runtime.camera.zoom <= start.zoom);
+    runtime.framePaint.paint(2810);
+    assert.equal(runtime.assembly.state, "complete");
+    assert.equal(scene.revision, revision);
+    assert.deepEqual(runtime.camera, Scene.fit(scene.bounds, runtime.viewport));
+    const layer = runtime.staticLayer;
+    runtime.framePaint.paint(2900);
+    assert.equal(runtime.staticLayer, layer, "completed intro resumes ordinary cache reuse");
+    runtime.lifecycle.stop();
+    runtime.lifecycle.start();
+    runtime.update(scene, { startupEligible: true });
+    runtime.framePaint.paint(3000);
+    assert.equal(runtime.assembly.state, "complete", "resume cannot replay");
+    runtime.lifecycle.stop();
+
+    const interrupted = create();
+    interrupted.update(interrupted.activeScene, { startupEligible: true });
+    interrupted.framePaint.paint(0);
+    assert.equal(interrupted.plateFrame, null);
+    interrupted.interaction.select({ x: -100, y: -100 });
+    assert.equal(interrupted.assembly.state, "complete");
+    assert(
+      interrupted.interaction.paintedFrameCurrent(),
+      "input paints final targets synchronously",
+    );
+    interrupted.cameraControl.zoomBy(1.1);
+    const requested = { ...interrupted.camera };
+    interrupted.framePaint.paint(1000);
+    assert.deepEqual(interrupted.camera, requested, "intro cannot override requested zoom");
+    interrupted.lifecycle.stop();
+
+    const waiting = create();
+    waiting.office = { state: "pending", composition: null };
+    waiting.update(waiting.activeScene, { startupEligible: true });
+    assert.equal(waiting.framePaint.paint(0), true);
+    waiting.framePaint.paint(499);
+    assert.equal(waiting.assembly.state, "pending");
+    waiting.framePaint.paint(500);
+    assert.equal(waiting.assembly.state, "playing", "fallback deadline bounds resource wait");
+    waiting.office.state = "failed";
+    waiting.framePaint.paint(600);
+    assert.equal(waiting.assembly.state, "playing", "failed fallback keeps same art mode");
+    reduced = true;
+    waiting.framePaint.paint(601);
+    assert.equal(waiting.assembly.state, "complete", "reduced motion transition finishes");
+    waiting.lifecycle.stop();
+
+    const skipped = create();
+    skipped.office = { state: "pending", composition: null };
+    skipped.update(skipped.activeScene, { startupEligible: true });
+    skipped.framePaint.paint(0);
+    assert.equal(skipped.assembly.state, "complete", "reduced motion skips resource wait");
+    skipped.lifecycle.stop();
+    reduced = false;
+    const disabled = create();
+    const startupEnabled = false;
+    disabled.lifecycle.setStartupAnimation(startupEnabled);
+    disabled.update(disabled.activeScene, { startupEligible: true });
+    disabled.framePaint.paint(0);
+    assert.equal(disabled.assembly.state, "complete");
+    disabled.lifecycle.stop();
+
+    for (const interrupt of [
+      "revision",
+      "resize",
+      "stop",
+      "disable",
+      "wheel",
+      "key",
+      "pan",
+      "sidebar",
+    ]) {
+      const view = create();
+      view.update(view.activeScene, { startupEligible: true });
+      view.framePaint.paint(0);
+      view.interaction.gestures.pointerMove({ clientX: 10, clientY: 10 });
+      assert.equal(view.assembly.state, "playing", "hover alone never interrupts");
+      switch (interrupt) {
+        case "revision":
+          view.update(Scene.build([], 1));
+          break;
+        case "resize":
+          Object.defineProperty(view.canvas, "clientWidth", { value: view.canvas.clientWidth + 1 });
+          view.cameraControl.measure();
+          break;
+        case "stop":
+          view.lifecycle.stop();
+          break;
+        case "disable":
+          view.lifecycle.setStartupAnimation(startupEnabled);
+          break;
+        case "wheel":
+          view.interaction.wheel({ deltaY: -50 });
+          break;
+        case "key":
+          view.interaction.keyDown({ key: "ArrowLeft" });
+          break;
+        case "pan":
+          view.cameraControl.panBy({ x: 20, y: 10 });
+          break;
+        case "sidebar":
+          view.cameraControl.overview();
+          break;
+      }
+      assert.equal(view.assembly.state, "complete", interrupt + " completes intro");
+      const camera = { ...view.camera };
+      view.framePaint.paint(1400);
+      assert.deepEqual(view.camera, camera, interrupt + " keeps requested camera");
+      view.lifecycle.stop();
+      assert.equal(view.frame, null);
+    }
+    const ready = create();
+    ready.office = { state: "pending", composition: null };
+    ready.update(ready.activeScene, { startupEligible: true });
+    ready.framePaint.paint(0);
+    ready.office.state = "ready";
+    ready.lifecycle.advanceAssembly(100);
+    assert.equal(ready.assembly.state, "playing", "ready office starts before deadline");
+    ready.office.state = "failed";
+    ready.lifecycle.advanceAssembly(200);
+    assert.equal(ready.assembly.state, "complete", "changed art mode completes before paint");
+    ready.lifecycle.stop();
+    const failed = create();
+    failed.office = { state: "failed", composition: null };
+    failed.update(failed.activeScene, { startupEligible: true });
+    failed.framePaint.paint(0);
+    assert.equal(
+      failed.assembly.state,
+      "playing",
+      "failed office starts truthful fallback immediately",
+    );
+    failed.lifecycle.stop();
+    const stopped = create();
+    stopped.lifecycle.stop();
+    stopped.update(stopped.activeScene, { startupEligible: true });
+    assert.equal(stopped.assembly.state, "pending", "stopped eligibility stays latched");
+    stopped.lifecycle.start();
+    stopped.framePaint.paint(0);
+    assert.equal(stopped.assembly.state, "playing");
+    stopped.lifecycle.stop();
+    const earlyInput = create();
+    earlyInput.update(earlyInput.activeScene, { startupEligible: true });
+    earlyInput.cameraControl.panBy({ x: 10, y: 10 });
+    assert.equal(
+      earlyInput.assembly.state,
+      "complete",
+      "input before first eligible paint consumes intro",
+    );
+    earlyInput.lifecycle.stop();
+  }
+  verifyAssemblyLifecycle();
+
   function verifyAssemblyLiveArt() {
     const runtime = new ViewRuntime(
       { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },

@@ -1,12 +1,10 @@
 import { build, relayNetworks, shadowRows, representedRows } from "../scene/index.js";
 import type { RemoteHost, Scene, RelayNetwork } from "../scene/types.js";
-import { record } from "../theme/validation.js";
 import type { MailFrame } from "../view/types.js";
 import type { AppView } from "./contracts.js";
 import type { AppBus, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppState } from "./state.js";
-import { HelperPresentation } from "./helper-presentation.js";
-
+import { geometryField, HelperPresentation } from "./helper-presentation.js";
 interface FloorOptions {
   state: AppState;
   view: AppView;
@@ -23,21 +21,6 @@ interface FloorOptions {
 const MINUTE_MS = 60000;
 type ShadowRow = ReturnType<typeof shadowRows>[number];
 type RelayMember = { host: string | null; repo: string };
-function geometryField(name: string, value: unknown) {
-  if (name !== "row" || !record(value)) return value;
-  const lifecycle = record(value.lifecycleEvidence) ? value.lifecycleEvidence : null;
-  return [
-    value.id,
-    value.status,
-    value.provider,
-    value.worktree,
-    value.checkoutId,
-    value.checkoutKind,
-    value.folder,
-    value.lineageState,
-    lifecycle?.state,
-  ];
-}
 /* llm-bus relays come from each observed bus's own binding. Each unobserved machine on a relay becomes a shadow ship
    of ghost crew from the relay roster: on the floor only, never in byId, so nothing selects, inspects or controls it. */
 export class Floor {
@@ -50,6 +33,7 @@ export class Floor {
   private candidates: AppRow[] = [];
   private presentationKey = "";
   private generation = 0;
+  private startupEligibilityDelivered = false;
   private resumedAt: number | null = null;
   constructor(private readonly options: FloorOptions) {
     this.presentation = new HelperPresentation(options.state);
@@ -175,6 +159,7 @@ export class Floor {
     };
     // Row freshness is read from the current roster by id: the cached scene's row objects can be older.
     view.update(scene, {
+      startupEligible: !!state.latest?.data,
       stale: () => state.isStale(),
       rowStale: (worker) => rowStale(worker.id),
       onHelperSettled: (id, phase) => {
@@ -189,6 +174,7 @@ export class Floor {
         this.options.repositoryToggle(repo);
       },
     });
+    if (state.latest?.data) this.startupEligibilityDelivered = true;
     if (state.zoomed) this.options.showZoom(state.zoomed);
   }
   private content(snapshot: AppQuerySnapshot) {
@@ -267,6 +253,9 @@ export class Floor {
       }
     }
   }
+  private needsEligibility(snapshot: AppQuerySnapshot) {
+    return !!snapshot.data && !this.startupEligibilityDelivered;
+  }
   render(snapshot: AppQuerySnapshot, hosts: RemoteHost[], refresh: boolean) {
     const { state, view } = this.options;
     let rows = this.candidates;
@@ -289,7 +278,8 @@ export class Floor {
       state.scene = this.buildScene(snapshot, sceneHosts, nets, overseer);
       this.phases(state.scene);
       this.update(state.scene);
-    } else if (refresh || content !== this.contentKey) view.invalidate();
+    } else if (this.needsEligibility(snapshot)) this.update(state.scene);
+    else if (refresh || content !== this.contentKey) view.invalidate();
     this.contentKey = content;
     const onFloor = this.crew(rows, overseer);
     return {
