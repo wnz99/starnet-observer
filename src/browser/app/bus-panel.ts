@@ -1,3 +1,4 @@
+import { createMessageRow } from "./message-row.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { AppNode } from "./dom.js";
 import type { AppState } from "./state.js";
@@ -5,7 +6,7 @@ import type { AppMessage } from "./data.js";
 import type { BusTarget, PanelTarget } from "./roster-ports.js";
 import type { AppUi } from "./ui.js";
 import { NodeEvents, setText } from "./ui.js";
-import { busHealth, mailStatus } from "./mail-text.js";
+import { busHealth, mailStatus, createMailText } from "./mail-text.js";
 import { busDiagnostics } from "./bus-text.js";
 import { createBusOverview } from "./bus-overview.js";
 import { validIdentity } from "../inspector/mail-validation.js";
@@ -25,7 +26,9 @@ interface MessageRow<N> {
   root: N;
   read: N;
   reply: N;
-  text: N;
+  route: N;
+  status: N;
+  button: N;
   events: NodeEvents;
 }
 class BusPanel<N extends AppNode, R extends SpriteResource> {
@@ -82,49 +85,45 @@ class BusPanel<N extends AppNode, R extends SpriteResource> {
   }
   private make(id: number): MessageRow<N> {
     const { ui, state } = this.options;
-    const root = ui.text("li", "bus-message", "");
-    const text = ui.text("p", "", "");
-    const read = ui.text("button", "", "Read message #" + String(id));
-    const reply = ui.text("button", "", "");
-    ui.document.setType(read, "button");
-    ui.document.setType(reply, "button");
     const events = new NodeEvents(() => !state.disposed);
-    events.on(read, "click", () => {
-      this.open(id, read);
+    const row = createMessageRow(ui, id, events, {
+      select: (trigger) => {
+        this.open(id, trigger);
+      },
+      inspect: (trigger) => {
+        this.open(id, trigger);
+      },
     });
+    const { item: root, read, button, route, state: status } = row;
+    root.className += " bus-message";
+    const reply = ui.text("button", "mail-reply", "");
+    ui.document.setType(reply, "button");
     events.on(reply, "click", () => {
       const parent = this.bus()?.messages?.find((value) => value.id === id)?.replyTo;
       if (parent) this.open(parent, reply);
     });
-    ui.document.attach(root, text, read, reply);
-    return { root, read, reply, text, events };
+    ui.document.attach(root, reply);
+    return { root, read, reply, route, status, button, events };
   }
   private message(message: AppMessage, items: AppMessage[]) {
-    const { ui } = this.options;
+    const { ui, state } = this.options;
     const entry = this.entries.get(message.id) ?? this.make(message.id);
     this.entries.set(message.id, entry);
-    const route = this.participant(message.from) + " → " + this.participant(message.to);
-    const relay = message.relay;
-    const transport = relay ? " · relay " + relay.machine + " / " + String(relay.repo) : "";
-    setText(
-      entry.text,
-      "#" +
-        String(message.id) +
-        " · " +
-        route +
-        "\n" +
-        mailStatus(message) +
-        transport +
-        "\nSent: " +
-        String(message.sentAt) +
-        " · " +
-        age(message.sentAt, this.options.now()) +
-        "\nAcknowledged: " +
-        (message.acknowledgedAt ? String(message.acknowledgedAt) : "not recorded"),
-    );
-    ui.document.setDisabled(entry.read, {
-      disabled: !this.readable() || !validIdentity(message.identity),
+    const text = createMailText({
+      rowFor: (id) => state.byId.get(id),
+      workerName: (row) => String(row.provider),
+      now: () => this.options.now(),
     });
+    const route =
+      text.endpointLabel(message.from, message, "from") +
+      " → " +
+      text.endpointLabel(message.to, message, "to");
+    setText(entry.route, "#" + String(message.id) + " " + route);
+    setText(entry.status, mailStatus(message) + " · " + age(message.sentAt, this.options.now()));
+    entry.button.setAttribute("title", route);
+    const disabled = !this.readable() || !validIdentity(message.identity);
+    ui.document.setDisabled(entry.read, { disabled });
+    ui.document.setDisabled(entry.button, { disabled });
     this.reply(message, items);
     return entry.root;
   }

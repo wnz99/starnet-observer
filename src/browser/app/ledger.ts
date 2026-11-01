@@ -1,3 +1,4 @@
+import { createMessageRow } from "./message-row.js";
 import { validIdentity } from "../inspector/mail-validation.js";
 import { age } from "../model/description.js";
 import type { SpriteResource } from "../sprites/types.js";
@@ -64,29 +65,18 @@ export class Ledger<N extends AppNode, R extends SpriteResource> {
   private make(id: number): LedgerRow<N> {
     const { ui, state, panels } = this.options;
     const events = new NodeEvents(() => !state.disposed);
-    const item = ui.text("li", "mail-item", "");
-    const button = ui.text("button", "mail-row", "");
-    const route = ui.text("span", "mail-route", "");
-    const status = ui.text("span", "mail-state", "");
-    ui.document.setType(button, "button");
-    button.dataset.messageId = String(id);
-    ui.document.attach(button, route, status);
-    events.on(button, "click", () => {
-      const message = state.messageFor(id);
-      if (message) this.showMail(message);
+    return createMessageRow(ui, id, events, {
+      select: () => {
+        const message = state.messageFor(id);
+        if (message) this.showMail(message);
+      },
+      inspect: (read) => {
+        const message = state.messageFor(id);
+        if (message) panels.togglePanel(mailTarget(message), read);
+      },
     });
-    // A sibling magnifier reads the body; the row click keeps meaning "focus the recipient".
-    const read = ui.text("button", "row-inspect", "⌕");
-    ui.document.setType(read, "button");
-    read.dataset.readId = String(id);
-    read.setAttribute("aria-haspopup", "dialog");
-    events.on(read, "click", () => {
-      const message = state.messageFor(id);
-      if (message) panels.togglePanel(mailTarget(message), read);
-    });
-    ui.document.attach(item, button, read);
-    return { item, button, route, state: status, read, events };
   }
+
   private row(message: AppMessage) {
     const { ui, state, panels, text } = this.options;
     const entry = this.rows.get(message.id) ?? this.make(message.id);

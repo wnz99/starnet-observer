@@ -152,7 +152,9 @@ test("bus-only panel expires its transport proof while inventory is unavailable"
     await flushMount();
     present(probe.viewOptions).onMailroom?.(null);
     const root = present(probe.page.document.getElementById("panels"));
-    const read = present(all(root).find((node) => node.textContent === "Read message #1"));
+    const read = present(
+      all(root).find((node) => node.attributes.get("aria-label") === "Read message #1"),
+    );
     assert.equal(read.disabled, false);
     probe.page.scheduler.advance(6001);
     await flushMount();
@@ -216,15 +218,20 @@ test("bus cards use aggregate observations while recent activity stays bounded a
       present(cards[3]?.children[1]).textContent,
       /2 recipients pending.*\n— · Unavailable failed messages/,
     );
-    assert.equal(nodes.filter((node) => node.className === "bus-message").length, 10);
-    assert(!nodes.some((node) => node.textContent === "Read message #1"));
-    assert(nodes.some((node) => node.textContent === "Read message #3"));
+    assert.equal(
+      nodes.filter((node) => node.className.split(" ").includes("bus-message")).length,
+      10,
+    );
+    assert(!nodes.some((node) => node.attributes.get("aria-label") === "Read message #1"));
+    assert(nodes.some((node) => node.attributes.get("aria-label") === "Read message #3"));
     assert.equal(part(probe, "mail-inspector-empty-").hidden, true);
     const remote = present(nodes.find((node) => node.textContent === "Remote activity")).parent;
     assert.equal(remote?.hidden, true);
     const resource = present(nodes.find((node) => node.className === "bus-resource"));
     resource.open = true;
-    const read = present(nodes.find((node) => node.textContent === "Read message #12"));
+    const read = present(
+      nodes.find((node) => node.attributes.get("aria-label") === "Read message #12"),
+    );
     read.focus();
     probe.page.scheduler.advance(2001);
     await flushMount();
