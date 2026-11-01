@@ -1,6 +1,8 @@
 import { project as P } from "../scene/index.js";
 import { FrameOverlays } from "./frame-overlays.js";
 import { StationItems } from "./station-items.js";
+import { rectPoly } from "./primitives.js";
+import type { AssemblyOwner, AssemblyStage } from "./startup-assembly.js";
 import type { ArtPainters } from "./types.js";
 import * as Scene from "../scene/index.js";
 import type { Rect } from "../scene/types.js";
@@ -64,20 +66,22 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
 
     this.view.space.paintSpace(now, animate);
     const { A, stationArt, ambient } = this.worldLayer();
-    if (stationArt) this.radar(now, animate);
-
-    for (const link of this.view.activeScene.links || [])
-      this.view.effects.paintObservation(link, now, animate);
+    if (stationArt)
+      this.paintAssembly("mail", "content", () => {
+        this.radar(now, animate);
+      });
+    this.observations(now, animate);
     this.measureVisibleArea();
 
     if (ambient) this.ambient(now, animate);
     const staleKeys = this.paintItems({ A, now, animate, ambient });
-    this.overlays.repository(stationArt);
-    this.overlays.focus(now, animate);
-    this.overlays.platform(this.view.camera.zoom);
-    this.overlays.host(now, animate, this.view.camera.zoom);
-
-    this.view.mail.paintMail(mail, now, animate);
+    if (!this.view.assemblyFrame.active) {
+      this.overlays.repository(stationArt);
+      this.overlays.focus(now, animate);
+      this.overlays.platform(this.view.camera.zoom);
+      this.overlays.host(now, animate, this.view.camera.zoom);
+      this.view.mail.paintMail(mail, now, animate);
+    }
 
     if (!stationArt) this.view.ctx.imageSmoothingEnabled = true;
     if (isStale) this.overlays.stale();
@@ -88,6 +92,27 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
 
     return animate;
   };
+  private observations(now: number, animate: boolean) {
+    if (this.view.assemblyFrame.active) return;
+    for (const link of this.view.activeScene.links || [])
+      this.view.effects.paintObservation(link, now, animate);
+  }
+  paintAssembly(owner: AssemblyOwner | undefined, stage: AssemblyStage, draw: () => void) {
+    if (!this.view.assemblyFrame.active) {
+      draw();
+      return;
+    }
+    const alpha = owner === undefined ? 0 : this.view.assemblyFrame.progress(owner, stage);
+    if (alpha <= 0) return;
+    const ctx = this.view.ctx;
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    try {
+      draw();
+    } finally {
+      ctx.restore();
+    }
+  }
   private ambient(now: number, animate: boolean) {
     this.view.platformEffects.paintPlatformGlow(now, animate);
     this.view.furnitureEffects.paintFurnitureFx(now, animate);
@@ -111,11 +136,25 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
       this.view.dpr * this.view.camera.ty,
     );
 
-    const layer = this.view.cache.staticFor(),
-      b = layer.bounds,
-      A = this.view.resources.artPainters(),
+    const A = this.view.resources.artPainters(),
       stationArt = A !== this.view.office?.painters,
-      ambient = this.view.fx && this.view.decor && stationArt;
+      ambient = this.view.fx && this.view.decor && stationArt && !this.view.assemblyFrame.active;
+
+    if (this.view.assemblyFrame.active) {
+      this.view.ctx.imageSmoothingEnabled =
+        !stationArt && this.view.camera.zoom * this.view.dpr < 1;
+      A.paintStatic(this.view.ctx, this.view.activeScene, {
+        owners: this.view.assemblyOwners,
+        frame: this.view.assemblyFrame,
+        paint: (owner, stage, draw) => {
+          this.paintAssembly(owner, stage, draw);
+        },
+      });
+      this.assemblyEdges();
+      return { A, stationArt, ambient };
+    }
+    const layer = this.view.cache.staticFor(),
+      b = layer.bounds;
 
     // Magnified office art keeps crisp pixel outlines; smaller buckets use smoothing.
     if (!stationArt)
@@ -129,6 +168,49 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
       this.view.ctx.imageSmoothingEnabled = this.view.camera.zoom * this.view.dpr < 1;
     return { A, stationArt, ambient };
   };
+  private assemblyEdges() {
+    const scene = this.view.activeScene;
+    this.assemblyEdge("mail", scene.mail.rect, this.view.C.amber);
+    this.assemblyEdge("observatory", scene.observatory.rect, this.view.C.cyan);
+    for (const platform of scene.platforms)
+      this.assemblyEdge(
+        this.view.assemblyOwners.platform(platform.key),
+        platform.rect,
+        platform.accent,
+      );
+  }
+  private assemblyEdge(owner: AssemblyOwner | undefined, rect: Rect, accent: string) {
+    if (!owner) return;
+    const frame = this.view.assemblyFrame,
+      outline = frame.outline(owner),
+      sweep = frame.sweep(owner);
+    const ctx = this.view.ctx,
+      points = rectPoly(rect, 0);
+    ctx.save();
+    try {
+      ctx.globalAlpha *= outline * (1 - frame.progress(owner, "floor"));
+      ctx.lineWidth = 1 / this.view.camera.zoom;
+      this.view.geometry.poly(points, null, accent);
+      if (sweep > 0 && sweep < 1) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = accent;
+        const perimeter = points.length,
+          position = sweep * perimeter;
+        const index = Math.min(perimeter - 1, Math.floor(position));
+        const from = points[index],
+          to = points[(index + 1) % perimeter];
+        if (from && to) {
+          const t = position - index;
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          ctx.lineTo(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+          ctx.stroke();
+        }
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
   private paintTethers(): void {
     const actors = new Map(this.view.actors.map((actor) => [actor.id, actor]));
     const ctx = this.view.ctx;

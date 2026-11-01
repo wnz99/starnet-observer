@@ -556,6 +556,146 @@ test("observer-view regression contracts", async () => {
   const regionOf = (view: ViewInstance, id: string) =>
     present(view.hitRegions().find((region) => region.id === id));
 
+  function verifyAssemblyLiveArt() {
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        reducedMotion: () => true,
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile([
+      { id: "assembly-worker", projectId: "assembly", repoId: "assembly", status: "working" },
+    ]);
+    const scene = Scene.build(layout.onPage(0), 0),
+      count = scene.workers.length;
+    runtime.update(scene);
+    runtime.actors = runtime.movement.step(0, { stale: () => false, reduced: true });
+    runtime.framePaint.onStage = () => true;
+    const realCrew = runtime.crew.paintCrew.bind(runtime.crew);
+    let auras = 0;
+    runtime.aura.paintBackdrop = () => {
+      auras++;
+    };
+    runtime.aura.paintMotes = () => {
+      auras++;
+    };
+    runtime.fx = true;
+    runtime.assembly.begin(scene, 0);
+    const probe = new StartupAssembly();
+    probe.begin(scene, 0);
+    runtime.assemblyFrame = probe.frame(740);
+    const worker = present(scene.workers[0]),
+      actor = present(runtime.actors[0]);
+    const alphas: number[] = [],
+      stack: number[] = [];
+    const ctx = runtime.ctx;
+    ctx.save = () => {
+      stack.push(ctx.globalAlpha);
+    };
+    ctx.restore = () => {
+      ctx.globalAlpha = present(stack.pop());
+    };
+    ctx.fill = () => {
+      alphas.push(ctx.globalAlpha);
+    };
+    runtime.framePaint.paintAssembly(runtime.assemblyOwners.worker(worker), "content", () => {
+      const reduced = true;
+      realCrew(worker, actor, 740, reduced);
+    });
+    assert.equal(auras, 0, "intro suppresses crew ambient aura");
+    assert.ok(
+      alphas.some((alpha) => alpha > 0 && alpha < 0.85),
+      "silhouette composes parent fade",
+    );
+    assert.equal(ctx.globalAlpha, 1);
+    let desks = 0,
+      crew = 0,
+      caches = 0;
+    runtime.stationArt.desk = () => {
+      desks++;
+    };
+    runtime.crew.paintCrew = (worker) => {
+      crew++;
+      const region = {
+        id: worker.id,
+        left: 0,
+        top: 0,
+        width: 20,
+        height: 40,
+        depth: 0,
+        head: { x: 10, y: 0 },
+        foot: 40,
+      };
+      runtime.anchors.push(region);
+      runtime.regions.push(region);
+    };
+    const cached = runtime.cache.staticFor;
+    runtime.cache.staticFor = () => {
+      caches++;
+      return cached();
+    };
+    runtime.assembly.begin(scene, 0);
+    const paint = (now: number) => {
+      runtime.regions = [];
+      runtime.anchors = [];
+      runtime.assemblyFrame = runtime.assembly.frame(now);
+      const { A } = runtime.framePaint.worldLayer();
+      runtime.framePaint.paintItems({ A, now, animate: false, ambient: false });
+    };
+    paint(0);
+    assert.equal(desks, 0);
+    assert.equal(crew, 0);
+    assert.equal(caches, 0);
+    assert.equal(runtime.regions.length, 0);
+    paint(740);
+    assert.notEqual(desks, 0);
+    assert.notEqual(crew, 0);
+    assert.equal(runtime.regions.length, 0, "fading bodies cannot register targets");
+    paint(840);
+    assert.notEqual(runtime.regions.length, 0, "complete content restores body targets");
+    assert.equal(caches, 0);
+    const ancillary: string[] = [];
+    runtime.mail.paintMail = () => {
+      ancillary.push("mail");
+    };
+    runtime.framePaint.overlays.repository = () => {
+      ancillary.push("repository");
+    };
+    runtime.framePaint.overlays.focus = () => {
+      ancillary.push("focus");
+    };
+    runtime.platformEffects.paintPlatformGlow = () => {
+      ancillary.push("ambient");
+    };
+    runtime.framePaint.paint(840);
+    assert.deepEqual(
+      ancillary,
+      [],
+      "active paint suppresses couriers, focus, repository and ambient passes",
+    );
+    runtime.assembly.complete();
+    paint(2800);
+    paint(2816);
+    const reduced = true;
+    realCrew(worker, actor, 2816, reduced);
+    assert.equal(auras, 2, "ordinary crew restores both aura passes");
+    assert.equal(caches, 2, "completed frames use ordinary cached path");
+    runtime.framePaint.paint(2816);
+    assert.deepEqual(ancillary, ["ambient", "repository", "focus", "mail"]);
+    assert.equal(scene.workers.length, count);
+  }
+  verifyAssemblyLiveArt();
+
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),
       runtime = new ViewRuntime(

@@ -1,4 +1,5 @@
 import { callbacksFor } from "./callbacks.js";
+import { StartupAssembly, type AssemblyOwner } from "./startup-assembly.js";
 import { drawingEnvironment } from "./environment.js";
 import { GeometryPainter } from "./geometry-painter.js";
 import type { ViewBody } from "./state-types.js";
@@ -198,6 +199,17 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
 
   fx = false;
   startupAnimation = true;
+  readonly assembly = new StartupAssembly();
+  assemblyFrame = this.assembly.frame(0);
+  get assemblyOwners() {
+    return this.assembly.owners;
+  }
+  assemblyVisible(owner: AssemblyOwner | undefined): boolean {
+    return (
+      !this.assemblyFrame.active ||
+      (owner !== undefined && this.assemblyFrame.progress(owner, "content") === 1)
+    );
+  }
 
   dirty = false;
 

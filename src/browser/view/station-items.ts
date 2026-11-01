@@ -4,6 +4,7 @@ import { middle } from "./primitives.js";
 import type { ViewRuntime } from "./runtime.js";
 import type { DepthItem } from "./state-types.js";
 import type { ArtPainters } from "./types.js";
+import type { AssemblyOwner } from "./startup-assembly.js";
 interface ItemFrame<R extends SpriteResource> {
   A: ArtPainters<R>;
   now: number;
@@ -35,11 +36,27 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
       const own = this.view.workerStale(worker),
         live = frame.animate && !own;
       if (own) staleKeys.add(worker.platformKey);
-      items.push(...this.desks(worker, { ...frame, live }), ...this.chair(worker, frame.A));
+      const owned = [...this.desks(worker, { ...frame, live }), ...this.chair(worker, frame.A)];
       const actor = byId.get(worker.id);
-      if (actor) items.push(this.crew(worker, actor, { ...frame, live }));
+      if (actor) owned.push(this.crew(worker, actor, { ...frame, live }));
+      items.push(...this.owned(owned, this.view.assemblyOwners.worker(worker)));
     }
     return { items, staleKeys };
+  }
+  private owned(items: DepthItem[], owner: AssemblyOwner | undefined): DepthItem[] {
+    if (!this.view.assemblyFrame.active) return items;
+    return items.map((item) => ({
+      ...item,
+      draw: () => {
+        const regions = this.view.regions.length,
+          anchors = this.view.anchors.length;
+        this.view.framePaint.paintAssembly(owner, "content", item.draw);
+        if (!this.view.assemblyVisible(owner)) {
+          this.view.regions.length = regions;
+          this.view.anchors.length = anchors;
+        }
+      },
+    }));
   }
   private desks(worker: Worker, frame: ItemFrame<R> & { live: boolean }): DepthItem[] {
     const items: DepthItem[] = [],
@@ -97,7 +114,7 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
         }
         const ctx = this.view.ctx;
         ctx.save();
-        ctx.globalAlpha = ITEM.ghostAlpha;
+        ctx.globalAlpha *= ITEM.ghostAlpha;
         const reduced = true;
         try {
           this.view.crew.paintCrew(worker, actor, frame.now, reduced);
@@ -108,7 +125,10 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
     };
   }
   observatory(A: ArtPainters<R>, now: number, animate: boolean): DepthItem[] {
-    return [...this.observatoryFurniture(A), ...this.observatoryProps(A, now, animate)];
+    return this.owned(
+      [...this.observatoryFurniture(A), ...this.observatoryProps(A, now, animate)],
+      "observatory",
+    );
   }
   private observatoryFurniture(A: ArtPainters<R>): DepthItem[] {
     const { desk, chair, viewer, overseer } = this.view.activeScene.observatory,
@@ -180,7 +200,12 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
     for (const platform of this.view.activeScene.platforms)
       for (const section of platform.sections)
         for (const wall of section.partitions)
-          items.push(...this.partitionWall(wall, A, platform.accent));
+          items.push(
+            ...this.owned(
+              this.partitionWall(wall, A, platform.accent),
+              this.view.assemblyOwners.platform(platform.key),
+            ),
+          );
     return items;
   }
   private partitionWall(wall: Rect, A: ArtPainters<R>, accent: string): DepthItem[] {
@@ -206,12 +231,19 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
           region.kind === "apron" &&
           this.view.framePaint.onStage(region.rect, ITEM.apronHeight, ITEM.apronPadding)
         )
-          items.push({
-            depth: region.rect.x + region.rect.y + 1,
-            draw: () => {
-              A.apron(this.view.ctx, region);
-            },
-          });
+          items.push(
+            ...this.owned(
+              [
+                {
+                  depth: region.rect.x + region.rect.y + 1,
+                  draw: () => {
+                    A.apron(this.view.ctx, region);
+                  },
+                },
+              ],
+              this.view.assemblyOwners.platform(platform.key),
+            ),
+          );
     return items;
   }
 }
