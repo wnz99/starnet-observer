@@ -29,10 +29,17 @@ test("hubs precede stable outward families and annexes regardless of input order
   const assembly = new StartupAssembly();
   assembly.begin(scene, 100);
   assert.equal(assembly.state, "playing");
-  assert.equal(assembly.frame(200).outline("mail"), 1);
-  assert.equal(assembly.frame(200).outline("observatory"), 0);
-  const frame = assembly.frame(600);
-  assert(frame.progress("mail", "content") > frame.progress("observatory", "content"));
+  const core = assembly.frame(100);
+  assert.equal(core.progress("mail", "content"), 1);
+  assert.equal(core.progress("observatory", "content"), 1);
+  for (const now of [100, 500, 1000]) {
+    const pullingBack = assembly.frame(now);
+    for (const room of scene.platforms) {
+      assert.equal(pullingBack.outline(`platform:${room.key}`), 0);
+      assert.equal(pullingBack.progress(`platform:${room.key}`, "floor"), 0);
+    }
+  }
+  const frame = assembly.frame(1200);
   assert.equal(frame.outline("platform:parent"), 1);
   assert.equal(frame.outline("platform:annex"), 0);
   assert.equal(assembly.owners.platform("missing"), undefined);
@@ -85,15 +92,19 @@ test("phase boundaries and at most twelve contiguous room groups", () => {
   scene.platforms = Array.from({ length: 100 }, (_, i) => platform(String(i).padStart(3, "0")));
   const assembly = new StartupAssembly();
   assembly.begin(scene, 0);
-  assert.equal(assembly.frame(50).outline("mail"), 0.5);
-  assert.equal(assembly.frame(100).progress("mail", "floor"), 0);
-  assert.equal(assembly.frame(190).progress("mail", "floor"), 0.5);
-  assert.equal(assembly.frame(280).progress("mail", "content"), 0);
-  assert.equal(assembly.frame(380).progress("mail", "content"), 0.5);
-  assert.equal(assembly.frame(390).sweep("mail"), 0.5);
+  assert.equal(assembly.frame(0).progress("mail", "content"), 1);
+  assert.equal(assembly.frame(900).outline("platform:000"), 0);
+  assert.equal(assembly.frame(1050).outline("platform:000"), 0.5);
+  assert.equal(assembly.frame(1100).progress("platform:000", "floor"), 0);
+  assert.equal(assembly.frame(1190).progress("platform:000", "floor"), 0.5);
+  assert.equal(assembly.frame(1280).progress("platform:000", "content"), 0);
+  assert.equal(assembly.frame(1380).progress("platform:000", "content"), 0.5);
+  assert.equal(assembly.frame(1390).sweep("platform:000"), 0.5);
   const firstSeen = new Map<string, number>();
-  for (let now = 380; now <= 2210; now += 10) {
-    const frame = assembly.frame(now);
+  const groups = new StartupAssembly();
+  groups.begin(scene, 0);
+  for (let now = 1000; now <= 2210; now += 10) {
+    const frame = groups.frame(now);
     for (const room of scene.platforms) {
       if (!firstSeen.has(room.key) && frame.outline(`platform:${room.key}`) > 0)
         firstSeen.set(room.key, now);
@@ -163,9 +174,11 @@ test("remote and shadow hubs precede rooms; relay spokes wait for their host's c
   assert.equal(assembly.owners.ship("remote"), "ship:remote");
   assert.equal(assembly.owners.ship("shadow"), "ship:shadow");
   assert.equal(assembly.frame(0).progress(assembly.owners.relay("relay"), "floor"), 0);
-  assert(assembly.frame(359).outline("ship:remote") > 0);
-  assert.equal(assembly.frame(359).outline("platform:remote-room"), 0);
-  assert.equal(assembly.frame(700).progress(assembly.owners.relay("relay"), "content"), 1);
-  assert.equal(assembly.owners.walkwayReady(highway, assembly.frame(1000)), false);
+  assert.equal(assembly.frame(899).outline("ship:remote"), 0);
+  assert.equal(assembly.frame(899).outline(assembly.owners.relay("relay")), 0);
+  assert(assembly.frame(959).outline("ship:remote") > 0);
+  assert.equal(assembly.frame(959).outline("platform:remote-room"), 0);
+  assert.equal(assembly.frame(1400).progress(assembly.owners.relay("relay"), "content"), 1);
+  assert.equal(assembly.owners.walkwayReady(highway, assembly.frame(1400)), false);
   assert.equal(assembly.owners.walkwayReady(highway, assembly.frame(2680)), true);
 });

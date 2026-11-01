@@ -597,8 +597,12 @@ test("observer-view regression contracts", async () => {
     const start = { ...runtime.camera };
     runtime.update(scene);
     assert.deepEqual(runtime.camera, start, "equal revisions do not reset intro camera");
-    runtime.framePaint.paint(1410);
+    runtime.framePaint.paint(910);
     assert(runtime.camera.zoom <= start.zoom);
+    assert.deepEqual(runtime.camera, Scene.fit(scene.bounds, runtime.viewport));
+    const settled = { ...runtime.camera };
+    runtime.framePaint.paint(1410);
+    assert.deepEqual(runtime.camera, settled, "rooms build after camera settles");
     runtime.framePaint.paint(2810);
     assert.equal(runtime.assembly.state, "complete");
     assert.equal(scene.revision, revision);
@@ -787,7 +791,7 @@ test("observer-view regression contracts", async () => {
     runtime.assembly.begin(scene, 0);
     const probe = new StartupAssembly();
     probe.begin(scene, 0);
-    runtime.assemblyFrame = probe.frame(740);
+    runtime.assemblyFrame = probe.frame(1340);
     const worker = present(scene.workers[0]),
       actor = present(runtime.actors[0]);
     const alphas: number[] = [],
@@ -804,7 +808,7 @@ test("observer-view regression contracts", async () => {
     };
     runtime.framePaint.paintAssembly(runtime.assemblyOwners.worker(worker), "content", () => {
       const reduced = true;
-      realCrew(worker, actor, 740, reduced);
+      realCrew(worker, actor, 1340, reduced);
     });
     assert.equal(auras, 0, "intro suppresses crew ambient aura");
     assert.ok(
@@ -815,11 +819,11 @@ test("observer-view regression contracts", async () => {
     const viewer = present(scene.observatory.viewer),
       viewerProbe = new StartupAssembly();
     viewerProbe.begin(scene, 0);
-    for (const now of [460, 560, 660, 2800]) {
-      runtime.assemblyFrame = viewerProbe.frame(now);
+    for (const opacity of [0, 0.5, 1]) {
+      const now = 0;
+      runtime.assemblyFrame = { ...viewerProbe.frame(now), progress: () => opacity };
       alphas.length = 0;
       const progress = runtime.assemblyFrame.progress("observatory", "content");
-      if (now === 560) assert.equal(progress, 0.5, "probe reaches partial content opacity");
       const animate = false;
       const item = present(
         runtime.framePaint.items
@@ -834,7 +838,7 @@ test("observer-view regression contracts", async () => {
       );
       assert.equal(ctx.globalAlpha, 1, "viewer restores parent alpha");
     }
-    runtime.assemblyFrame = probe.frame(740);
+    runtime.assemblyFrame = probe.frame(1340);
     let desks = 0,
       crew = 0,
       caches = 0;
@@ -874,11 +878,11 @@ test("observer-view regression contracts", async () => {
     assert.equal(crew, 0);
     assert.equal(caches, 0);
     assert.equal(runtime.regions.length, 0);
-    paint(740);
+    paint(1340);
     assert.notEqual(desks, 0);
     assert.notEqual(crew, 0);
     assert.equal(runtime.regions.length, 0, "fading bodies cannot register targets");
-    paint(840);
+    paint(1480);
     assert.notEqual(runtime.regions.length, 0, "complete content restores body targets");
     assert.equal(caches, 0);
     const ancillary: string[] = [];
@@ -894,7 +898,7 @@ test("observer-view regression contracts", async () => {
     runtime.platformEffects.paintPlatformGlow = () => {
       ancillary.push("ambient");
     };
-    runtime.framePaint.paint(840);
+    runtime.framePaint.paint(1480);
     assert.deepEqual(
       ancillary,
       [],
@@ -1002,13 +1006,12 @@ test("observer-view regression contracts", async () => {
         "partial frames cannot reuse ordinary target validity",
       );
       if (now === 0) {
-        assert.deepEqual(runtime.plates.hostLabels.ships(options), []);
-        assert.deepEqual(runtime.plates.stationLabels.hub(), []);
-        assert.deepEqual(runtime.plates.stationLabels.observatory(options), []);
-        assert.deepEqual(targets(), [[], [], [], [], [], [], null], "old target boxes cleared");
+        assert(runtime.plates.hostLabels.ships(options).length > 0);
+        assert(runtime.plates.stationLabels.hub().length > 0);
+        assert(runtime.plates.stationLabels.observatory(options).length > 0);
       }
     }
-    runtime.assemblyFrame = runtime.assembly.frame(840);
+    runtime.assemblyFrame = runtime.assembly.frame(1480);
     assert(
       runtime.plates.workerLabels.collect(options).length > 0,
       "settled content restores labels before finish",

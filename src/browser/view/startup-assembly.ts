@@ -9,10 +9,10 @@ export interface AssemblyFrame {
   outline(owner: AssemblyOwner): number;
   sweep(owner: AssemblyOwner): number;
 }
+export const ASSEMBLY_CAMERA_DURATION = 900;
 const TIMING = {
   total: 2800,
-  observatory: 180,
-  first: 360,
+  first: 1000,
   last: 2200,
   groups: 12,
   outline: 100,
@@ -217,10 +217,12 @@ export class StartupAssembly {
     if (this.state !== "pending") return;
     this.began = now;
     this.state = "playing";
-    this.starts.set("mail", 0);
-    this.starts.set("observatory", TIMING.observatory);
+    // Keep the completed core visible throughout the initial pullback.
+    const coreStart = -TIMING.outline - TIMING.floor - TIMING.content;
+    this.starts.set("mail", coreStart);
+    this.starts.set("observatory", coreStart);
     for (const relay of scene.relays ?? [])
-      this.starts.set(this.owners.relay(relay.key), TIMING.observatory);
+      this.starts.set(this.owners.relay(relay.key), ASSEMBLY_CAMERA_DURATION);
     const rooms = orderedPlatforms(scene),
       groups = Math.min(TIMING.groups, rooms.length);
     rooms.forEach((p, index) => {
@@ -238,7 +240,7 @@ export class StartupAssembly {
         this.starts.set(
           shipOwner(ship.id),
           Math.max(
-            TIMING.observatory,
+            ASSEMBLY_CAMERA_DURATION,
             Math.min(TIMING.last, ...own) - TIMING.outline - TIMING.floor - TIMING.content,
           ),
         );
