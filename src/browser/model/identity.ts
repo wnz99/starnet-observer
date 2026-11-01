@@ -79,6 +79,7 @@ export function arranged<T extends DisplayRow>(row: T) {
   return {
     ...row,
     observedRepo: row.observedRepo === undefined ? row.repo || null : row.observedRepo,
+    observedRepoId: row.observedRepoId === undefined ? row.repoId || null : row.observedRepoId,
     projectId: value.roomId,
     project: value.room,
     projectKind: "group",

@@ -60,6 +60,16 @@ export interface ObserverRow {
   checkoutId?: string | null;
   checkoutKind?: "main" | "worktree" | "folder" | null;
   worktree?: string | null;
+  checkoutObservation?: {
+    source: "shell-entry";
+    observedAt: number;
+    state: "observed" | "stale";
+    repoId: string | null;
+    repo: string;
+    checkoutId: string | null;
+    checkoutKind: "main" | "worktree" | "folder" | null;
+    worktree: string | null;
+  };
   folder?: string;
   status: "working" | "blocked" | "idle" | "done" | "unknown";
   sessionId: string | null;

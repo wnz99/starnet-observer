@@ -5,6 +5,7 @@ import { Warmup } from "./warmup.js";
 import { Refresh } from "./refresh.js";
 import { Snapshots } from "./snapshot.js";
 import { Lifecycle } from "./lifecycle.js";
+import { WorkdirObservations } from "./workdirs.js";
 import type { ObserverSnapshot } from "../../shared/observer.js";
 import type { FooterProof } from "../identity/types.js";
 import type { BusState } from "../bus/types.js";
@@ -37,11 +38,13 @@ export class State {
   refresh = new Refresh(this);
   snapshot = new Snapshots(this);
   lifecycle = new Lifecycle(this);
+  workdirs = new WorkdirObservations(this);
 
   identityProofs = new Map<string, FooterProof>();
   controlTargets = new Map<string, ControlProof>();
   lastGood: ObserverInputRow[] = [];
   coreRows: ObserverInputRow[] = [];
+  terminalCwds: unknown[] = [];
   refreshStartedAt: number | null = null;
   pending: Promise<Inventory> | null = null;
   mail: BusState | null = null;

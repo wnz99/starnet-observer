@@ -96,6 +96,7 @@ export class InventoryReader {
   ) {
     const resolved = await this.resolveIdentities(panes),
       cwds = panes.map((pane) => pane.foreground_cwd || pane.cwd);
+    this.state.terminalCwds = cwds;
     const projects = this.state.projects.resolveMany
       ? await this.state.projects.resolveMany(cwds)
       : [];

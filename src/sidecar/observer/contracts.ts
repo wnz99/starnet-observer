@@ -1,4 +1,5 @@
 import type { ObserverRow, ObserverSnapshot } from "../../shared/observer.js";
+import type { ShellEntryObservation } from "../tool-workdirs/contracts.js";
 import type { SessionInspection, MessageInspection } from "../../shared/inspection.js";
 import type { ChildInspection } from "../inspector/contracts.js";
 import type { HelperRow, HelperTranscripts } from "../helpers/contracts.js";
@@ -113,6 +114,10 @@ export interface ObserverOptions {
   readIdentityConfiguration?: IdentityOptions["readConfiguration"];
   readProcessBirth?: IdentityOptions["readProcessBirth"];
   warmDetails?: boolean;
+  workdirs?: (options: {
+    sessionId: string;
+    now: () => number;
+  }) => Promise<ShellEntryObservation | null>;
 }
 export interface Owner {
   row: ObserverInputRow;
