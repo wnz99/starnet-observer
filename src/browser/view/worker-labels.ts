@@ -121,8 +121,11 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
     const row = worker.row;
     if (!row.checkoutId) return "Checkout unavailable";
     if (row.checkoutKind === "folder") return "Local folder";
+    if (row.checkoutKind === "main") {
+      const name = row.observedRepo === undefined ? row.repo : row.observedRepo;
+      return name ? name + " · main" : "Checkout unavailable";
+    }
     if (!row.worktree) return "Checkout unavailable";
-    if (row.checkoutKind === "main") return row.worktree + " · main";
     if (row.checkoutKind !== "worktree") return "Checkout unavailable";
     const ids = desks.map(({ worker: entry }) => entry.row.checkoutId);
     return row.worktree + " · " + checkoutSuffix(row.checkoutId, ids);

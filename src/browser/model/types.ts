@@ -15,6 +15,7 @@ export type DisplayRow = Partial<
     | "task"
   >
 > & {
+  observedRepo?: string | null;
   observedAt?: number | string | null;
   provider?: string;
   source?: string;

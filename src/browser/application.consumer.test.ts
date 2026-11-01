@@ -549,6 +549,7 @@ async function nativeDeskBadges(page: Page, artifacts: string) {
     );
     const badge = evidence.badges[0];
     assert.ok(badge);
+    assert.equal(badge.text, "fixture-repo · main");
     const box = await page.locator("canvas").boundingBox();
     assert.ok(box);
     await page.mouse.move(
@@ -1068,7 +1069,7 @@ function snapshot() {
     repoId: "repo_fixture",
     checkoutId: "checkout_fixture",
     checkoutKind: "main" as const,
-    worktree: "fixture-repo",
+    worktree: null,
     title: "Synthetic browser fixture",
     status: "working",
     observedAt: now,
