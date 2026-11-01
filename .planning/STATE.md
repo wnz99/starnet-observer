@@ -35,12 +35,12 @@ Last activity: 2026-10-19 — Current-position regrouping, bounded following acq
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261101-r27 | Station assembly and saved visual settings | All three tasks independently reviewed; upstream integration and PR preparation underway; aggregate review and CI pending | [261101-r27](./quick/261101-r27-station-assembly-and-saved-visual-settin/) |
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261101-r27 | Station assembly and saved visual settings | 2026-11-01 | [PR #38](https://github.com/wnz99/starnet-observer/pull/38) | Implementation, integration, independent aggregate/PR review and local verification complete; source CI passed at e9cbdd5; final tracking-head CI and guarded merge pending at summary preparation | [261101-r27](./quick/261101-r27-station-assembly-and-saved-visual-settin/) |
 | 261101-l00 | Record exact-session tool checkout observations and source-qualified desk badges | 2026-11-01 | [PR #35](https://github.com/wnz99/starnet-observer/pull/35) | Code implementation, independent full-branch review and verification complete at f86e66a; final tracking-head CI and guarded merge pending at summary preparation; optional shell setup remains uninstalled | [261101-l00](./quick/261101-l00-record-exact-session-tool-checkout-obser/) |
 | 261101-ggo follow-up | Correct main-checkout desk badge identity after PR #33 | 2026-11-01 | [PR #34](https://github.com/wnz99/starnet-observer/pull/34) | Implementation, independent full-branch review and required local verification complete; final tracking-head CI and guarded merge pending at summary preparation | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
 | 261101-ggo | Deliver one repository sign and selected flat desk badges | 2026-11-01 | [PR #33](https://github.com/wnz99/starnet-observer/pull/33) | Implementation, independent full-branch review and required local verification complete; final tracking-head CI and merge pending at summary preparation | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
