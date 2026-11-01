@@ -837,7 +837,8 @@ input::placeholder {
   border-left-color: var(--blocked);
   background: var(--row-selected);
 }
-.mail-item {
+.mail-item,
+.mail-controls {
   position: relative;
   min-width: 0;
 }
