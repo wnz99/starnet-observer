@@ -24,6 +24,7 @@ interface NavigationOptions<N extends AppNode, R extends SpriteResource> {
 }
 export class Navigation<N extends AppNode, R extends SpriteResource> {
   private readonly events: NodeEvents;
+  private startupAnimation = true;
   constructor(private readonly options: NavigationOptions<N, R>) {
     this.events = new NodeEvents(() => !options.state.disposed);
     this.restore();
@@ -45,6 +46,8 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
       ?.setAttribute("aria-pressed", String(state.arrangeOn));
     if (ui.document.getElementById("fx-toggle") && typeof this.options.view.setFx === "function")
       this.applyFx(prefs.flag("fx", typeof theme.fx === "boolean" ? theme.fx : false));
+    const startupDefault = this.startupAnimation;
+    this.applyStartupAnimation(prefs.flag("startupAnimation", startupDefault));
   }
   private bind() {
     const { ui, view, state, prefs } = this.options;
@@ -62,6 +65,7 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
       ui.get("world").focus();
     });
     this.bindFx();
+    this.bindStartupAnimation();
     on("zoom-in", () => {
       view.zoomBy(CAMERA_ZOOM.in);
     });
@@ -106,10 +110,27 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
       prefs.set("fx", enabled ? 1 : 0);
     });
   }
+  private bindStartupAnimation() {
+    const { ui, prefs } = this.options;
+    const startup = ui.document.getElementById("startup-animation-toggle");
+    if (startup)
+      this.events.on(startup, "click", () => {
+        this.applyStartupAnimation(!this.startupAnimation);
+        prefs.set("startupAnimation", this.startupAnimation ? 1 : 0);
+      });
+  }
   private applyFx(value: boolean) {
     this.options.view.setFx?.(value);
     const { document } = this.options.ui;
-    document.getElementById("fx-toggle")?.setAttribute("aria-pressed", String(value));
+    document.getElementById("fx-toggle")?.setAttribute("aria-checked", String(value));
+  }
+  private applyStartupAnimation(value: boolean) {
+    this.startupAnimation = value;
+    this.options.view.setStartupAnimation?.(value);
+    const { document } = this.options.ui;
+    document
+      .getElementById("startup-animation-toggle")
+      ?.setAttribute("aria-checked", String(value));
   }
   private applyArrange({ arrangeOn }: { arrangeOn: boolean }) {
     const { state, prefs, ui } = this.options;

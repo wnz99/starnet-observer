@@ -197,6 +197,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   observer: ViewObserver<R> | null = null;
 
   fx = false;
+  startupAnimation = true;
 
   dirty = false;
 

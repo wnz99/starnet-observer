@@ -16,6 +16,7 @@ export interface AppView {
   stop(): void;
   invalidate(): void;
   setFx?(on: boolean): void;
+  setStartupAnimation?(on: boolean): void;
   fx?(): boolean;
 }
 export interface AppQuery {

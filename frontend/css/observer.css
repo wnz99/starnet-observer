@@ -1575,12 +1575,28 @@ body.is-stale .inspector {
   }
 }
 
-.fx-toggle[aria-pressed="true"],
-.fx-toggle[aria-pressed="true"]:not(:disabled):hover {
+.arrange-toggle[aria-pressed="true"],
+.arrange-toggle[aria-pressed="true"]:not(:disabled):hover,
+.visual-settings-popover [aria-checked="true"] {
   color: var(--tab-ink);
   background: var(--phosphor);
   border-color: var(--phosphor);
   box-shadow: 0 0 10px var(--glow);
+}
+
+.visual-settings-popover button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  white-space: normal;
+}
+.visual-settings-popover button::after {
+  content: "Off";
+  margin-left: 16px;
+}
+.visual-settings-popover [aria-checked="true"]::after {
+  content: "On";
 }
 
 /* Theme brand slots: a contained local logo beside the decorative mark, and theme warnings kept apart from source health. */

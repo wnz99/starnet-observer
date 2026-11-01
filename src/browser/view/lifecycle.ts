@@ -109,4 +109,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     this.invalidate();
     return this.view.fx;
   };
+  setStartupAnimation = (on: boolean): void => {
+    this.view.startupAnimation = on;
+  };
 }

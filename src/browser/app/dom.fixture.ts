@@ -263,6 +263,19 @@ const HTML_IDS =
 export function createAppFixture() {
   const document = new AppFixtureDocument();
   for (const id of HTML_IDS.split(" ")) document.register(id);
+  for (const id of [
+    "visual-settings",
+    "visual-settings-popover",
+    "visual-settings-title",
+    "startup-animation-toggle",
+  ])
+    document.register(id);
+  document.node("visual-settings-popover").hidden = true;
+  document.attach(
+    document.node("visual-settings-popover"),
+    document.node("startup-animation-toggle"),
+    document.node("fx-toggle"),
+  );
   for (const filter of ["all", "working", "blocked"]) {
     const button = document.createElement("button");
     button.dataset.filter = filter;

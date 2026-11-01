@@ -30,8 +30,16 @@ export class Overlays<N extends AppNode, R extends SpriteResource> {
     this.events.on(ui.get("controls-help"), "click", () => {
       this.setHelp({ open: !this.helpOpen() });
     });
+    const settings = ui.document.getElementById("visual-settings");
+    if (settings)
+      this.events.on(settings, "click", () => {
+        this.setSettings({ open: !this.settingsOpen() });
+      });
+    this.events.on(ui.document, "focusin", (event) => {
+      if (this.settingsOpen()) this.dismissOutside(event);
+    });
     this.events.on(ui.document, "pointerdown", (event) => {
-      this.pointerDown(event);
+      this.dismissOutside(event);
     });
     this.events.on(ui.document, "keydown", (event) => {
       this.keyDown(event);
@@ -40,21 +48,48 @@ export class Overlays<N extends AppNode, R extends SpriteResource> {
   private helpOpen() {
     return !this.options.ui.get("controls-help-popover").hidden;
   }
+  private settingsOpen() {
+    const { document } = this.options.ui;
+    return document.getElementById("visual-settings-popover")?.hidden === false;
+  }
+  private setSettings({ open, restoreFocus }: { open: boolean; restoreFocus?: boolean }) {
+    const { ui } = this.options;
+    const popover = ui.document.getElementById("visual-settings-popover");
+    const trigger = ui.document.getElementById("visual-settings");
+    if (!popover || !trigger || this.settingsOpen() === open) return;
+    if (open) this.setHelp({ open: false });
+    popover.hidden = !open;
+    trigger.setAttribute("aria-expanded", String(open));
+    if (open) ui.get("startup-animation-toggle").focus();
+    else if (restoreFocus) trigger.focus();
+  }
   /* Station controls help is a disclosure, not a dialog: the trigger names and controls it. Opening a panel closes it,
      so throughout its open state it remains the newest layer and Escape closes it first, returning focus to the trigger. A press
      anywhere outside dismisses it without moving focus. */
   private setHelp({ open, restoreFocus }: { open: boolean; restoreFocus?: boolean }) {
     if (this.helpOpen() === open) return;
     const { ui } = this.options;
+    if (open) this.setSettings({ open: false });
     ui.get("controls-help-popover").hidden = !open;
     ui.get("controls-help").setAttribute("aria-expanded", String(open));
     if (!open && restoreFocus) ui.get("controls-help").focus();
   }
   closeHelp() {
     this.setHelp({ open: false });
+    this.setSettings({ open: false });
   }
-  private pointerDown(event: AppEvent) {
+  private dismissOutside(event: AppEvent) {
     const { ui } = this.options;
+    const popover = ui.document.getElementById("visual-settings-popover");
+    const trigger = ui.document.getElementById("visual-settings");
+    if (
+      this.settingsOpen() &&
+      popover &&
+      trigger &&
+      !ui.document.contains(popover, event.target) &&
+      !ui.document.contains(trigger, event.target)
+    )
+      this.setSettings({ open: false });
     if (
       this.helpOpen() &&
       !ui.document.contains(ui.get("controls-help-popover"), event.target) &&
@@ -71,6 +106,11 @@ export class Overlays<N extends AppNode, R extends SpriteResource> {
       return;
     }
     // The innermost layer closes first: help, then the top panel only, then the worker focus or platform zoom.
+    if (this.settingsOpen()) {
+      event.preventDefault();
+      this.setSettings({ open: false, restoreFocus: true });
+      return;
+    }
     if (this.helpOpen()) {
       event.preventDefault();
       this.setHelp({ open: false, restoreFocus: true });
