@@ -28,6 +28,17 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
         )?.id || null
       : null;
 
+  badgeAt = (point: Point) =>
+    this.paintedFrameCurrent()
+      ? (this.view.badgeRegions.find(
+          (region) =>
+            point.x >= region.left &&
+            point.x <= region.left + region.width &&
+            point.y >= region.top &&
+            point.y <= region.top + region.height,
+        ) ?? null)
+      : null;
+
   shipAt = (point: Point) => {
     if (!this.view.callbacks.onShip || !this.paintedFrameCurrent()) return null;
     const label = this.view.shipRegions.find(
@@ -65,6 +76,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   paintedFrameCurrent = () =>
     !!this.view.plateFrame &&
     this.view.plateFrame.scene === this.view.scene &&
+    this.view.plateFrame.selectedRepo === this.view.repositorySelection() &&
     this.view.plateFrame.zoom === this.view.camera.zoom &&
     this.view.plateFrame.tx === this.view.camera.tx &&
     this.view.plateFrame.ty === this.view.camera.ty;
@@ -262,6 +274,9 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   }
   refreshHover() {
     this.gestures.updateHover();
+  }
+  refreshBadgeHover() {
+    this.gestures.updateBadgeHover();
   }
   reset() {
     this.gestures.reset();

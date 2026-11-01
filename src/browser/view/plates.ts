@@ -18,7 +18,7 @@ const PLATE = {
   strokeInset: 0.5,
   headerHeight: 2,
   textInset: 6,
-  rowCenter: 0.5,
+  badgeInset: 2,
 };
 const BADGE = { period: 380, phaseSlots: 7, bob: 2, overviewLift: 14, lift: 34 };
 
@@ -92,22 +92,18 @@ export class Plates<R extends SpriteResource, B extends R = R> {
     this.view.ctx.textAlign = "left";
     this.view.ctx.textBaseline = "middle";
     this.view.ctx.fillStyle = plate.color;
-    if (plate.lines)
-      plate.lines.forEach((line, index) => {
-        this.view.ctx.fillText(
-          line,
-          x + PLATE.textInset,
-          y + ((index + PLATE.rowCenter) * plate.h) / required(plate.lines).length + 1,
-        );
-      });
-    else this.view.ctx.fillText(plate.text, x + PLATE.textInset, y + plate.h / PLATE.diameter + 1);
+    this.view.ctx.fillText(
+      plate.text,
+      x + (plate.badge ? PLATE.badgeInset : PLATE.textInset),
+      y + plate.h / PLATE.diameter + 1,
+    );
   };
 
   clipText = (text: string, max: number, size: number) => {
     this.view.ctx.font = String(size) + "px VT323, monospace";
     if (this.view.ctx.measureText(text).width <= max) return text;
     let cut = text.length;
-    while (cut > 1 && this.view.ctx.measureText(text.slice(0, cut) + "…").width > max) cut--;
+    while (cut > 0 && this.view.ctx.measureText(text.slice(0, cut) + "…").width > max) cut--;
     return text.slice(0, cut).trimEnd() + "…";
   };
 
@@ -144,10 +140,12 @@ export class Plates<R extends SpriteResource, B extends R = R> {
       zoom: this.view.camera.zoom,
       tx: this.view.camera.tx,
       ty: this.view.camera.ty,
+      selectedRepo,
     };
     this.hoverBrackets();
   };
   recordTargets = (accepted: TextPlate[]) => {
+    this.recordBadges(accepted);
     this.view.platformRegions = accepted
       .filter((plate) => plate.platformKey)
       .map((plate) => ({
@@ -157,6 +155,25 @@ export class Plates<R extends SpriteResource, B extends R = R> {
         width: plate.w,
         height: plate.h,
       }));
+    this.recordWorkerTargets(accepted);
+  };
+  private recordBadges(accepted: TextPlate[]) {
+    this.view.badgeRegions = accepted.flatMap((plate) =>
+      plate.badge
+        ? [
+            {
+              id: plate.badge.id,
+              text: plate.badge.fullText,
+              left: plate.x,
+              top: plate.y,
+              width: plate.w,
+              height: plate.h,
+            },
+          ]
+        : [],
+    );
+  }
+  private recordWorkerTargets(accepted: TextPlate[]) {
     // Title hits are exactly the accepted, drawn plate boxes: never the body, never a dropped plate.
     this.view.titleRegions = accepted
       .filter((plate) => plate.target)
@@ -188,7 +205,7 @@ export class Plates<R extends SpriteResource, B extends R = R> {
         width: plate.w,
         height: plate.h,
       }));
-  };
+  }
   paintBadges = (tier: ReturnType<typeof lodFor>, now: number, animate: boolean) => {
     /* Needs attention: a fresh blocked agent (startup dialog, permission prompt) carries a "!" badge above its head,
          drawn in screen pixels so it reads at every zoom, overview included. Per-frame like the body; never cached. */

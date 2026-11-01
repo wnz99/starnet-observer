@@ -1,4 +1,6 @@
 import type { Worker } from "../scene/types.js";
+import { toScreen } from "../scene/index.js";
+import { checkoutSuffix } from "../model/identity.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { LabelContext } from "./label-types.js";
 import { statusColor } from "./look.js";
@@ -24,6 +26,22 @@ const DETAILS = {
   priority: 10,
 };
 const INSPECTION = { lift: 38, size: 13, priority: 95 };
+const DESK_BADGE = {
+  gap: 4,
+  height: 18,
+  width: 114,
+  inset: 4,
+  size: 13,
+  priority: 60,
+  separation: 2,
+  corners: 4,
+  paddingTrim: 8,
+};
+interface DeskAnchor {
+  worker: Worker;
+  x: number;
+  y: number;
+}
 export class WorkerLabels<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
   collect(options: LabelContext): TextPlate[] {
@@ -36,7 +54,78 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       if (title) plates.push(title);
       if (region.id === inspectedId) plates.push(this.inspection(region));
     }
-    return plates;
+    return [...plates, ...this.deskBadges(options)];
+  }
+  private deskBadges(options: LabelContext): TextPlate[] {
+    const scene = this.view.activeScene;
+    const desks = scene.workers
+      .filter(
+        (worker) => options.selectedRepo !== null && worker.row.repoId === options.selectedRepo,
+      )
+      .map((worker) => {
+        const { x, y, w, h } = worker.desk;
+        const corners = [
+          { x, y },
+          { x: x + w, y },
+          { x, y: y + h },
+          { x: x + w, y: y + h },
+        ].map((point) => toScreen(point, this.view.camera));
+        return {
+          worker,
+          x: corners.reduce((sum, point) => sum + point.x, 0) / DESK_BADGE.corners,
+          y: Math.max(...corners.map((point) => point.y)) + DESK_BADGE.gap,
+        };
+      });
+    return desks.flatMap((desk) => this.deskBadge(desk, desks));
+  }
+  private deskBadge(desk: DeskAnchor, desks: DeskAnchor[]): TextPlate[] {
+    const { gap, height, width, separation, inset, size, priority } = DESK_BADGE;
+    const viewport = this.view.viewport;
+    if (
+      desk.x < gap ||
+      desk.x > viewport.width - gap ||
+      desk.y < gap ||
+      desk.y + height > viewport.height - gap
+    )
+      return [];
+    const space = Math.min(
+      width,
+      separation * (desk.x - gap),
+      separation * (viewport.width - gap - desk.x),
+      ...desks
+        .filter((other) => other !== desk && Math.abs(other.y - desk.y) < height)
+        .map((other) => Math.abs(other.x - desk.x) - separation),
+    );
+    this.view.ctx.font = String(size) + "px VT323, monospace";
+    if (space < inset + this.view.ctx.measureText("…").width) return [];
+    const fullText = this.checkoutText(desk.worker, desks);
+    const overlays = this.view.framePaint.overlays;
+    const color = overlays.repositoryColor(desk.worker.id);
+    const plate = this.view.plates.textPlate(
+      this.view.plates.clipText(fullText, space - inset, size),
+      desk.x,
+      desk.y + height,
+      { size, accent: color, color, priority },
+    );
+    // Flat desk badges use two-pixel side padding; passive plates retain six.
+    return [
+      {
+        ...plate,
+        x: plate.x + DESK_BADGE.paddingTrim / separation,
+        w: plate.w - DESK_BADGE.paddingTrim,
+        badge: { id: desk.worker.id, fullText },
+      },
+    ];
+  }
+  private checkoutText(worker: Worker, desks: DeskAnchor[]): string {
+    const row = worker.row;
+    if (!row.checkoutId) return "Checkout unavailable";
+    if (row.checkoutKind === "folder") return "Local folder";
+    if (!row.worktree) return "Checkout unavailable";
+    if (row.checkoutKind === "main") return row.worktree + " · main";
+    if (row.checkoutKind !== "worktree") return "Checkout unavailable";
+    const ids = desks.map(({ worker: entry }) => entry.row.checkoutId);
+    return row.worktree + " · " + checkoutSuffix(row.checkoutId, ids);
   }
   paintStatusDots() {
     for (const region of this.view.anchors) {
@@ -79,7 +168,12 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
         ),
         target: region.id,
       };
-    if (options.tier !== "detail" || !worker.row.worktree) return null;
+    if (
+      options.tier !== "detail" ||
+      !worker.row.worktree ||
+      worker.row.repoId === options.selectedRepo
+    )
+      return null;
     return this.view.plates.textPlate(
       this.view.plates.clipText(worker.row.worktree, DETAILS.width, DETAILS.size),
       region.head.x,

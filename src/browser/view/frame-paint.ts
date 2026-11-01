@@ -84,6 +84,7 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     this.view.interaction.refreshHover();
 
     this.view.plates.paintPlates(isStale, staleKeys, now, animate);
+    this.view.interaction.refreshBadgeHover();
 
     return animate;
   };
