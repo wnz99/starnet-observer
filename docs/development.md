@@ -18,7 +18,7 @@ Use `bun run format` or `bun run fix` for explicit edits. Ordinary checks do not
 
 ## Build, package and CI
 
-Shell-entry recorder tests require `/bin/zsh` for synthetic login and nonlogin startup coverage. macOS supplies it; Ubuntu CI explicitly installs the `zsh` system package. Linux developers running these tests must install that package too.
+Shell-entry recorder tests require `/bin/zsh` for synthetic login and nonlogin startup coverage. macOS supplies it; Ubuntu CI explicitly installs the `zsh` system package. Linux developers running these tests must install that package too. This is a test prerequisite, not a new requirement for normal observer operation. Optional tool-checkout recording does not require changing your default shell.
 
 Ubuntu CI runs for pull requests and pushes to main. It installs frozen dependencies and Chromium, then runs `bun run check` once. These cover formatting, shell checks, lint, strict types, unused code/dependencies, duplicate code, builds, native Bun tests, installed-package consumers and real browser fixtures. Test and build commands remain available for CI and deliberate maintenance work:
 
