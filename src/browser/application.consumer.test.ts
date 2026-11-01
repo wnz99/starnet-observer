@@ -2073,14 +2073,31 @@ async function assemblyInput(
       await page.keyboard.press("+");
     } else
       await page.getByRole("button", { name: "Zoom to the Left platform", exact: true }).click();
-    const interrupted = await paint(700);
+    let interrupted = await paint(700);
     assert.equal(interrupted.state, "complete", input);
     if (input === "wheel" || input === "key")
       assert.ok(interrupted.camera.zoom > overview.camera.zoom, input + " zooms in from overview");
     if (input === "drag") {
       assert.ok(Math.abs(interrupted.camera.zoom - overview.camera.zoom) < 1e-12);
-      assert.ok(Math.abs(interrupted.camera.tx - overview.camera.tx - 70) < 0.01, "drag pans x");
-      assert.ok(interrupted.camera.ty >= overview.camera.ty, "drag does not pan against y input");
+      // Overview fits both axes, so camera bounds correctly prevent panning there.
+      assert.ok(Math.abs(interrupted.camera.tx - overview.camera.tx) < 0.01);
+      assert.ok(Math.abs(interrupted.camera.ty - overview.camera.ty) < 0.01);
+      assert.equal(
+        await page.evaluate(() => (Reflect.get(window, "__view") as CanvasProbe).mode),
+        "manual",
+        "drag takes control from assembly",
+      );
+      // Once zoomed beyond the fit, the same native gesture must visibly pan.
+      await page.mouse.wheel(0, -1500);
+      const zoomed = await paint(700);
+      assert.ok(zoomed.camera.zoom > overview.camera.zoom * 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 140, box.y + box.height / 2 + 60);
+      await page.mouse.up();
+      interrupted = await paint(700);
+      assert.ok(Math.abs(interrupted.camera.zoom - zoomed.camera.zoom) < 1e-12);
+      assert.ok(Math.abs(interrupted.camera.tx - zoomed.camera.tx - 70) < 0.01, "drag pans x");
+      assert.ok(Math.abs(interrupted.camera.ty - zoomed.camera.ty - 30) < 0.01, "drag pans y");
     }
     if (input === "sidebar") {
       const focus = await page.evaluate(() => {
