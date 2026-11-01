@@ -14,6 +14,38 @@ import {
 } from "./index.js";
 import { startStream } from "../../../scripts/stream.js";
 import { UUID, row, fakeSpawn, fakeTimers, safeRow, required } from "./remotes.fixture.js";
+test("remote checkout allowlist preserves event age and scopes checkout identities", () => {
+  const base = row();
+  const value = {
+    source: "shell-entry",
+    observedAt: 1000000,
+    state: "observed",
+    repoId: base.repoId,
+    repo: "Repository",
+    checkoutId: "checkout_private",
+    checkoutKind: "main",
+    worktree: null,
+    cwd: "/secret",
+    sessionId: "secret",
+  };
+  const safe = sanitizeRow("host", { ...base, checkoutObservation: value }, 1400000);
+  const nested = safe?.checkoutObservation;
+  assert.equal(nested?.observedAt, 1000000);
+  assert.equal(nested.state, "stale");
+  assert.equal(nested.repoId, safe?.repoId);
+  assert.notEqual(nested.checkoutId, value.checkoutId);
+  assert.equal(JSON.stringify(nested).includes("secret"), false);
+  for (const patch of [
+    { source: "terminal" },
+    { observedAt: 1500000 },
+    { checkoutKind: "unknown" },
+  ])
+    assert.equal(
+      sanitizeRow("host", { ...base, checkoutObservation: { ...value, ...patch } }, 1400000)
+        ?.checkoutObservation,
+      undefined,
+    );
+});
 test("observer-remotes regression contracts", async () => {
   // ── ssh argv and remote command: fixed, quoted, and option-injection proof.
   {

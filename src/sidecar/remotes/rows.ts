@@ -18,6 +18,9 @@ import {
 } from "./fields.js";
 const SOURCES = new Set(["herdr", "helper"] as const);
 const STATUSES = new Set(["working", "blocked", "idle", "done", "unknown"] as const);
+const EVENT_SKEW = 30000;
+const EVENT_EXPIRY = 24 * 60 * 60 * 1000;
+const EVENT_STALE = 5 * 60 * 1000;
 function counters(usage: unknown) {
   if (!record(usage)) return null;
   const counter = (value: unknown) =>
@@ -149,7 +152,58 @@ export function sanitizeRow(host: string, row: unknown, receivedAt: number): Obs
   };
   Object.assign(safe, optionalFields(row));
   if (identity.helper) Object.assign(safe, helperFields(host, row));
+  Object.assign(safe, checkoutFields(host, row.checkoutObservation, receivedAt));
   return safe;
+}
+
+function validEventTime(value: unknown, now: number): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value > 0 &&
+    value <= now + EVENT_SKEW &&
+    now - value <= EVENT_EXPIRY
+  );
+}
+function checkoutFields(host: string, value: unknown, now: number): Partial<ObserverRow> {
+  const checkoutObservation = remoteCheckout(host, value, now);
+  return checkoutObservation ? { checkoutObservation } : {};
+}
+function nullableText(value: unknown) {
+  return value === null || typeof value === "string";
+}
+function checkoutLabels(value: Record<string, unknown>) {
+  return (
+    typeof value.repo === "string" &&
+    nullableText(value.repoId) &&
+    nullableText(value.checkoutId) &&
+    nullableText(value.worktree)
+  );
+}
+function remoteCheckout(
+  host: string,
+  value: unknown,
+  now: number,
+): ObserverRow["checkoutObservation"] {
+  if (
+    !record(value) ||
+    value.source !== "shell-entry" ||
+    !has(new Set(["observed", "stale"] as const), value.state) ||
+    !validEventTime(value.observedAt, now) ||
+    !has(new Set(["main", "worktree", "folder", null]), value.checkoutKind) ||
+    !checkoutLabels(value)
+  )
+    return undefined;
+  return {
+    source: "shell-entry",
+    observedAt: value.observedAt,
+    state: now - value.observedAt > EVENT_STALE ? "stale" : value.state,
+    repoId: opaque(prefixOf(value.repoId, "dir_"), host, value.repoId),
+    repo: text(value.repo, LIMITS.LABEL) || "Unassigned",
+    checkoutId: opaque("checkout_", host, value.checkoutId),
+    checkoutKind: oneOf(value.checkoutKind, new Set(["main", "worktree", "folder"] as const)),
+    worktree: text(value.worktree, LIMITS.LABEL),
+  };
 }
 
 function optionalFields(row: Record<string, unknown>) {
