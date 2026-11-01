@@ -163,6 +163,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   anchors: Anchor[] = [];
 
   titleRegions: TitleBox[] = [];
+  badgeRegions: (TitleBox & { text: string })[] = [];
 
   signRegions: SignBox[] = [];
   platformRegions: TitleBox[] = [];
@@ -267,6 +268,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   visibleArea: { left: number; top: number; right: number; bottom: number } | null = null;
 
   update = (next: SceneGeometry, options: UpdateOptions = {}) => {
+    this.badgeRegions = [];
+    this.canvas.title = "";
     this.clearSettlements();
     this.onHelperSettled = options.onHelperSettled;
     const revised = !this.scene || this.activeScene.revision !== next.revision;

@@ -88,6 +88,7 @@ export type InputName =
   | "keydown"
   | "dblclick";
 export interface ViewCanvas<R extends SpriteResource> extends SpriteResource {
+  title?: string;
   width: number;
   height: number;
   readonly clientWidth: number;
@@ -238,7 +239,7 @@ export interface TextPlate extends Plate {
   size: number;
   color: string;
   dash: number[] | null;
-  lines?: string[];
+  badge?: { id: string; fullText: string };
   target?: string;
   repo?: string | null;
   platformKey?: string;
@@ -255,6 +256,7 @@ export interface PlateOptions {
 }
 export interface PlateFrame extends Camera {
   scene: Scene;
+  selectedRepo: string | null;
 }
 export interface ViewDefaults {
   defaults: ThemeDefault;

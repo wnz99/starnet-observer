@@ -46,10 +46,19 @@ interface CanvasProbe {
   interaction: {
     titleAt(point: { x: number; y: number }): unknown;
     signAt(point: { x: number; y: number }): unknown;
+    badgeAt(point: { x: number; y: number }): unknown;
   };
   signRegions: { left: number; top: number; width: number; height: number }[];
   platformRegions: { id: string; left: number; top: number; width: number; height: number }[];
   titleRegions: { left: number; top: number; width: number; height: number }[];
+  badgeRegions: {
+    id: string;
+    text: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }[];
   regions: { left: number; top: number; width: number; height: number; id: string }[];
   observatoryRegion: { left: number; top: number; width: number; height: number } | null;
   focused: string | null;
@@ -133,6 +142,7 @@ async function paintedTargets(page: Page) {
       signs: view.signRegions,
       headings: view.platformRegions,
       titles: view.titleRegions,
+      badges: view.badgeRegions,
       bodies: view.regions,
       observatory: view.observatoryRegion,
       focused: view.focused,
@@ -147,7 +157,12 @@ async function bodyTarget(page: Page) {
     const view = Reflect.get(window, "__view") as CanvasProbe;
     for (const body of [...view.regions].sort((left, right) => left.left - right.left)) {
       const point = { x: body.left + body.width / 2, y: body.top + body.height * 0.75 };
-      if (body.top > 100 && !view.interaction.titleAt(point) && !view.interaction.signAt(point))
+      if (
+        body.top > 100 &&
+        !view.interaction.titleAt(point) &&
+        !view.interaction.signAt(point) &&
+        !view.interaction.badgeAt(point)
+      )
         return { id: body.id, left: point.x, top: point.y, width: 0, height: 0 };
     }
     return null;
@@ -269,9 +284,11 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       assert.ok(sign);
       await click(sign);
       await expect.poll(async () => (await paintedTargets(page)).repository).toBe("repo_fixture");
+      await nativeDeskBadges(page, artifacts);
       await page.waitForTimeout(delay);
       await click(sign);
       await expect.poll(async () => (await paintedTargets(page)).repository).toBe(null);
+      await expect.poll(async () => (await paintedTargets(page)).badges.length).toBe(0);
       const title = await hoverTitle(page);
       await click(title);
       await expect(page.getByRole("dialog")).toHaveCount(1);
@@ -306,7 +323,7 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     ] as const) {
       await painted();
       const targets = await paintedTargets(page);
-      // Overview omits repository labels; its painted room heading remains a native refit target.
+      // Repository signs remain available in overview; room headings retain native refit behavior.
       const target =
         mode === "overview"
           ? targets.signs[0]
@@ -339,6 +356,16 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     await expect.poll(async () => (await paintedTargets(page)).focused).toBe(body.id);
     await fresh();
     let overlap: { left: number; top: number; width: number; height: number } | null = null;
+    await page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const scene = view.activeScene;
+      const platform = scene.platforms[0];
+      const section = platform?.sections[0],
+        worker = view.activeScene.workers[0];
+      if (!section || !worker) throw new Error("Missing synthetic overlap fixture");
+      section.sign = { ...worker.chair };
+      view.framePaint.paint(1000);
+    });
     for (let zoom = 0; zoom < 22 && !overlap; zoom++) {
       await page.keyboard.press(zoom < 12 ? "+" : "-");
       await painted();
@@ -467,6 +494,76 @@ function annexSnapshot(roots: number, compact: boolean): AppSnapshot {
   };
 }
 
+async function nativeDeskBadges(page: Page, artifacts: string) {
+  const original = await page.evaluate(() => ({
+    ...(Reflect.get(window, "__view") as CanvasProbe).camera,
+  }));
+  for (const zoom of [0.3, 0.8, 1.5]) {
+    const evidence = await page.evaluate((zoom) => {
+      const view = Reflect.get(window, "__view") as CanvasProbe;
+      const worker = view.activeScene.workers[0];
+      if (!worker) throw new Error("Synthetic desk fixture missing");
+      const x = worker.desk.x + worker.desk.w / 2,
+        y = worker.desk.y + worker.desk.h / 2;
+      Object.assign(view.camera, {
+        zoom,
+        tx: view.viewport.width / 2 - 24 * (x - y) * zoom,
+        ty: view.viewport.height / 2 - 12 * (x + y) * zoom,
+      });
+      view.framePaint.paint(1000);
+      const visible = view.activeScene.workers.filter((entry) => {
+        const desk = entry.desk;
+        const sx = 24 * (desk.x + desk.w / 2 - desk.y - desk.h / 2) * zoom + view.camera.tx;
+        const sy = 12 * (desk.x + desk.w + desk.y + desk.h) * zoom + view.camera.ty + 4;
+        return (
+          entry.row.repoId === view.repositorySelection() &&
+          sx >= 14 &&
+          sx <= view.viewport.width - 14 &&
+          sy >= 4 &&
+          sy + 18 <= view.viewport.height - 4
+        );
+      });
+      return {
+        zoom,
+        camera: view.camera,
+        viewport: view.viewport,
+        visible: visible.map((entry) => entry.id),
+        desks: visible.map((entry) => ({
+          id: entry.id,
+          desk: entry.desk,
+          x:
+            24 * (entry.desk.x + entry.desk.w / 2 - entry.desk.y - entry.desk.h / 2) * zoom +
+            view.camera.tx,
+          top:
+            12 * (entry.desk.x + entry.desk.w + entry.desk.y + entry.desk.h) * zoom +
+            view.camera.ty +
+            4,
+        })),
+        badges: view.badgeRegions,
+      };
+    }, zoom);
+    assert.deepEqual(
+      evidence.badges.map((badge) => badge.id).sort(),
+      evidence.visible.sort(),
+      JSON.stringify(evidence),
+    );
+    const badge = evidence.badges[0];
+    assert.ok(badge);
+    const box = await page.locator("canvas").boundingBox();
+    assert.ok(box);
+    await page.mouse.move(
+      box.x + badge.left + badge.width / 2,
+      box.y + badge.top + badge.height / 2,
+    );
+    await expect(page.locator("canvas")).toHaveAttribute("title", badge.text);
+    await capture(page, path.join(artifacts, "desk-badges-" + String(zoom) + ".png"));
+  }
+  await page.evaluate((camera) => {
+    const view = Reflect.get(window, "__view") as CanvasProbe;
+    Object.assign(view.camera, camera);
+    view.framePaint.paint(1000);
+  }, original);
+}
 async function annexFrame(page: Page) {
   return page.evaluate(() => {
     const view = Reflect.get(window, "__view") as CanvasProbe;
@@ -969,6 +1066,9 @@ function snapshot() {
     projectKind: "group",
     repo: "fixture-repo",
     repoId: "repo_fixture",
+    checkoutId: "checkout_fixture",
+    checkoutKind: "main" as const,
+    worktree: "fixture-repo",
     title: "Synthetic browser fixture",
     status: "working",
     observedAt: now,

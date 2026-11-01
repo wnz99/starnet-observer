@@ -119,16 +119,18 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
     this.selection.tap = null;
   };
   pointerLeave = () => {
+    this.view.canvas.title = "";
     this.pointer = null;
     this.view.hovered = null;
     this.view.lifecycle.invalidate();
   };
   updateHover = () => {
+    const badge = this.updateBadgeHover();
     // Hovering a worker's own name plate keeps it hovered, so the plate stays put to be clicked.
     if (this.pointer) {
       this.view.hovered =
         this.selection.titleAt(this.pointer) ||
-        (this.selection.signAt(this.pointer)
+        (badge || this.selection.signAt(this.pointer)
           ? null
           : Scene.hitTest(this.pointer, this.view.regions));
       const style = this.view.canvas.style;
@@ -140,7 +142,14 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
             : "grab";
     }
   };
+  private updateBadgeHover() {
+    const badge = this.pointer && this.selection.badgeAt(this.pointer);
+    this.view.canvas.title = badge ? badge.text : "";
+    return badge;
+  }
   reset() {
+    this.view.canvas.title = "";
+    this.view.badgeRegions = [];
     this.completedClick = null;
     this.pointers.clear();
     this.drag = null;

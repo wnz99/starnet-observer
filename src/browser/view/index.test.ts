@@ -2555,7 +2555,11 @@ test("observer-view regression contracts", async () => {
       },
     });
     view.start();
-    view.update(Scene.build(layout.onPage(0), 0), {
+    const overlapScene = Scene.build(layout.onPage(0), 0);
+    present(present(overlapScene.platforms[0]).sections[0]).sign = {
+      ...present(overlapScene.workers[0]).chair,
+    };
+    view.update(overlapScene, {
       onRepositoryToggle: (repo) => repositories.push(repo),
     });
     let overlap: Point | null = null;
@@ -2793,11 +2797,12 @@ test("observer-view regression contracts", async () => {
     view.focusPlatform(present(scene.platforms[0]).key);
     view.paint(16);
     assert(
-      labelColors.some(([text, color]) => text === "Worktree review · abcd" && color === "#123456"),
+      labelColors.some(([text, color]) => text === "api" && color === "#123456"),
       "checkout signs use the instance theme label color",
     );
-    for (const text of ["api", "Worktree review · abcd", "src"])
+    for (const text of ["api"])
       assert(recordedCalls(node).fillText.includes(text), "checkout sign paints " + text);
+    assert(!recordedCalls(node).fillText.includes("src"), "repository sign omits checkout root");
     assert.equal(
       present(view.signRegions()[0]).repo,
       "r",
@@ -2837,37 +2842,237 @@ test("observer-view regression contracts", async () => {
         lines: string[] = [];
       for (const platform of scene.platforms) {
         const node = canvas(1600, 1000);
-        const view = View.create({
-          canvas: node,
-          env: { raf: () => 1, caf() {}, now: () => 0, dpr: () => 1, createCanvas: () => canvas() },
-        });
-        view.start();
-        view.update(scene, {});
-        view.focusPlatform(platform.key);
-        view.paint(16);
-        lines.push(...recordedCalls(node).fillText.filter((text) => text.startsWith("Worktree ")));
+        const runtime = new ViewRuntime(
+          { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+          {
+            canvas: node,
+            env: {
+              raf: () => 1,
+              caf() {},
+              now: () => 0,
+              dpr: () => 1,
+              createCanvas: () => canvas(),
+            },
+          },
+        );
+        runtime.lifecycle.start();
+        runtime.update(scene, { repositorySelection: () => "r" });
+        runtime.cameraControl.focusPlatform(platform.key);
+        runtime.framePaint.paint(16);
+        lines.push(...runtime.badgeRegions.map((badge) => badge.text));
         assert(recordedCalls(node).fillText.includes("api"), "repository text remains painted");
-        assert(recordedCalls(node).fillText.includes("src"), "folder text remains painted");
+        assert(!recordedCalls(node).fillText.includes("src"), "folder text is absent");
         assert(
-          view.signRegions().every((sign) => sign.repo === "r"),
+          runtime.signRegions.every((sign) => sign.repo === "r"),
           "repository hit targets stay exact",
         );
-        view.stop();
+        runtime.lifecycle.stop();
       }
       const distinct = [...new Set(lines)];
-      assert.equal(distinct.length, 2, "same-basename checkouts paint two distinct signs");
-      for (const suffix of present(suffixes))
-        assert(
-          distinct.some((text) => text.endsWith(" · " + suffix)),
-          "painted sign retains " + suffix,
-        );
-      assert(
-        distinct.every((text) => text.length * 7 <= 180),
-        "checkout sign text stays within existing width",
-      );
+      assert.equal(distinct.length, 2, "equal-basename badges retain distinct full text");
+      for (const suffix of suffixes)
+        assert(distinct.some((text) => text === name + " · " + suffix));
     }
   }
   verifyCheckoutDiscriminators();
+  function verifySelectedDeskBadges() {
+    for (const dpr of [1, 2])
+      for (const zoom of [0.3, 0.8, 1.5]) {
+        const layout = Model.createLayout();
+        layout.reconcile([
+          ...Array.from({ length: 12 }, (_, index): LayoutRow => ({
+            id: "badge-" + String(index),
+            projectId: "p",
+            project: "P",
+            repoId: "r",
+            repo: "api",
+            checkoutId: index === 3 ? null : "checkout_" + String(index % 3),
+            checkoutKind: index === 0 ? "main" : "worktree",
+            worktree: index === 0 ? "api" : "a-very-long-observed-worktree-name-" + String(index),
+            provider: "codex",
+            status: "idle",
+          })),
+          {
+            id: "badge-helper",
+            parentId: "badge-0",
+            source: "helper",
+            projectId: "p",
+            project: "P",
+            repoId: "r",
+            repo: "api",
+            checkoutId: "checkout_0",
+            checkoutKind: "main",
+            worktree: "api",
+            provider: "codex",
+            status: "idle",
+          },
+        ]);
+        const node = canvas(1600, 1000),
+          runtime = new ViewRuntime(
+            { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+            {
+              canvas: node,
+              reducedMotion: () => true,
+              env: {
+                raf: () => 1,
+                caf() {},
+                now: () => 0,
+                dpr: () => dpr,
+                createCanvas: () => canvas(),
+              },
+            },
+          );
+        let selected: string | null = "r";
+        const scene = Scene.build(layout.onPage(0), 0);
+        runtime.lifecycle.start();
+        runtime.update(scene, { repositorySelection: () => selected });
+        Object.assign(runtime.camera, { zoom, tx: 800, ty: 500 });
+        const center = Scene.toScreen(present(scene.workers[1]).chair, runtime.camera);
+        runtime.camera.tx += 800 - center.x;
+        runtime.camera.ty += 500 - center.y;
+        const isStale = false;
+        runtime.plates.paintPlates(isStale, new Set());
+        const sections = scene.platforms.flatMap((platform) => platform.sections);
+        const firstSection = present(sections[0]),
+          sibling = present(sections[1]);
+        const firstSign = firstSection.sign,
+          siblingSign = sibling.sign;
+        firstSection.sign = { x: -1000000, y: 0 };
+        sibling.sign = Scene.fromScreen({ x: 800, y: 200 }, runtime.camera);
+        const repositorySigns = runtime.plates.platformLabels
+          .collect({ tier: lodFor(zoom), selectedRepo: selected, isStale, staleKeys: new Set() })
+          .filter((plate) => plate.repo);
+        assert.equal(
+          repositorySigns.length,
+          1,
+          "offscreen first checkout cannot suppress visible repository sibling at any tier",
+        );
+        assert.equal(present(repositorySigns[0]).text, "api");
+        assert.equal(present(repositorySigns[0]).repo, "r");
+        firstSection.sign = firstSign;
+        sibling.sign = siblingSign;
+        const onScreenDesks = scene.workers.filter((worker) => {
+          const desk = worker.desk;
+          const bottom = Scene.toScreen({ x: desk.x + desk.w, y: desk.y + desk.h }, runtime.camera);
+          const midpoint = Scene.toScreen(
+            { x: desk.x + desk.w / 2, y: desk.y + desk.h / 2 },
+            runtime.camera,
+          );
+          return midpoint.x >= 4 && midpoint.x <= 1596 && bottom.y + 4 >= 4 && bottom.y + 22 <= 996;
+        });
+        assert.equal(
+          runtime.badgeRegions.length,
+          onScreenDesks.length,
+          "every visible selected desk gets a badge " +
+            JSON.stringify({
+              zoom,
+              camera: runtime.camera,
+              accepted: runtime.badgeRegions,
+              desks: onScreenDesks.map((worker) => ({
+                id: worker.id,
+                desk: worker.desk,
+                point: Scene.toScreen(
+                  { x: worker.desk.x + worker.desk.w / 2, y: worker.desk.y + worker.desk.h / 2 },
+                  runtime.camera,
+                ),
+              })),
+            }),
+        );
+        const visible = runtime.plates.workerLabels
+          .collect({
+            tier: lodFor(zoom),
+            selectedRepo: selected,
+            isStale: false,
+            staleKeys: new Set(),
+          })
+          .filter((plate) => plate.badge);
+        assert(
+          visible.length > 0,
+          JSON.stringify({
+            zoom,
+            viewport: runtime.viewport,
+            desks: scene.workers.map((worker) => ({
+              id: worker.id,
+              desk: worker.desk,
+              projected: Scene.toScreen(
+                { x: worker.desk.x + worker.desk.w / 2, y: worker.desk.y + worker.desk.h },
+                runtime.camera,
+              ),
+            })),
+          }),
+        );
+        assert.equal(
+          runtime.badgeRegions.length,
+          visible.length,
+          "normal dense layout retains every candidate badge at " + String(zoom),
+        );
+        for (const plate of visible) {
+          assert.equal(plate.size, 13);
+          assert(plate.w <= 114);
+          assert.equal(
+            plate.color,
+            runtime.framePaint.overlays.repositoryColor(present(plate.badge).id),
+          );
+          const badge = present(
+            runtime.badgeRegions.find((region) => region.id === present(plate.badge).id),
+          );
+          runtime.interaction.gestures.pointer = {
+            x: badge.left + badge.width / 2,
+            y: badge.top + badge.height / 2,
+          };
+          runtime.interaction.refreshHover();
+          assert.equal(runtime.canvas.title, badge.text);
+          assert.equal(runtime.hovered, null);
+          const worker = present(scene.workers.find((entry) => entry.id === badge.id));
+          const bottom = Scene.toScreen(
+            { x: worker.desk.x + worker.desk.w, y: worker.desk.y + worker.desk.h },
+            runtime.camera,
+          );
+          assert(
+            Math.abs(badge.top - bottom.y - 4) <= 0.5,
+            "badge begins four CSS pixels below the floor footprint",
+          );
+          if (worker.row.checkoutId === null) assert.equal(badge.text, "Checkout unavailable");
+          else if (worker.row.checkoutKind === "main") assert.equal(badge.text, "api · main");
+          else assert(badge.text.endsWith(" · " + present(worker.row.checkoutId).slice(-4)));
+        }
+        const stationary = runtime.badgeRegions.map((badge) => ({ ...badge }));
+        runtime.anchors = runtime.anchors.map((anchor) => ({
+          ...anchor,
+          head: { x: anchor.head.x + 70, y: anchor.head.y + 50 },
+        }));
+        runtime.plates.paintPlates(isStale, new Set());
+        assert.deepEqual(
+          runtime.badgeRegions,
+          stationary,
+          "actor movement never moves desk badges",
+        );
+        runtime.camera.tx += 1;
+        runtime.interaction.refreshHover();
+        assert.equal(runtime.canvas.title, "", "camera change retires stale hover text");
+        runtime.camera.tx -= 1;
+        runtime.interaction.gestures.pointerLeave();
+        assert.equal(runtime.canvas.title, "");
+        selected = null;
+        runtime.interaction.refreshHover();
+        assert.equal(runtime.canvas.title, "");
+        runtime.plates.paintPlates(isStale, new Set());
+        assert.equal(runtime.badgeRegions.length, 0);
+        selected = "r";
+        const coincident = present(scene.workers[0]).desk;
+        for (const worker of scene.workers) worker.desk = { ...coincident };
+        runtime.plates.paintPlates(isStale, new Set());
+        assert.equal(
+          runtime.badgeRegions.length,
+          0,
+          "coincident desks omit impossible badges without invisible targets",
+        );
+        runtime.lifecycle.stop();
+        assert.equal(runtime.canvas.title, "");
+        assert.equal(runtime.badgeRegions.length, 0);
+      }
+  }
+  verifySelectedDeskBadges();
   // ---------- Theme: instance palette, effect modes and replacement loading ----------
   function verifyThemeColors() {
     const Mail = createMail(canonicalTheme());
@@ -2971,6 +3176,13 @@ test("observer-view regression contracts", async () => {
       const colors = theme?.scene?.colors;
       return Mail.createCourier(colors ? { colors } : undefined);
     }
+    function keepPaletteSignVisible(scene: SceneGeometry) {
+      const selectedSection = scene.platforms
+        .flatMap((platform) => platform.sections)
+        .find((section) => section.repo === "web");
+      const worker = scene.workers.find((entry) => entry.id === "r2");
+      if (selectedSection && worker) selectedSection.sign = { ...worker.chair };
+    }
     function record(
       theme: AppearanceTheme | null | undefined,
       {
@@ -2985,6 +3197,8 @@ test("observer-view regression contracts", async () => {
       const scene = Scene.build(layout.onPage(0), 0),
         courier = createThemeCourier(theme),
         result: Record<string, ColorRecord> = {};
+      // Keep the selected repository sign on screen in the worker-focused palette fixture.
+      keepPaletteSignVisible(scene);
       function paintScenario([name, fx, stale, reduced, sprite, zoom]: (typeof SCENARIOS)[number]) {
         const { ctx, log, strokes, firstStops } = recorder();
         const node = {
@@ -3067,7 +3281,7 @@ test("observer-view regression contracts", async () => {
     // additive passes only (no upstream entry changed or removed): the blocked-agent "!" marker and idle resting sparks.
     // T4 adds all-zoom dots after plates and computed per-agent repository colors.
     // Helper quarters add exactly fill, stroke and label colors per platform; prior operations retain their order.
-    const HEAD_DEFAULT = "38d26fe6aa6f9b5a1e53eba6514b2fda57b1ace2ba88dc1c72de14724130e527";
+    const HEAD_DEFAULT = "5e130ef91772f59c37ab44995d5251c805558b2190a1660874c3f106daf10380";
     const omitted = record(undefined).result;
     assert.equal(
       digest(omitted),

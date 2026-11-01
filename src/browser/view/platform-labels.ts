@@ -1,4 +1,3 @@
-import { checkoutSuffix } from "../model/identity.js";
 import { toScreen } from "../scene/index.js";
 import type { Platform, Section } from "../scene/types.js";
 import type { SpriteResource } from "../sprites/types.js";
@@ -11,7 +10,6 @@ const STALE_SIGN = { label: "STALE", size: 13, spacing: 1.5, priority: 49, dash:
 const REPOSITORY_SIGN = {
   size: 13,
   width: 160,
-  checkoutWidth: 180,
   lift: 2,
   shade: -0.3,
   priority: 30,
@@ -21,16 +19,23 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
   constructor(readonly view: ViewRuntime<R, B>) {}
   collect(options: LabelContext): TextPlate[] {
     const scene = this.view.activeScene;
-    const checkoutIds = scene.platforms.flatMap((platform) =>
-      platform.sections.map((section) => section.checkoutId),
-    );
+    const seen = new Set<string>();
     return scene.platforms.flatMap((platform) => [
       ...this.heading(platform, options),
-      ...(options.tier === "overview"
-        ? []
-        : platform.sections.flatMap((section) =>
-            this.section(platform, section, { ...options, checkoutIds }),
-          )),
+      ...platform.sections.flatMap((section) => {
+        const point = toScreen(section.sign, this.view.camera);
+        if (
+          seen.has(section.repo) ||
+          !this.view.repositories.has(section.repo) ||
+          point.x < 0 ||
+          point.x > this.view.viewport.width ||
+          point.y < 0 ||
+          point.y > this.view.viewport.height
+        )
+          return [];
+        seen.add(section.repo);
+        return this.section(platform, section, options);
+      }),
     ]);
   }
   private heading(platform: Platform, options: LabelContext): TextPlate[] {
@@ -68,14 +73,13 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
     );
     return [heading, stale];
   }
-  private section(
-    platform: Platform,
-    section: Section,
-    options: LabelContext & { checkoutIds: (string | null)[] },
-  ): TextPlate[] {
+  private section(platform: Platform, section: Section, options: LabelContext): TextPlate[] {
     const point = toScreen(section.sign, this.view.camera);
+    const scene = this.view.activeScene;
     const text = this.view.plates.clipText(
-      section.label || section.repo || "",
+      section.repoLabel ||
+        scene.workers.find((worker) => worker.row.repoId === section.repo)?.row.repo ||
+        "",
       REPOSITORY_SIGN.width,
       REPOSITORY_SIGN.size,
     );
@@ -83,11 +87,7 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
     const repo = this.view.repositories.has(section.repo) ? section.repo : null;
     const chosen = repo !== null && repo === options.selectedRepo;
     // Selection changes only colour: text, size and priority keep the same placement.
-    const lines = this.sectionLines(section, text, options.checkoutIds);
-    const longest = lines.reduce((a, b) =>
-      this.view.ctx.measureText(a).width > this.view.ctx.measureText(b).width ? a : b,
-    );
-    const plate = this.view.plates.textPlate(longest, point.x, point.y - REPOSITORY_SIGN.lift, {
+    const plate = this.view.plates.textPlate(text, point.x, point.y - REPOSITORY_SIGN.lift, {
       accent: chosen ? this.view.C.repo : shade(platform.accent, REPOSITORY_SIGN.shade),
       size: REPOSITORY_SIGN.size,
       color: chosen ? this.view.C.repo : this.view.C["repo-label"],
@@ -96,39 +96,9 @@ export class PlatformLabels<R extends SpriteResource, B extends R = R> {
     return [
       {
         ...plate,
-        y: plate.y - plate.h * (lines.length - 1),
-        h: plate.h * lines.length,
-        lines,
         repo,
         platformKey: platform.key,
       },
     ];
-  }
-  private sectionLines(section: Section, text: string, checkoutIds: (string | null)[]): string[] {
-    const suffix =
-      section.checkoutKind === "worktree" && section.checkoutId
-        ? ` · ${checkoutSuffix(section.checkoutId, checkoutIds)}`
-        : "";
-    this.view.ctx.font = "13px VT323, monospace";
-    const suffixWidth = this.view.ctx.measureText(suffix).width;
-    return section.checkoutLabel
-      ? [
-          this.view.plates.clipText(
-            section.repoLabel || section.repo || "",
-            REPOSITORY_SIGN.checkoutWidth,
-            REPOSITORY_SIGN.size,
-          ),
-          this.view.plates.clipText(
-            section.checkoutLabel,
-            REPOSITORY_SIGN.checkoutWidth - suffixWidth,
-            REPOSITORY_SIGN.size,
-          ) + suffix,
-          this.view.plates.clipText(
-            section.folder || "Checkout root",
-            REPOSITORY_SIGN.checkoutWidth,
-            REPOSITORY_SIGN.size,
-          ),
-        ]
-      : [text];
   }
 }

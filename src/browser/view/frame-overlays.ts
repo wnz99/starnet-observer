@@ -12,7 +12,7 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   private readonly agentColors = new Map<string, string>();
   constructor(readonly view: ViewRuntime<R, B>) {}
 
-  private ringColor(id: string): string {
+  repositoryColor(id: string): string {
     const existing = this.agentColors.get(id);
     if (existing) return existing;
     const index = this.agentColors.size,
@@ -35,7 +35,7 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
     if (!point) return;
     const working = worker.row.status === "working" && !this.view.workerStale(worker),
       radius = 0.62 * worker.scale,
-      color = this.ringColor(worker.id);
+      color = this.repositoryColor(worker.id);
     if (working && stationArt)
       this.view.geometry.glow(point, REPOSITORY_RING.glowRadius * worker.scale, {
         color,
