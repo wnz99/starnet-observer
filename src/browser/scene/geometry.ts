@@ -35,6 +35,23 @@ export const unproject = ({ x, y }: Point) => ({
 });
 export const contains = (rect: Rect, point: Point) =>
   point.x >= rect.x && point.x < rect.x + rect.w && point.y >= rect.y && point.y < rect.y + rect.h;
+const MIDPOINT_DIVISOR = 2;
+export function longestSegmentMidpoint(path: readonly Point[]): Point {
+  let a = element(path, 0),
+    b = element(path, 1);
+  let length = Math.hypot(b.x - a.x, b.y - a.y);
+  for (let index = 2; index < path.length; index++) {
+    const from = element(path, index - 1),
+      to = element(path, index);
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    if (distance > length) {
+      a = from;
+      b = to;
+      length = distance;
+    }
+  }
+  return { x: (a.x + b.x) / MIDPOINT_DIVISOR, y: (a.y + b.y) / MIDPOINT_DIVISOR };
+}
 export const pointAt = (rect: Rect, x: number, y: number, z = 0) => ({
   x: rect.x + x,
   y: rect.y + y,

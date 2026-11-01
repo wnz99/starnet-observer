@@ -250,13 +250,18 @@ test("observer-hosts-view regression contracts", () => {
   // The remote ship's own label is drawn at overview and still when zoomed onto its room (it outranks room signs and is
   // clamped into view when the hull is on screen).
   const labelled = () => node.ctx.texts.some((text) => /^● VM · 2 agents/.test(text));
+  view.overview();
   node.ctx.texts.length = 0;
   now += 16;
   view.paint(now);
   assert.ok(labelled(), "remote ship label at overview");
   const drawn = (text: string) => node.ctx.texts.includes(text);
-  assert.ok(drawn("ssh · observing"), "a live host's observation link says what it is");
-  assert.ok(drawn("ssh · stale"), "a stale host's link shows its real state");
+  assert.ok(drawn("RELAY MAILROOM · relay.example.dev"), "the external mailroom has its own sign");
+  assert.ok(drawn("vm · ssh · observing"), "a live host's observation link names its destination");
+  assert.ok(
+    drawn("empty · ssh · stale"),
+    "a stale host's link shows its destination and real state",
+  );
   function verifyShadowLabelsAndHighways() {
     // Zoomed onto the shadow ship's room: its ghost crew, its own label and the relay link's label are on screen.
     const shadowRoom = scene.platforms.find((platform) => platform.host === "relay:whitenoise");
@@ -271,13 +276,14 @@ test("observer-hosts-view regression contracts", () => {
       "a shadow ship names its machine and says it is not observed",
     );
     assert.ok(node.ctx.texts.includes("LLM-BUS · 2 · ⇄ relay"), "a relay room says so on its sign");
-    assert.ok(
-      node.ctx.texts.some((text) =>
-        /^RELAY relay\.example\.dev · live · unverified · roster only, no mail yet · 0 agents here on it/.test(
-          text,
-        ),
-      ),
-      "the highway names its relay and live state, says no mail has crossed yet, and counts the agents here on it",
+    view.overview();
+    node.ctx.texts.length = 0;
+    now += 16;
+    view.paint(now);
+    assert.equal(
+      present(present(scene.relays)[0]).spokes.find((spoke) => spoke.machine === "vm-1")?.state,
+      "active",
+      "observed activity remains attached to its own spoke",
     );
     const vmShip = present(scene.ships).find((ship) => ship.id === "vm"),
       shadowShip = present(scene.ships).find((ship) => ship.shadow);

@@ -13,7 +13,6 @@ import type { SpriteResource } from "../sprites/types.js";
 import { GeometryPainter } from "./geometry-painter.js";
 import { center, middle, rectPoly, withAlpha } from "./primitives.js";
 import type { Colors, ViewContext } from "./types.js";
-import { present } from "./values.js";
 const HULL = {
   height: -2.4,
   shadowAlpha: 0.7,
@@ -116,17 +115,19 @@ class StationFloor<R extends SpriteResource> {
           this.art.hub(this.context, this.scene.mail);
         },
       },
-      ...(this.scene.ships || [])
-        .filter((ship) => !ship.local && ship.mail)
-        .map((ship) => {
-          const mail = present(ship.mail);
-          return {
-            key: center(mail.rect).x + center(mail.rect).y + DEPTH.hub,
-            paint: () => {
-              this.art.hub(this.context, mail);
-            },
-          };
-        }),
+      ...[
+        ...(this.scene.ships || []).flatMap((ship) =>
+          !ship.local && ship.mail ? [ship.mail] : [],
+        ),
+        ...(this.scene.relays || []).map((relay) => relay.mail),
+      ].map((mail) => {
+        return {
+          key: center(mail.rect).x + center(mail.rect).y + DEPTH.hub,
+          paint: () => {
+            this.art.hub(this.context, mail);
+          },
+        };
+      }),
       {
         key: middle(this.scene.observatory.rect),
         paint: () => {

@@ -354,8 +354,8 @@ test("observer-relay-scene regression contracts", () => {
     );
     const mid = present(at("accepted_remote")[0]).point;
     assert.ok(
-      highway.some((segment) => inside(mid, segment.rect)),
-      "held by the relay: on the highway",
+      inside(mid, present(present(scene.relays)[0]).mail.rect),
+      "held by the relay: in the external mailroom",
     );
     assert.deepEqual(
       [present(at("delivered_local")[0]).point.x, present(at("delivered_local")[0]).point.y],
@@ -470,11 +470,11 @@ test("observer-relay-scene regression contracts", () => {
       present(present(scene.relays)[0]).links.map((link) => [link.from, link.to, link.shadow]),
       [[null, "vm", false]],
     );
-    const column = scene.walkways.filter((walkway) => walkway.kind === "relay-highway");
+    const network = present(present(scene.relays)[0]);
+    assert.equal(network.spokes.length, 2, "one tunnel per machine to the external relay");
     assert.ok(
-      column.length === 1 &&
-        present(column[0]).rect.x + present(column[0]).rect.w / 2 === scene.mail.hub.x,
-      "member to member: straight down the centre line between the banks",
+      network.links.every((link) => link.path.includes(network.mail.hub)),
+      "mail passes through the external relay room",
     );
     const fake = {
       seatFor: (id: string) => (["obs_l", "obs_v"].includes(id) ? 0 : undefined),

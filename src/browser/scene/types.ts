@@ -160,6 +160,8 @@ export interface ObservationLink {
   health: string;
   from: Point;
   to: Point;
+  path: Point[];
+  label: Point;
 }
 export interface RelayMember {
   host: Host;
@@ -196,13 +198,24 @@ export interface RelayLink {
   lastActivityAt: number | null;
   verified: boolean;
   path: Point[];
-  carried?: number;
+  relayHub: Point;
+}
+export interface RelaySpoke {
+  host: Host;
+  machine: string;
+  state: string;
+  lastActivityAt: number | null;
+  verified: boolean;
+  carried: number;
+  path: Point[];
 }
 export interface SceneRelay {
   key: string;
   relay: string;
   members: Omit<RelayMember, "crossed">[];
   links: RelayLink[];
+  mail: Mailroom;
+  spokes: RelaySpoke[];
 }
 export interface Scene {
   page: number;
