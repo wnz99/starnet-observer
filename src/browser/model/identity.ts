@@ -78,6 +78,7 @@ export function arranged<T extends DisplayRow>(row: T) {
   if (!value || typeof value.roomId !== "string" || typeof value.sectionId !== "string") return row;
   return {
     ...row,
+    observedRepo: row.observedRepo === undefined ? row.repo || null : row.observedRepo,
     projectId: value.roomId,
     project: value.room,
     projectKind: "group",

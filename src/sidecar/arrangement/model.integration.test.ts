@@ -69,15 +69,16 @@ test("arrangement browser toggle groups actual rows and preserves seats", () => 
     repoId: "repo_1",
     repo: "bq-web",
     folder: "src",
-    arrangement: { roomId: "room_1", room: "banqora", sectionId: "sec_1", section: "bq-web" },
+    arrangement: { roomId: "room_1", room: "banqora", sectionId: "sec_1", section: "Web" },
   };
   assert.deepEqual(Model.arranged(row), {
     ...row,
+    observedRepo: "bq-web",
     projectId: "room_1",
     project: "banqora",
     projectKind: "group",
     repoId: "sec_1",
-    repo: "bq-web",
+    repo: "Web",
     folder: "",
   });
   const bare = { id: "x", projectId: "prj_2" };

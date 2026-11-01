@@ -2875,6 +2875,40 @@ test("observer-view regression contracts", async () => {
     }
   }
   verifyCheckoutDiscriminators();
+  function verifyMainCheckoutText(runtime: ViewRuntime<Resource>, workerId: string, zoom: number) {
+    const worker = present(runtime.workerIndex.get(workerId));
+    if (worker.row.checkoutKind !== "main") return;
+    const original = worker.row;
+    const arranged = Model.arranged({
+      ...original,
+      arrangement: { roomId: "p", room: "Room", sectionId: "r", section: "Section" },
+    });
+    for (const [row, expected] of [
+      [arranged, "api · main"],
+      [Model.arranged(arranged), "api · main"],
+      [{ ...original, repo: "" }, "Checkout unavailable"],
+      [
+        Model.arranged({ ...original, repo: "", arrangement: arranged.arrangement }),
+        "Checkout unavailable",
+      ],
+      [{ ...original, checkoutId: null }, "Checkout unavailable"],
+      [{ ...original, checkoutKind: "folder" }, "Local folder"],
+      [{ ...original, checkoutKind: null }, "Checkout unavailable"],
+      [{ ...original, checkoutKind: "worktree" }, "Checkout unavailable"],
+    ] as const) {
+      worker.row = row;
+      const candidate = runtime.plates.workerLabels
+        .collect({
+          tier: lodFor(zoom),
+          selectedRepo: "r",
+          isStale: false,
+          staleKeys: new Set(),
+        })
+        .find((entry) => entry.badge?.id === worker.id);
+      assert.equal(candidate?.badge?.fullText, expected);
+    }
+    worker.row = original;
+  }
   function verifySelectedDeskBadges() {
     for (const dpr of [1, 2])
       for (const zoom of [0.3, 0.8, 1.5]) {
@@ -2888,7 +2922,7 @@ test("observer-view regression contracts", async () => {
             repo: "api",
             checkoutId: index === 3 ? null : "checkout_" + String(index % 3),
             checkoutKind: index === 0 ? "main" : "worktree",
-            worktree: index === 0 ? "api" : "a-very-long-observed-worktree-name-" + String(index),
+            worktree: index === 0 ? null : "a-very-long-observed-worktree-name-" + String(index),
             provider: "codex",
             status: "idle",
           })),
@@ -2902,7 +2936,7 @@ test("observer-view regression contracts", async () => {
             repo: "api",
             checkoutId: "checkout_0",
             checkoutKind: "main",
-            worktree: "api",
+            worktree: null,
             provider: "codex",
             status: "idle",
           },
@@ -3024,6 +3058,7 @@ test("observer-view regression contracts", async () => {
           assert.equal(runtime.canvas.title, badge.text);
           assert.equal(runtime.hovered, null);
           const worker = present(scene.workers.find((entry) => entry.id === badge.id));
+          verifyMainCheckoutText(runtime, worker.id, zoom);
           const bottom = Scene.toScreen(
             { x: worker.desk.x + worker.desk.w, y: worker.desk.y + worker.desk.h },
             runtime.camera,
