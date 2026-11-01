@@ -17,7 +17,7 @@ import { GeometryPainter } from "./geometry-painter.js";
 import { officeFurnishing } from "./office-furnishing.js";
 import { corners, hash, middle, rectPoly, visibleFaces, withAlpha } from "./primitives.js";
 import { staticPass } from "./static.js";
-import type { Look, ViewContext } from "./types.js";
+import type { Look, StaticPresentation, ViewContext } from "./types.js";
 import { present as required } from "./values.js";
 const MAIL_PROPS = {
   chamfer: 2,
@@ -162,6 +162,9 @@ export class OfficeFloor<R extends SpriteResource> {
         x: pad.x - MAIL_PROPS.padInset,
         y: pad.y - MAIL_PROPS.padInset,
       });
+  }
+  hubProps(mail: Mailroom) {
+    const r = mail.rect;
     const pod = required(mail.pod[0]),
       chute = required(mail.chute[0]);
     const props: [SceneArtRoleName, Rect][] = [
@@ -196,28 +199,36 @@ export class OfficeFloor<R extends SpriteResource> {
     this.floor(corners(r), "floor", r);
     this.walls(r);
   }
-  paintStatic(scene: Scene) {
-    staticPass(this.context, scene, {
-      colors: this.look.colors,
-      pools: null,
-      deck: (_ctx, value) => {
-        this.deck(value);
+  paintStatic(scene: Scene, presentation?: StaticPresentation) {
+    staticPass(
+      this.context,
+      scene,
+      {
+        colors: this.look.colors,
+        pool: null,
+        deck: (_ctx, value) => {
+          this.deck(value);
+        },
+        walkway: (_ctx, value) => {
+          this.walkway(value);
+        },
+        hub: (_ctx, value) => {
+          this.hub(value);
+        },
+        hubProps: (_ctx, value) => {
+          this.hubProps(value);
+        },
+        observatory: (_ctx, value) => {
+          this.observatory(value);
+        },
+        walls: (_ctx, value) => {
+          this.walls(value);
+        },
+        region: (_ctx, platform, value, index) => {
+          this.region(platform, value, index);
+        },
       },
-      walkway: (_ctx, value) => {
-        this.walkway(value);
-      },
-      hub: (_ctx, value) => {
-        this.hub(value);
-      },
-      observatory: (_ctx, value) => {
-        this.observatory(value);
-      },
-      walls: (_ctx, value) => {
-        this.walls(value);
-      },
-      region: (_ctx, platform, value, index) => {
-        this.region(platform, value, index);
-      },
-    });
+      presentation,
+    );
   }
 }

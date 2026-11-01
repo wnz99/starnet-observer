@@ -39,6 +39,7 @@ import { palette, resolveLook } from "./look.js";
 import { officeFurnishing } from "./office-furnishing.js";
 import { OfficeFloor } from "./office-floor.js";
 import { Surfaces } from "./surfaces.js";
+import { StartupAssembly } from "./startup-assembly.js";
 import { officePaintersFor } from "./office.js";
 import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
@@ -57,6 +58,134 @@ const Model = createModel(canonicalTheme());
 const View = createViewFactory(canonicalTheme(), { reportNotice() {}, reportWarning() {} });
 
 for (const office of [false, true]) {
+  test(
+    (office ? "office" : "station") + " static presentation preserves whole draws and hides owners",
+    () => {
+      const layout = Model.createLayout();
+      layout.reconcile([
+        {
+          id: "static-worker",
+          project: "Static",
+          projectId: "static",
+          projectKind: "group",
+          repo: "static",
+          repoId: "static",
+          provider: "codex",
+          status: "working",
+          worktree: "static",
+        },
+      ]);
+      const scene = Scene.build(layout.onPage(0), 0);
+      const assembly = new StartupAssembly();
+      assembly.begin(scene, 0);
+      const calls: unknown[][] = [];
+      const alphas: number[] = [];
+      const stack: number[] = [];
+      const ctx = drawing({
+        save: () => {
+          stack.push(ctx.globalAlpha);
+        },
+        restore: () => {
+          ctx.globalAlpha = present(stack.pop());
+        },
+        fill: () => {
+          calls.push(["fill", ctx.fillStyle]);
+          alphas.push(ctx.globalAlpha);
+        },
+        stroke: () => {
+          calls.push(["stroke", ctx.strokeStyle]);
+          alphas.push(ctx.globalAlpha);
+        },
+        drawImage: (...args: Parameters<ViewContext<Resource>["drawImage"]>) => {
+          calls.push(["image", ...args]);
+          alphas.push(ctx.globalAlpha);
+        },
+        clip: () => {
+          calls.push(["clip"]);
+        },
+        lineTo: (...args: Parameters<ViewContext<Resource>["lineTo"]>) => {
+          calls.push(["lineTo", ...args]);
+        },
+        fillText: (...args: Parameters<ViewContext<Resource>["fillText"]>) => {
+          calls.push(["text", ...args]);
+        },
+      });
+      const images = Object.fromEntries(
+        SCENE_ART_ROLE_NAMES.map((role) => [role, new OfficeImageFixture()]),
+      ) as Record<SceneArtRoleName, OfficeImageFixture>;
+      const composition = createOffice({
+        images,
+        colors: canonicalLook.colors,
+        project: Scene.project,
+        crewHeight: 60,
+      });
+      const painter = office
+        ? officePaintersFor(canonicalLook, composition)
+        : paintersFor<Resource>(canonicalLook);
+      painter.paintStatic(ctx, scene);
+      const ordinary = [...calls];
+      calls.length = 0;
+      const stages = new Map<string, unknown[][]>();
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (owner, stage, draw) => {
+          const start = calls.length;
+          draw();
+          const key = owner + ":" + stage;
+          stages.set(key, [...(stages.get(key) ?? []), ...calls.slice(start)]);
+        },
+      });
+      assert.deepEqual(
+        calls,
+        ordinary,
+        "omitted hook and fully visible art preserve operation ordering and geometry",
+      );
+      assert.ok(present(stages.get("mail:floor")).length > 0);
+      assert.ok(
+        present(stages.get("mail:content")).length > 0,
+        "tall mail props have a separate content pass",
+      );
+      assert.ok(stages.has("platform:" + present(scene.platforms[0]).key + ":content"));
+      calls.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (owner, stage, draw) => {
+          if (owner === "mail" && stage === "floor") draw();
+        },
+      });
+      assert.deepEqual(
+        calls,
+        stages.get("mail:floor"),
+        "mail floor reveals without its tall props or other owners",
+      );
+      calls.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint() {},
+      });
+      assert.deepEqual(calls, [], "hidden owners produce no drawing or clipping");
+      alphas.length = 0;
+      painter.paintStatic(ctx, scene, {
+        owners: assembly.owners,
+        frame: assembly.frame(0),
+        paint: (_owner, _stage, draw) => {
+          ctx.save();
+          ctx.globalAlpha *= 0.25;
+          draw();
+          ctx.restore();
+        },
+      });
+      assert.ok(alphas.length > 0);
+      assert.ok(
+        alphas.every((alpha) => alpha > 0 && alpha <= 0.25),
+        "nested lines, grids, walls and pools compose opacity",
+      );
+      assert.equal(ctx.globalAlpha, 1);
+    },
+  );
   test((office ? "office" : "station") + " annex bridge trim preserves existing surfaces", () => {
     const strokes: { color: unknown; from: Point; to: Point }[] = [];
     let from = { x: 0, y: 0 },
