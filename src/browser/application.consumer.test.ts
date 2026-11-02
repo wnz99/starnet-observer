@@ -45,7 +45,7 @@ interface CanvasProbe {
   actors: ActorFrame[];
   ctx: CanvasRenderingContext2D;
   framePaint: { paint(now: number): unknown };
-  staticLayer: { builds: number } | null;
+  staticLayer: { builds: number; resolution: number } | null;
   plateFrame: { scene: SceneGeometry; zoom: number; tx: number; ty: number } | null;
   callbacks: { onObservatory: () => void };
   interaction: {
@@ -2378,6 +2378,20 @@ async function startupAssembly(
       await page.screenshot({ path: path.join(artifacts, "assembly-office-" + mode + "-mid.png") });
       assert.equal((await paint(2800)).state, "complete");
       await page.screenshot({ path: path.join(artifacts, "assembly-office-" + mode + "-end.png") });
+      if (mode === "ready") {
+        await page.evaluate(() => {
+          (Reflect.get(window, "__view") as CanvasProbe).camera.zoom = 3;
+        });
+        await paint(2900);
+        assert.ok(
+          await page.evaluate(() => {
+            const view = Reflect.get(window, "__view") as CanvasProbe;
+            return (view.staticLayer?.resolution ?? 0) >= 3 * window.devicePixelRatio;
+          }),
+          "zoomed office walls retain display resolution independently of the scene's room count",
+        );
+        await page.screenshot({ path: path.join(artifacts, "room-cache-zoom.png") });
+      }
     }
     assert.deepEqual(errors, []);
     await fs.writeFile(

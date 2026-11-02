@@ -332,13 +332,18 @@ test("observer-view regression contracts", async () => {
   const huge = { minX: 0, minY: 0, maxX: 20000, maxY: 9000 },
     resolution = cacheResolution(huge, 3, 2);
   assert(
-    20000 * resolution <= 4096 + 1e-6 && 20000 * 9000 * resolution * resolution <= 4e6 + 1,
+    20000 * resolution <= 8192 + 1e-6 && 20000 * 9000 * resolution * resolution <= 16e6 + 1,
     "the static layer honours the axis and pixel ceilings",
   );
   assert.equal(
     cacheResolution({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, 0.6, 1),
     1,
     "zoom buckets",
+  );
+  assert.equal(
+    cacheResolution({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, 3, 2),
+    8,
+    "maximum camera zoom on Retina must not hit the old 2x cache ceiling",
   );
 
   // Painted wall and corner furnishings stay inside the reserved regions the walk graph treats as obstacles.
@@ -1466,6 +1471,57 @@ test("observer-view regression contracts", async () => {
   }
   verifyStaticCacheInvalidation();
 
+  function verifyViewportCache() {
+    const { scene } = setup();
+    let dpr = 2;
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1200, 900),
+        env: { dpr: () => dpr, createCanvas: () => canvas(), raf: () => 0, caf() {} },
+      },
+    );
+    runtime.update(scene);
+    runtime.cameraControl.measure();
+    runtime.camera = { zoom: 3, tx: 0, ty: 0 };
+    const first = runtime.cache.staticFor();
+    assert(first.resolution >= 6, "walls retain enough samples at maximum zoom on Retina");
+    scene.bounds = { minX: -100000, minY: -100000, maxX: 100000, maxY: 100000 };
+    assert.equal(runtime.cache.staticFor(), first, "offscreen scene size never lowers wall detail");
+    runtime.camera.tx -= 64;
+    assert.equal(runtime.cache.staticFor(), first, "a short pan reuses the surrounding margin");
+    runtime.camera.tx -= 256;
+    const panned = runtime.cache.staticFor();
+    assert.equal(
+      panned.builds,
+      first.builds + 1,
+      "crossing the cached edge repaints before display",
+    );
+    assert.equal(panned.canvas, first.canvas, "rebuilds reuse one backing store");
+    assert(panned.bounds.maxX >= (1200 - runtime.camera.tx) / 3);
+    runtime.viewport = { width: 10000, height: 10000 };
+    const huge = runtime.cache.staticFor();
+    assert(huge.canvas.width <= 8192 && huge.canvas.height <= 8192);
+    assert(
+      huge.canvas.width * huge.canvas.height <= 16e6,
+      "large displays retain allocation bounds",
+    );
+    assert(huge.resolution < 6, "only an oversized viewport may reduce visible resolution");
+    runtime.viewport = { width: 1200, height: 900 };
+    dpr = 1;
+    runtime.dpr = dpr;
+    const standard = runtime.cache.staticFor();
+    assert(standard.resolution >= 3 && standard.resolution < first.resolution);
+    runtime.camera.zoom = 1.5;
+    const zoomed = runtime.cache.staticFor();
+    assert.equal(
+      zoomed.builds,
+      standard.builds + 1,
+      "zoom bucket changes rebuild at the new scale",
+    );
+  }
+  verifyViewportCache();
+
   // Helper desk links follow chair occupancy without rebuilding the static floor.
   function verifyOccupiedHelperLinks() {
     for (const mode of ["station", "office"] as const) {
@@ -1841,7 +1897,7 @@ test("observer-view regression contracts", async () => {
       assert.equal(scene.platforms.length, projects);
       for (const [w, h] of sizes)
         assert(
-          Number.isInteger(w) && Number.isInteger(h) && w <= 4096 && h <= 4096 && w * h <= 4e6,
+          Number.isInteger(w) && Number.isInteger(h) && w <= 8192 && h <= 8192 && w * h <= 16e6,
           String(projects) + " platforms: " + String(w) + "x" + String(h) + " within budget",
         );
     }

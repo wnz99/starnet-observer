@@ -12,7 +12,7 @@ const FNV_OFFSET = 2166136261;
 const FNV_PRIME = 16777619;
 const FACE_EPSILON = 0.0001;
 const LOD_BREAKPOINTS = { overview: 0.45, detail: 1.1 };
-const CACHE_POLICY = { pixels: 4e6, axis: 4096, buckets: [0.25, 0.5, 1, 2] };
+const CACHE_POLICY = { pixels: 16e6, axis: 8192, margin: 128 };
 export const LOD = Object.freeze(LOD_BREAKPOINTS);
 export const CACHE = Object.freeze(CACHE_POLICY);
 /* Approved skins draw about 19 design px tall natively (76 source px at 0.25). Crew stand ~40 px: just under
