@@ -4,7 +4,6 @@ import type { Envelope, Plate } from "./types.js";
 export { CREW_HEIGHT, MIN_HIT, SPRITE_SCALE, ZOOM_STEP } from "./primitives.js";
 const IDLE_TINT = { grayscale: 0.85, darkness: 0.55, precision: 2 };
 const CACHE_MIN_RESOLUTION = 0.01;
-const CACHE_MAX_BUCKET = 2;
 const ENVELOPE_ANCHOR_PRECISION = 100;
 const ENVELOPE_STACK_LIFT = 14;
 // A fresh blocked row identifies a prompt or dialog awaiting input.
@@ -21,10 +20,10 @@ export function idleFilter(level: unknown) {
 }
 export const lodFor = (zoom: number) =>
   zoom < LOD.overview ? "overview" : zoom < LOD.detail ? "sections" : "detail";
-// One static-layer resolution per zoom bucket, capped by the pixel budget so huge decks never allocate unbounded canvases.
+// Power-of-two zoom buckets preserve display detail, with bounded canvas allocations.
 export function cacheResolution(bounds: Bounds, zoom: number, dpr: number) {
   const want = Math.max(CACHE_MIN_RESOLUTION, zoom * dpr),
-    bucket = CACHE.buckets.find((value) => value >= want) || CACHE_MAX_BUCKET;
+    bucket = 2 ** Math.ceil(Math.log2(want));
   const w = Math.max(1, bounds.maxX - bounds.minX),
     h = Math.max(1, bounds.maxY - bounds.minY);
   return Math.min(bucket, CACHE.axis / w, CACHE.axis / h, Math.sqrt(CACHE.pixels / (w * h)));
