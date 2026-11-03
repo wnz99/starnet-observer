@@ -607,6 +607,145 @@ test("local roster actions preserve the floor and mail without unrelated reconci
     couriers.mockRestore();
   }
 });
+test("room and repository labels refresh host-owned UI across hosts without moving the camera", async () => {
+  const page = uiFixture({ __OBSERVER_CONTROL__: true });
+  let live: Deliver | null = null;
+  let frame!: UiFrame;
+  let callbacks!: UiViewOptions;
+  const camera: string[] = [];
+  const floor = spyOn(Floor.prototype, "render");
+  const app = page.mount({
+    createView: (options) => {
+      callbacks = options;
+      return viewSpy({
+        update(scene, options) {
+          frame = { scene, options };
+        },
+        start() {},
+        stop() {},
+        invalidate() {},
+        overview() {
+          camera.push("overview");
+        },
+        focus() {
+          camera.push("focus");
+        },
+        focusPlatform() {
+          camera.push("platform");
+        },
+        zoomBy() {
+          camera.push("zoom");
+        },
+      });
+    },
+    query: {
+      ...querySpy({
+        define() {},
+        invalidate: () => Promise.resolve(),
+        subscribe: (_key, listener) => {
+          live = listener;
+          return () => {};
+        },
+      }),
+      dispose() {},
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    const now = Date.now();
+    notify(live, {
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions: ["local-one", "local-two", "remote-one"].map((id) => ({
+          id,
+          host: id.startsWith("remote") ? "remote" : null,
+          projectId: id,
+          project: id,
+          repoId: id,
+          status: "working",
+          observedAt: now,
+        })),
+        sources: {
+          hosts: {
+            local: { health: "available", observedAt: now },
+            remote: { health: "available", observedAt: now },
+          },
+        },
+        bus: { health: "available", messages: [{ id: 11, sentAt: now }] },
+        hostBus: { remote: { health: "available", messages: [{ id: 22, sentAt: now }] } },
+      },
+    });
+    const assertHost = (host: "remote" | "") => {
+      const remote = host === "remote";
+      assert.equal(
+        present(
+          page.get("host-tabs").children.find((tab) => tab.dataset.host === host),
+        ).attributes.get("aria-selected"),
+        "true",
+      );
+      assert.equal(
+        page.get("crew-title").textContent,
+        (remote ? "remote" : "This machine") + " crew",
+      );
+      assert.equal(
+        page.get("host-health").textContent,
+        remote ? "Live · 1 agent" : "Live · 2 agents",
+      );
+      assert.equal(
+        page.get("counts").textContent,
+        remote ? "1 working · 0 waiting · 1 total" : "2 working · 0 waiting · 2 total",
+      );
+      assert.match(
+        page.get("mail-title").textContent,
+        remote ? /Mailroom · remote/ : /Mailroom · this machine/,
+      );
+      const ledger = page.get("mail-ledger");
+      assert.equal(ledger.children.length, 1);
+      assert.equal(child(child(child(ledger, 0), 0), 0).dataset.messageId, remote ? "22" : "11");
+      assert.equal(page.get("host-spawn").hidden, !remote);
+      if (remote) {
+        assert.equal(page.get("host-spawn").dataset.host, "remote");
+        assert.match(child(page.get("host-spawn"), 1).title, /on remote$/);
+      }
+    };
+    const ids = () =>
+      page.document
+        .querySelectorAll(page.get("sessions"), ".session-row")
+        .map((row) => row.dataset.sessionId)
+        .sort();
+    assertHost("");
+    camera.length = 0;
+    for (const kind of ["repository", "room"]) {
+      for (const id of ["remote-one", "local-one"]) {
+        const toggle = () => {
+          if (kind === "repository") present(frame.options.onRepositoryToggle)(id);
+          else
+            present(callbacks.onRoomToggle)(
+              present(frame.scene.workers.find((worker) => worker.id === id)).platformKey,
+            );
+        };
+        toggle();
+        assertHost(id === "remote-one" ? "remote" : "");
+        assert.deepEqual(ids(), [id], kind + " installs the exact filter before rendering");
+        const renders = floor.mock.calls.length;
+        toggle();
+        assert.deepEqual(ids(), id === "remote-one" ? [id] : ["local-one", "local-two"]);
+        assert.equal(
+          floor.mock.calls.length,
+          renders,
+          "same-host clearing keeps the scoped refresh",
+        );
+      }
+    }
+    assert.deepEqual(camera, [], "label filters keep the camera fixed");
+  } finally {
+    app.dispose();
+    floor.mockRestore();
+  }
+});
 test("observer-ui regression contracts", async () => {
   const defaults = canonicalTheme();
   const ObserverModel = createModel(defaults);

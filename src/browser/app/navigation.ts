@@ -222,19 +222,21 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     const data = state.latest?.data;
     const row = data?.sessions.find((row) => row.repoId === repoId);
     if (!row) return;
+    const host = state.selectedHost;
     this.selectHost(row.host || null);
     state.selectedRepoId = state.selectedRepoId === repoId ? null : repoId;
     state.selectedRoomKey = null;
-    this.options.refreshRoster({ canvas: true });
+    this.refreshSelection(state.page, host);
   }
   toggleRoom(key: string) {
     const { state } = this.options;
     const room = state.scene?.platforms.find((platform) => platform.key === key);
     if (!room || state.disposed) return;
+    const host = state.selectedHost;
     this.selectHost(room.host || null);
     state.selectedRoomKey = state.selectedRoomKey === key ? null : key;
     state.selectedRepoId = null;
-    this.options.refreshRoster({ canvas: true });
+    this.refreshSelection(state.page, host);
   }
   dispose() {
     this.events.dispose();
