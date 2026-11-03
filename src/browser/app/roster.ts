@@ -41,9 +41,9 @@ class Roster<N extends AppNode, R extends SpriteResource> implements AppRoster<N
   }
   render(rows: AppRow[], stale: boolean, messages: AppMessage[], bus: AppBus | null) {
     if (this.disposed || this.options.state.disposed) return;
-    const { ui, state } = this.options;
+    const { ui } = this.options;
     const query = ui.document.value(ui.get("search")).trim().toLowerCase();
-    const groups = new RosterGroups(rows, { filter: state.filter, query }, messages);
+    const groups = this.filteredGroups(rows, query, messages);
     const focusedNode = ui.document.activeElement,
       sessions = ui.get("sessions"),
       scrollTop = sessions.scrollTop;
@@ -77,6 +77,23 @@ class Roster<N extends AppNode, R extends SpriteResource> implements AppRoster<N
         focusedNode.focus({ preventScroll: true });
     }
     this.empty(rows, { stale, matching: groups.matching.length });
+  }
+  private filteredGroups(rows: AppRow[], query: string, messages: AppMessage[]) {
+    const { state } = this.options;
+    const room = state.selectedRoomKey;
+    const members =
+      room === null
+        ? null
+        : new Set(
+            state.scene?.workers
+              .filter((worker) => worker.platformKey === room)
+              .map((worker) => worker.id),
+          );
+    return new RosterGroups(
+      rows,
+      { filter: state.filter, query, repoId: state.selectedRepoId, members },
+      messages,
+    );
   }
   private empty(rows: AppRow[], observation: { stale: boolean; matching: number }) {
     const { ui, state } = this.options;

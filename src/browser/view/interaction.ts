@@ -114,7 +114,17 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
     const title = this.titleAt(point);
     if (title) return { id: null, title, sign: null, platform: null, obs: false, ship: null };
     const sign = this.signAt(point);
-    const platform = this.paintedFrameCurrent()
+    const platform = this.platformAt(point);
+    if (sign || platform) return { id: null, title, sign, platform, obs: false, ship: null };
+    const id = Scene.hitTest(point, this.view.regions);
+    if (id) return { id, title, sign: null, platform: null, obs: false, ship: null };
+    const mail = this.mailroomAt(point);
+    if (mail) return { id, title, sign, platform, obs: false, ship: null, mail };
+    const obs = this.observatoryAt(point);
+    return { id, title, sign, platform, obs, ship: obs ? null : this.shipAt(point) };
+  }
+  platformAt(point: Point) {
+    return this.paintedFrameCurrent()
       ? (this.view.platformRegions.find(
           (r) =>
             point.x >= r.left &&
@@ -123,16 +133,20 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
             point.y <= r.top + r.height,
         )?.id ?? null)
       : null;
-    if (platform) return { id: null, title, sign, platform, obs: false, ship: null };
-    const id = Scene.hitTest(point, this.view.regions);
-    if (id) return { id, title, sign: null, platform: null, obs: false, ship: null };
-    const mail = this.mailroomAt(point);
-    if (mail) return { id, title, sign, platform, obs: false, ship: null, mail };
-    const obs = this.observatoryAt(point);
-    return { id, title, sign, platform, obs, ship: obs ? null : this.shipAt(point) };
   }
-  private mailroomAt(point: Point) {
+  actionableAt(point: Point) {
+    return this.signAt(point) || this.platformAt(point) || this.mailroomAt(point);
+  }
+  mailroomAt(point: Point) {
     if (!this.view.callbacks.onMailroom || !this.paintedFrameCurrent()) return null;
+    const label = this.view.mailroomRegions.find(
+      (r) =>
+        point.x >= r.left &&
+        point.x <= r.left + r.width &&
+        point.y >= r.top &&
+        point.y <= r.top + r.height,
+    );
+    if (label) return label;
     const floor = Scene.fromScreen(point, this.view.camera);
     const scene = this.view.activeScene;
     const rooms = scene.ships?.length
@@ -168,10 +182,12 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   }
 
   private toggleTargets(target: Omit<Tap, "point">) {
-    const { title, sign, obs, ship } = target;
+    const { title, sign, platform, mail, obs, ship } = target;
     if (ship) this.view.callbacks.onShip?.(ship.host);
     if (title && this.view.workerIndex.has(title)) this.view.callbacks.onTitleToggle(title);
     if (sign) this.view.onRepositoryToggle(sign);
+    else if (platform) this.view.callbacks.onRoomToggle(platform);
+    if (mail) this.view.callbacks.onMailroom?.(mail.host);
     if (obs) this.view.callbacks.onObservatory();
   }
 
@@ -199,7 +215,7 @@ export class Interaction<R extends SpriteResource, B extends R = R> {
   private mailDoubleClick(point: Point, known: Tap | null) {
     const mail = known ? known.mail : this.mailroomAt(point);
     if (!mail) return false;
-    this.view.callbacks.onMailroom?.(mail.host);
+    if (!known) this.view.callbacks.onMailroom?.(mail.host);
     return true;
   }
 

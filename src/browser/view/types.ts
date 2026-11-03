@@ -169,6 +169,7 @@ export interface ViewOptions<R extends SpriteResource, B extends R = R> {
   onSelect?: (id: string) => void;
   onTitleToggle?: (id: string) => void;
   onPlatform?: (key: string) => void;
+  onRoomToggle?: (key: string) => void;
   onObservatory?: () => void;
   onMailroom?: (host: string | null) => void;
   onShip?: ((host: string | null) => void) | null;
@@ -251,6 +252,7 @@ export interface TextPlate extends Plate {
   repo?: string | null;
   platformKey?: string;
   ship?: { host: string | null };
+  mail?: { host: string | null };
   observatory?: boolean;
 }
 export interface PlateOptions {

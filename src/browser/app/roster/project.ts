@@ -115,7 +115,7 @@ export class ProjectGroup<N extends AppNode, R extends SpriteResource> {
             : "");
       setText(node, shown);
       node.setAttribute("aria-pressed", String(this.options.state.selectedRepoId === id));
-      node.setAttribute("aria-label", "Highlight the " + shown + " repository");
+      node.setAttribute("aria-label", "Filter by the " + shown + " repository");
       return node;
     });
     this.repos.hidden = toggles.length === 0;

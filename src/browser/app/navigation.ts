@@ -140,11 +140,13 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     state.layout = state.model.createLayout({ projectAccents: state.pack.scene.projectAccents });
     this.options.resetFloor();
     state.selectedRepoId = null;
+    state.selectedRoomKey = null;
     this.options.rebaseCouriers();
     this.options.arrangeChanged();
   }
   setPage(next: number) {
     if (next === this.options.state.page) return;
+    this.options.state.selectedRoomKey = null;
     this.options.state.page = next;
     this.options.resetCouriers();
     this.options.prefs.set("page", next);
@@ -214,14 +216,27 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     this.overview();
     this.options.refresh();
   }
-  /* Repository highlight: one exact repository id, never a label or the parent-folder project. It selects, never
-     filters or moves the camera, and does not request anything: the list and the floor just repaint. */
+  // Exact repository ids keep same-name repositories apart. Filtering never moves the camera or requests data.
   toggleRepository(repoId: string) {
     const { state } = this.options;
     const data = state.latest?.data;
-    if (!data?.sessions.some((row) => row.repoId === repoId)) return;
+    const row = data?.sessions.find((row) => row.repoId === repoId);
+    if (!row) return;
+    const host = state.selectedHost;
+    this.selectHost(row.host || null);
     state.selectedRepoId = state.selectedRepoId === repoId ? null : repoId;
-    this.options.refreshRoster({ canvas: true });
+    state.selectedRoomKey = null;
+    this.refreshSelection(state.page, host);
+  }
+  toggleRoom(key: string) {
+    const { state } = this.options;
+    const room = state.scene?.platforms.find((platform) => platform.key === key);
+    if (!room || state.disposed) return;
+    const host = state.selectedHost;
+    this.selectHost(room.host || null);
+    state.selectedRoomKey = state.selectedRoomKey === key ? null : key;
+    state.selectedRepoId = null;
+    this.refreshSelection(state.page, host);
   }
   dispose() {
     this.events.dispose();

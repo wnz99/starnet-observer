@@ -1,7 +1,11 @@
 import type { SpriteResource } from "../sprites/types.js";
 import type { ViewOptions } from "./types.js";
 export function callbacksFor<R extends SpriteResource, B extends R>(options: ViewOptions<R, B>) {
-  return { ...selectionCallbacks(options), ...appearanceCallbacks(options) };
+  return {
+    ...selectionCallbacks(options),
+    ...appearanceCallbacks(options),
+    onRoomToggle: options.onRoomToggle ?? (() => {}),
+  };
 }
 function selectionCallbacks<R extends SpriteResource, B extends R>(options: ViewOptions<R, B>) {
   return {

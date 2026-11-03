@@ -180,6 +180,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   observatoryRegion: TargetBox | null = null;
 
   shipRegions: ShipBox[] = [];
+  mailroomRegions: ShipBox[] = [];
 
   attentionRegions: TitleBox[] = [];
 

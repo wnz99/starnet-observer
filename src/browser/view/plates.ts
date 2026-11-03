@@ -147,6 +147,11 @@ export class Plates<R extends SpriteResource, B extends R = R> {
     this.hoverBrackets();
   };
   recordTargets = (accepted: TextPlate[]) => {
+    this.view.mailroomRegions = accepted.flatMap((plate) =>
+      plate.mail
+        ? [{ ...plate.mail, left: plate.x, top: plate.y, width: plate.w, height: plate.h }]
+        : [],
+    );
     this.recordBadges(accepted);
     this.view.platformRegions = accepted
       .filter((plate) => plate.platformKey)

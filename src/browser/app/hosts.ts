@@ -58,6 +58,7 @@ export class Hosts<N extends AppNode, R extends SpriteResource> {
     if (next === state.selectedHost) return;
     state.selectedHost = next;
     state.selectedRepoId = null;
+    state.selectedRoomKey = null;
     state.mailSelected = null;
     this.options.remember(next);
     this.clearForeignSelection(next);

@@ -138,7 +138,7 @@ export class PointerGestures<R extends SpriteResource, B extends R = R> {
       style.cursor =
         this.drag && this.drag.moved
           ? "grabbing"
-          : this.view.hovered || this.selection.signAt(this.pointer)
+          : this.view.hovered || this.selection.actionableAt(this.pointer)
             ? "pointer"
             : "grab";
     }

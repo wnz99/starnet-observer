@@ -20,11 +20,18 @@ export class RosterGroups {
   readonly matching: AppRow[];
   constructor(
     rows: AppRow[],
-    selection: { filter: string; query: string },
+    selection: {
+      filter: string;
+      query: string;
+      repoId?: string | null;
+      members?: ReadonlySet<string> | null;
+    },
     messages: AppMessage[],
   ) {
     this.matching = rows.filter(
       (row) =>
+        (!selection.repoId || row.repoId === selection.repoId) &&
+        (!selection.members || selection.members.has(row.id)) &&
         (selection.filter === "all" || row.status === selection.filter) &&
         [
           row.project,
