@@ -15,12 +15,15 @@ export class StationLabels<R extends SpriteResource, B extends R = R> {
     const tower = mail.tower;
     const at = toScreen({ ...center(tower), z: MAIL_SIGN.height }, this.view.camera);
     return [
-      this.view.plates.textPlate("MAILROOM · llm-bus", at.x, at.y, {
-        accent: this.view.C.amber,
-        size: this.view.plates.signSize(MAIL_SIGN.size),
-        color: this.view.C.window,
-        priority: MAIL_SIGN.priority,
-      }),
+      {
+        ...this.view.plates.textPlate("MAILROOM · llm-bus", at.x, at.y, {
+          accent: this.view.C.amber,
+          size: this.view.plates.signSize(MAIL_SIGN.size),
+          color: this.view.C.window,
+          priority: MAIL_SIGN.priority,
+        }),
+        ...(this.view.callbacks.onMailroom ? { mail: { host: null } } : {}),
+      },
     ];
   }
   observatory(options: LabelContext): TextPlate[] {

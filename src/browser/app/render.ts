@@ -186,6 +186,11 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     const { state } = this.options;
     if (state.selectedRepoId !== null && !rows.some((row) => row.repoId === state.selectedRepoId))
       state.selectedRepoId = null;
+    if (
+      state.selectedRoomKey !== null &&
+      !state.scene?.platforms.some((room) => room.key === state.selectedRoomKey)
+    )
+      state.selectedRoomKey = null;
   }
   private emptyHost(snapshot: AppQuerySnapshot, hosts: number, rows: number) {
     const { state, ui } = this.options;

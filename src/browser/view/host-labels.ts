@@ -134,12 +134,18 @@ export class HostLabels<R extends SpriteResource, B extends R = R> {
     });
     const label =
       "MAILROOM · " + (ship.shadow ? String(ship.machine) + " (its own llm-bus)" : String(ship.id));
-    return this.view.plates.textPlate(label, at.x, at.y, {
+    const plate = this.view.plates.textPlate(label, at.x, at.y, {
       accent: this.view.C.amber,
       size: this.view.plates.signSize(MAIL_SIGN.size),
       color: this.view.C.window,
       priority: MAIL_SIGN.priority,
     });
+    return {
+      ...plate,
+      ...(!ship.shadow && this.view.callbacks.onMailroom
+        ? { mail: { host: ship.local ? null : ship.id } }
+        : {}),
+    };
   }
   observation(): TextPlate[] {
     if (this.view.assemblyFrame.active) return [];

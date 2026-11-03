@@ -40,6 +40,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   | "hostSelection"
   | "onTitleToggle"
   | "onPlatform"
+  | "onRoomToggle"
   | "onMode"
 > {
   const { state, descriptions, ui } = core;
@@ -60,6 +61,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
     onShip: (host) => {
       links.hosts?.clicked(host);
     },
+    onRoomToggle: (key) => links.navigation?.toggleRoom(key),
     hostSelection: () => (links.hosts?.list().length ? state.selectedHost : undefined),
     // A worker's canvas title toggles the same exact panel as its list title and magnifier; focus returns to the station.
     onTitleToggle: (id) => {

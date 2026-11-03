@@ -169,6 +169,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     this.view.signRegions = [];
     this.view.platformRegions = [];
     this.view.shipRegions = [];
+    this.view.mailroomRegions = [];
     this.view.attentionRegions = [];
     this.view.plateFrame = null;
   };

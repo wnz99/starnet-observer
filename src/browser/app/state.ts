@@ -13,6 +13,7 @@ export class AppState {
   rawLatest: AppQuerySnapshot | null = null;
   selected: string | null = null;
   selectedRepoId: string | null = null;
+  selectedRoomKey: string | null = null;
   selectedHost: string | null = null;
   mailSelected: number | null = null;
   page = 0;

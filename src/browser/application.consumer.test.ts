@@ -54,6 +54,7 @@ interface CanvasProbe {
     badgeAt(point: { x: number; y: number }): unknown;
   };
   signRegions: { left: number; top: number; width: number; height: number }[];
+  mailroomRegions: { left: number; top: number; width: number; height: number }[];
   platformRegions: { id: string; left: number; top: number; width: number; height: number }[];
   titleRegions: { left: number; top: number; width: number; height: number }[];
   badgeRegions: {
@@ -196,6 +197,7 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     marker,
     "framePaint = (window.__view = this, new FramePaint(this));",
   );
+  await labelFiltering(browser, http, injected);
   let closed = false;
   let bornAt: number | null = null;
   let crewEnabled = false;
@@ -324,7 +326,7 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
       ["overview", null, null],
       ["platform", fittedRoom, null],
       ["overview", null, "repo_fixture"],
-      ["platform", fittedRoom, "repo_fixture"],
+      ["platform", fittedRoom, null],
     ] as const) {
       await painted();
       const targets = await paintedTargets(page);
@@ -423,6 +425,108 @@ async function nativeCanvas(browser: Browser, root: string, http: HttpModule, ar
     return annexes;
   } finally {
     await canvasPage?.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}
+async function labelFiltering(browser: Browser, http: HttpModule, injected: string) {
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: {
+      get: () => {
+        const data = snapshot();
+        const first = data.sessions[0];
+        assert.ok(first);
+        data.sessions = [
+          first,
+          {
+            ...first,
+            id: "obs_label_other",
+            project: "Other project",
+            projectId: "other_project",
+            repo: "Other repository",
+            repoId: "other_repo",
+          },
+        ];
+        return data;
+      },
+      inspect: () => ({ health: "unavailable", turns: [] }),
+    },
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "reduce",
+  });
+  try {
+    await page.route("**/app/main.js", (route) =>
+      route.fulfill({ body: injected, contentType: "text/javascript" }),
+    );
+    await page.goto(fixture.url);
+    await page.waitForFunction(
+      () => (Reflect.get(window, "__view") as CanvasProbe | undefined)?.platformRegions.length,
+    );
+    const camera = () =>
+      page.evaluate(() => ({ ...(Reflect.get(window, "__view") as CanvasProbe).camera }));
+    const target = async (kind: "room" | "repo" | "mail") => {
+      await page.waitForFunction(() => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        return view.plateFrame?.scene === view.activeScene;
+      });
+      const box = await page.locator("canvas").boundingBox();
+      assert.ok(box);
+      const region = await page.evaluate((kind) => {
+        const view = Reflect.get(window, "__view") as CanvasProbe;
+        return (
+          kind === "mail"
+            ? view.mailroomRegions
+            : kind === "repo"
+              ? view.signRegions
+              : view.platformRegions
+        )[0];
+      }, kind);
+      assert.ok(region, kind + " label is drawn");
+      return {
+        x: box.x + region.left + region.width / 2,
+        y: box.y + region.top + region.height / 2,
+      };
+    };
+    const rows = page.locator("#sessions .session-item");
+    await expect(rows).toHaveCount(2);
+    for (const kind of ["room", "repo"] as const) {
+      if (kind === "repo") {
+        await page.locator("canvas").focus();
+        for (let zoom = 0; zoom < 9 && (await paintedTargets(page)).signs.length === 0; zoom++) {
+          await page.keyboard.press("+");
+          await page.waitForTimeout(50);
+        }
+      }
+      const point = await target(kind);
+      const before = await camera();
+      await page.mouse.move(point.x, point.y);
+      await expect(page.locator("canvas")).toHaveCSS("cursor", "pointer");
+      await page.mouse.click(point.x, point.y);
+      await expect(rows).toHaveCount(1);
+      assert.deepEqual(await camera(), before, "single label clicks keep the camera fixed");
+      await page.waitForTimeout(600);
+      await page.mouse.click(point.x, point.y);
+      await expect(rows).toHaveCount(2);
+    }
+    await page.keyboard.press("0");
+    await page.waitForTimeout(100);
+    const mail = await target("mail");
+    await page.mouse.move(mail.x, mail.y);
+    await expect(page.locator("canvas")).toHaveCSS("cursor", "pointer");
+    await page.mouse.click(mail.x, mail.y);
+    await expect(page.locator("dialog[open]")).toContainText("Mailroom · this machine");
+    console.log(
+      "Canvas labels: pointer cursors, single-click room/repo filters, repeat-click clearing, fixed camera and mailroom panel verified",
+    );
+  } finally {
+    await page.close();
     fixture.server.closeAllConnections();
     await new Promise<void>((resolve) =>
       fixture.server.close(() => {
