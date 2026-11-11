@@ -251,7 +251,7 @@ export type MessageRelay = Omit<
   "state" | "direction"
 > & { machine: string; state: string; direction: string };
 export type SceneMessage = Partial<
-  Pick<PublicBus["messages"][number], "from" | "to" | "acknowledgedAt" | "wake">
+  Pick<PublicBus["messages"][number], "from" | "to" | "acknowledgedAt" | "wake" | "coordination">
 > & { relay?: MessageRelay };
 export interface PendingSpot {
   point: Point;

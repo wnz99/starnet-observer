@@ -133,11 +133,14 @@ export function route(
 ) {
   const { from, to, recipientId } = messageEndpoints(scene, layout, message, host);
   const recipient = rows.find((row) => row.id === recipientId);
+  const kind = message.coordination;
   return {
-    key: `${from.key}>${to.key}`,
+    // A kind suffix keeps sealed, report and plain mail between the same endpoints in separate flights.
+    key: kind ? `${from.key}>${to.key}|${kind}` : `${from.key}>${to.key}`,
     from: from.points,
     to: to.points,
     color: recipient ? layout.colorFor(projectKey(recipient)).accent : null,
+    ...(kind ? { kind } : {}),
   };
   // The courier colours unassigned recipients.
 }

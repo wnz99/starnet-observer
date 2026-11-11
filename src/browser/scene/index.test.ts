@@ -2498,6 +2498,27 @@ test("coordinators sit on the observatory bench with local and remote courier ro
   assert.deepEqual(Scene.endpoint(local, layout, "a"), { key: "a", points: seated[0]?.route });
   assert.equal(Scene.endpoint(local, layout, "a", "elsewhere").key, "chute");
 
+  // Coordination kind rides on the route; kinds never share a flight key, plain mail keeps today's key.
+  const plainRoute = Scene.route(local, layout, { from: "a", to: "x" }, []);
+  const sealedRoute = Scene.route(
+    local,
+    layout,
+    { from: "a", to: "x", coordination: "sealed" },
+    [],
+  );
+  const reportRoute = Scene.route(
+    local,
+    layout,
+    { from: "a", to: "x", coordination: "report" },
+    [],
+  );
+  assert.equal(plainRoute.key, "a>chute");
+  assert.equal("kind" in plainRoute, false);
+  assert.deepEqual(
+    [sealedRoute.kind, sealedRoute.key, reportRoute.kind, reportRoute.key],
+    ["sealed", "a>chute|sealed", "report", "a>chute|report"],
+  );
+
   // (c) remote coordinators end exactly at that host's mail hub: direct link, relay-routed link, no link.
   const member = (host: string | null) => ({
     host,

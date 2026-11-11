@@ -4177,9 +4177,9 @@ test("observer-view regression contracts", async () => {
         "office-backdrop",
         "mail-acknowledged",
         "mail-unassigned",
-        // Painted by the sealed/report parcels and beacons of later coordination tasks.
         "mail-sealed",
         "mail-report",
+        // Painted by the beacons of a later coordination task.
         "coordination-beacon",
       ],
     );
