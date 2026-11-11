@@ -1,6 +1,6 @@
 # Coordinator observatory registration
 
-Status: Registered. Execution through the personal feature workflow and wnz-phase-executor; no GSD planner or executor was dispatched during registration.
+Status: Implemented and reviewed; PR #44 carries delivery. See [summary](./261111-tf5-SUMMARY.md). Execution ran through the personal feature workflow and wnz-phase-executor; no GSD planner or executor was dispatched during registration.
 
 ## Approval and authority
 

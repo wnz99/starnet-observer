@@ -29,18 +29,18 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 Phase: None (0 planned)
 Plan: None
 Status: Helper recovery and occupied-link implementation and independent aggregate/initial PR review complete; revision-2 conformance found no gaps. PR #21 awaits final tracking-head review, CI and merge.
-Last activity: 2026-11-12 — Quick task 261111-tf5 (coordinators in the observatory) implemented and independently reviewed; aggregate review approved; `bun run check` passed with 419 core tests and the Chromium consumers; PR review pending.
+Last activity: 2026-11-12 — Quick task 261111-tf5 (coordinators in the observatory) complete through PR #44: independent reviews approved, `bun run check` passed locally and source CI passed at d7624e7; tracking-head CI and merge pending.
 
 ## Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261111-tf5 | Coordinators in the observatory with team highlight, directive couriers and coordination signals | Implemented (10 tasks, independently reviewed); aggregate review approved, conformance and full `bun run check` passed; PR review pending | [261111-tf5](./quick/261111-tf5-coordinators-in-the-observatory-with-tea/) |
 
 ## Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | --- | --- | --- | --- | --- |
+| 261111-tf5 | Coordinators in the observatory with team highlight, directive couriers and coordination signals | 2026-11-12 | [PR #44](https://github.com/wnz99/starnet-observer/pull/44) | Implementation, independent task/aggregate/PR review and local verification complete; source CI passed at d7624e7; final tracking-head CI and merge pending at summary preparation | [261111-tf5](./quick/261111-tf5-coordinators-in-the-observatory-with-tea/) |
 | 261101-r27 | Station assembly and saved visual settings | 2026-11-01 | [PR #38](https://github.com/wnz99/starnet-observer/pull/38) | Implementation, integration, independent aggregate/PR review and local verification complete; source CI passed at e9cbdd5; final tracking-head CI and guarded merge pending at summary preparation | [261101-r27](./quick/261101-r27-station-assembly-and-saved-visual-settin/) |
 | 261101-l00 | Record exact-session tool checkout observations and source-qualified desk badges | 2026-11-01 | [PR #35](https://github.com/wnz99/starnet-observer/pull/35) | Code implementation, independent full-branch review and verification complete at f86e66a; final tracking-head CI and guarded merge pending at summary preparation; optional shell setup remains uninstalled | [261101-l00](./quick/261101-l00-record-exact-session-tool-checkout-obser/) |
 | 261101-ggo follow-up | Correct main-checkout desk badge identity after PR #33 | 2026-11-01 | [PR #34](https://github.com/wnz99/starnet-observer/pull/34) | Implementation, independent full-branch review and required local verification complete; final tracking-head CI and guarded merge pending at summary preparation | [261101-ggo](./quick/261101-ggo-deliver-one-repository-sign-and-selected/) |
