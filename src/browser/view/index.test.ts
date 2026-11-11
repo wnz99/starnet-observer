@@ -13,12 +13,13 @@ import { SCENE_ART_ROLE_NAMES, SCENE_ART_ROLES } from "../../shared/scene-art-ro
 import type { AppBus } from "../app/data.js";
 import { createMail } from "../mail.js";
 import { coordinationView } from "../model/coordination.js";
+import type { CoordinationView } from "../model/coordination.js";
 import { createModel } from "../model.js";
 import type { LayoutRow } from "../model/types.js";
 import * as Scene from "../scene/index.js";
 import type { ActorFrame } from "../scene/motion-types.js";
 import { create as createOffice } from "../office-art.js";
-import type { Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
+import type { BuildOptions, Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
 import { load } from "../sprites/runtime.fixture.js";
 import type { SpriteAppearance, SpriteBody } from "../sprites/types.js";
 import { canonicalTheme } from "../theme.fixture.js";
@@ -48,6 +49,7 @@ import { visibleFaces } from "./primitives.js";
 import type {
   AppearanceTheme,
   CoordinationViewForPaint,
+  UpdateOptions,
   ViewContext,
   ViewEvent,
   ViewOptions,
@@ -1173,6 +1175,131 @@ test("observer-view regression contracts", async () => {
     runtime.lifecycle.stop();
   }
   verifyTeamPaint();
+
+  // A seated coordinator whose team carries an overdue and a defaulted decision, two gates (PR 8 just turned
+  // accepted) and a generation change, all stamped at the current wall time.
+  function signalFixture() {
+    const key = "team_0123456789abcdef",
+      wall = Date.now(),
+      project = (generation: string, gate8: string) => ({
+        key,
+        label: "Project",
+        generation,
+        coordinator: "boss",
+        objective: "",
+        workers: [],
+        unobservedWorkers: 0,
+        grantExpiresAt: null,
+        instructions: null,
+        amendments: null,
+        decisions: [
+          {
+            class: "scope",
+            status: "pending",
+            question: "q",
+            createdAt: 1,
+            deadlineAt: wall - 1000,
+          },
+          { class: "scope", status: "defaulted", question: "q", createdAt: 1, deadlineAt: null },
+        ],
+        gates: [
+          { pr: 9, ticket: "T-9", status: "submitted", submittedAt: 20, decidedAt: null },
+          { pr: 8, ticket: "T-8", status: gate8, submittedAt: 10, decidedAt: null },
+        ],
+      }),
+      bus = (generation: string, gate8: string) => ({
+        coordination: {
+          teams: {
+            asOf: 1,
+            status: "available",
+            truncated: false,
+            sources: {},
+            projects: [project(generation, gate8)],
+          },
+        } as unknown as NonNullable<AppBus["coordination"]>,
+      }),
+      input = { hostBus: {}, rowIds: new Set(["boss"]), now: wall },
+      before = coordinationView({ ...input, bus: bus("gen00001", "submitted"), previous: null }),
+      view = coordinationView({ ...input, bus: bus("gen00002", "accepted"), previous: before }),
+      row: LayoutRow = {
+        id: "boss",
+        project: "P",
+        projectId: "p",
+        projectKind: "group",
+        repo: "r",
+        repoId: "r",
+        provider: "claude",
+        status: "idle",
+      };
+    const paint: SignalPaint = {
+      view,
+      extras: { coordinators: [{ row, host: null, accent: "#abcdef" }] },
+      update: { coordination: () => ({ view, team: null }) },
+    };
+    return paint;
+  }
+  interface SignalPaint {
+    view: CoordinationView | null;
+    extras: BuildOptions | undefined;
+    update: UpdateOptions;
+  }
+  const NO_SIGNALS: SignalPaint = { view: null, extras: undefined, update: {} };
+
+  function verifySignalPaint() {
+    const { view, extras, update } = signalFixture(),
+      node = canvas(1440, 1000),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => false,
+          env: {
+            raf: () => 1,
+            caf() {},
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout();
+    layout.reconcile([]);
+    const scene = Scene.build(layout.onPage(0), 0, extras);
+    runtime.update(scene, update);
+    runtime.cameraControl.setCamera(
+      Scene.focus(scene.observatory.chair, scene.bounds, runtime.viewport),
+    );
+    const glows: string[] = [],
+      strokes: unknown[] = [],
+      glow = runtime.geometry.glow.bind(runtime.geometry);
+    runtime.geometry.glow = (point, radius, style) => {
+      glows.push(style.color);
+      glow(point, radius, style);
+    };
+    const stroke = node.ctx.stroke.bind(node.ctx);
+    node.ctx.stroke = () => {
+      strokes.push(node.ctx.strokeStyle);
+      stroke();
+    };
+    runtime.framePaint.paint(100);
+    assert(glows.includes("#ff9f43"), "the decision beacon glows in its theme colour");
+    assert(
+      strokes.includes(present(present(view).teams[0]).hue),
+      "the handover sweep rings the seat in the team hue",
+    );
+    const drawn = recordedCalls(node).fillText;
+    for (const text of [
+      "? 1 · overdue",
+      "!",
+      "#9 T-9 submitted",
+      "#8 T-8 accepted",
+      "handover · gen gen00002",
+    ])
+      assert(drawn.includes(text), "the observatory paints " + text);
+    runtime.lifecycle.stop();
+  }
+  verifySignalPaint();
 
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),
@@ -4111,11 +4238,18 @@ test("observer-view regression contracts", async () => {
         focus = "r2",
         list = rows,
         at = 4321,
-      }: { only?: string[] | null; focus?: string | null; list?: LayoutRow[]; at?: number } = {},
+        signals = NO_SIGNALS,
+      }: {
+        only?: string[] | null;
+        focus?: string | null;
+        list?: LayoutRow[];
+        at?: number;
+        signals?: SignalPaint;
+      } = {},
     ) {
       const layout = Model.createLayout();
       layout.reconcile(list);
-      const scene = Scene.build(layout.onPage(0), 0),
+      const scene = Scene.build(layout.onPage(0), 0, signals.extras),
         courier = createThemeCourier(theme),
         result: Record<string, ColorRecord> = {};
       // Keep the selected repository sign on screen in the worker-focused palette fixture.
@@ -4177,6 +4311,7 @@ test("observer-view regression contracts", async () => {
           mailFrame: () => frame,
           inspected: () => "r1",
           repositorySelection: () => "web",
+          ...signals.update,
         });
         if (zoom !== 1) view.zoomBy(zoom);
         if (focus) view.focus(focus);
@@ -4286,6 +4421,9 @@ test("observer-view regression contracts", async () => {
       themedKeys = new Set([
         ...used(themed),
         ...used(record(snapshot(), { focus: null }).result),
+        ...used(
+          record(snapshot(), { focus: null, signals: signalFixture(), only: ["fx-on"] }).result,
+        ),
         ...[7400, 14400, 21400, 28400].flatMap((at) => [
           ...used(record(snapshot(), { focus: null, list: wide, at, only: ["fx-on"] }).result),
         ]),
@@ -4321,8 +4459,6 @@ test("observer-view regression contracts", async () => {
         "mail-unassigned",
         "mail-sealed",
         "mail-report",
-        // Painted by the beacons of a later coordination task.
-        "coordination-beacon",
       ],
     );
 

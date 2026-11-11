@@ -119,6 +119,9 @@ export class Plates<R extends SpriteResource, B extends R = R> {
       ...this.hostLabels.relays(),
       ...this.stationLabels.hub(),
       ...this.stationLabels.observatory(options),
+      ...(this.view.assemblyVisible("observatory")
+        ? this.view.coordinationSignals.plates(animate)
+        : []),
       ...this.workerLabels.collect(options),
     ];
 
