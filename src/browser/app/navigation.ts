@@ -1,6 +1,7 @@
 import type { ConfigInput } from "../../shared/observer.js";
 import type { SpriteResource } from "../sprites/types.js";
 import type { AppView } from "./contracts.js";
+import type { AppRow } from "./data.js";
 import type { AppNode } from "./dom.js";
 import type { createPreferences } from "./preferences.js";
 import type { AppState } from "./state.js";
@@ -161,10 +162,16 @@ export class Navigation<N extends AppNode, R extends SpriteResource> {
     state.selected = id;
     this.selectHost(row.host || null);
     const target = state.layout.pageFor(id);
-    if ((row.role !== "overseer" || row.host) && Number.isInteger(target)) this.setPage(target); // the local overseer sits on every page
+    if (!this.onEveryPage(row) && Number.isInteger(target)) this.setPage(target);
     this.refreshSelection(page, host);
     view.focus(id);
     if (options.scroll) this.options.scrollTo(id);
+  }
+  // The local overseer and a seated coordinator sit on every page.
+  private onEveryPage(row: AppRow) {
+    if (row.role === "overseer" && !row.host) return true;
+    const { scene } = this.options.state;
+    return !!scene?.workers.some((worker) => worker.id === row.id && worker.role === "coordinator");
   }
   private refreshSelection(page: number, host: string | null) {
     const { state } = this.options;

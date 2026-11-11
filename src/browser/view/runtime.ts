@@ -20,6 +20,7 @@ import type {
 } from "./state-types.js";
 import type {
   Anchor,
+  CoordinationViewForPaint,
   MailFrame,
   PlateFrame,
   ShipBox,
@@ -175,6 +176,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
 
   repositorySelection: () => string | null = () => null;
 
+  coordination: () => CoordinationViewForPaint | null = () => null;
+
   onRepositoryToggle: (repo: string) => void = () => {};
 
   observatoryRegion: TargetBox | null = null;
@@ -320,6 +323,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
     if (typeof options.inspected === "function") this.inspected = options.inspected;
     if (typeof options.repositorySelection === "function")
       this.repositorySelection = options.repositorySelection;
+    if (typeof options.coordination === "function") this.coordination = options.coordination;
     if (typeof options.onRepositoryToggle === "function")
       this.onRepositoryToggle = options.onRepositoryToggle;
   }

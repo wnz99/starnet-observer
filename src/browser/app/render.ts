@@ -1,6 +1,7 @@
 import type { PanelStack } from "./panel-stack.js";
 import type { QuerySnapshot } from "../queryspine/types.js";
 import type { SpriteResource } from "../sprites/types.js";
+import { coordinationView } from "../model/coordination.js";
 import { isAppSnapshot } from "./admission.js";
 import type { AppQuerySnapshot } from "./data.js";
 import type { PendingSpawn } from "./controls.js";
@@ -39,6 +40,7 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
   private inventoryStale = true;
   private mailProof: boolean | null = null;
   private pendingSpawn: PendingSpawn | null = null;
+  private transitionEpoch: number | null = null;
   constructor(private readonly options: RenderOptions<N, R>) {}
   ingest(snapshot: QuerySnapshot) {
     const data = snapshot.data;
@@ -76,19 +78,32 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     const { state, panels } = this.options;
     /* Proof is the read resume started: invalidation bumps the resource generation, so a request issued before the
        page was hidden can settle but never replaces the data. New data, settled after resume and live, proves it. */
-    if (
-      snapshot.data &&
+    const proven =
+      !!snapshot.data &&
       snapshot.data !== state.cachedAtResume &&
       !snapshot.error &&
       !snapshot.pending &&
-      snapshot.updatedAt >= state.resumedAt
-    ) {
+      snapshot.updatedAt >= state.resumedAt;
+    if (proven) {
       panels.resumeMailrooms();
       if (state.awaitingProof && !stale) {
         state.awaitingProof = false;
         panels.resume();
       }
     }
+    return proven;
+  }
+  // Team transitions compare consecutive snapshots; until the first proven one after load or resume there is no baseline.
+  private coordinate(snapshot: AppQuerySnapshot, fresh: boolean) {
+    const { state } = this.options;
+    state.coordination = coordinationView({
+      bus: snapshot.data?.bus,
+      hostBus: snapshot.data?.hostBus,
+      rowIds: new Set(state.byId.keys()),
+      previous: this.transitionEpoch === state.resumedAt ? state.coordination : null,
+      now: this.options.now(),
+    });
+    if (fresh) this.transitionEpoch = state.resumedAt;
   }
   private presentation(snapshot: AppQuerySnapshot) {
     const { ui, enabled } = this.options;
@@ -197,9 +212,10 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     if (hosts > 0 && rows === 0 && !state.isStale(snapshot))
       setText(ui.get("empty"), "No sessions on " + (state.selectedHost || "this machine") + ".");
   }
-  private content(snapshot: AppQuerySnapshot, refresh: boolean) {
+  private content(snapshot: AppQuerySnapshot, refresh: boolean, fresh: boolean) {
     const { state, hosts, floor, couriers, roster, totals } = this.options;
     this.presentation(snapshot);
+    this.coordinate(snapshot, fresh);
     const hostSources = snapshot.data?.sources?.hosts;
     const hostList = hosts.update(hostSources);
     this.selectSpawned(snapshot);
@@ -259,8 +275,8 @@ export class AppRenderer<N extends AppNode, R extends SpriteResource> {
     }
     this.mailProof = proof;
     this.inventoryStale = stale;
-    this.proveResume(snapshot, stale);
-    this.content(snapshot, options.refresh === true);
+    const fresh = this.proveResume(snapshot, stale);
+    this.content(snapshot, options.refresh === true, fresh);
   }
   dispose() {
     this.pendingSpawn = null;
