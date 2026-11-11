@@ -1,6 +1,6 @@
 import { validCoordination, validOverview, validTeams } from "../sqlite/validate-bus.js";
-import { TEAM_LIMITS, busRecord, clipUnits } from "./types.js";
-import type { BusState, RawTeam } from "./types.js";
+import { GENERATION_PREFIX, TEAM_LIMITS, busRecord, clipUnits } from "./types.js";
+import type { BusState, RawTeam, RawTeams } from "./types.js";
 import type { CoordinationTeam } from "../../shared/teams.js";
 import { redactText } from "../inspector/fields.js";
 import { cleanControls } from "../inspector/helper-state.js";
@@ -107,8 +107,7 @@ function publicResources(resources: Overview["resources"], endpoint: (address: s
   };
 }
 const observed = (id: string) => id !== "external" && id !== "ambiguous";
-type Teams = NonNullable<NonNullable<BusState["coordination"]>["teams"]>;
-function publicTeams(teams: Teams, endpoint: (address: string) => string) {
+function publicTeams(teams: RawTeams, endpoint: (address: string) => string) {
   const projects = teams.projects.flatMap((team) => {
     const projected = publicTeam(team, endpoint);
     return projected ? [projected] : [];
@@ -129,7 +128,7 @@ function publicTeam(team: RawTeam, endpoint: (address: string) => string): Coord
   return {
     key: team.key,
     label: safe(team.label, TEAM_LIMITS.label),
-    generation: team.generation,
+    generation: safe(team.generation, GENERATION_PREFIX),
     coordinator,
     objective: safe(team.objective, TEAM_LIMITS.objective),
     workers,

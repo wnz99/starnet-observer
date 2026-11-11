@@ -1,6 +1,6 @@
 import { TEAM_SOURCES } from "../../shared/teams.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
-import { TEAM_LIMITS } from "./types.js";
+import { GENERATION_PREFIX, TEAM_LIMITS } from "./types.js";
 import type { RawTeam, RawTeams } from "./types.js";
 import { parseConsents, parseGrants } from "./teams-grants.js";
 import { classify } from "./teams-kinds.js";
@@ -17,7 +17,6 @@ import type { Claim, Facts, Kind, Mail, Project } from "./teams-types.js";
 
 const ROW_LIMIT = 800;
 const GENERATION_CHARS = 64;
-const GENERATION_PREFIX = 8;
 const READ = TEAM_LIMITS.readChars;
 type Roster = ReturnType<typeof roster>;
 type Selection = { teams: RawTeams; kinds: Map<number, Kind> };

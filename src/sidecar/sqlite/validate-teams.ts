@@ -6,7 +6,7 @@ import {
   TEAM_SOURCES,
   WORKER_STATUSES,
 } from "../../shared/teams.js";
-import { busRecord, oneOf, TEAM_KEY, TEAM_LIMITS } from "../bus/types.js";
+import { busRecord, isListed, TEAM_KEY, TEAM_LIMITS } from "../bus/types.js";
 import type { RawTeams } from "../bus/types.js";
 
 const OBSERVATIONS = ["available", "partial", "unavailable"] as const;
@@ -31,7 +31,7 @@ function worker(value: unknown) {
   return (
     busRecord(value) &&
     rawText(value.agent) &&
-    oneOf(WORKER_STATUSES, value.status) &&
+    isListed(WORKER_STATUSES, value.status) &&
     claim(value.claim)
   );
 }
@@ -39,7 +39,7 @@ function decision(value: unknown) {
   return (
     busRecord(value) &&
     rawText(value.class) &&
-    oneOf(DECISION_STATUSES, value.status) &&
+    isListed(DECISION_STATUSES, value.status) &&
     rawText(value.question) &&
     optionalText(value.worker) &&
     instant(value.createdAt) &&
@@ -52,7 +52,7 @@ function gate(value: unknown) {
     typeof value.pr === "number" &&
     Number.isSafeInteger(value.pr) &&
     rawText(value.ticket) &&
-    oneOf(GATE_STATUSES, value.status) &&
+    isListed(GATE_STATUSES, value.status) &&
     instant(value.submittedAt) &&
     instant(value.decidedAt)
   );
@@ -61,8 +61,8 @@ function latestInstruction(value: unknown) {
   return (
     value === undefined ||
     (busRecord(value) &&
-      oneOf(INSTRUCTION_AUDIENCES, value.audience) &&
-      oneOf(INSTRUCTION_KINDS, value.kind) &&
+      isListed(INSTRUCTION_AUDIENCES, value.audience) &&
+      isListed(INSTRUCTION_KINDS, value.kind) &&
       rawText(value.text) &&
       instant(value.recordedAt))
   );
@@ -115,7 +115,7 @@ export function validTeams(value: unknown): value is RawTeams {
     busRecord(value) &&
     typeof value.asOf === "number" &&
     Number.isFinite(new Date(value.asOf).getTime()) &&
-    oneOf(OBSERVATIONS, value.status) &&
+    isListed(OBSERVATIONS, value.status) &&
     typeof value.truncated === "boolean" &&
     sources(value.sources) &&
     list(value.projects, TEAM_LIMITS.projects, team) &&

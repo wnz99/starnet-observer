@@ -4,7 +4,7 @@ import {
   INSTRUCTION_AUDIENCES,
   INSTRUCTION_KINDS,
 } from "../../shared/teams.js";
-import { TEAM_LIMITS, oneOf } from "./types.js";
+import { TEAM_LIMITS, isListed } from "./types.js";
 import type { RawTeam } from "./types.js";
 import { usable } from "./teams-grants.js";
 import { instant, scoped, text, texts } from "./teams-types.js";
@@ -37,7 +37,7 @@ function gateOf(row: Row): Gate | null {
   const ticket = text(row.ticket);
   const { pr, status } = row;
   if (ticket === null || typeof pr !== "number" || !Number.isSafeInteger(pr)) return null;
-  if (!oneOf(GATE_STATUSES, status)) return null;
+  if (!isListed(GATE_STATUSES, status)) return null;
   return {
     pr,
     ticket,
@@ -72,7 +72,7 @@ function decisionOf(row: Row): Decision | null {
   const klass = text(row.class);
   const question = text(row.question);
   const worker = text(row.worker);
-  if (klass === null || question === null || !oneOf(DECISION_STATUSES, row.status)) return null;
+  if (klass === null || question === null || !isListed(DECISION_STATUSES, row.status)) return null;
   return {
     class: klass,
     status: row.status,
@@ -119,8 +119,8 @@ export function readInstructions(reader: Reader, project: Project) {
   );
   const body = text(row?.text);
   const latest: RawTeam["latestInstruction"] =
-    oneOf(INSTRUCTION_AUDIENCES, row?.audience) &&
-    oneOf(INSTRUCTION_KINDS, row.kind) &&
+    isListed(INSTRUCTION_AUDIENCES, row?.audience) &&
+    isListed(INSTRUCTION_KINDS, row.kind) &&
     body !== null
       ? { audience: row.audience, kind: row.kind, text: body, recordedAt: instant(row.recorded_at) }
       : undefined;

@@ -60,6 +60,7 @@ export const TEAM_LIMITS = {
   readChars: 2048,
   rawUnits: 4096,
 };
+export const GENERATION_PREFIX = 8;
 export const TEAM_KEY = /^team_[a-f0-9]{16}$/;
 type PublicTeams = NonNullable<NonNullable<PublicBus["coordination"]>["teams"]>;
 // Raw worker-side shape: addresses are unprojected, text is pre-redaction, and unobservedWorkers is emitted by the local worker only when more than 48 workers are enrolled, or arrives on remote input.
@@ -73,6 +74,6 @@ export function clipUnits(value: string, limit: number): string {
   const last = clipped.charCodeAt(clipped.length - 1);
   return last >= 0xd800 && last <= 0xdbff ? clipped.slice(0, -1) : clipped;
 }
-export function oneOf<T extends string>(list: readonly T[], value: unknown): value is T {
+export function isListed<T extends string>(list: readonly T[], value: unknown): value is T {
   return typeof value === "string" && (list as readonly string[]).includes(value);
 }

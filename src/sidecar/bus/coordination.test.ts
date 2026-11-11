@@ -13,7 +13,7 @@ import { selectBusOverview } from "./overview.js";
 import { publicCoordination } from "./public-coordination.js";
 import { validCoordination } from "../sqlite/validate-bus.js";
 import { remap } from "../remotes/fields.js";
-import { TEAM_LIMITS } from "./types.js";
+import { GENERATION_PREFIX, TEAM_LIMITS } from "./types.js";
 import { TEAM_SOURCES } from "../../shared/teams.js";
 import type { BusState, RawTeam, RawTeams } from "./types.js";
 
@@ -396,6 +396,7 @@ test("bus coordination reads bounded metadata, retains replies and remaps identi
 });
 
 const TEAM_ID = (letter: string) => "obs_" + letter.repeat(24);
+const hostId = (id: string) => remap("host", id);
 function rawTeam(overrides: Partial<RawTeam> = {}): RawTeam {
   return {
     key: "team_0123456789abcdef",
@@ -598,5 +599,16 @@ test("malformed remote teams are omitted while sections and valid kinds survive"
   const edge = mutate({ objective: "x".repeat(TEAM_LIMITS.rawUnits) });
   const [edgeTeam] = must(must(edge.coordination).teams).projects;
   assert.equal(must(edgeTeam).objective.length, 512);
+  for (const generation of [
+    "\u0007ab\ncd\u001bef" + "x".repeat(4000),
+    "sk-live-" + "A1b2".repeat(40),
+  ]) {
+    const [cleaned] = must(must(mutate({ generation }).coordination).teams).projects;
+    const published = must(cleaned).generation;
+    assert(published.length <= GENERATION_PREFIX);
+    for (let index = 0; index < published.length; index += 1) {
+      assert(published.charCodeAt(index) >= 32 && published.charCodeAt(index) !== 127);
+    }
+    assert(!published.includes("sk-live-A1b2"));
+  }
 });
-const hostId = (id: string) => remap("host", id);
