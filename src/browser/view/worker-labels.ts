@@ -55,7 +55,18 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
       if (title) plates.push(title);
       if (region.id === inspectedId) plates.push(this.inspection(region));
     }
-    return [...plates, ...this.deskBadges(options)];
+    return [...plates, ...this.claimChips(options), ...this.deskBadges(options)];
+  }
+  private claimChips(options: LabelContext): TextPlate[] {
+    if (options.tier !== "detail") return [];
+    const overlays = this.view.framePaint.overlays;
+    return overlays.teams.claimChips(this.view.plates, {
+      color: this.view.C.dim,
+      visible: (id) => {
+        const worker = this.view.workerIndex.get(id);
+        return !!worker && this.view.assemblyVisible(this.view.assemblyOwners.worker(worker));
+      },
+    });
   }
   private deskBadges(options: LabelContext): TextPlate[] {
     const scene = this.view.activeScene;
