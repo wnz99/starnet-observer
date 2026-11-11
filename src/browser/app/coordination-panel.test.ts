@@ -156,6 +156,23 @@ test("unavailable sources read unavailable, never zero", () => {
   expect(text).not.toContain("No pending decisions");
 });
 
+test("grant expiry and unobserved count stay visible when merged halves supplied a value", () => {
+  const down = { grants: false, enrollments: false };
+  const text = harness(
+    teamOf({ grantExpiresAt: NOW + 2 * 3600000, unobservedWorkers: 2 }),
+    down,
+  ).text();
+  expect(text).toContain("Earliest grant expiry: in 2h");
+  expect(text).toContain("Not observed: 2");
+  expect(harness(teamOf(), down).text()).toContain("Earliest grant expiry: unavailable");
+  expect(harness(teamOf(), down).text()).toContain("Not observed: unavailable");
+});
+
+test("an empty roster reads no observed workers, whatever the sources", () => {
+  const text = harness(teamOf(), { grants: false, consents: false }).text();
+  expect(text).toContain("No observed workers");
+});
+
 test("gates read unavailable only with the source down and no merged gate row", () => {
   const down = { gates: false };
   expect(harness(teamOf(), down).text()).toMatch(/Gates\n+unavailable/);

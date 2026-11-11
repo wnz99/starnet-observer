@@ -177,4 +177,14 @@ describe("team overlays", () => {
     for (const fill of fills)
       expect(Math.max(...fill.points.map((point) => point.y))).toBeLessThan(headY);
   });
+
+  test("crests clear the status dot drawn above the head", () => {
+    const { overlays, fills } = harness("none");
+    overlays.crests();
+    const zoom = 2,
+      dotTop = 50 - 5 - 2.5; // head y minus the dot lift and radius, in screen pixels
+    expect(fills.length).toBeGreaterThan(0);
+    for (const fill of fills)
+      expect(Math.max(...fill.points.map((point) => point.y * zoom))).toBeLessThanOrEqual(dotTop);
+  });
 });

@@ -97,10 +97,13 @@ function workerLines(
   sources: Sources,
   rowFor: (id: string) => Roster | undefined,
 ) {
-  const rosterDown = missing(sources, "grants") && missing(sources, "consents");
   const lines = team.workers.map((worker) => workerLine(worker, rowFor(worker.agent)));
-  if (lines.length === 0) lines.push(rosterDown ? UNAVAILABLE : "No observed workers");
-  lines.push("Not observed: " + count(team.unobservedWorkers, missing(sources, "enrollments")));
+  if (lines.length === 0) lines.push("No observed workers");
+  // Merged halves may supply a non-zero count even when the owner half could not read enrollments.
+  lines.push(
+    "Not observed: " +
+      count(team.unobservedWorkers, missing(sources, "enrollments") && !team.unobservedWorkers),
+  );
   return lines;
 }
 function describeTeam(input: {
@@ -115,7 +118,9 @@ function describeTeam(input: {
     Workers: workerLines(team, sources, input.rowFor),
     Grants: [
       "Earliest grant expiry: " +
-        (missing(sources, "grants") ? UNAVAILABLE : until(team.grantExpiresAt, now)),
+        (missing(sources, "grants") && team.grantExpiresAt === null
+          ? UNAVAILABLE
+          : until(team.grantExpiresAt, now)),
     ],
     Instructions: instructionLines(team, sources),
     Decisions: decisionLines(team, sources, now),
@@ -177,6 +182,7 @@ class CoordinationPanel<N extends AppNode, R extends SpriteResource> {
     const { state, get, now } = this.options;
     const { team } = facts;
     const bus = state.busFor(facts.host);
+    const snapshot = age(bus?.coordination?.teams?.asOf, now());
     const stale = facts.host ? state.remoteMailStale(facts.host) : !state.busLive();
     setText(get("mail-inspector-title"), "Coordination · " + (team.label || "Project"));
     setText(
@@ -185,8 +191,7 @@ class CoordinationPanel<N extends AppNode, R extends SpriteResource> {
         shortId(team.generation) +
         " · coordinator " +
         (state.byId.get(team.coordinator)?.project || team.coordinator) +
-        " · snapshot " +
-        age(bus?.coordination?.teams?.asOf, now()),
+        (snapshot ? " · snapshot " + snapshot : ""),
     );
     setText(get("mail-inspector-health"), stale ? "Last known" : "Live");
   }

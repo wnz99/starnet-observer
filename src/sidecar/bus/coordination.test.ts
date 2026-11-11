@@ -609,6 +609,7 @@ test("malformed remote teams are omitted while sections and valid kinds survive"
     for (let index = 0; index < published.length; index += 1) {
       assert(published.charCodeAt(index) >= 32 && published.charCodeAt(index) !== 127);
     }
+    assert(!published.startsWith("sk-live"));
     assert(!published.includes("sk-live-A1b2"));
   }
 });

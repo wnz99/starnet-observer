@@ -2465,6 +2465,11 @@ test("coordinators sit on the observatory bench with local and remote courier ro
   assert.equal(none.observatory.extents.length, 8);
   assert.equal(empty.revision, none.revision);
   assert(!none.revision.includes("coordinator"));
+  // Literal captured before the coordinator change (80d9328): an unchanged revision means no repaint churn.
+  assert.equal(
+    none.revision,
+    '[0,[{"rect":{"x":0,"y":-14,"w":14,"h":10},"height":3.2},{"rect":{"x":4,"y":-12,"w":2,"h":1},"height":1.5},{"rect":{"x":1,"y":-14,"w":2,"h":1},"height":3},{"rect":{"x":7,"y":-14,"w":2,"h":1},"height":3},{"rect":{"x":1,"y":-11,"w":1,"h":1},"height":3.5},{"rect":{"x":10,"y":-11,"w":1,"h":1},"height":3.5},{"rect":{"x":8,"y":-9,"w":1,"h":1},"height":2},{"rect":{"x":8,"y":-13,"w":1,"h":1},"height":4.5}],null,[],[],[["observatory-link",{"x":11,"y":-4,"w":2,"h":4},null,null,null]],[]]',
+  );
 
   const local = Scene.build([], 0, { coordinators: [coordinator("a"), coordinator("b")] });
   const seated = local.workers.filter((w) => w.role === "coordinator");

@@ -411,6 +411,19 @@ test("courier colour follows message kind and kinds never share a flight", () =>
     [colors["mail-sealed"], colors["mail-report"], "#abcdef"].sort(),
     "kind colours win; plain mail keeps the recipient colour",
   );
+  const themed = createCourier({
+    colors: { ...colors, "mail-sealed": "#112233", "mail-report": "#445566" },
+  });
+  themed.update(bus([1]), { now: 0, deck: 0, route: routeOf });
+  themed.update(bus([1, 2, 3, 4]), { now: 1000, deck: 0, route: routeOf });
+  assert.deepEqual(
+    themed
+      .frame(1000, {})
+      .drones.flatMap((drone) => drone.parcels)
+      .sort(),
+    ["#112233", "#445566", "#abcdef"].sort(),
+    "themed sealed and report colours reach the parcels",
+  );
 });
 
 test("partial observed buses never invent a courier flight", () => {

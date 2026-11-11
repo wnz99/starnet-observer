@@ -195,6 +195,43 @@ describe("coordination view", () => {
     expect(facts?.team.label).toBe("owner");
   });
 
+  test("decisions and instructions come from the owner half", () => {
+    const decision = (question: string): CoordinationTeam["decisions"][number] => ({
+      class: "scope",
+      status: "pending",
+      question,
+      createdAt: 1,
+      deadlineAt: null,
+    });
+    const text = (value: string) => ({
+      audience: "worker" as const,
+      kind: "set" as const,
+      text: value,
+      recordedAt: 1,
+    });
+    const owner = team({
+      coordinator: "c1",
+      decisions: [decision("owner question")],
+      instructions: 3,
+      amendments: 2,
+      latestInstruction: text("owner text"),
+    });
+    const other = team({
+      coordinator: "external",
+      decisions: [decision("other question")],
+      instructions: 9,
+      amendments: 8,
+      latestInstruction: text("other text"),
+    });
+    const [facts] = view(busOf(owner), { h: busOf(other) }, ["c1"]).teams;
+    expect(facts?.team.decisions.map((d) => d.question)).toEqual(["owner question"]);
+    expect(facts?.team).toMatchObject({
+      instructions: 3,
+      amendments: 2,
+      latestInstruction: { text: "owner text" },
+    });
+  });
+
   test("resolves merge conflicts deterministically", () => {
     const rows = ["c1", "b1", "w1", "x1"];
     const local = busOf(

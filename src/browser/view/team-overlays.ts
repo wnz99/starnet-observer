@@ -6,9 +6,10 @@ import type { CoordinationViewForPaint, TextPlate } from "./types.js";
 
 const NON_MEMBER_ALPHA = 0.35;
 const RING = { radius: 0.72, width: 2 };
-const CREST = { dx: 0, dy: -6, size: 4.5 };
+// The crest sits above the status dot (worker-labels: 5px lift, 2.5px radius) so the dot never covers it.
+const CREST = { dx: 0, dy: -13, size: 4.5 };
 const STAR = { outer: 1.3, inner: 0.585, vertices: 10, alternate: 2, turn: Math.PI * 2 };
-// Priority sits below every sign and the desk badge (60) yet above the worktree detail plate (10).
+// Priority sits below the desk badge (60) and the host, station and platform signs yet above the worktree detail plate (10).
 const CLAIM_CHIP = { priority: 40, gap: 1, width: 150, size: 12 };
 
 interface Claim {
