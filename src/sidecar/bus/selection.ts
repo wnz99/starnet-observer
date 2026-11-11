@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { selectCoordination } from "./coordination.js";
 import { selectRemote } from "./relay.js";
+import { selectTeams } from "./teams.js";
+import { validTeams } from "../sqlite/validate-bus.js";
 import { WINDOW, MAX_RAW_CHARS, busRecord } from "./types.js";
 import type { BusRow } from "./types.js";
 import type { Fingerprint, SnapshotDatabase } from "../sqlite/snapshots.js";
@@ -105,9 +107,29 @@ function selectLocal(database: SnapshotDatabase, proof: Fingerprint) {
         : [],
     );
 }
+// The single point guaranteeing transport validity of teams: a defect drops only teams and message kinds, never the bus.
+export function withTeams(
+  rows: BusRow[],
+  coordination: ReturnType<typeof selectCoordination>,
+  read: () => ReturnType<typeof selectTeams>,
+) {
+  try {
+    const { teams, kinds } = read();
+    if (!validTeams(teams)) return coordination;
+    for (const row of rows) {
+      const kind = kinds.get(row.id);
+      if (kind) row.coordination = kind;
+    }
+    return { sections: [], ...coordination, teams };
+  } catch {
+    return coordination;
+  }
+}
 export function selectRows(database: SnapshotDatabase, proof: Fingerprint, selectedAt: number) {
   const rows: BusRow[] = selectLocal(database, proof);
-  const coordination = selectCoordination(database, selectedAt);
+  const coordination = withTeams(rows, selectCoordination(database, selectedAt), () =>
+    selectTeams(database, selectedAt, rows),
+  );
   // Relay metadata is optional: a bus without (or with unreadable) remote tables still reads as a plain local bus.
   try {
     const selection = selectRemote(database, rows, selectedAt);

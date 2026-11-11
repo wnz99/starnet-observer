@@ -1,3 +1,5 @@
+import type { CoordinationTeam, TeamSource } from "./teams.js";
+
 export interface ConfigInput {
   presentation?: boolean;
   company?: string;
@@ -214,6 +216,13 @@ interface PublicBus {
       truncated: boolean;
       rows: { label: string; detail: string; agent?: string }[];
     }[];
+    teams?: {
+      asOf: number;
+      status: BusObservationStatus;
+      truncated: boolean;
+      sources: Record<TeamSource, boolean>;
+      projects: CoordinationTeam[];
+    };
   };
   messages: {
     id: number;
@@ -226,6 +235,7 @@ interface PublicBus {
     acknowledgedAt: number | string | null;
     wake: "none" | "requested" | "failed" | "unsupported" | "unknown";
     replyTo?: number | null;
+    coordination?: "sealed" | "report";
     relay?: {
       direction: "in" | "out";
       machine: string;
