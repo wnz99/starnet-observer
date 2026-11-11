@@ -16,11 +16,26 @@ const MAIL = { pendingHeight: 1.2 };
 const WAKE_MARKS = ["failed", "unsupported", "unknown"];
 export const mailOf = (scene: Scene, host: Host) =>
   host ? (scene.ships || []).find((ship) => ship.id === host)?.mail || null : scene.mail;
+// A seated coordinator is not in the room layout, so it is found among the scene workers of its own host.
+function seatedRoute(scene: Scene, id: string, host: Host) {
+  return scene.workers.find(
+    (w) => w.id === id && w.role === "coordinator" && (w.row.host || null) === host,
+  )?.route;
+}
 export function endpoint(
   scene: Scene,
   layout: MailLayout,
   id: string,
   host: Host = null,
+): { key: string; points: Point[]; deck?: number } {
+  const seat = seatedRoute(scene, id, host);
+  return seat ? { key: id, points: seat } : layoutEndpoint(scene, layout, id, host);
+}
+function layoutEndpoint(
+  scene: Scene,
+  layout: MailLayout,
+  id: string,
+  host: Host,
 ): { key: string; points: Point[]; deck?: number } {
   const own = mailOf(scene, host) || scene.mail;
   if (layout.seatFor(id) !== undefined) {
