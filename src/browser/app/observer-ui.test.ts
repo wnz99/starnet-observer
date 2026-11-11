@@ -4787,9 +4787,11 @@ function coordinationHarness() {
   const deliver = (
     sessions: AppRow[],
     buses: { bus?: AppBus; hostBus?: Record<string, AppBus> } = {},
+    extra: { pending?: boolean } = {},
   ) => {
     const now = Date.now();
     notify(live, {
+      ...extra,
       hasData: true,
       updatedAt: now,
       data: {
@@ -5000,6 +5002,7 @@ test("a team observed across machines seats its remote coordinator and merges ga
     assert.equal(seat.id, "bc");
     assert.equal(seat.row.host, "B", "the seat's mail host equals its row host");
     assert.deepEqual(h.seated(), ["bc"]);
+    assert.equal(h.frame().scene.workers.filter((worker) => worker.id === "bc").length, 1);
     h.select("bc");
     const team = present(h.paint().team);
     assert.deepEqual(team.memberIds, new Set(["bc", "w1", "w2"]));
@@ -5032,6 +5035,9 @@ test("the transition baseline resets on resume until the first proven snapshot",
     });
     h.deliver(rows, snapshot("g1", "submitted"));
     await h.resume();
+    // A pending snapshot is not proof: it must not become the baseline the proven one is compared against.
+    h.deliver(rows, snapshot("g1", "submitted"), { pending: true });
+    assert.equal(h.paint().view.handovers.size, 0);
     h.deliver(rows, snapshot("g2", "accepted"));
     assert.equal(
       h.paint().view.flashes.size,

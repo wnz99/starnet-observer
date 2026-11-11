@@ -1,10 +1,9 @@
 import type { Scene } from "../scene/types.js";
 import type { CoordinationView } from "../model/coordination.js";
 import type { AppBus, AppRow } from "./data.js";
+import { BENCH_SEATS } from "../scene/observatory.js";
 import { record } from "../theme/validation.js";
 
-// Bench capacity of the observatory (scene/observatory.ts); overflow coordinators keep their room desks.
-const BENCH_SEATS = 4;
 export interface Seat {
   row: AppRow;
   host: string | null;

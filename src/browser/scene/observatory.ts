@@ -23,6 +23,8 @@ const OBSERVATORY = {
   deskHeight: 1.5,
   bench: { seats: 4, y: -7, x0: 1.5, pitch: 2.5, w: 2, h: 1, chairDx: 1, chairDy: -0.5 },
 };
+/** Seat count owned by the scene; the floor imports it to decide which coordinators leave their rooms. */
+export const BENCH_SEATS = OBSERVATORY.bench.seats;
 export function observatoryFor(): Observatory {
   const rect = { ...OBSERVATORY.rect },
     desk = { ...OBSERVATORY.desk },
