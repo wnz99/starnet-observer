@@ -29,12 +29,13 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 Phase: None (0 planned)
 Plan: None
 Status: Helper recovery and occupied-link implementation and independent aggregate/initial PR review complete; revision-2 conformance found no gaps. PR #21 awaits final tracking-head review, CI and merge.
-Last activity: 2026-10-19 — Current-position regrouping, bounded following acquisition and links drawn only at occupied helper chairs. Source gate passed 271 native tests plus production-first installed/browser consumers; source Ubuntu CI 39178798972 passed. Final tracking-head CI remains required.
+Last activity: 2026-11-11 — Registered quick task 261111-tf5 (coordinators in the observatory); plan revision 5 approved, execution starting.
 
 ## Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
+| 261111-tf5 | Coordinators in the observatory with team highlight, directive couriers and coordination signals | Registered; plan r5 approved, execution starting | [261111-tf5](./quick/261111-tf5-coordinators-in-the-observatory-with-tea/) |
 
 ## Quick Tasks Completed
 
