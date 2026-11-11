@@ -6,9 +6,10 @@ import type { CoordinationViewForPaint, TextPlate } from "./types.js";
 
 const NON_MEMBER_ALPHA = 0.35;
 const RING = { radius: 0.72, width: 2 };
-const CREST = { dx: 10, dy: 4, size: 4.5 };
+const CREST = { dx: 0, dy: -6, size: 4.5 };
 const STAR = { outer: 1.3, inner: 0.585, vertices: 10, alternate: 2, turn: Math.PI * 2 };
-const CLAIM_CHIP = { priority: 50, lift: 32, width: 150, size: 12 };
+// Priority sits below every sign and the desk badge (60) yet above the worktree detail plate (10).
+const CLAIM_CHIP = { priority: 40, gap: 1, width: 150, size: 12 };
 
 interface Claim {
   ticket: string;
@@ -78,26 +79,31 @@ export class TeamOverlays {
       );
     }
   };
-  // Claim chips sit under the worker; priority below the desk badge, so a collision drops the chip.
-  claimChips(plates: ChipPlates, options: { visible: (id: string) => boolean; color: string }) {
+  // Claim chips hang under the worker's foot labels: `below` is the lift of the lowest existing worker
+  // plate, and the chip starts just beneath it. Priority is lower than the desk badge and every sign,
+  // so a collision drops the chip.
+  claimChips(
+    plates: ChipPlates,
+    options: { visible: (id: string) => boolean; color: string; below: number },
+  ) {
     const chips: TextPlate[] = [];
     if (!this.byWorker) return chips;
     for (const region of this.view.anchors) {
       const member = this.byWorker.get(region.id);
       if (!member?.claim || !options.visible(region.id)) continue;
-      chips.push(
-        plates.textPlate(
-          plates.clipText(claimChipText(member.claim), CLAIM_CHIP.width, CLAIM_CHIP.size),
-          region.head.x,
-          region.foot + CLAIM_CHIP.lift,
-          {
-            accent: member.hue,
-            size: CLAIM_CHIP.size,
-            color: options.color,
-            priority: CLAIM_CHIP.priority,
-          },
-        ),
+      const plate = plates.textPlate(
+        plates.clipText(claimChipText(member.claim), CLAIM_CHIP.width, CLAIM_CHIP.size),
+        region.head.x,
+        region.foot + options.below,
+        {
+          accent: member.hue,
+          size: CLAIM_CHIP.size,
+          color: options.color,
+          priority: CLAIM_CHIP.priority,
+        },
       );
+      // textPlate bottom-anchors at foot + below; shift down one plate height so the top meets that line.
+      chips.push({ ...plate, y: plate.y + plate.h + CLAIM_CHIP.gap });
     }
     return chips;
   }

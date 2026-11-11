@@ -62,6 +62,7 @@ export class WorkerLabels<R extends SpriteResource, B extends R = R> {
     const overlays = this.view.framePaint.overlays;
     return overlays.teams.claimChips(this.view.plates, {
       color: this.view.C.dim,
+      below: DETAILS.lift,
       visible: (id) => {
         const worker = this.view.workerIndex.get(id);
         return !!worker && this.view.assemblyVisible(this.view.assemblyOwners.worker(worker));

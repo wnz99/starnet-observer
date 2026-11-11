@@ -10,7 +10,9 @@ import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import type { SceneArtRoleName } from "../../shared/scene-art-roles.js";
 import { SCENE_ART_ROLE_NAMES, SCENE_ART_ROLES } from "../../shared/scene-art-roles.js";
+import type { AppBus } from "../app/data.js";
 import { createMail } from "../mail.js";
+import { coordinationView } from "../model/coordination.js";
 import { createModel } from "../model.js";
 import type { LayoutRow } from "../model/types.js";
 import * as Scene from "../scene/index.js";
@@ -45,6 +47,7 @@ import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
 import type {
   AppearanceTheme,
+  CoordinationViewForPaint,
   ViewContext,
   ViewEvent,
   ViewOptions,
@@ -1031,6 +1034,145 @@ test("observer-view regression contracts", async () => {
     runtime.lifecycle.stop();
   }
   verifyAssemblyLabels();
+
+  function verifyTeamPaint() {
+    const key = "team_0123456789abcdef";
+    const coordination = coordinationView({
+      bus: {
+        coordination: {
+          teams: {
+            asOf: 1,
+            status: "available",
+            truncated: false,
+            sources: {},
+            projects: [
+              {
+                key,
+                label: "Project",
+                generation: "gen00001",
+                coordinator: "boss",
+                objective: "",
+                workers: [
+                  { agent: "member", status: "idle", claim: { ticket: "T-1", branch: "b" } },
+                ],
+                unobservedWorkers: 0,
+                grantExpiresAt: null,
+                instructions: null,
+                amendments: null,
+                decisions: [],
+                gates: [],
+              },
+            ],
+          },
+        } as unknown as NonNullable<AppBus["coordination"]>,
+      },
+      hostBus: {},
+      rowIds: new Set(["boss", "member", "stranger", "ghost"]),
+      previous: null,
+      now: 1,
+    });
+    const selected = present(coordination.teams[0]);
+    let paint: CoordinationViewForPaint = { view: coordination, team: selected };
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        reducedMotion: () => true,
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile(
+      ["boss", "member", "stranger", "ghost"].map((id) => ({
+        id,
+        projectId: "teams",
+        repoId: "teams",
+        status: "working",
+        ...(id === "member" ? { worktree: "wt-member" } : {}),
+        ...(id === "ghost" ? { shadow: true } : {}),
+      })),
+    );
+    const scene = Scene.build(layout.onPage(0), 0);
+    runtime.update(scene, { coordination: () => paint });
+    runtime.fx = false;
+    runtime.movement.step = () =>
+      scene.workers.map((worker) => ({
+        id: worker.id,
+        point: { ...worker.chair },
+        pose: "idle",
+        direction: "south",
+      }));
+    const real = runtime.crew.paintCrew.bind(runtime.crew);
+    const ctx = runtime.ctx,
+      stack: number[] = [],
+      peak = new Map<string, number>();
+    let current = "";
+    ctx.save = () => {
+      stack.push(ctx.globalAlpha);
+    };
+    ctx.restore = () => {
+      ctx.globalAlpha = present(stack.pop());
+    };
+    ctx.fill = () => {
+      peak.set(current, Math.max(peak.get(current) ?? 0, ctx.globalAlpha));
+    };
+    runtime.crew.paintCrew = (worker, actor, now, reduced) => {
+      current = worker.id;
+      const parent = ctx.globalAlpha;
+      real(worker, actor, now, reduced);
+      current = "";
+      assert.equal(ctx.globalAlpha, parent, "dimming restores the parent alpha");
+    };
+    runtime.framePaint.paint(100);
+    assert.ok(present(peak.get("member")) === 1, "members paint at full alpha");
+    assert.ok(Math.abs(present(peak.get("stranger")) - 0.35) < 1e-9, "non-members recede");
+    assert.ok(
+      Math.abs(present(peak.get("ghost")) - 0.35 * 0.45) < 1e-9,
+      "a shadow ghost composes with the dimming",
+    );
+    peak.clear();
+    paint = { view: coordination, team: null };
+    runtime.framePaint.paint(116);
+    assert.equal(peak.get("stranger"), 1, "no selected team leaves everyone at full alpha");
+
+    const member = present(scene.workers.find((worker) => worker.id === "member"));
+    runtime.anchors = [
+      {
+        id: member.id,
+        left: 690,
+        top: 400,
+        width: 20,
+        height: 60,
+        depth: 0,
+        head: { x: 700, y: 400 },
+        foot: 460,
+      },
+    ];
+    const { overlays } = runtime.framePaint;
+    overlays.teams.begin();
+    const labels = runtime.plates.workerLabels.collect({
+      tier: "detail",
+      selectedRepo: null,
+      isStale: false,
+      staleKeys: new Set(),
+    });
+    assert.deepEqual(
+      placePlates(labels)
+        .map((plate) => plate.text)
+        .sort(),
+      ["T-1 · b", "wt-member"],
+      "the claim chip and the worktree detail plate both survive placement",
+    );
+    runtime.lifecycle.stop();
+  }
+  verifyTeamPaint();
 
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),

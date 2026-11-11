@@ -113,7 +113,7 @@ describe("team overlays", () => {
       textPlate: (text: string, x: number, y: number, style: PlateStyle): TextPlate => ({
         text,
         x,
-        y,
+        y: y - 16,
         w: 80,
         h: 16,
         force: false,
@@ -122,15 +122,59 @@ describe("team overlays", () => {
       }),
       clipText: (text: string) => text,
     };
-    const chips = overlays.claimChips(plates, { color: "dim", visible: (id) => id !== "" });
+    const below = 18;
+    const chips = overlays.claimChips(plates, { color: "dim", visible: (id) => id !== "", below });
     expect(chips.map((chip) => chip.text)).toEqual(["T-1 · feat/x"]);
     const [chip] = chips;
     if (!chip) throw new Error("expected a chip");
     expect(chip.accent).toBe(teamFacts.hue);
-    expect(chip.priority).toBe(50);
-    expect(overlays.claimChips(plates, { color: "dim", visible: (id) => id === "" })).toEqual([]);
+    expect(chip.priority).toBeLessThan(44);
+    expect(
+      overlays.claimChips(plates, { color: "dim", visible: (id) => id === "", below }),
+    ).toEqual([]);
     const badge: TextPlate = { ...chip, text: "badge", priority: 60 };
     expect(placePlates([chip, badge]).map((plate) => plate.text)).toEqual(["badge"]);
     expect(placePlates([chip, { ...badge, y: chip.y + 40 }])).toHaveLength(2);
+    const sign: TextPlate = { ...chip, text: "sign", priority: 44 };
+    expect(placePlates([chip, sign]).map((plate) => plate.text)).toEqual(["sign"]);
+  });
+
+  test("claim chip sits below the worktree detail plate so both survive placement", () => {
+    const { overlays } = harness("none");
+    const plates = {
+      textPlate: (text: string, x: number, y: number, style: PlateStyle): TextPlate => ({
+        text,
+        x: x - 40,
+        y: y - 16,
+        w: 80,
+        h: 16,
+        force: false,
+        dash: null,
+        ...style,
+      }),
+      clipText: (text: string) => text,
+    };
+    const lift = 18;
+    const [chip] = overlays.claimChips(plates, { color: "dim", visible: () => true, below: lift });
+    if (!chip) throw new Error("expected a chip");
+    const detail = plates.textPlate("worktree", 100, 90 + lift, {
+      accent: "x",
+      size: 12,
+      color: "dim",
+      priority: 10,
+    });
+    expect(placePlates([chip, detail]).map((plate) => plate.text)).toEqual([
+      "T-1 · feat/x",
+      "worktree",
+    ]);
+    expect(chip.y).toBeGreaterThanOrEqual(detail.y + detail.h);
+  });
+
+  test("crests sit above the head", () => {
+    const { overlays, fills } = harness("none");
+    overlays.crests();
+    const headY = 50 / 2; // anchor head y over the camera zoom of 2
+    for (const fill of fills)
+      expect(Math.max(...fill.points.map((point) => point.y))).toBeLessThan(headY);
   });
 });
