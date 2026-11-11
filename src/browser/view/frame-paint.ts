@@ -94,8 +94,14 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     this.view.plates.paintPlates(isStale, staleKeys, now, animate);
     this.view.interaction.refreshBadgeHover();
 
+    this.wake(animate);
+
     return animate || assemblyAnimating;
   };
+  // Without a frame loop (reduced motion, stale) one timed repaint keeps time-based text current.
+  private wake(animate: boolean) {
+    this.view.lifecycle.wakeIn(animate ? null : this.view.coordinationSignals.nextChangeIn());
+  }
   private observations(now: number, animate: boolean) {
     for (const link of this.view.activeScene.links || [])
       this.view.effects.paintObservation(link, now, animate);

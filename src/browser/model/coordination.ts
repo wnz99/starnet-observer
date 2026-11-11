@@ -5,8 +5,8 @@ import { goldenHue } from "./hues.js";
 
 const TEAM_KEY = /^team_[a-f0-9]{16}$/;
 const GATE_LIMIT = 12;
-const FLASH_MS = 1200;
-const HANDOVER_MS = 2400;
+export const FLASH_MS = 1200;
+export const HANDOVER_MS = 2400;
 
 export interface TeamFacts {
   teamKey: string;

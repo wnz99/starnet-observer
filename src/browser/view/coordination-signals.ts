@@ -1,3 +1,4 @@
+import { FLASH_MS, HANDOVER_MS } from "../model/coordination.js";
 import type { CoordinationView, TeamFacts } from "../model/coordination.js";
 import { toScreen } from "../scene/index.js";
 import type { Camera, Point, PropExtent, Rect, Worker } from "../scene/types.js";
@@ -7,8 +8,6 @@ import type { DepthItem } from "./state-types.js";
 import type { CoordinationViewForPaint, PlateOptions, TextPlate, ViewContext } from "./types.js";
 
 const PENDING = "pending";
-const FLASH_MS = 1200;
-const HANDOVER_MS = 2400;
 const SECONDS = 1000;
 const CLOCK = { minute: 60, digits: 2 };
 const BEACON = {
@@ -84,7 +83,7 @@ function countdown(remaining: number) {
   const seconds = Math.ceil(remaining / SECONDS);
   return two(Math.floor(seconds / CLOCK.minute)) + ":" + two(seconds % CLOCK.minute);
 }
-function beaconText(facts: TeamFacts, wall: number) {
+function pendingOf(facts: TeamFacts) {
   let count = 0,
     earliest: number | null = null;
   for (const decision of facts.team.decisions) {
@@ -93,6 +92,11 @@ function beaconText(facts: TeamFacts, wall: number) {
     if (decision.deadlineAt !== null && (earliest === null || decision.deadlineAt < earliest))
       earliest = decision.deadlineAt;
   }
+  return { count, earliest };
+}
+const earliestDeadline = (facts: TeamFacts) => pendingOf(facts).earliest;
+function beaconText(facts: TeamFacts, wall: number) {
+  const { count, earliest } = pendingOf(facts);
   if (count === 0) return null;
   const head = "? " + String(count);
   if (earliest === null) return head;
@@ -175,6 +179,24 @@ export class CoordinationSignals {
     if (!paint || paint.view.teams.length === 0) return [];
     const wall = this.wall();
     return [...this.seatPlates(paint.view, wall), ...this.gatePlates(paint, wall, animate)];
+  }
+
+  /** Milliseconds until a plate's text next changes on its own (countdown tick, overdue, handover end), else null. */
+  nextChangeIn(): number | null {
+    const paint = this.view.coordination();
+    if (!paint || paint.view.teams.length === 0) return null;
+    const wall = this.wall();
+    let next = Infinity;
+    for (const { facts } of seatsOf(this.view, paint.view)) {
+      const deadline = earliestDeadline(facts);
+      if (deadline !== null && deadline > wall) {
+        const seconds = Math.ceil((deadline - wall) / SECONDS);
+        next = Math.min(next, deadline - (seconds - 1) * SECONDS - wall);
+      }
+      const elapsed = age(paint.view.handovers.get(facts.teamKey), wall);
+      if (elapsed >= 0 && elapsed < HANDOVER_MS) next = Math.min(next, HANDOVER_MS - elapsed);
+    }
+    return next === Infinity ? null : next;
   }
 
   private beacon(chair: Point, now: number, animate: boolean) {

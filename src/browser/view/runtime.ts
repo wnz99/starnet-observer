@@ -67,6 +67,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
     this.win = environment.win;
     this.raf = environment.raf;
     this.caf = environment.caf;
+    this.timers = environment.timers;
     this.dprOf = environment.dprOf;
     this.makeCanvas = environment.makeCanvas;
     this.clock = environment.clock;
@@ -113,6 +114,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   raf;
 
   caf;
+
+  timers;
 
   dprOf;
 

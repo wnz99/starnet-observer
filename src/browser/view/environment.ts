@@ -19,6 +19,12 @@ export function drawingEnvironment<R extends SpriteResource, B extends R>(
         if (!win.cancelAnimationFrame) throw new Error("Missing View animation cancellation");
         win.cancelAnimationFrame(frame);
       }),
+    timers: env.timers ?? {
+      after: (run: () => void, ms: number) => Number(setTimeout(run, ms)),
+      cancel: (id: number) => {
+        clearTimeout(id);
+      },
+    },
     dprOf: env.dpr ?? (() => win.devicePixelRatio || 1),
     makeCanvas:
       env.createCanvas ??

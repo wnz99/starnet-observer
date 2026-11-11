@@ -1301,6 +1301,63 @@ test("observer-view regression contracts", async () => {
   }
   verifySignalPaint();
 
+  // Reduced motion has no frame loop: the handover plate must still expire through one timed repaint.
+  function verifyReducedSignalRepaint() {
+    const { extras, update } = signalFixture(),
+      node = canvas(1440, 1000),
+      frames: ((now: number) => void)[] = [],
+      timers: { run: () => void; ms: number }[] = [],
+      realNow = Date.now.bind(Date),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => true,
+          env: {
+            raf: (fn) => frames.push(fn),
+            caf() {},
+            timers: { after: (run, ms) => timers.push({ run, ms }), cancel() {} },
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout();
+    layout.reconcile([]);
+    const scene = Scene.build(layout.onPage(0), 0, extras);
+    runtime.update(scene, update);
+    runtime.cameraControl.setCamera(
+      Scene.focus(scene.observatory.chair, scene.bounds, runtime.viewport),
+    );
+    runtime.lifecycle.start();
+    try {
+      frames.shift()?.(100);
+      const drawn = recordedCalls(node).fillText,
+        handover = "handover · gen gen00002";
+      assert(drawn.includes(handover), "the handover plate shows without animation");
+      assert.equal(timers.length, 1, "one timed repaint is scheduled, no frame loop");
+      assert.equal(frames.length, 0);
+      const [timer] = timers;
+      assert(timer && timer.ms > 0 && timer.ms <= 2400, "the wake lands within the plate lifetime");
+      Date.now = () => realNow() + 2500;
+      const painted = drawn.length;
+      timer.run();
+      assert.equal(frames.length, 1, "the timer invalidates the view");
+      frames[0]?.(200);
+      assert(
+        !drawn.slice(painted).includes(handover),
+        "the handover plate is gone after the timed repaint",
+      );
+      assert.equal(timers.length, 1, "nothing further to wake for");
+    } finally {
+      Date.now = realNow;
+      runtime.lifecycle.stop();
+    }
+  }
+  verifyReducedSignalRepaint();
+
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),
       runtime = new ViewRuntime(

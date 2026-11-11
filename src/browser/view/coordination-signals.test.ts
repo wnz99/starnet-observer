@@ -73,7 +73,7 @@ const chair = { x: 4, y: 5, z: 0 };
 const worker = { id: "boss", role: "coordinator", chair } as unknown as Worker;
 const screens = [0, 10].map((x) => ({ rect: { x, y: 0, w: 2, h: 1 }, height: 2 }));
 
-function harness(coordination: CoordinationView, wall = T0) {
+function harness(coordination: CoordinationView, wall = T0, selectedKey: string | null = null) {
   const glows: number[] = [],
     rings: { radius: number; hue: unknown }[] = [];
   const ctx = {
@@ -84,7 +84,10 @@ function harness(coordination: CoordinationView, wall = T0) {
   };
   let clock = wall;
   const view: SignalView = {
-    coordination: () => ({ view: coordination, team: null }),
+    coordination: () => ({
+      view: coordination,
+      team: coordination.teams.find((facts) => facts.teamKey === selectedKey) ?? null,
+    }),
     activeScene: { workers: [worker], observatory: { screens } },
     geometry: {
       glow: (_point, _radius, style) => {
@@ -185,6 +188,16 @@ describe("decision beacon", () => {
     expect(texts(both.animated())).toEqual(["? 1", "!"]);
   });
 
+  test("reports the next instant the plate text changes: countdown tick, then overdue, then never", () => {
+    const h = harness(viewOf(team({ decisions: [decision({ deadlineAt: T0 + 90_000 })] })));
+    expect(h.signals.nextChangeIn()).toBe(1000);
+    h.at(T0 + 89_500);
+    expect(h.signals.nextChangeIn()).toBe(500);
+    h.at(T0 + 90_000);
+    expect(h.signals.nextChangeIn()).toBeNull();
+    expect(harness(viewOf(team({ decisions: [decision({})] }))).signals.nextChangeIn()).toBeNull();
+  });
+
   test("a team without decisions paints nothing", () => {
     const h = harness(viewOf(team({})));
     expect(h.animated()).toEqual([]);
@@ -216,6 +229,33 @@ describe("gate monitors", () => {
     ]);
     const [left, right] = [plates[0], plates[3]];
     expect(Number(left?.x)).toBeLessThan(Number(right?.x));
+  });
+
+  test("the selected team's rows come first, ahead of newer rows of other teams", () => {
+    const other = team({ key: "team_fedcba9876543210", gates: [gate(5, "accepted", 90)] }),
+      mine = team({ gates: [gate(1, "submitted", 10)] }),
+      view = coordinationView({
+        bus: {
+          coordination: {
+            teams: {
+              asOf: 1,
+              status: "available",
+              truncated: false,
+              sources: {},
+              projects: [other, mine],
+            },
+          },
+        } as unknown as AppBus,
+        hostBus: {},
+        rowIds: new Set(["boss"]),
+        previous: null,
+        now: T0,
+      });
+    expect(texts(harness(view).animated())).toEqual(["#5 T-5 accepted", "#1 T-1 submitted"]);
+    expect(texts(harness(view, T0, KEY).animated())).toEqual([
+      "#1 T-1 submitted",
+      "#5 T-5 accepted",
+    ]);
   });
 
   test("the accepted flash shows for 1200 ms after the transition, only when animated, once", () => {
@@ -256,6 +296,15 @@ describe("handover", () => {
     const h = harness(handedOver);
     expect(texts(h.reduced())).toEqual(["handover · gen gen00002"]);
     expect(h.rings).toEqual([]);
+  });
+
+  test("the plate's expiry is the next change instant", () => {
+    const h = harness(handedOver);
+    expect(h.signals.nextChangeIn()).toBe(2400);
+    h.at(T0 + 1000);
+    expect(h.signals.nextChangeIn()).toBe(1400);
+    h.at(T0 + 2400);
+    expect(h.signals.nextChangeIn()).toBeNull();
   });
 
   test("no transition, no handover", () => {

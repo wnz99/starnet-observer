@@ -86,6 +86,25 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     if (this.view.running && !this.scheduled()) this.view.frame = this.view.raf(this.loop);
   };
 
+  // A single timed repaint keeps clock text current when no frame loop runs.
+  private wakeId: number | null = null;
+  wakeIn = (delayMs: number | null) => {
+    this.clearWake();
+    if (delayMs === null || !this.view.running) return;
+    this.wakeId = this.view.timers.after(
+      () => {
+        this.wakeId = null;
+        this.invalidate();
+      },
+      Math.max(0, delayMs),
+    );
+  };
+  private clearWake() {
+    if (this.wakeId === null) return;
+    this.view.timers.cancel(this.wakeId);
+    this.wakeId = null;
+  }
+
   loop = (now: number) => {
     this.view.frame = null;
     if (!this.view.running) return;
@@ -152,6 +171,7 @@ export class Lifecycle<R extends SpriteResource, B extends R = R> {
     this.view.clearSettlements();
     if (!this.view.running) return;
     this.view.running = false;
+    this.clearWake();
     if (this.view.frame !== null) this.view.caf(this.view.frame);
     this.view.frame = null;
     this.view.dirty = false;

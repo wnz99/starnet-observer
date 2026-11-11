@@ -156,6 +156,7 @@ export interface ViewEnvironment<R extends SpriteResource, B extends R = R> {
   window?: ViewWindow<R>;
   raf?: (callback: (now: number) => void) => number;
   caf?: (id: number) => void;
+  timers?: { after: (run: () => void, ms: number) => number; cancel: (id: number) => void };
   dpr?: () => number;
   createCanvas?: (w: number, h: number) => ViewCanvas<R> & R;
   sprites?: ViewSprites<R, B> | null;
