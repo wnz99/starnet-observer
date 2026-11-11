@@ -2126,6 +2126,312 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
     );
   }
 }
+// Team keys are literals: the installed-package sandbox holds no source modules to derive them from.
+const TEAM_ALPHA = "team_aaaaaaaaaaaaaaaa";
+const TEAM_BOREAL = "team_bbbbbbbbbbbbbbbb";
+const SEALED_SECRET = "sk-synthetic-never-published";
+const COORDINATION_IDS = {
+  alphaLead: "obs_" + "a".repeat(23) + "1",
+  alphaOne: "obs_" + "a".repeat(23) + "2",
+  alphaTwo: "obs_" + "a".repeat(23) + "3",
+  borealLead: "obs_" + "b".repeat(23) + "1",
+  borealOne: "obs_" + "b".repeat(23) + "2",
+  borealTwo: "obs_" + "b".repeat(23) + "3",
+};
+function coordinationRow(
+  id: string,
+  seat: { room: string; title: string; host?: string },
+  observedAt: number,
+) {
+  const base = snapshot().sessions[0];
+  assert.ok(base);
+  return {
+    ...base,
+    id,
+    identity: "codex:" + id.slice(4, 12).padEnd(8, "0") + "-1111-1111-1111-111111111111",
+    project: seat.room,
+    projectId: "project_" + seat.room.toLowerCase(),
+    repo: seat.room.toLowerCase() + "-repo",
+    repoId: "repo_" + seat.room.toLowerCase(),
+    checkoutId: "checkout_" + id.slice(-8),
+    title: seat.title,
+    paneId: "w1:p" + id.slice(-1),
+    observedAt,
+    ...(seat.host ? { host: seat.host } : {}),
+  };
+}
+// The synthetic station has a local team and a cross-machine team whose coordinator runs on the host named buildbox.
+// The workers' machine stores that team's gate and grant, so the local half of it carries both.
+function coordinationSnapshot() {
+  const data = snapshot();
+  const now = data.observedAt;
+  const ids = COORDINATION_IDS;
+  data.sessions = [
+    coordinationRow(ids.alphaLead, { room: "Aurora", title: "Alpha coordinator" }, now),
+    coordinationRow(ids.alphaOne, { room: "Aurora", title: "Alpha worker one" }, now),
+    coordinationRow(ids.alphaTwo, { room: "Cedar", title: "Alpha worker two" }, now),
+    coordinationRow(
+      ids.borealLead,
+      { room: "Borealis", title: "Boreal coordinator", host: "buildbox" },
+      now,
+    ),
+    coordinationRow(ids.borealOne, { room: "Aurora", title: "Boreal worker one" }, now),
+    coordinationRow(ids.borealTwo, { room: "Cedar", title: "Boreal worker two" }, now),
+  ];
+  const team = (over: Record<string, unknown>) => ({
+    generation: "gen00001abcdef",
+    objective: "",
+    workers: [],
+    unobservedWorkers: 0,
+    grantExpiresAt: null,
+    instructions: 0,
+    amendments: 0,
+    decisions: [],
+    gates: [],
+    ...over,
+  });
+  const teams = (projects: unknown[]) => ({
+    asOf: now,
+    status: "available",
+    truncated: false,
+    sources: Object.fromEntries(
+      [
+        "enrollments",
+        "grants",
+        "consents",
+        "claims",
+        "gates",
+        "decisions",
+        "instructions",
+        "amendments",
+        "directives",
+      ].map((source) => [source, true]),
+    ),
+    projects,
+  });
+  const bus = (projects: unknown[], messages: unknown[] = []) => ({
+    health: "available",
+    reason: null,
+    observedAt: now,
+    window: 100,
+    messages,
+    coordination: { teams: teams(projects) },
+  });
+  const alpha = team({
+    key: TEAM_ALPHA,
+    label: "Aurora launch",
+    coordinator: ids.alphaLead,
+    objective: "Ship the Aurora launch with " + "[redacted]" + " credentials rotated",
+    workers: [
+      { agent: ids.alphaOne, status: "claimed", claim: { ticket: "AUR-1", branch: "feat/aurora" } },
+      { agent: ids.alphaTwo, status: "idle" },
+    ],
+    grantExpiresAt: now + 7200000,
+    instructions: 2,
+    amendments: 1,
+    latestInstruction: {
+      audience: "worker",
+      kind: "set",
+      text: "Keep commits small",
+      recordedAt: now - 60000,
+    },
+    decisions: [
+      {
+        class: "scope",
+        status: "pending",
+        question: "Include the beta cohort?",
+        createdAt: now - 120000,
+        deadlineAt: now + 900000,
+      },
+    ],
+  });
+  const borealLocal = team({
+    key: TEAM_BOREAL,
+    label: "Boreal build",
+    generation: "gen00002abcdef",
+    coordinator: "external",
+    workers: [
+      {
+        agent: ids.borealOne,
+        status: "claimed",
+        claim: { ticket: "BOR-7", branch: "feat/boreal" },
+      },
+      { agent: ids.borealTwo, status: "idle" },
+    ],
+    grantExpiresAt: now + 3600000,
+    gates: [
+      {
+        pr: 7,
+        ticket: "BOR-7",
+        status: "accepted",
+        submittedAt: now - 90000,
+        decidedAt: now - 30000,
+      },
+    ],
+  });
+  const borealRemote = team({
+    key: TEAM_BOREAL,
+    label: "Boreal build",
+    generation: "gen00002abcdef",
+    coordinator: ids.borealLead,
+    objective: "Ship Boreal",
+    workers: [{ agent: "external", status: "idle" }],
+  });
+  const sealed = {
+    id: 1,
+    identity: "mail_" + "1".padStart(64, "0"),
+    from: ids.alphaLead,
+    to: ids.alphaOne,
+    sentAt: new Date(now).toISOString(),
+    acknowledgedAt: null,
+    wake: "requested",
+    coordination: "sealed",
+  };
+  Reflect.set(data.sources.hosts, "buildbox", {
+    health: "available",
+    observedAt: now,
+    reason: null,
+    agents: 1,
+  });
+  const { local } = data.sources.hosts;
+  local.agents = 5;
+  return {
+    ...data,
+    bus: bus([alpha, borealLocal], [sealed]),
+    hostBus: { buildbox: bus([borealRemote]) },
+  };
+}
+interface TeamProbe {
+  framePaint: {
+    overlays: { teams: { selected: { teamKey: string; memberIds: Set<string> } | null } };
+  };
+  regions: { left: number; top: number; width: number; height: number; id: string }[];
+  activeScene: { workers: { id: string; role: string }[] };
+}
+async function coordinatorObservatory(
+  browser: Browser,
+  root: string,
+  http: HttpModule,
+  artifacts: string,
+) {
+  const original = await fs.readFile(path.join(root, "dist/public/app/main.js"), "utf8");
+  const marker = "framePaint = new FramePaint(this);";
+  assert.equal(
+    original.split(marker).length,
+    2,
+    "emitted view instrumentation has one known entry",
+  );
+  const injected = original.replace(
+    marker,
+    "framePaint = (window.__view = this, new FramePaint(this));",
+  );
+  const reads: number[] = [];
+  const fixture = await listen(http, {
+    token: TOKEN,
+    observer: {
+      get: coordinationSnapshot,
+      inspect: () => ({ health: "unavailable", turns: [] }),
+      inspectMessage: (id) => {
+        reads.push(id);
+        return { id, health: "unavailable" };
+      },
+    },
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: "reduce",
+  });
+  const errors = observeErrors(page);
+  const ids = COORDINATION_IDS;
+  const members = () =>
+    page.evaluate(() => {
+      const view = Reflect.get(window, "__view") as TeamProbe;
+      const { framePaint } = view;
+      const { overlays } = framePaint;
+      const { selected } = overlays.teams;
+      return selected && { key: selected.teamKey, ids: [...selected.memberIds].sort() };
+    });
+  const clickSprite = async (id: string) => {
+    await expect
+      .poll(() =>
+        page.evaluate(
+          (wanted) =>
+            (Reflect.get(window, "__view") as TeamProbe).regions.find((r) => r.id === wanted)?.id,
+          id,
+        ),
+      )
+      .toBe(id);
+    const target = await page.evaluate((wanted) => {
+      const region = (Reflect.get(window, "__view") as TeamProbe).regions.find(
+        (r) => r.id === wanted,
+      );
+      return region && { x: region.left + region.width / 2, y: region.top + region.height * 0.75 };
+    }, id);
+    const box = await page.locator("canvas").boundingBox();
+    assert.ok(target && box);
+    await page.mouse.click(box.x + target.x, box.y + target.y);
+  };
+  try {
+    await page.route("**/app/main.js", (route) =>
+      route.fulfill({ body: injected, contentType: "text/javascript" }),
+    );
+    await page.goto(fixture.url);
+    await page.waitForFunction(() => Reflect.get(window, "__view") !== undefined);
+    await page.evaluate(() => document.fonts.ready);
+    const seated = () =>
+      page.evaluate(() =>
+        (Reflect.get(window, "__view") as TeamProbe).activeScene.workers
+          .filter((worker) => worker.role === "coordinator")
+          .map((worker) => worker.id)
+          .sort(),
+      );
+    await expect.poll(seated).toEqual([ids.alphaLead, ids.borealLead].sort());
+    await capture(page, path.join(artifacts, "coordinator-bench.png"));
+
+    await clickSprite(ids.alphaLead);
+    await expect.poll(members).toEqual({
+      key: TEAM_ALPHA,
+      ids: [ids.alphaLead, ids.alphaOne, ids.alphaTwo].sort(),
+    });
+    const panel = page.locator("dialog[open]");
+    await expect(panel).toContainText("Coordination · Aurora launch");
+    await expect(panel).toContainText("Include the beta cohort?");
+    await expect(panel).toContainText("AUR-1 on feat/aurora");
+    await expect(panel).not.toContainText(SEALED_SECRET);
+    await clickSprite(ids.alphaLead);
+    await expect(panel).toHaveCount(1);
+    await expect(panel).toContainText("Coordination · Aurora launch");
+
+    // The docked panel covers the second bench seat at this width, so dismiss it as a user would.
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect.poll(members).toBe(null);
+    await clickSprite(ids.borealLead);
+    await expect
+      .poll(members)
+      .toEqual({ key: TEAM_BOREAL, ids: [ids.borealLead, ids.borealOne, ids.borealTwo].sort() });
+    await expect(panel).toContainText("Coordination · Boreal build");
+    await expect(panel).toContainText("PR #7 · BOR-7 · accepted");
+    await expect(panel).toContainText("BOR-7 on feat/boreal");
+    await capture(page, path.join(artifacts, "coordinator-team-panel.png"));
+    assert.deepEqual(reads, [], "coordination panel never reads message bodies");
+
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect.poll(members).toBe(null);
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+    fixture.server.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      fixture.server.close(() => {
+        resolve();
+      }),
+    );
+  }
+}
 async function assemblyInput(
   page: Page,
   fresh: () => Promise<void>,
@@ -2541,6 +2847,7 @@ async function runBrowserConsumer(root: string) {
     const stableRefresh = await refreshContinuity(browser, root, http, artifacts);
     const annexes = await nativeCanvas(browser, root, http, artifacts);
     await mailroomDetails(browser, http, artifacts);
+    await coordinatorObservatory(browser, root, http, artifacts);
     await fs.mkdir(artifacts, { recursive: true });
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1000 },
@@ -2593,6 +2900,12 @@ async function runBrowserConsumer(root: string) {
       staleProof: true,
       panelsAndFocus: true,
       mailroomCoordinationAndReplies: true,
+      coordinatorObservatory: {
+        benchSeats: true,
+        crossMachineTeamSelection: true,
+        panelRedactedNoBodyReads: true,
+        screenshots: ["coordinator-bench.png", "coordinator-team-panel.png"],
+      },
       hostTabs: true,
       screenshotContext:
         "Fresh 1440x1000 contexts, reduced motion, no stored preferences; capture before interactions after fonts and paint. Fixture adds empty remote dock; old baseline differs in geometry and FX, so no exact pixel-parity claim.",
