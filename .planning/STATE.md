@@ -29,13 +29,13 @@ See: .planning/PROJECT.md (updated 2026-10-14)
 Phase: None (0 planned)
 Plan: None
 Status: Helper recovery and occupied-link implementation and independent aggregate/initial PR review complete; revision-2 conformance found no gaps. PR #21 awaits final tracking-head review, CI and merge.
-Last activity: 2026-11-11 — Registered quick task 261111-tf5 (coordinators in the observatory); plan revision 5 approved, execution starting.
+Last activity: 2026-11-12 — Quick task 261111-tf5 (coordinators in the observatory) implemented and independently reviewed; aggregate review approved; `bun run check` passed with 419 core tests and the Chromium consumers; PR review pending.
 
 ## Registered Work
 
 | # | Description | Status | Directory |
 | --- | --- | --- | --- |
-| 261111-tf5 | Coordinators in the observatory with team highlight, directive couriers and coordination signals | Registered; plan r5 approved, execution starting | [261111-tf5](./quick/261111-tf5-coordinators-in-the-observatory-with-tea/) |
+| 261111-tf5 | Coordinators in the observatory with team highlight, directive couriers and coordination signals | Implemented (10 tasks, independently reviewed); aggregate review approved, conformance and full `bun run check` passed; PR review pending | [261111-tf5](./quick/261111-tf5-coordinators-in-the-observatory-with-tea/) |
 
 ## Quick Tasks Completed
 
