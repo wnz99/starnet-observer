@@ -57,6 +57,7 @@ export class Floor {
     this.presentationKey = key;
     return changed;
   }
+  benchHost = (id: string) => this.seats.find((seat) => seat.row.id === id)?.host ?? null;
   reset() {
     this.sceneKey = null;
     this.generation++;

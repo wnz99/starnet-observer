@@ -118,7 +118,9 @@ function describeTeam(input: {
     Workers: workerLines(team, sources, input.rowFor),
     Grants: [
       "Earliest grant expiry: " +
-        (missing(sources, "grants") && team.grantExpiresAt === null
+        // The sidecar nulls the expiry when either the grants or the consents could not be read.
+        ((missing(sources, "grants") || missing(sources, "consents")) &&
+        team.grantExpiresAt === null
           ? UNAVAILABLE
           : until(team.grantExpiresAt, now)),
     ],

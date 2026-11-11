@@ -1,4 +1,4 @@
-import { busRecord } from "./types.js";
+import { boundedIds, busRecord } from "./types.js";
 import { OPERATIONS, usable } from "./teams-grants.js";
 import { scoped, text } from "./teams-types.js";
 import type { Reader } from "./teams-reader.js";
@@ -98,7 +98,10 @@ export function classify(reader: Reader, facts: Facts, window: readonly Mail[]) 
   if (window.length === 0) return kinds;
   const ids = window.map((mail) => mail.id);
   const directives = reader.load("directives", {
-    sql: "SELECT c.message_id, substr(c.metadata_json,1,?) metadata, m.recipient_scope FROM coordination_messages c JOIN messages m ON m.id = c.message_id WHERE c.message_id BETWEEN ? AND ? ORDER BY c.message_id DESC",
+    sql:
+      "SELECT c.message_id, substr(c.metadata_json,1,?) metadata, " +
+      boundedIds("m.recipient_scope") +
+      " FROM coordination_messages c JOIN messages m ON m.id = c.message_id WHERE c.message_id BETWEEN ? AND ? ORDER BY c.message_id DESC",
     params: [METADATA_CHARS, Math.min(...ids), Math.max(...ids)],
     limit: DIRECTIVE_ROWS,
   });

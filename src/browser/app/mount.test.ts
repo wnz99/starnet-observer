@@ -319,6 +319,23 @@ test("selecting a coordinator through the view opens its coordination panel and 
   expect(probe.page.document.dialogOpen(panels()[0] as AppFixtureNode)).toBeTrue();
   app.dispose();
 });
+test("picking a coordinator in the roster opens its panel once, never toggling it shut", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const rowFor = (id: string) =>
+    probe.page.document
+      .querySelectorAll(probe.page.document.body, ".session-row")
+      .find((node) => node.dataset.sessionId === id);
+  const worker = rowFor("w1");
+  worker?.click();
+  expect(panels()).toHaveLength(0);
+  const coordinator = rowFor("c1");
+  if (!coordinator) throw new Error("Expected the coordinator roster row");
+  coordinator.click();
+  expect(panels()).toHaveLength(1);
+  rowFor("c1")?.click();
+  expect(panels()).toHaveLength(1);
+  app.dispose();
+});
 test("selecting an ordinary worker opens no coordination panel", async () => {
   const { app, select, panels } = await mountedTeam();
   select("w1");

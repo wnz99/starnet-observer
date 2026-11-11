@@ -4,7 +4,7 @@ import type { createControls } from "./controls.js";
 import type { AppNode } from "./dom.js";
 import { Ledger } from "./ledger.js";
 import type { AppCore } from "./mount-core.js";
-import type { MountLinks } from "./mount-view.js";
+import { openCoordination, type MountLinks } from "./mount-view.js";
 import type { Navigation } from "./navigation.js";
 import { Overlays } from "./overlays.js";
 import { PanelAdapter } from "./panel-adapter.js";
@@ -112,8 +112,10 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
       controls,
       panels: panelAccess,
       enabled: bootstrap.control,
+      // A roster pick of a coordinator opens its panel exactly as a canvas click does.
       select: (id) => {
         navigationOwner.select(id);
+        openCoordination(this.core, this.links, id);
       },
       toggleRepository: (repo) => {
         navigationOwner.toggleRepository(repo);

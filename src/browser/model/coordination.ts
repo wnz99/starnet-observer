@@ -1,10 +1,8 @@
-import type { CoordinationTeam } from "../../shared/teams.js";
+import { GATE_LIMIT, TEAM_KEY, type CoordinationTeam } from "../../shared/teams.js";
 import type { AppBus } from "../app/data.js";
 import { record } from "../theme/validation.js";
 import { goldenHue } from "./hues.js";
 
-const TEAM_KEY = /^team_[a-f0-9]{16}$/;
-const GATE_LIMIT = 12;
 export const FLASH_MS = 1200;
 export const HANDOVER_MS = 2400;
 

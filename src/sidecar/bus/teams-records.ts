@@ -4,7 +4,7 @@ import {
   INSTRUCTION_AUDIENCES,
   INSTRUCTION_KINDS,
 } from "../../shared/teams.js";
-import { TEAM_LIMITS, isListed } from "./types.js";
+import { TEAM_LIMITS, boundedIds, isListed } from "./types.js";
 import type { RawTeam } from "./types.js";
 import { usable } from "./teams-grants.js";
 import { instant, scoped, text, texts } from "./teams-types.js";
@@ -51,7 +51,10 @@ export function readGates(reader: Reader, byProject: Map<string, Project>) {
   const seen = new Set<string>();
   const entries: [string, Gate][] = [];
   const rows = reader.load("gates", {
-    sql: "SELECT scope, project_id, generation, pr, substr(ticket,1,?) ticket, status, submitted_at, decided_at FROM coordination_gate_records ORDER BY submitted_at DESC",
+    sql:
+      "SELECT " +
+      boundedIds("scope", "project_id", "generation", "status") +
+      ", pr, substr(ticket,1,?) ticket, submitted_at, decided_at FROM coordination_gate_records ORDER BY submitted_at DESC",
     params: [READ],
     limit: GATE_ROWS,
   });
@@ -85,7 +88,10 @@ function decisionOf(row: Row): Decision | null {
 // Open decisions of the project's current generation, capped per team. decision_id is never read.
 export function readDecisions(reader: Reader, byProject: Map<string, Project>) {
   const rows = reader.load("decisions", {
-    sql: "SELECT scope, project_id, generation, substr(class,1,?) class, worker, substr(question,1,?) question, status, created_at, deadline_at FROM coordination_decisions WHERE status IN ('pending','defaulted') ORDER BY created_at DESC",
+    sql:
+      "SELECT " +
+      boundedIds("scope", "project_id", "generation", "worker", "status") +
+      ", substr(class,1,?) class, substr(question,1,?) question, created_at, deadline_at FROM coordination_decisions WHERE status IN ('pending','defaulted') ORDER BY created_at DESC",
     params: [READ, READ],
     limit: DECISION_ROWS,
   });

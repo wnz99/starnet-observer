@@ -168,6 +168,15 @@ test("grant expiry and unobserved count stay visible when merged halves supplied
   expect(harness(teamOf(), down).text()).toContain("Not observed: unavailable");
 });
 
+test("grant expiry reads unavailable when only the consents are unreadable", () => {
+  expect(harness(teamOf(), { consents: false }).text()).toContain(
+    "Earliest grant expiry: unavailable",
+  );
+  expect(
+    harness(teamOf({ grantExpiresAt: NOW + 2 * 3600000 }), { consents: false }).text(),
+  ).toContain("Earliest grant expiry: in 2h");
+});
+
 test("an empty roster reads no observed workers, whatever the sources", () => {
   const text = harness(teamOf(), { grants: false, consents: false }).text();
   expect(text).toContain("No observed workers");

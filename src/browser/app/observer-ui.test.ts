@@ -5001,6 +5001,11 @@ test("a team observed across machines seats its remote coordinator and merges ga
     const seat = present(h.frame().scene.workers.find((worker) => worker.role === "coordinator"));
     assert.equal(seat.id, "bc");
     assert.equal(seat.row.host, "B", "the seat's mail host equals its row host");
+    // AC1.2: the bench label and hover name the host.
+    const options = h.viewOptions();
+    assert.match(present(options.nameFor)("bc"), /@B$/);
+    assert.match(present(options.hoverLabel)("bc"), /@B/);
+    assert.doesNotMatch(present(options.nameFor)("w1"), /@/);
     assert.deepEqual(h.seated(), ["bc"]);
     assert.equal(h.frame().scene.workers.filter((worker) => worker.id === "bc").length, 1);
     h.select("bc");

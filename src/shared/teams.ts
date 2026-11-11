@@ -1,3 +1,5 @@
+export const TEAM_KEY = /^team_[a-f0-9]{16}$/;
+export const GATE_LIMIT = 12;
 export const TEAM_SOURCES = [
   "enrollments",
   "grants",

@@ -1,4 +1,5 @@
 import type { ObserverRow, ObserverSnapshot } from "../../shared/observer.js";
+import { GATE_LIMIT, TEAM_KEY } from "../../shared/teams.js";
 type PublicBus = NonNullable<ObserverSnapshot["bus"]>;
 export type Relay = NonNullable<PublicBus["messages"][number]["relay"]>;
 export interface BusRow {
@@ -49,7 +50,7 @@ export const TEAM_LIMITS = {
   projects: 16,
   workers: 48,
   decisions: 8,
-  gates: 12,
+  gates: GATE_LIMIT,
   label: 160,
   objective: 512,
   question: 240,
@@ -61,7 +62,20 @@ export const TEAM_LIMITS = {
   rawUnits: 4096,
 };
 export const GENERATION_PREFIX = 8;
-export const TEAM_KEY = /^team_[a-f0-9]{16}$/;
+// SQL select list that bounds identifier columns at the transport limit, so no row can load an unbounded value.
+export const boundedIds = (...columns: string[]): string =>
+  columns
+    .map(
+      (column) =>
+        "substr(" +
+        column +
+        ",1," +
+        String(TEAM_LIMITS.rawUnits) +
+        ") " +
+        (column.split(".").pop() ?? column),
+    )
+    .join(", ");
+export { TEAM_KEY };
 type PublicTeams = NonNullable<NonNullable<PublicBus["coordination"]>["teams"]>;
 // Raw worker-side shape: addresses are unprojected, text is pre-redaction, and unobservedWorkers is emitted by the local worker only when more than 48 workers are enrolled, or arrives on remote input.
 export type RawTeam = Omit<PublicTeams["projects"][number], "unobservedWorkers"> & {

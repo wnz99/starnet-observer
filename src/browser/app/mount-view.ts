@@ -29,7 +29,7 @@ export interface MountLinks<N extends AppNode, R extends SpriteResource> {
   ledger?: Ledger<N, R>;
 }
 // Opens, never toggles: a repeat select or the double-click path fires onSelect again and must keep the panel.
-function openCoordination<N extends AppNode, R extends SpriteResource, B extends R>(
+export function openCoordination<N extends AppNode, R extends SpriteResource, B extends R>(
   core: AppCore<N, R, B>,
   links: MountLinks<N, R>,
   id: string,
@@ -110,6 +110,11 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
   links: MountLinks<N, R>,
 ): Pick<ViewOptions<R, B>, "hoverLabel" | "idleLevel" | "idleVigour" | "nameFor"> {
   const { state, options, format } = core;
+  // A remote coordinator on the observatory bench has lost its host's room, so its labels name the host.
+  const hostTag = (id: string) => {
+    const host = links.floor?.benchHost(id);
+    return host ? " @" + host : "";
+  };
   return {
     // Read every frame, so a title Herdr publishes later replaces the fallback throughout the hover.
     hoverLabel: (id) => {
@@ -118,6 +123,7 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
       if (row)
         return (
           state.model.hoverLabel(row, state.rowStale(row), options.clock.now()) +
+          hostTag(id) +
           (carried ? " · on relay (" + carried.repo + ")" : "")
         );
       const ghost = links.floor?.shadows.get(id); // a relay roster entry: what llm-bus lists, nothing observed
@@ -143,7 +149,7 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
     },
     nameFor: (id) => {
       const row = state.byId.get(id);
-      if (row) return format.workerName(row);
+      if (row) return format.workerName(row) + hostTag(id);
       const ghost = links.floor?.shadows.get(id);
       return ghost ? (PROVIDERS[ghost.provider ?? ""] || "Agent") + " · " + ghost.machine : "";
     },

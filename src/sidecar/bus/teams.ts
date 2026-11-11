@@ -1,6 +1,6 @@
 import { TEAM_SOURCES } from "../../shared/teams.js";
 import type { SnapshotDatabase } from "../sqlite/snapshots.js";
-import { GENERATION_PREFIX, TEAM_LIMITS } from "./types.js";
+import { GENERATION_PREFIX, TEAM_LIMITS, boundedIds } from "./types.js";
 import type { RawTeam, RawTeams } from "./types.js";
 import { parseConsents, parseGrants } from "./teams-grants.js";
 import { classify } from "./teams-kinds.js";
@@ -37,7 +37,10 @@ function unavailable(asOf: number): Selection {
 function readFacts(reader: Reader, projects: Project[], asOf: number): Facts {
   const enrollments = parseEnrollments(
     reader.load("enrollments", {
-      sql: "SELECT scope, project_id, address, role, generation FROM coordination_enrollments",
+      sql:
+        "SELECT " +
+        boundedIds("scope", "project_id", "address", "role", "generation") +
+        " FROM coordination_enrollments",
       params: [],
       limit: ROW_LIMIT,
       strict: true,
@@ -45,7 +48,10 @@ function readFacts(reader: Reader, projects: Project[], asOf: number): Facts {
   );
   const grants = parseGrants(
     reader.load("grants", {
-      sql: "SELECT grant_id, scope, project_id, recipient, generation, coordinator, substr(operations_json,1,?) operations, expires_at FROM coordination_grants WHERE revoked_at IS NULL",
+      sql:
+        "SELECT " +
+        boundedIds("grant_id", "scope", "project_id", "recipient", "generation", "coordinator") +
+        ", substr(operations_json,1,?) operations, expires_at FROM coordination_grants WHERE revoked_at IS NULL",
       params: [TEAM_LIMITS.readChars],
       limit: ROW_LIMIT,
       strict: true,
@@ -54,7 +60,10 @@ function readFacts(reader: Reader, projects: Project[], asOf: number): Facts {
   );
   const consents = parseConsents(
     reader.load("consents", {
-      sql: "SELECT c.grant_id, c.address, c.ended_at IS NULL AS open FROM coordination_session_consents c JOIN coordination_grants g ON g.grant_id = c.grant_id WHERE g.revoked_at IS NULL",
+      sql:
+        "SELECT " +
+        boundedIds("c.grant_id", "c.address") +
+        ", c.ended_at IS NULL AS open FROM coordination_session_consents c JOIN coordination_grants g ON g.grant_id = c.grant_id WHERE g.revoked_at IS NULL",
       params: [],
       limit: ROW_LIMIT,
       strict: true,
@@ -74,7 +83,10 @@ function readFacts(reader: Reader, projects: Project[], asOf: number): Facts {
 function readClaims(reader: Reader) {
   return parseClaims(
     reader.load("claims", {
-      sql: "SELECT address, scope, project_id, substr(ticket,1,?) ticket, substr(branch,1,?) branch FROM coordination_claims",
+      sql:
+        "SELECT " +
+        boundedIds("address", "scope", "project_id") +
+        ", substr(ticket,1,?) ticket, substr(branch,1,?) branch FROM coordination_claims",
       params: [READ, READ],
       limit: ROW_LIMIT,
     }),
@@ -135,7 +147,10 @@ export function selectTeams(
 ): Selection {
   const reader = new Reader(database);
   const rows = reader.read({
-    sql: "SELECT scope, project_id, substr(label,1,?) label, substr(generation,1,?) generation, coordinator, substr(objective,1,?) objective FROM coordination_projects WHERE revoked_at IS NULL ORDER BY rowid DESC",
+    sql:
+      "SELECT " +
+      boundedIds("scope", "project_id", "coordinator") +
+      ", substr(label,1,?) label, substr(generation,1,?) generation, substr(objective,1,?) objective FROM coordination_projects WHERE revoked_at IS NULL ORDER BY rowid DESC",
     params: [READ, GENERATION_CHARS, READ],
     limit: TEAM_LIMITS.projects,
   });
