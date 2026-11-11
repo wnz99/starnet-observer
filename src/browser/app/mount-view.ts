@@ -28,6 +28,31 @@ export interface MountLinks<N extends AppNode, R extends SpriteResource> {
   floor?: Floor;
   ledger?: Ledger<N, R>;
 }
+// Opens, never toggles: a repeat select or the double-click path fires onSelect again and must keep the panel.
+function openCoordination<N extends AppNode, R extends SpriteResource, B extends R>(
+  core: AppCore<N, R, B>,
+  links: MountLinks<N, R>,
+  id: string,
+) {
+  const { state, ui } = core;
+  const facts = state.selectedTeam();
+  if (!facts || state.selected !== id || state.presentation()) return;
+  const target = {
+    kind: "coordination",
+    id: facts.teamKey,
+    identity: facts.team.generation,
+  } as const;
+  if (!links.panels?.isOpenTarget(target)) links.panels?.togglePanel(target, ui.get("world"));
+}
+function selectAndOpenTeam<N extends AppNode, R extends SpriteResource, B extends R>(
+  core: AppCore<N, R, B>,
+  links: MountLinks<N, R>,
+  id: string,
+) {
+  if (core.state.disposed) return;
+  links.navigation?.select(id, { scroll: true });
+  openCoordination(core, links, id);
+}
 function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   core: AppCore<N, R, B>,
   links: MountLinks<N, R>,
@@ -46,7 +71,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   const { state, descriptions, ui } = core;
   return {
     onSelect: (id) => {
-      if (!state.disposed) links.navigation?.select(id, { scroll: true });
+      selectAndOpenTeam(core, links, id);
     },
     onObservatory: () => {
       links.overlays?.observatoryClicked();

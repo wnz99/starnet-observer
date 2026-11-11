@@ -190,7 +190,11 @@ export class PanelStack<N extends AppNode, R extends SpriteResource> {
   }
   roster(kind: "agent" | "mail") {
     for (const entry of this.entries)
-      if (entry.target.kind === kind || (kind === "mail" && entry.target.kind === "bus"))
+      if (
+        entry.target.kind === kind ||
+        (kind === "mail" && entry.target.kind === "bus") ||
+        (kind === "agent" && entry.target.kind === "coordination")
+      )
         entry.view.roster();
   }
   suspend() {

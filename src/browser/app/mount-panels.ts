@@ -54,7 +54,9 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
           ? (this.links.roster?.inspectTrigger(target.id) ?? null)
           : target.kind === "mail"
             ? (this.links.ledger?.readTrigger(target.id) ?? null)
-            : ui.get("mail-title"),
+            : target.kind === "coordination"
+              ? ui.get("world")
+              : ui.get("mail-title"),
       closeHelp: () => {
         this.links.overlays?.closeHelp();
       },

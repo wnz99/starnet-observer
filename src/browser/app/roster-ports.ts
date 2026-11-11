@@ -20,7 +20,13 @@ export interface BusTarget {
   id: string;
   identity: string;
 }
-export type PanelTarget = AgentTarget | MailTarget | BusTarget;
+// id is the browser team key; identity is the team's generation, so a handover is a different exact target.
+export interface CoordinationTarget {
+  kind: "coordination";
+  id: string;
+  identity: string;
+}
+export type PanelTarget = AgentTarget | MailTarget | BusTarget | CoordinationTarget;
 export interface RosterPanels<N extends AppNode> {
   agentTarget(row: AppRow): AgentTarget | null;
   panelFor(target: PanelTarget | null): { root: N } | null;

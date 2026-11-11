@@ -9,7 +9,8 @@ import type { AgentTarget, MailTarget, PanelTarget } from "./roster-ports.js";
 import type { AppState } from "./state.js";
 import { NodeEvents, type AppUi } from "./ui.js";
 import { createBusPanel } from "./bus-panel.js";
-import type { BusTarget } from "./roster-ports.js";
+import { createCoordinationPanel } from "./coordination-panel.js";
+import type { BusTarget, CoordinationTarget } from "./roster-ports.js";
 
 interface AdapterOptions<N extends AppNode, R extends SpriteResource> {
   ui: AppUi<N, R>;
@@ -30,7 +31,23 @@ export class PanelAdapter<N extends AppNode, R extends SpriteResource> {
       ? this.agent(target, serial)
       : target.kind === "bus"
         ? this.bus(target, serial)
-        : this.mail(target, serial);
+        : target.kind === "coordination"
+          ? this.coordination(target, serial)
+          : this.mail(target, serial);
+  }
+  private coordination(target: CoordinationTarget, serial: number) {
+    const shell = buildMailPanel(this.options.ui.document, serial, "team");
+    let entry: PanelEntry<N> | null = null;
+    const view = createCoordinationPanel({
+      ...this.options,
+      target,
+      get: shell.get,
+      close: () => {
+        if (entry) this.options.close(entry);
+      },
+    });
+    entry = this.entry(target, shell, view, view.open);
+    return entry;
   }
   private bus(target: BusTarget, serial: number) {
     const shell = buildMailPanel(this.options.ui.document, serial, "bus");
