@@ -2129,7 +2129,6 @@ async function mailroomDetails(browser: Browser, http: HttpModule, artifacts: st
 // Team keys are literals: the installed-package sandbox holds no source modules to derive them from.
 const TEAM_ALPHA = "team_aaaaaaaaaaaaaaaa";
 const TEAM_BOREAL = "team_bbbbbbbbbbbbbbbb";
-const SEALED_SECRET = "sk-synthetic-never-published";
 const COORDINATION_IDS = {
   alphaLead: "obs_" + "a".repeat(23) + "1",
   alphaOne: "obs_" + "a".repeat(23) + "2",
@@ -2397,7 +2396,7 @@ async function coordinatorObservatory(
     await expect(panel).toContainText("Coordination · Aurora launch");
     await expect(panel).toContainText("Include the beta cohort?");
     await expect(panel).toContainText("AUR-1 on feat/aurora");
-    await expect(panel).not.toContainText(SEALED_SECRET);
+    await expect(panel).toContainText("Ship the Aurora launch with [redacted] credentials rotated");
     await clickSprite(ids.alphaLead);
     await expect(panel).toHaveCount(1);
     await expect(panel).toContainText("Coordination · Aurora launch");
@@ -2903,7 +2902,8 @@ async function runBrowserConsumer(root: string) {
       coordinatorObservatory: {
         benchSeats: true,
         crossMachineTeamSelection: true,
-        panelRedactedNoBodyReads: true,
+        panelShowsPublishedRedactedText: true,
+        noBodyReads: true,
         screenshots: ["coordinator-bench.png", "coordinator-team-panel.png"],
       },
       hostTabs: true,
