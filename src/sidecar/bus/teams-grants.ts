@@ -19,11 +19,13 @@ const HOURS_PER_DAY = 24;
 const MS_PER_MINUTE = 60_000;
 const EXPIRED = { live: false, at: null };
 
+// The hours limit is a portability guard: Bun already fails to parse an offset of a day or more, and Python rejects it too.
+// Minutes get no range check because Python accepts minute 60, so an engine that parses it matches llm-bus.
 function offsetMs(groups: Record<string, string | undefined>) {
   if (groups.sign === undefined) return 0;
   const hours = Number(groups.offsetHours);
   const minutes = Number(groups.offsetMinutes);
-  if (hours >= HOURS_PER_DAY || minutes >= MINUTES_PER_HOUR) return null;
+  if (hours >= HOURS_PER_DAY) return null;
   return (groups.sign === "-" ? -1 : 1) * (hours * MINUTES_PER_HOUR + minutes) * MS_PER_MINUTE;
 }
 // Python rejects out-of-range dates, hour 24 and offsets of a day or more; so does the round trip here.

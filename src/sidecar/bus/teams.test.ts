@@ -5,7 +5,7 @@ import { selectTeams } from "./teams.js";
 import { selectRows, withTeams } from "./selection.js";
 import { TEAM_KEY, TEAM_LIMITS, clipUnits } from "./types.js";
 import { must } from "./sqlite.fixture.js";
-import { validBusState } from "../sqlite/validate-bus.js";
+import { validBusState, validTeams } from "../sqlite/validate-bus.js";
 
 const ASOF = Date.parse("2026-11-11T00:00:00Z");
 const PROOF = ["1:2:3:4:5:6"];
@@ -341,6 +341,7 @@ test("sealed requires every stored-record predicate of the llm-bus authorization
     ["expiry without offset", expires("2026-11-12T00:00:00")],
     ["out-of-range date", expires("2026-02-30T00:00:00Z")],
     ["hour 24", expires("2999-01-01T24:00:00Z")],
+    // Both are rejected by Bun's Date.parse before the offsetMs portability guard runs.
     ["offset hours 24", expires("2999-01-01T00:00:00+24:00")],
     ["offset minutes 60", expires("2999-01-01T00:00:00+00:60")],
     [
@@ -635,4 +636,51 @@ test("a teams failure drops only teams and kinds", () => {
   assert.equal(good?.teams?.projects.length, 1);
   assert.equal(rows[0] && "coordination" in rows[0] ? rows[0].coordination : undefined, "sealed");
   database.close();
+});
+
+test("workers past the cap are counted and mark the read truncated", () => {
+  const database = createDatabase();
+  seed(database);
+  const baseline = read(database);
+  assert.equal(baseline.teams.truncated, false);
+  assert.equal("unobservedWorkers" in must(baseline.teams.projects[0]), false);
+  for (let index = 0; index < TEAM_LIMITS.workers - 2; index += 1)
+    enroll(database, "codex:w" + String(index).padStart(2, "0"), "worker");
+  const result = read(database);
+  const capped = must(result.teams.projects[0]);
+  assert.equal(capped.workers.length, TEAM_LIMITS.workers);
+  assert.equal(capped.unobservedWorkers, 1);
+  assert.equal(result.teams.truncated, true);
+  assert.equal(validTeams(result.teams), true);
+  database.close();
+});
+
+test("validTeams accepts a numeric or absent unobservedWorkers and rejects null", () => {
+  const database = createDatabase();
+  seed(database);
+  const teams = structuredClone(read(database).teams);
+  const first = must(teams.projects[0]);
+  assert.equal(validTeams(teams), true);
+  for (const [value, expected] of [
+    [null, false],
+    [3, true],
+    [-1, false],
+    [1.5, false],
+  ] as const) {
+    first.unobservedWorkers = value as number;
+    assert.equal(validTeams(teams), expected, String(value));
+  }
+  database.close();
+});
+
+test("a version written as a float is not sealed", () => {
+  for (const version of ["1.0", "1e0", "1.00"]) {
+    const database = sealedBase();
+    assert.equal(kindOf(database), "sealed", version + " baseline");
+    database.run("UPDATE coordination_messages SET metadata_json = ?", [
+      metadata().replace('"version":1', '"version":' + version),
+    ]);
+    assert.equal(kindOf(database), undefined, version);
+    database.close();
+  }
 });

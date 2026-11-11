@@ -2,7 +2,7 @@ import { busRecord } from "./types.js";
 import { OPERATIONS, usable } from "./teams-grants.js";
 import { scoped, text } from "./teams-types.js";
 import type { Reader } from "./teams-reader.js";
-import type { Facts, Kind, Project, Row } from "./teams-types.js";
+import type { Facts, Kind, Mail, Project, Row } from "./teams-types.js";
 
 const METADATA_KEYS = ["version", "project_id", "generation", "grant_id", "operation"];
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -15,11 +15,6 @@ interface Directive {
   grantId: string;
   operation: string;
 }
-interface Mail {
-  id: number;
-  sender: string;
-  recipient: string;
-}
 
 function parseJson(value: unknown): unknown {
   try {
@@ -29,6 +24,12 @@ function parseJson(value: unknown): unknown {
   }
 }
 const isUuid = (value: unknown) => typeof value === "string" && UUID4.test(value);
+// JSON.parse reads a float spelling of 1 as the integer, but llm-bus's Python parser yields a float and rejects it.
+// So every version value in the raw text must be the bare integer.
+const VERSION_VALUE = /"version"\s*:\s*([^,}\s]+)/g;
+const bareVersion = (value: unknown) =>
+  typeof value === "string" &&
+  [...value.matchAll(VERSION_VALUE)].every((match) => match[1] === String(SUPPORTED_VERSION));
 // The exact llm-bus Direction fields; gate operations and anything else are rejected.
 function readDirective(value: unknown): Directive | null {
   const parsed = parseJson(value);
@@ -40,6 +41,7 @@ function readDirective(value: unknown): Directive | null {
   const ids = [projectId, generation, grantId];
   const valid =
     version === SUPPORTED_VERSION &&
+    bareVersion(value) &&
     ids.every(isUuid) &&
     typeof operation === "string" &&
     OPERATIONS.includes(operation);

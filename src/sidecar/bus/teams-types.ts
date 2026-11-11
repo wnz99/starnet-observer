@@ -27,6 +27,12 @@ export interface Enrollment {
   role: string;
   generation: string;
 }
+// The message fields the worker needs to classify a windowed message.
+export interface Mail {
+  id: number;
+  sender: string;
+  recipient: string;
+}
 export interface Claim {
   scope: string;
   projectId: string;

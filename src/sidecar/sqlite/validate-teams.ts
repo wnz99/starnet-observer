@@ -16,8 +16,9 @@ const rawText = (value: unknown) =>
 const optionalText = (value: unknown) => value === undefined || rawText(value);
 const instant = (value: unknown) =>
   value === null || (typeof value === "number" && Number.isFinite(value));
-const counter = (value: unknown) =>
-  value === null || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
+const count = (value: unknown) =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const counter = (value: unknown) => value === null || count(value);
 const list = (value: unknown, limit: number, check: (entry: unknown) => boolean) =>
   Array.isArray(value) && value.length <= limit && value.every(check);
 
@@ -80,7 +81,7 @@ function identity(value: Record<string, unknown>) {
 }
 function counts(value: Record<string, unknown>) {
   return (
-    (value.unobservedWorkers === undefined || counter(value.unobservedWorkers)) &&
+    (value.unobservedWorkers === undefined || count(value.unobservedWorkers)) &&
     instant(value.grantExpiresAt) &&
     counter(value.instructions) &&
     counter(value.amendments)

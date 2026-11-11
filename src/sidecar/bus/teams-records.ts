@@ -152,7 +152,8 @@ function workerStatus(
   return { agent: address, status: holders.has(address) ? "idle" : "no-consent" };
 }
 // Worker roster and the earliest usable-grant expiry; claim wins, then grants and consents decide idle.
-export function roster(project: Project, facts: Facts, claims: Map<string, Claim>) {
+// Workers past the cap are counted in unobservedWorkers and mark the read truncated.
+export function roster(reader: Reader, project: Project, facts: Facts, claims: Map<string, Claim>) {
   const own = facts.grants.filter((grant) =>
     usable(project, grant.recipient, grant, facts.consents),
   );
@@ -162,9 +163,10 @@ export function roster(project: Project, facts: Facts, claims: Map<string, Claim
       (entry) =>
         entry.role === "worker" && entry.scope === project.scope && entry.projectId === project.id,
     )
-    .sort(byAddress)
-    .slice(0, TEAM_LIMITS.workers);
-  const workers = members.map((entry) => {
+    .sort(byAddress);
+  const unobservedWorkers = Math.max(0, members.length - TEAM_LIMITS.workers);
+  if (unobservedWorkers > 0) reader.truncate();
+  const workers = members.slice(0, TEAM_LIMITS.workers).map((entry) => {
     const claim = claims.get(entry.address);
     const mine = claim?.scope === project.scope && claim.projectId === project.id;
     const visible = mine ? { ticket: claim.ticket, branch: claim.branch } : undefined;
@@ -172,5 +174,5 @@ export function roster(project: Project, facts: Facts, claims: Map<string, Claim
   });
   const expiries = own.flatMap((grant) => (grant.expiresAt === null ? [] : [grant.expiresAt]));
   const earliest = expiries.length > 0 && facts.readable ? Math.min(...expiries) : null;
-  return { workers, grantExpiresAt: earliest };
+  return { workers, unobservedWorkers, grantExpiresAt: earliest };
 }

@@ -13,17 +13,12 @@ import {
   roster,
 } from "./teams-records.js";
 import { scoped } from "./teams-types.js";
-import type { Claim, Facts, Kind, Project } from "./teams-types.js";
+import type { Claim, Facts, Kind, Mail, Project } from "./teams-types.js";
 
 const ROW_LIMIT = 800;
 const GENERATION_CHARS = 64;
 const GENERATION_PREFIX = 8;
 const READ = TEAM_LIMITS.readChars;
-interface Mail {
-  id: number;
-  sender: string;
-  recipient: string;
-}
 type Roster = ReturnType<typeof roster>;
 type Selection = { teams: RawTeams; kinds: Map<number, Kind> };
 
@@ -117,6 +112,7 @@ function teamOf(project: Project, index: number, records: Records, members: Rost
     coordinator: project.coordinator,
     objective: project.objective,
     workers: members.workers,
+    ...(members.unobservedWorkers > 0 ? { unobservedWorkers: members.unobservedWorkers } : {}),
     grantExpiresAt: members.grantExpiresAt,
     ...(records.instructions?.[index] ?? NO_INSTRUCTIONS),
     ...(records.amendments?.[index] ?? NO_AMENDMENTS),
@@ -128,7 +124,7 @@ function teamOf(project: Project, index: number, records: Records, members: Rost
 function assemble(reader: Reader, projects: Project[], facts: Facts, claims: Map<string, Claim>) {
   const records = readRecords(reader, projects, facts);
   return projects.map((project, index) =>
-    teamOf(project, index, records, roster(project, facts, claims)),
+    teamOf(project, index, records, roster(reader, project, facts, claims)),
   );
 }
 
