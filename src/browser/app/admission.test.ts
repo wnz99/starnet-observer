@@ -46,6 +46,17 @@ describe("dashboard snapshot admission", () => {
     ])
       expect(isAppSnapshot(body)).toBeFalse();
   });
+  test("admits known coordination message kinds and rejects unknown ones", () => {
+    const withKind = (coordination: unknown) => ({
+      sessions: [],
+      health: "available",
+      bus: { messages: [{ id: 1, coordination }] },
+    });
+    expect(isAppSnapshot(withKind("sealed"))).toBeTrue();
+    expect(isAppSnapshot(withKind("report"))).toBeTrue();
+    expect(isAppSnapshot(withKind(undefined))).toBeTrue();
+    expect(isAppSnapshot(withKind("directive"))).toBeFalse();
+  });
   test("preserves unavailable, absent, null and zero observations", () => {
     const body = {
       sessions: [],

@@ -4170,7 +4170,18 @@ test("observer-view regression contracts", async () => {
      office-backdrop (home-office art) and the courier-owned mail keys, which observer-mail tests cover. */
     assert.deepEqual(
       keys.filter((key) => !themedKeys.has(key)),
-      ["console", "chair", "spark", "office-backdrop", "mail-acknowledged", "mail-unassigned"],
+      [
+        "console",
+        "chair",
+        "spark",
+        "office-backdrop",
+        "mail-acknowledged",
+        "mail-unassigned",
+        // Painted by the sealed/report parcels and beacons of later coordination tasks.
+        "mail-sealed",
+        "mail-report",
+        "coordination-beacon",
+      ],
     );
 
     // Two views on one page: a custom view never changes a default view painted before or after it.

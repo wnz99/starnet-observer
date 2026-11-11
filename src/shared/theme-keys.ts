@@ -214,6 +214,9 @@ export const THEME_SCENE_COLORS = [
   "mail-pending",
   "mail-acknowledged",
   "mail-unassigned",
+  "mail-sealed",
+  "mail-report",
+  "coordination-beacon",
 ] as const;
 export type ThemeSceneColor = (typeof THEME_SCENE_COLORS)[number];
 

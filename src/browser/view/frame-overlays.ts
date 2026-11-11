@@ -1,3 +1,4 @@
+import { goldenHue } from "../model/hues.js";
 import type { Worker, RelaySpoke } from "../scene/types.js";
 import { CABLE_HEIGHT, mailCablePath, cableSurfaces } from "../scene/cables.js";
 import type { SpriteResource } from "../sprites/types.js";
@@ -17,8 +18,7 @@ export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   repositoryColor(id: string): string {
     const existing = this.agentColors.get(id);
     if (existing) return existing;
-    const index = this.agentColors.size,
-      color = `hsl(${String((index * 137.507764 + 7.5) % 360)} 70% 65%)`;
+    const color = goldenHue(this.agentColors.size);
     this.agentColors.set(id, color);
     return color;
   }

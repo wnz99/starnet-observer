@@ -239,7 +239,10 @@
       "office-backdrop": "#020406",
       "mail-pending": "#ffbd5c",
       "mail-acknowledged": "#9fe7b9",
-      "mail-unassigned": "#c9d3da"
+      "mail-unassigned": "#c9d3da",
+      "mail-sealed": "#f2c94c",
+      "mail-report": "#7ee0a1",
+      "coordination-beacon": "#ff9f43"
     },
     "projectAccents": [
       "#78add7",
