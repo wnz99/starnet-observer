@@ -348,7 +348,7 @@ function coordinatorRowControls(probe: { page: { document: AppFixtureDocument } 
 }
 test("the roster magnifier on a coordinator opens only the agent panel", async () => {
   const { probe, app, panels } = await mountedTeam();
-  const { doc, inspect } = coordinatorRowControls(probe);
+  const { inspect } = coordinatorRowControls(probe);
   inspect.click();
   expect(panels()).toHaveLength(0);
   expect(inspect.attributes.get("aria-expanded")).toBe("true");
