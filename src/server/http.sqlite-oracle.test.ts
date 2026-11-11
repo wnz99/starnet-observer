@@ -116,6 +116,7 @@ export async function sqliteContracts({
             coordination: {
               ...first.coordination,
               overview: { ...first.coordination.overview, asOf: 2000 },
+              teams: { ...requiredHttpValue(first.coordination.teams), asOf: 2000 },
             },
           },
           "aggregate calculation advances while unchanged rows and source observation time remain stable",

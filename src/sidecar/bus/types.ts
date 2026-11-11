@@ -62,7 +62,7 @@ export const TEAM_LIMITS = {
 };
 export const TEAM_KEY = /^team_[a-f0-9]{16}$/;
 type PublicTeams = NonNullable<NonNullable<PublicBus["coordination"]>["teams"]>;
-// Raw worker-side shape: addresses are unprojected, text is pre-redaction, and unobservedWorkers only exists on remote input.
+// Raw worker-side shape: addresses are unprojected, text is pre-redaction, and unobservedWorkers is emitted by the local worker only when more than 48 workers are enrolled, or arrives on remote input.
 export type RawTeam = Omit<PublicTeams["projects"][number], "unobservedWorkers"> & {
   unobservedWorkers?: number;
 };
