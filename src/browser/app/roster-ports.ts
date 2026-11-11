@@ -49,7 +49,10 @@ export interface RosterOptions<N extends AppNode, R extends SpriteResource> {
   controls: AppControls<N, R>;
   panels: RosterPanels<N>;
   enabled: boolean;
-  select(id: string): void;
+  /** Row select action: selects the agent and opens a coordinator's panel, returning focus to `trigger`. */
+  select(id: string, trigger: N): void;
+  /** Selects the agent without opening a coordination panel (magnifier path). */
+  reveal(id: string): void;
   toggleRepository(repoId: string): void;
   zoomProject(key: string): void;
   confirm(message: string): boolean;

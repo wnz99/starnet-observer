@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createAppFixture, type AppFixtureNode } from "./dom.fixture.js";
+import { createAppFixture, type AppFixtureDocument, type AppFixtureNode } from "./dom.fixture.js";
 import { MountProbe, flushMount } from "./mount-lifecycle.fixture.js";
 import { mountObserver } from "./mount.js";
 
@@ -334,6 +334,35 @@ test("picking a coordinator in the roster opens its panel once, never toggling i
   expect(panels()).toHaveLength(1);
   rowFor("c1")?.click();
   expect(panels()).toHaveLength(1);
+  app.dispose();
+});
+function coordinatorRowControls(probe: { page: { document: AppFixtureDocument } }) {
+  const doc = probe.page.document;
+  const select = doc
+    .querySelectorAll(doc.body, ".session-row")
+    .find((node) => node.dataset.sessionId === "c1");
+  const item = select?.parent;
+  const inspect = item && doc.querySelectorAll(item, ".row-inspect")[0];
+  if (!select || !inspect) throw new Error("Expected the coordinator roster row controls");
+  return { doc, select, inspect };
+}
+test("the roster magnifier on a coordinator opens only the agent panel", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const { doc, inspect } = coordinatorRowControls(probe);
+  inspect.click();
+  expect(panels()).toHaveLength(0);
+  expect(inspect.attributes.get("aria-expanded")).toBe("true");
+  app.dispose();
+});
+test("roster select opens one coordination panel and closing it returns focus to the row", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const { doc, select, inspect } = coordinatorRowControls(probe);
+  select.click();
+  expect(panels()).toHaveLength(1);
+  expect(inspect.attributes.get("aria-expanded")).toBe("false");
+  const close = doc.querySelectorAll(panels()[0] as AppFixtureNode, "button")[0];
+  close?.click();
+  expect(doc.activeElement).toBe(select);
   app.dispose();
 });
 test("selecting an ordinary worker opens no coordination panel", async () => {

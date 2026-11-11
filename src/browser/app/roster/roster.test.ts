@@ -130,6 +130,20 @@ test("search/filter preserve cached rows and unfiltered repository toggles; remo
   f.controls.dispose();
 });
 
+test("the row select action passes its own button as the panel trigger", () => {
+  const f = new RosterFixture(),
+    rows = [row("first", { inspectionIdentity: "codex:session" })];
+  f.inventory(rows);
+  f.roster.render(rows, FRESH_OBSERVATION, [], null);
+  const button = f.node(".session-row");
+  button.click();
+  expect(f.selected).toEqual(["first"]);
+  expect(f.selectTriggers).toEqual([button]);
+  expect(f.revealed).toEqual([]);
+  f.roster.dispose();
+  f.controls.dispose();
+});
+
 test("title and magnifier preserve exact panel guard, selection, ARIA and presentation behavior", () => {
   const f = new RosterFixture(),
     rows = [row("first", { inspectionIdentity: "codex:session" })];
@@ -144,11 +158,13 @@ test("title and magnifier preserve exact panel guard, selection, ARIA and presen
     trigger: title,
   });
   inspect.click();
-  expect(f.selected).toEqual(["first"]);
+  expect(f.revealed).toEqual(["first"]);
+  expect(f.selected).toEqual([]);
   f.open();
   f.roster.render(rows, FRESH_OBSERVATION, [], null);
   inspect.click();
-  expect(f.selected).toEqual(["first"]);
+  expect(f.revealed).toEqual(["first"]);
+  expect(f.selected).toEqual([]);
   expect(title.attributes.get("aria-controls")).toBe("test-agent-panel");
   expect(inspect.attributes.get("aria-expanded")).toBe("true");
   f.close();

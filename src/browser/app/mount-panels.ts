@@ -112,10 +112,14 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
       controls,
       panels: panelAccess,
       enabled: bootstrap.control,
-      // A roster pick of a coordinator opens its panel exactly as a canvas click does.
-      select: (id) => {
+      // A roster pick of a coordinator opens its panel exactly as a canvas click does,
+      // but focus returns to the row. The magnifier only reveals, keeping one agent panel.
+      select: (id, trigger) => {
         navigationOwner.select(id);
-        openCoordination(this.core, this.links, id);
+        openCoordination(this.core, this.links, id, trigger);
+      },
+      reveal: (id) => {
+        navigationOwner.select(id);
       },
       toggleRepository: (repo) => {
         navigationOwner.toggleRepository(repo);

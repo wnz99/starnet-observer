@@ -33,6 +33,7 @@ export function openCoordination<N extends AppNode, R extends SpriteResource, B 
   core: AppCore<N, R, B>,
   links: MountLinks<N, R>,
   id: string,
+  trigger?: AppNode,
 ) {
   const { state, ui } = core;
   const facts = state.selectedTeam();
@@ -42,7 +43,8 @@ export function openCoordination<N extends AppNode, R extends SpriteResource, B 
     id: facts.teamKey,
     identity: facts.team.generation,
   } as const;
-  if (!links.panels?.isOpenTarget(target)) links.panels?.togglePanel(target, ui.get("world"));
+  if (!links.panels?.isOpenTarget(target))
+    links.panels?.togglePanel(target, trigger ?? ui.get("world"));
 }
 function selectAndOpenTeam<N extends AppNode, R extends SpriteResource, B extends R>(
   core: AppCore<N, R, B>,

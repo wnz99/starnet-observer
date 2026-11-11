@@ -34,6 +34,8 @@ export class RosterFixture {
   readonly ui = createUi(this.document);
   readonly state = new AppState(canonicalTheme(), this.scheduler.clock);
   readonly selected: string[] = [];
+  readonly selectTriggers: unknown[] = [];
+  readonly revealed: string[] = [];
   readonly repositories: string[] = [];
   readonly zooms: string[] = [];
   readonly posts: { path: string; payload: unknown; signal: AbortSignal }[] = [];
@@ -73,8 +75,12 @@ export class RosterFixture {
         byId: () => this.state.byId,
       }),
       panels: this.panels(),
-      select: (id) => {
+      select: (id, trigger) => {
         this.selected.push(id);
+        this.selectTriggers.push(trigger);
+      },
+      reveal: (id) => {
+        this.revealed.push(id);
       },
       toggleRepository: (id) => {
         this.repositories.push(id);
