@@ -33,7 +33,7 @@ export function openCoordination<N extends AppNode, R extends SpriteResource, B 
   core: AppCore<N, R, B>,
   links: MountLinks<N, R>,
   id: string,
-  trigger?: AppNode,
+  trigger?: N,
 ) {
   const { state, ui } = core;
   const facts = state.selectedTeam();
