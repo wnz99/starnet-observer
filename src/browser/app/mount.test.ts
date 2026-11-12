@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createAppFixture } from "./dom.fixture.js";
+import { createAppFixture, type AppFixtureDocument, type AppFixtureNode } from "./dom.fixture.js";
 import { MountProbe, flushMount } from "./mount-lifecycle.fixture.js";
 import { mountObserver } from "./mount.js";
 
@@ -240,4 +240,134 @@ test("a freshness deadline acquired during disposal is released before mount can
   expect(scheduler.timers.size).toBe(0);
   for (const callback of probe.retainedTimers()) callback();
   expect(scheduler.timers.size).toBe(0);
+});
+
+const TEAM_KEY = "team_0123456789abcdef";
+function crewRow(id: string) {
+  return {
+    id,
+    title: id,
+    source: "herdr",
+    paneId: "p_" + id,
+    project: "Crew " + id,
+    projectId: "crew_" + id,
+    repoId: "crew_" + id,
+    provider: "codex",
+    status: "working",
+    observedAt: Date.now(),
+  };
+}
+async function mountedTeam() {
+  const probe = new MountProbe();
+  const app = mountObserver(probe.options);
+  await flushMount();
+  const now = Date.now();
+  probe.reply(0, {
+    health: "available",
+    observedAt: now,
+    sessions: [crewRow("c1"), crewRow("w1")],
+    bus: {
+      health: "available",
+      messages: [],
+      coordination: {
+        teams: {
+          asOf: now,
+          status: "available",
+          truncated: false,
+          sources: {},
+          projects: [
+            {
+              key: TEAM_KEY,
+              label: "Aurora",
+              generation: "gen-abcdef123456",
+              coordinator: "c1",
+              objective: "Ship it",
+              workers: [{ agent: "w1", status: "idle" }],
+              unobservedWorkers: 2,
+              grantExpiresAt: null,
+              instructions: 1,
+              amendments: 0,
+              decisions: [],
+              gates: [],
+            },
+          ],
+        },
+      },
+    },
+  });
+  await flushMount();
+  const select = (id: string) => {
+    probe.viewOptions?.onSelect?.(id);
+  };
+  const panels = () =>
+    probe.page.document.querySelectorAll(probe.page.document.body, ".mail-inspector");
+  return { probe, app, select, panels };
+}
+test("selecting a coordinator through the view opens its coordination panel and repeats keep exactly one", async () => {
+  const { probe, app, select, panels } = await mountedTeam();
+  expect(panels()).toHaveLength(0);
+  select("c1");
+  expect(panels()).toHaveLength(1);
+  const text = (node: AppFixtureNode): string =>
+    [node.textContent, ...node.children.map(text)].join("\n");
+  const shown = text(panels()[0] as AppFixtureNode);
+  expect(shown).toContain("Coordination · Aurora");
+  expect(shown).toContain("Not observed: 2");
+  select("c1");
+  select("c1");
+  expect(panels()).toHaveLength(1);
+  expect(probe.page.document.dialogOpen(panels()[0] as AppFixtureNode)).toBeTrue();
+  app.dispose();
+});
+test("picking a coordinator in the roster opens its panel once, never toggling it shut", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const rowFor = (id: string) =>
+    probe.page.document
+      .querySelectorAll(probe.page.document.body, ".session-row")
+      .find((node) => node.dataset.sessionId === id);
+  const worker = rowFor("w1");
+  worker?.click();
+  expect(panels()).toHaveLength(0);
+  const coordinator = rowFor("c1");
+  if (!coordinator) throw new Error("Expected the coordinator roster row");
+  coordinator.click();
+  expect(panels()).toHaveLength(1);
+  rowFor("c1")?.click();
+  expect(panels()).toHaveLength(1);
+  app.dispose();
+});
+function coordinatorRowControls(probe: { page: { document: AppFixtureDocument } }) {
+  const doc = probe.page.document;
+  const select = doc
+    .querySelectorAll(doc.body, ".session-row")
+    .find((node) => node.dataset.sessionId === "c1");
+  const item = select?.parent;
+  const inspect = item && doc.querySelectorAll(item, ".row-inspect")[0];
+  if (!select || !inspect) throw new Error("Expected the coordinator roster row controls");
+  return { doc, select, inspect };
+}
+test("the roster magnifier on a coordinator opens only the agent panel", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const { inspect } = coordinatorRowControls(probe);
+  inspect.click();
+  expect(panels()).toHaveLength(0);
+  expect(inspect.attributes.get("aria-expanded")).toBe("true");
+  app.dispose();
+});
+test("roster select opens one coordination panel and closing it returns focus to the row", async () => {
+  const { probe, app, panels } = await mountedTeam();
+  const { doc, select, inspect } = coordinatorRowControls(probe);
+  select.click();
+  expect(panels()).toHaveLength(1);
+  expect(inspect.attributes.get("aria-expanded")).toBe("false");
+  const close = doc.querySelectorAll(panels()[0] as AppFixtureNode, "button")[0];
+  close?.click();
+  expect(doc.activeElement).toBe(select);
+  app.dispose();
+});
+test("selecting an ordinary worker opens no coordination panel", async () => {
+  const { app, select, panels } = await mountedTeam();
+  select("w1");
+  expect(panels()).toHaveLength(0);
+  app.dispose();
 });

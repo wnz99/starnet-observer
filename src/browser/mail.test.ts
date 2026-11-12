@@ -374,6 +374,58 @@ test("original courier route, recovery, frame and theme contracts", () => {
   }
 });
 
+test("courier colour follows message kind and kinds never share a flight", () => {
+  const colors = canonicalTheme().scene.colors;
+  const kinds = new Map<number, "sealed" | "report">([
+    [2, "sealed"],
+    [3, "report"],
+  ]);
+  const routeOf = (value: CourierMessage) => {
+    const kind = kinds.get(value.id);
+    return {
+      key: kind ? `a>b|${kind}` : "a>b",
+      from: [{ x: 0, y: 0 }],
+      to: [{ x: 10, y: 0 }],
+      color: "#abcdef",
+      ...(kind ? { kind } : {}),
+    };
+  };
+  const courier = createCourier();
+  const bus = (ids: number[]) => ({
+    health: "available",
+    window: 100,
+    messages: ids.map((id) => ({ id, acknowledgedAt: null })),
+  });
+  courier.update(bus([1]), { now: 0, deck: 0, route: routeOf });
+  courier.update(bus([1, 2, 3, 4]), { now: 1000, deck: 0, route: routeOf });
+  assert.deepEqual(
+    courier.state().airborne.map((flight) => flight.ids),
+    [[2], [3], [4]],
+    "sealed, report and plain mail on one pair fly as separate parcels",
+  );
+  assert.deepEqual(
+    courier
+      .frame(1000, {})
+      .drones.flatMap((drone) => drone.parcels)
+      .sort(),
+    [colors["mail-sealed"], colors["mail-report"], "#abcdef"].sort(),
+    "kind colours win; plain mail keeps the recipient colour",
+  );
+  const themed = createCourier({
+    colors: { ...colors, "mail-sealed": "#112233", "mail-report": "#445566" },
+  });
+  themed.update(bus([1]), { now: 0, deck: 0, route: routeOf });
+  themed.update(bus([1, 2, 3, 4]), { now: 1000, deck: 0, route: routeOf });
+  assert.deepEqual(
+    themed
+      .frame(1000, {})
+      .drones.flatMap((drone) => drone.parcels)
+      .sort(),
+    ["#112233", "#445566", "#abcdef"].sort(),
+    "themed sealed and report colours reach the parcels",
+  );
+});
+
 test("partial observed buses never invent a courier flight", () => {
   const courier = createMail(canonicalTheme()).createCourier();
   const buses: CourierBus<CourierMessage>[] = [

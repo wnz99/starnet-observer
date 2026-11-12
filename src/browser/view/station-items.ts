@@ -126,7 +126,11 @@ export class StationItems<R extends SpriteResource, B extends R = R> {
   }
   observatory(A: ArtPainters<R>, now: number, animate: boolean): DepthItem[] {
     return this.owned(
-      [...this.observatoryFurniture(A), ...this.observatoryProps(A, now, animate)],
+      [
+        ...this.observatoryFurniture(A),
+        ...this.observatoryProps(A, now, animate),
+        ...this.view.coordinationSignals.items(now, animate),
+      ],
       "observatory",
     );
   }

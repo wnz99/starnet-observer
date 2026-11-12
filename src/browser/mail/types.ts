@@ -11,6 +11,7 @@ export interface CourierRoute {
   readonly from: readonly Point[];
   readonly to: readonly Point[];
   readonly color?: string | null;
+  readonly kind?: "sealed" | "report";
 }
 export interface Flight {
   readonly key: string;

@@ -14,7 +14,7 @@ import type {
 export { along, LEG, SORT, FLIGHT, FADE, GAP, MAX_AIRBORNE, MAX_QUEUE } from "./mail/geometry.js";
 type MailColors = Pick<
   ThemeContents["scene"]["colors"],
-  "mail-pending" | "mail-acknowledged" | "mail-unassigned"
+  "mail-pending" | "mail-acknowledged" | "mail-unassigned" | "mail-sealed" | "mail-report"
 >;
 const PENDING_COLOR = "mail-pending";
 class Courier {
@@ -30,6 +30,7 @@ class Courier {
   private skipped = 0;
   constructor(private readonly colors: MailColors) {}
   private tint(route: CourierRoute) {
+    if (route.kind) return this.colors[`mail-${route.kind}`];
     return route.color || this.colors["mail-unassigned"];
   }
   private clear() {
@@ -156,6 +157,8 @@ export function createMail(defaults: ThemeContents) {
       "mail-pending": colors[PENDING_COLOR] ?? base[PENDING_COLOR],
       "mail-acknowledged": colors["mail-acknowledged"] ?? base["mail-acknowledged"],
       "mail-unassigned": colors["mail-unassigned"] ?? base["mail-unassigned"],
+      "mail-sealed": colors["mail-sealed"] ?? base["mail-sealed"],
+      "mail-report": colors["mail-report"] ?? base["mail-report"],
     });
     return {
       update: courier.update.bind(courier),

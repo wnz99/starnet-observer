@@ -91,3 +91,32 @@ test("partial relay arrays keep empty fallbacks and stable private aliases", asy
     assert(!JSON.stringify(shown).includes(secret));
   }
 });
+
+test("presentation omits coordination teams and message kinds", async () => {
+  const secret = "PRIVATE-TEAM-CANARY";
+  const bus = {
+    health: "available" as const,
+    reason: null,
+    observedAt: 1000,
+    window: 100,
+    coordination: { sections: [], teams: { label: secret } },
+    messages: [
+      {
+        id: 1,
+        from: "a",
+        to: "b",
+        sentAt: 1,
+        acknowledgedAt: null,
+        wake: "none" as const,
+        coordination: "sealed" as const,
+      },
+    ],
+  };
+  const snapshot = await makePresentationObserver({
+    get: () => ({ sessions: [], bus, hostBus: { privateHost: bus } }),
+  }).get();
+  const text = JSON.stringify(snapshot);
+  assert(!text.includes(secret));
+  assert(!text.includes("coordination"));
+  assert(!text.includes("sealed"));
+});

@@ -2,7 +2,7 @@ import { projectedBounds } from "./geometry.js";
 import { locateShips, mailroomAt } from "./site.js";
 import { observatoryFor } from "./observatory.js";
 import { populateRooms } from "./rooms.js";
-import { finishCrew } from "./crew-topology.js";
+import { finishCrew, seatCoordinators } from "./crew-topology.js";
 import { buildHulls } from "./hulls.js";
 import { buildHighways } from "./highways.js";
 import { revisionFor } from "./revision.js";
@@ -33,6 +33,7 @@ export function build(rooms: SceneRooms, page: number, extras: BuildOptions = {}
     ships,
   });
   const links = observationLinks(plainLinks, relays);
+  workers.push(...seatCoordinators({ observatory, mail, links, ships }, extras.coordinators ?? []));
   const revision = revisionFor({
     page,
     observatory,

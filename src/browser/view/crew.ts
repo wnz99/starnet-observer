@@ -49,6 +49,23 @@ export class Crew<R extends SpriteResource, B extends R = R> {
     return body;
   }
   paintCrew(worker: Worker, actor: ActorFrame, now: number, reduced: boolean) {
+    // While a team is selected, workers outside it recede.
+    const overlays = this.view.framePaint.overlays,
+      alpha = overlays.teams.alpha(worker.id);
+    if (alpha === 1) {
+      this.paintBody(worker, actor, now, reduced);
+      return;
+    }
+    const ctx = this.view.ctx;
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    try {
+      this.paintBody(worker, actor, now, reduced);
+    } finally {
+      ctx.restore();
+    }
+  }
+  private paintBody(worker: Worker, actor: ActorFrame, now: number, reduced: boolean) {
     const foot = project(actor.point),
       body = this.bodyFor(worker),
       size = worker.scale || 1,

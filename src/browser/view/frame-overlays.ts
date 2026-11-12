@@ -1,9 +1,11 @@
+import { goldenHue } from "../model/hues.js";
 import type { Worker, RelaySpoke } from "../scene/types.js";
 import { CABLE_HEIGHT, mailCablePath, cableSurfaces } from "../scene/cables.js";
 import type { SpriteResource } from "../sprites/types.js";
 import { rectPoly } from "./primitives.js";
 import { shipLive } from "./static.js";
 import type { ViewRuntime } from "./runtime.js";
+import { TeamOverlays } from "./team-overlays.js";
 const REPOSITORY_RING = { glowRadius: 40, glowAlpha: 0.4, workingWidth: 3, width: 1.5, gap: 0.16 };
 const FOCUS_RING = { period: 450, radius: 0.55, width: 2 };
 const PLATFORM_RING = { height: 0.02 };
@@ -12,13 +14,15 @@ const CONNECTION = { height: CABLE_HEIGHT, width: 2, junctionRadius: 0.35, alpha
 
 export class FrameOverlays<R extends SpriteResource, B extends R = R> {
   private readonly agentColors = new Map<string, string>();
-  constructor(readonly view: ViewRuntime<R, B>) {}
+  readonly teams: TeamOverlays;
+  constructor(readonly view: ViewRuntime<R, B>) {
+    this.teams = new TeamOverlays(view);
+  }
 
   repositoryColor(id: string): string {
     const existing = this.agentColors.get(id);
     if (existing) return existing;
-    const index = this.agentColors.size,
-      color = `hsl(${String((index * 137.507764 + 7.5) % 360)} 70% 65%)`;
+    const color = goldenHue(this.agentColors.size);
     this.agentColors.set(id, color);
     return color;
   }

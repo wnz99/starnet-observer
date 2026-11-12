@@ -28,7 +28,7 @@ export class SessionRow<N extends AppNode, R extends SpriteResource> {
     );
     this.view = new RowView(options, id);
     this.events.on(this.view.button, "click", () => {
-      options.select(id);
+      options.select(id, this.view.button);
     });
     this.events.on(this.view.title, "click", () => {
       const row = options.state.byId.get(id);
@@ -39,7 +39,7 @@ export class SessionRow<N extends AppNode, R extends SpriteResource> {
       if (!row) return;
       const target = options.panels.agentTarget(row);
       if (!target) return;
-      if (!options.panels.isOpenTarget(target)) options.select(id);
+      if (!options.panels.isOpenTarget(target)) options.reveal(id);
       options.panels.togglePanel(target, this.view.inspect);
     });
     this.controls = options.enabled ? this.makeControls() : null;

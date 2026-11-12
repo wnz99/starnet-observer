@@ -4701,6 +4701,362 @@ test("observer-ui regression contracts", async () => {
     ]);
   })();
 }, 30000);
+const TEAM_A = "team_0123456789abcdef";
+const TEAM_B = "team_fedcba9876543210";
+type TeamInput = Record<string, unknown>;
+const teamOf = (over: TeamInput = {}): TeamInput => ({
+  key: TEAM_A,
+  label: "Project",
+  generation: "g1",
+  coordinator: "external",
+  objective: "",
+  workers: [],
+  unobservedWorkers: 0,
+  grantExpiresAt: null,
+  instructions: null,
+  amendments: null,
+  decisions: [],
+  gates: [],
+  ...over,
+});
+const gateOf = (pr: number, status: string, submittedAt: number | null = 100) => ({
+  pr,
+  ticket: "T-" + String(pr),
+  status,
+  submittedAt,
+  decidedAt: null,
+});
+const teamBus = (...projects: TeamInput[]): AppBus =>
+  ({
+    health: "available",
+    messages: [],
+    coordination: {
+      teams: { asOf: 1, status: "available", truncated: false, sources: {}, projects },
+    },
+  }) as unknown as AppBus;
+const crewRow = (id: string, extra: Partial<AppRow> = {}): AppRow => ({
+  id,
+  title: id,
+  source: "herdr",
+  paneId: "p_" + id,
+  project: "Crew " + id,
+  projectId: "crew_" + id,
+  repoId: "crew_" + id,
+  provider: "codex",
+  status: "working",
+  observedAt: Date.now(),
+  ...extra,
+});
+/* One mounted observer with a scripted view: every delivery goes through the real renderer, floor and navigation. */
+function coordinationHarness() {
+  const page = uiFixture();
+  let live: Deliver | null = null;
+  let frame!: UiFrame;
+  let viewOptions!: UiViewOptions;
+  let updates = 0;
+  const focused: string[] = [];
+  const app = page.mount({
+    createView: (options) => {
+      viewOptions = options;
+      return viewSpy({
+        start() {},
+        stop() {},
+        overview() {},
+        invalidate() {},
+        update: (scene, updateOptions) => {
+          updates++;
+          frame = { scene, options: updateOptions };
+        },
+        focus: (id) => {
+          focused.push(id);
+        },
+      });
+    },
+    query: {
+      ...querySpy({
+        define() {},
+        invalidate: () => Promise.resolve(),
+        subscribe: (_key, listener) => {
+          live = listener;
+          return () => {};
+        },
+      }),
+      dispose() {},
+    },
+  });
+  const deliver = (
+    sessions: AppRow[],
+    buses: { bus?: AppBus; hostBus?: Record<string, AppBus> } = {},
+    extra: { pending?: boolean } = {},
+  ) => {
+    const now = Date.now();
+    notify(live, {
+      ...extra,
+      hasData: true,
+      updatedAt: now,
+      data: {
+        health: "available",
+        observedAt: now,
+        sessions,
+        sources: {
+          hosts: {
+            local: { health: "available", observedAt: now },
+            ...(buses.hostBus
+              ? Object.fromEntries(
+                  Object.keys(buses.hostBus).map((id) => [
+                    id,
+                    { health: "available", observedAt: now },
+                  ]),
+                )
+              : {}),
+          },
+        },
+        ...buses,
+      },
+    });
+  };
+  const paint = () => present(present(frame.options.coordination)());
+  const seated = () =>
+    frame.scene.workers.filter((worker) => worker.role === "coordinator").map((w) => w.id);
+  const select = (id: string) => {
+    present(viewOptions.onSelect)(id);
+  };
+  const resume = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    page.document.hidden = true;
+    page.document.emit("visibilitychange");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    page.document.hidden = false;
+    page.document.emit("visibilitychange");
+  };
+  return {
+    page,
+    app,
+    deliver,
+    paint,
+    seated,
+    select,
+    resume,
+    focused,
+    viewOptions: () => viewOptions,
+    frame: () => frame,
+    updates: () => updates,
+  };
+}
+test("seated coordinators leave their rooms, keep their deck on select, and ride the observatory bench", () => {
+  const h = coordinationHarness();
+  try {
+    const crew = ["c1", "c2", "w1", "w2"].map((id) => crewRow(id));
+    h.deliver(crew);
+    const plain = h.frame().scene;
+    assert.deepEqual(h.seated(), []);
+    assert.equal(h.paint().team, null);
+    // AC1.4: tables absent or a team with no observed coordinator changes nothing about the station.
+    h.deliver(crew, { bus: teamBus() });
+    h.deliver(crew, { bus: teamBus(teamOf({ workers: [{ agent: "w1", status: "idle" }] })) });
+    assert.equal(h.frame().scene, plain, "no rebuild without a seated coordinator");
+    assert.equal(h.frame().scene.revision, plain.revision);
+    const before = h.updates();
+    h.deliver(crew, {
+      bus: teamBus(
+        teamOf({
+          coordinator: "c1",
+          workers: [
+            { agent: "w1", status: "claimed" },
+            { agent: "w2", status: "idle" },
+          ],
+        }),
+      ),
+    });
+    assert.equal(h.updates(), before + 1);
+    assert.deepEqual(h.seated(), ["c1"]);
+    assert.equal(h.frame().scene.workers.filter((worker) => worker.id === "c1").length, 1);
+    assert.equal(
+      h.frame().scene.workers.find((worker) => worker.id === "c1")?.platformKey,
+      "observatory",
+    );
+    assert.notEqual(h.frame().scene.revision, plain.revision);
+    assert(
+      !h.frame().scene.platforms.some((room) => room.projectId === "crew_c1"),
+      "the coordinator left its room",
+    );
+    h.select("c1");
+    assert.deepEqual(h.paint().team?.memberIds, new Set(["c1", "w1", "w2"]));
+    assert.equal(h.paint().team?.coordinatorId, "c1");
+    h.select("w1");
+    assert.equal(h.paint().team, null, "a member is not a coordinator");
+    // Later polls that change only signals repaint without rebuilding geometry.
+    const rebuilds = h.updates();
+    h.deliver(crew, {
+      bus: teamBus(
+        teamOf({
+          coordinator: "c1",
+          workers: [
+            { agent: "w1", status: "claimed" },
+            { agent: "w2", status: "idle" },
+          ],
+          gates: [gateOf(1, "submitted")],
+        }),
+      ),
+    });
+    assert.equal(h.updates(), rebuilds, "gate changes never rebuild the scene");
+    const [facts] = h.paint().view.teams;
+    const gates = facts?.team.gates;
+    assert.equal(gates?.length, 1);
+  } finally {
+    h.app.dispose();
+  }
+});
+test("overflow coordinators, an overseer-coordinator and duplicate ids resolve to one seat each", () => {
+  const h = coordinationHarness();
+  try {
+    const rows = [
+      crewRow("boss", { role: "overseer" }),
+      ...["c1", "c2", "c3", "c4", "c5"].map((id) => crewRow(id)),
+    ];
+    const keys = [
+      TEAM_A,
+      TEAM_B,
+      "team_1111111111111111",
+      "team_2222222222222222",
+      "team_3333333333333333",
+    ];
+    const projects = ["c1", "c2", "c3", "c4", "c5"].map((id, index) =>
+      teamOf({ key: keys[index], coordinator: id }),
+    );
+    // The overseer coordinates a sixth project; one id also coordinates twice.
+    projects.push(
+      teamOf({ key: "team_4444444444444444", coordinator: "boss" }),
+      teamOf({ key: "team_5555555555555555", coordinator: "c1" }),
+    );
+    h.deliver(rows, { bus: teamBus(...projects) });
+    assert.deepEqual(h.seated(), ["c1", "c2", "c3", "c4"], "five coordinators: four seated");
+    const ids = h.frame().scene.workers.map((worker) => worker.id);
+    assert.equal(new Set(ids).size, ids.length, "no duplicated worker ids");
+    assert.equal(h.frame().scene.workers.find((worker) => worker.id === "boss")?.role, "overseer");
+    assert(ids.includes("c5"), "the overflow coordinator keeps its room desk");
+    assert.equal(h.frame().scene.workers.find((worker) => worker.id === "c5")?.role, undefined);
+    h.select("c5");
+    assert.equal(h.paint().team?.coordinatorId, "c5", "overflow coordinators still select a team");
+    h.select("boss");
+    assert.equal(h.paint().team?.coordinatorId, "boss");
+  } finally {
+    h.app.dispose();
+  }
+});
+test("selecting a seated coordinator never changes the deck and the observatory still selects the overseer", () => {
+  const h = coordinationHarness();
+  try {
+    const family: AppRow[] = Array.from({ length: 49 }, (_, index) =>
+      crewRow("annex_" + String(index), {
+        project: "Family",
+        projectId: "family",
+        repoId: "family",
+      }),
+    );
+    const others = Array.from({ length: 8 }, (_, index) => crewRow("other_" + String(index)));
+    const boss = crewRow("boss", { role: "overseer", projectId: "boss", repoId: "boss" });
+    h.deliver([boss, ...family, ...others]);
+    assert.match(h.page.get("page-label").textContent, /Deck 1 \/ 2/);
+    // An id the layout dropped maps to deck 1, so a jump would show from deck 2.
+    h.page.get("next-page").emit("click");
+    h.deliver([boss, ...family, ...others], {
+      bus: teamBus(teamOf({ coordinator: "annex_48" })),
+    });
+    assert.deepEqual(h.seated(), ["annex_48"]);
+    assert.match(h.page.get("page-label").textContent, /Deck 2 \/ 2/);
+    h.select("annex_48");
+    assert.match(h.page.get("page-label").textContent, /Deck 2 \/ 2/, "the deck stays put");
+    assert.equal(h.paint().team?.coordinatorId, "annex_48");
+    // AC2.2: the observatory keeps overseer selection with coordinators seated.
+    present(h.viewOptions().onObservatory)();
+    assert.equal(h.focused.at(-1), "boss");
+    assert.equal(h.paint().team, null);
+    assert.match(h.page.get("page-label").textContent, /Deck 2 \/ 2/);
+  } finally {
+    h.app.dispose();
+  }
+});
+test("a team observed across machines seats its remote coordinator and merges gates and grant expiry", () => {
+  const h = coordinationHarness();
+  try {
+    const rows = [
+      crewRow("bc", { host: "B", project: "Remote", projectId: "remote", repoId: "remote" }),
+      crewRow("w1"),
+      crewRow("w2"),
+    ];
+    const local = (gates: unknown[]) =>
+      teamBus(
+        teamOf({
+          workers: [
+            { agent: "w1", status: "claimed" },
+            { agent: "w2", status: "idle" },
+          ],
+          gates,
+          grantExpiresAt: 5000,
+        }),
+      );
+    const remote = teamBus(teamOf({ coordinator: "bc", generation: "g1" }));
+    h.deliver(rows, { bus: local([gateOf(4, "submitted")]), hostBus: { B: remote } });
+    const seat = present(h.frame().scene.workers.find((worker) => worker.role === "coordinator"));
+    assert.equal(seat.id, "bc");
+    assert.equal(seat.row.host, "B", "the seat's mail host equals its row host");
+    // AC1.2: the bench label and hover name the host.
+    const options = h.viewOptions();
+    assert.match(present(options.nameFor)("bc"), /@B$/);
+    assert.match(present(present(options.hoverLabel)("bc")), /@B/);
+    assert.doesNotMatch(present(options.nameFor)("w1"), /@/);
+    assert.deepEqual(h.seated(), ["bc"]);
+    assert.equal(h.frame().scene.workers.filter((worker) => worker.id === "bc").length, 1);
+    h.select("bc");
+    const team = present(h.paint().team);
+    assert.deepEqual(team.memberIds, new Set(["bc", "w1", "w2"]));
+    assert.equal(team.host, "B");
+    assert.deepEqual(
+      team.team.gates.map((gate) => gate.pr),
+      [4],
+    );
+    assert.equal(team.team.grantExpiresAt, 5000);
+    // AC6.3: the accepted flip arrives in the local half only.
+    h.deliver(rows, { bus: local([gateOf(4, "accepted")]), hostBus: { B: remote } });
+    assert.deepEqual([...h.paint().view.flashes.keys()], [TEAM_A + "#4"]);
+  } finally {
+    h.app.dispose();
+  }
+});
+test("the transition baseline resets on resume until the first proven snapshot", async () => {
+  const h = coordinationHarness();
+  try {
+    const rows = [crewRow("c1"), crewRow("w1")];
+    const snapshot = (generation: string, status: string) => ({
+      bus: teamBus(
+        teamOf({
+          coordinator: "c1",
+          generation,
+          workers: [{ agent: "w1", status: "idle" }],
+          gates: [gateOf(7, status)],
+        }),
+      ),
+    });
+    h.deliver(rows, snapshot("g1", "submitted"));
+    await h.resume();
+    // A pending snapshot is not proof: it must not become the baseline the proven one is compared against.
+    h.deliver(rows, snapshot("g1", "submitted"), { pending: true });
+    assert.equal(h.paint().view.handovers.size, 0);
+    h.deliver(rows, snapshot("g2", "accepted"));
+    assert.equal(
+      h.paint().view.flashes.size,
+      0,
+      "a change made while hidden is state, not a flash",
+    );
+    assert.equal(h.paint().view.handovers.size, 0);
+    h.deliver(rows, snapshot("g3", "accepted"));
+    assert.equal(h.paint().view.handovers.size, 1, "the next generation change hands over once");
+    assert.equal(h.paint().view.flashes.size, 0);
+  } finally {
+    h.app.dispose();
+  }
+});
 test("observer entry preserves synchronous prepaint and one module after the DOM", () => {
   const page = fs.readFileSync(new URL("../../../frontend/observer.html", import.meta.url), "utf8");
   const scripts = [...page.matchAll(/<script\b([^>]*)><\/script>/g)]

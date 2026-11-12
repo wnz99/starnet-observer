@@ -87,7 +87,7 @@ export interface Worker {
   station?: Rect;
   anchor?: Point | null;
   connector?: { from: Point; to: Point } | null;
-  role?: "overseer";
+  role?: "overseer" | "coordinator";
 }
 export interface Overflow {
   id: string;
@@ -122,6 +122,7 @@ export interface Observatory {
   chair: Point;
   viewer: { id: string; label: string; kind: string; point: Point } | null;
   overseer?: string;
+  bench: { desk: Rect; chair: Point }[];
   screens: PropExtent[];
   telescopes: PropExtent[];
   plant: PropExtent;
@@ -235,6 +236,7 @@ export interface BuildOptions {
   relays?: (Omit<RelayNetwork, "shadows"> & { shadows?: RelayShadow[] })[];
   overseer?: LayoutRow | null;
   overseerAccent?: string;
+  coordinators?: { row: LayoutRow; host: string | null; accent: string }[];
   localHealth?: string;
 }
 export type SceneRooms = readonly Room[];
@@ -249,7 +251,7 @@ export type MessageRelay = Omit<
   "state" | "direction"
 > & { machine: string; state: string; direction: string };
 export type SceneMessage = Partial<
-  Pick<PublicBus["messages"][number], "from" | "to" | "acknowledgedAt" | "wake">
+  Pick<PublicBus["messages"][number], "from" | "to" | "acknowledgedAt" | "wake" | "coordination">
 > & { relay?: MessageRelay };
 export interface PendingSpot {
   point: Point;

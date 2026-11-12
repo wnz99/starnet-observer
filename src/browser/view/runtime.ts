@@ -20,6 +20,7 @@ import type {
 } from "./state-types.js";
 import type {
   Anchor,
+  CoordinationViewForPaint,
   MailFrame,
   PlateFrame,
   ShipBox,
@@ -42,6 +43,7 @@ import { FurnitureEffects } from "./furniture-effects.js";
 import { Interaction } from "./interaction.js";
 import { Lifecycle } from "./lifecycle.js";
 import { Mail } from "./mail.js";
+import { CoordinationSignals } from "./coordination-signals.js";
 import { Plates } from "./plates.js";
 import { PlatformEffects } from "./platform-effects.js";
 import { Resources } from "./resources.js";
@@ -65,6 +67,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
     this.win = environment.win;
     this.raf = environment.raf;
     this.caf = environment.caf;
+    this.timers = environment.timers;
     this.dprOf = environment.dprOf;
     this.makeCanvas = environment.makeCanvas;
     this.clock = environment.clock;
@@ -111,6 +114,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   raf;
 
   caf;
+
+  timers;
 
   dprOf;
 
@@ -174,6 +179,8 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   repositories: Set<string> = new Set();
 
   repositorySelection: () => string | null = () => null;
+
+  coordination: () => CoordinationViewForPaint | null = () => null;
 
   onRepositoryToggle: (repo: string) => void = () => {};
 
@@ -320,6 +327,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
     if (typeof options.inspected === "function") this.inspected = options.inspected;
     if (typeof options.repositorySelection === "function")
       this.repositorySelection = options.repositorySelection;
+    if (typeof options.coordination === "function") this.coordination = options.coordination;
     if (typeof options.onRepositoryToggle === "function")
       this.onRepositoryToggle = options.onRepositoryToggle;
   }
@@ -356,6 +364,7 @@ export class ViewRuntime<R extends SpriteResource, B extends R = R> {
   aura: Aura<R, B> = new Aura(this);
   crew: Crew<R, B> = new Crew(this);
   mail: Mail<R, B> = new Mail(this);
+  coordinationSignals = new CoordinationSignals(this);
   plates: Plates<R, B> = new Plates(this);
   framePaint: FramePaint<R, B> = new FramePaint(this);
   interaction: Interaction<R, B> = new Interaction(this);

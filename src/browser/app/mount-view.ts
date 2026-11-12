@@ -28,6 +28,33 @@ export interface MountLinks<N extends AppNode, R extends SpriteResource> {
   floor?: Floor;
   ledger?: Ledger<N, R>;
 }
+// Opens, never toggles: a repeat select or the double-click path fires onSelect again and must keep the panel.
+export function openCoordination<N extends AppNode, R extends SpriteResource, B extends R>(
+  core: AppCore<N, R, B>,
+  links: MountLinks<N, R>,
+  id: string,
+  trigger?: N,
+) {
+  const { state, ui } = core;
+  const facts = state.selectedTeam();
+  if (!facts || state.selected !== id || state.presentation()) return;
+  const target = {
+    kind: "coordination",
+    id: facts.teamKey,
+    identity: facts.team.generation,
+  } as const;
+  if (!links.panels?.isOpenTarget(target))
+    links.panels?.togglePanel(target, trigger ?? ui.get("world"));
+}
+function selectAndOpenTeam<N extends AppNode, R extends SpriteResource, B extends R>(
+  core: AppCore<N, R, B>,
+  links: MountLinks<N, R>,
+  id: string,
+) {
+  if (core.state.disposed) return;
+  links.navigation?.select(id, { scroll: true });
+  openCoordination(core, links, id);
+}
 function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   core: AppCore<N, R, B>,
   links: MountLinks<N, R>,
@@ -46,7 +73,7 @@ function viewActions<N extends AppNode, R extends SpriteResource, B extends R>(
   const { state, descriptions, ui } = core;
   return {
     onSelect: (id) => {
-      if (!state.disposed) links.navigation?.select(id, { scroll: true });
+      selectAndOpenTeam(core, links, id);
     },
     onObservatory: () => {
       links.overlays?.observatoryClicked();
@@ -85,6 +112,11 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
   links: MountLinks<N, R>,
 ): Pick<ViewOptions<R, B>, "hoverLabel" | "idleLevel" | "idleVigour" | "nameFor"> {
   const { state, options, format } = core;
+  // A remote coordinator on the observatory bench has lost its host's room, so its labels name the host.
+  const hostTag = (id: string) => {
+    const host = links.floor?.benchHost(id);
+    return host ? " @" + host : "";
+  };
   return {
     // Read every frame, so a title Herdr publishes later replaces the fallback throughout the hover.
     hoverLabel: (id) => {
@@ -93,6 +125,7 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
       if (row)
         return (
           state.model.hoverLabel(row, state.rowStale(row), options.clock.now()) +
+          hostTag(id) +
           (carried ? " · on relay (" + carried.repo + ")" : "")
         );
       const ghost = links.floor?.shadows.get(id); // a relay roster entry: what llm-bus lists, nothing observed
@@ -118,7 +151,7 @@ function viewLabels<N extends AppNode, R extends SpriteResource, B extends R>(
     },
     nameFor: (id) => {
       const row = state.byId.get(id);
-      if (row) return format.workerName(row);
+      if (row) return format.workerName(row) + hostTag(id);
       const ghost = links.floor?.shadows.get(id);
       return ghost ? (PROVIDERS[ghost.provider ?? ""] || "Agent") + " · " + ghost.machine : "";
     },

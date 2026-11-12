@@ -12,6 +12,10 @@ import { must } from "./sqlite.fixture.js";
 import { selectBusOverview } from "./overview.js";
 import { publicCoordination } from "./public-coordination.js";
 import { validCoordination } from "../sqlite/validate-bus.js";
+import { remap } from "../remotes/fields.js";
+import { GENERATION_PREFIX, TEAM_LIMITS } from "./types.js";
+import { TEAM_SOURCES } from "../../shared/teams.js";
+import type { BusState, RawTeam, RawTeams } from "./types.js";
 
 test("overview excludes SQLite-relative timestamps consistently before aggregation and ranking", () => {
   const database = new Database(":memory:");
@@ -388,5 +392,224 @@ test("bus coordination reads bounded metadata, retains replies and remaps identi
   } finally {
     database.close();
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const TEAM_ID = (letter: string) => "obs_" + letter.repeat(24);
+const hostId = (id: string) => remap("host", id);
+function rawTeam(overrides: Partial<RawTeam> = {}): RawTeam {
+  return {
+    key: "team_0123456789abcdef",
+    label: "Atlas",
+    generation: "bbbbbbbb",
+    coordinator: "claude:coord",
+    objective: "Ship Atlas",
+    workers: [
+      { agent: "codex:w1", status: "claimed", claim: { ticket: "T-1", branch: "feat/x" } },
+      { agent: "codex:w2", status: "idle" },
+      { agent: "buildbox/repo/codex:w3", status: "unknown" },
+    ],
+    grantExpiresAt: null,
+    instructions: 1,
+    amendments: 0,
+    decisions: [],
+    gates: [],
+    ...overrides,
+  };
+}
+function rawTeams(...projects: RawTeam[]): RawTeams {
+  const sources = Object.fromEntries(
+    TEAM_SOURCES.map((name) => [name, true]),
+  ) as RawTeams["sources"];
+  return { asOf: 1000, status: "available", truncated: false, sources, projects };
+}
+function busState(teams: RawTeams): BusState {
+  return {
+    rows: [
+      {
+        id: 1,
+        sender: "claude:coord",
+        recipient: "codex:w1",
+        sentAt: null,
+        acknowledgedAt: null,
+        wake: "none",
+        coordination: "sealed",
+      },
+      {
+        id: 2,
+        sender: "codex:w1",
+        recipient: "claude:coord",
+        sentAt: null,
+        acknowledgedAt: null,
+        wake: "none",
+        coordination: "report",
+      },
+      {
+        id: 3,
+        sender: "codex:w1",
+        recipient: "codex:w2",
+        sentAt: null,
+        acknowledgedAt: null,
+        wake: "none",
+      },
+    ],
+    coordination: { sections: [], teams },
+    observedAt: 1000,
+    health: "available",
+    reason: null,
+  };
+}
+const PANES = [
+  { id: TEAM_ID("a"), provider: "claude", sessionId: "coord" },
+  { id: TEAM_ID("b"), provider: "codex", sessionId: "w1" },
+  { id: TEAM_ID("c"), provider: "codex", sessionId: "w2" },
+] as const;
+const publicTeamsOf = (bus: { coordination?: { teams?: { projects: unknown[] } } }) =>
+  must(must(bus.coordination).teams);
+
+test("local teams publish endpoint ids, count unobserved workers and keep message kinds", () => {
+  const bus = publicBus(busState(rawTeams(rawTeam())), [...PANES]);
+  const [team] = publicTeamsOf(bus).projects as {
+    coordinator: string;
+    workers: { agent: string }[];
+    unobservedWorkers: number;
+  }[];
+  assert.equal(must(team).coordinator, TEAM_ID("a"));
+  assert.deepEqual(
+    must(team).workers.map((worker) => worker.agent),
+    [TEAM_ID("b"), TEAM_ID("c")],
+  );
+  assert.equal(must(team).unobservedWorkers, 1);
+  assert.deepEqual(
+    bus.messages.map((message) => message.coordination),
+    ["sealed", "report", undefined],
+  );
+  assert(!JSON.stringify(bus).includes("codex:w"));
+  assert(!JSON.stringify(bus).includes("claude:coord"));
+});
+
+test("unobserved coordinator keeps a team with an observed worker and external coordinator", () => {
+  const bus = publicBus(
+    busState(rawTeams(rawTeam({ coordinator: "buildbox/repo/claude:c1", unobservedWorkers: 4 }))),
+    [PANES[1]],
+  );
+  const [team] = publicTeamsOf(bus).projects as {
+    coordinator: string;
+    unobservedWorkers: number;
+  }[];
+  assert.equal(must(team).coordinator, "external");
+  assert.equal(must(team).unobservedWorkers, 4 + 2);
+});
+
+test("ambiguous panes drop a team without another observed member", () => {
+  const twin = { id: TEAM_ID("d"), provider: "claude", sessionId: "coord" } as const;
+  const alone = rawTeam({ workers: [{ agent: "codex:zzz", status: "unknown" }] });
+  assert.equal(
+    publicTeamsOf(publicBus(busState(rawTeams(alone)), [PANES[0], twin])).projects.length,
+    0,
+  );
+  assert.equal(
+    publicTeamsOf(publicBus(busState(rawTeams(rawTeam())), [PANES[0], twin, PANES[1]])).projects
+      .length,
+    1,
+  );
+});
+
+test("team free text is redacted before the display cap and never splits a surrogate pair", () => {
+  const secret = 'api_key="sk-live-abcdefghijklmnopqrstuvwxyz0123456789"';
+  const straddle = (cap: number) => "x".repeat(cap - 10) + secret;
+  const team = rawTeam({
+    label: straddle(160),
+    objective: "😀".repeat(600),
+    workers: [
+      {
+        agent: "codex:w1",
+        status: "claimed",
+        claim: { ticket: straddle(64), branch: straddle(160) },
+      },
+    ],
+    decisions: [
+      {
+        class: "x",
+        status: "pending",
+        question: "token Bearer abcdefghijklmnopqrstuvwxyz0123456789 " + "y".repeat(300),
+        createdAt: null,
+        deadlineAt: null,
+      },
+    ],
+    latestInstruction: { audience: "worker", kind: "set", text: straddle(512), recordedAt: null },
+    latestAmendment: { text: straddle(512), recordedAt: null },
+    gates: [
+      { pr: 1, ticket: straddle(64), status: "submitted", submittedAt: null, decidedAt: null },
+    ],
+  });
+  const text = JSON.stringify(publicBus(busState(rawTeams(team)), [...PANES]));
+  assert(!text.includes("sk-live"));
+  assert(!text.includes("abcdefghijklmnopqrstuvwxyz0123456789"));
+  const [published] = publicTeamsOf(publicBus(busState(rawTeams(team)), [...PANES])).projects as {
+    label: string;
+    objective: string;
+    decisions: { question: string }[];
+  }[];
+  assert(must(published).label.length <= 160);
+  assert(must(published).objective.length <= 512);
+  assert(!/[\ud800-\udbff]$/.test(must(published).objective));
+  assert(must(must(published).decisions[0]).question.length <= 240);
+});
+
+test("remote teams remap to surviving host rows and sum unobserved workers", () => {
+  const bus = publicBus(busState(rawTeams(rawTeam({ unobservedWorkers: 2 }))), [...PANES]);
+  const rowIds = new Set([TEAM_ID("a"), TEAM_ID("b")].map(hostId));
+  const remote = must(sanitizeBus("host", bus, rowIds, 5000));
+  const [team] = must(must(remote.coordination).teams).projects;
+  assert.equal(must(team).workers.length, 1);
+  assert.equal(must(team).unobservedWorkers, 2 + 1 + 1);
+  assert.equal(remote.messages[0]?.coordination, "sealed");
+  const gone = must(sanitizeBus("host", bus, new Set(), 5000));
+  assert.equal(must(must(gone.coordination).teams).projects.length, 0);
+});
+
+test("malformed remote teams are omitted while sections and valid kinds survive", () => {
+  const good = publicBus(busState(rawTeams(rawTeam())), [...PANES]);
+  const rowIds = new Set([TEAM_ID("a")].map((id) => hostId(id)));
+  const mutate = (patch: Record<string, unknown>) => {
+    const copy = structuredClone(good);
+    const published = must(must(copy.coordination).teams);
+    const message = must(copy.messages[2]);
+    const sent = {
+      ...copy,
+      coordination: {
+        ...copy.coordination,
+        teams: { ...published, projects: [{ ...must(published.projects[0]), ...patch }] },
+      },
+      messages: [{ ...message, coordination: "directive" }],
+    };
+    return must(sanitizeBus("host", sent, rowIds, 5000));
+  };
+  for (const patch of [
+    { objective: "x".repeat(TEAM_LIMITS.rawUnits + 1) },
+    { key: "bad" },
+    { workers: [{ agent: "x", status: "weird" }] },
+  ]) {
+    const remote = mutate(patch);
+    assert.equal(must(remote.coordination).teams, undefined);
+    assert.deepEqual(must(remote.coordination).sections, []);
+    assert.equal(remote.messages[0]?.coordination, undefined);
+  }
+  const edge = mutate({ objective: "x".repeat(TEAM_LIMITS.rawUnits) });
+  const [edgeTeam] = must(must(edge.coordination).teams).projects;
+  assert.equal(must(edgeTeam).objective.length, 512);
+  for (const generation of [
+    "\u0007ab\ncd\u001bef" + "x".repeat(4000),
+    "sk-live-" + "A1b2".repeat(40),
+  ]) {
+    const [cleaned] = must(must(mutate({ generation }).coordination).teams).projects;
+    const published = must(cleaned).generation;
+    assert(published.length <= GENERATION_PREFIX);
+    for (let index = 0; index < published.length; index += 1) {
+      assert(published.charCodeAt(index) >= 32 && published.charCodeAt(index) !== 127);
+    }
+    assert(!published.startsWith("sk-live"));
+    assert(!published.includes("sk-live-A1b2"));
   }
 });

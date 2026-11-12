@@ -5,7 +5,7 @@ import type { AppView } from "./contracts.js";
 import type { AppBus, AppQuerySnapshot, AppRow } from "./data.js";
 import type { AppState } from "./state.js";
 import { HelperPresentation } from "./helper-presentation.js";
-import { geometryField, refreshSceneRows } from "./floor-rows.js";
+import { benchSeats, busKey, geometryField, refreshSceneRows, type Seat } from "./floor-rows.js";
 
 interface FloorOptions {
   state: AppState;
@@ -35,6 +35,7 @@ export class Floor {
   private candidates: AppRow[] = [];
   private presentationKey = "";
   private generation = 0;
+  private seats: Seat[] = [];
   private startupEligibilityDelivered = false;
   private resumedAt: number | null = null;
   constructor(private readonly options: FloorOptions) {
@@ -56,6 +57,7 @@ export class Floor {
     this.presentationKey = key;
     return changed;
   }
+  benchHost = (id: string) => this.seats.find((seat) => seat.row.id === id)?.host ?? null;
   reset() {
     this.sceneKey = null;
     this.generation++;
@@ -119,7 +121,12 @@ export class Floor {
     hasData: boolean,
   ) {
     const { state } = this.options;
-    state.layout.reconcile([...rows.filter((row) => row !== overseer), ...ghosts]);
+    this.seats = benchSeats(state.coordination, rows, overseer);
+    const seated = new Set(this.seats.map((seat) => seat.row.id));
+    state.layout.reconcile([
+      ...rows.filter((row) => row !== overseer && !seated.has(row.id)),
+      ...ghosts,
+    ]);
     if (hasData && state.page >= state.layout.pages())
       this.options.setPage(state.layout.pages() - 1);
     const first = rows[0];
@@ -133,6 +140,7 @@ export class Floor {
       state.page,
       state.layout.onPage(state.page),
       overseer && [overseer.id, overseer.status, overseer.provider],
+      this.seats.map(({ row, host, accent }) => [row.id, row.status, row.provider, host, accent]),
     ];
     if (hosts.length > 0)
       fields.push(
@@ -172,6 +180,7 @@ export class Floor {
       mailFrame: (now) => this.options.mailFrame(now),
       inspected: () => this.options.inspected(),
       repositorySelection: () => state.selectedRepoId,
+      coordination: () => ({ view: state.coordination, team: state.selectedTeam() }),
       onRepositoryToggle: (repo) => {
         this.options.repositoryToggle(repo);
       },
@@ -181,19 +190,13 @@ export class Floor {
   }
   private content(snapshot: AppQuerySnapshot) {
     const data = snapshot.data;
-    const bus = data?.bus;
-    const messages = bus?.messages ?? [];
-    // Hover text, plates and pending envelopes read rows and bus live; a frozen floor repaints only when they change.
+    // Hover text, plates, pending envelopes and team signals read rows and bus live; a frozen floor repaints only when they change.
     return JSON.stringify([
       this.options.state.isStale(snapshot),
       data?.health,
       data?.sessions ?? [],
-      bus && [bus.health, bus.reason, messages],
-      Object.entries(data?.hostBus ?? {}).map(([id, value]) => [
-        id,
-        value?.health,
-        value?.messages,
-      ]),
+      busKey(data?.bus),
+      Object.entries(data?.hostBus ?? {}).map(([id, value]) => [id, busKey(value)]),
     ]);
   }
   private buildScene(
@@ -209,6 +212,7 @@ export class Floor {
     return build(state.layout.onPage(state.page), state.page, {
       overseer,
       overseerAccent: colors.cyan,
+      coordinators: this.seats,
       relays: nets,
       relayMembers: this.relayMembers,
       ...(hosts.length > 0
@@ -234,6 +238,7 @@ export class Floor {
     this.displayedRows = observed([
       ...representedRows(state.layout.allRooms()).map((row) => row.id),
       ...(overseer ? [overseer.id] : []),
+      ...this.seats.map((seat) => seat.row.id),
     ]);
     if (state.selected && !this.displayedRows.some((row) => row.id === state.selected))
       this.options.overview();
@@ -296,6 +301,7 @@ export class Floor {
     this.presentation.dispose();
     this.candidates = [];
     this.displayedRows = [];
+    this.seats = [];
     for (const map of [this.shadows, this.relayMembers]) map.clear();
   }
 }

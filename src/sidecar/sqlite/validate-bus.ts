@@ -1,5 +1,8 @@
 import { busRecord, MESSAGE_IDENTITY } from "../bus/types.js";
 import type { BusState, BusRow, Relay, RemoteView } from "../bus/types.js";
+import { validTeams } from "./validate-teams.js";
+
+export { validTeams };
 const WAKE_FAILED = "failed";
 const MAX_FIELD_CHARS = 65536;
 const MAX_MACHINES = 32;
@@ -78,9 +81,18 @@ function row(value: unknown): value is BusRow {
     instant(value.sentAt) &&
     instant(value.acknowledgedAt) &&
     wake(value.wake) &&
-    optionalMessageId(value.replyTo) &&
-    optionalRelay(value.relay)
+    optionalFields(value)
   );
+}
+function optionalFields(value: Record<string, unknown>) {
+  return (
+    optionalMessageId(value.replyTo) &&
+    optionalRelay(value.relay) &&
+    optionalKind(value.coordination)
+  );
+}
+function optionalKind(value: unknown) {
+  return value === undefined || value === "sealed" || value === "report";
 }
 function optionalMessageId(value: unknown) {
   return value === undefined || value === null || messageId(value);
@@ -151,6 +163,7 @@ export function validCoordination(value: unknown): value is BusState["coordinati
     value === undefined ||
     (busRecord(value) &&
       (value.overview === undefined || validOverview(value.overview)) &&
+      (value.teams === undefined || validTeams(value.teams)) &&
       Array.isArray(value.sections) &&
       value.sections.length <= 12 &&
       value.sections.every(

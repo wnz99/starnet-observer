@@ -69,6 +69,9 @@ function sanitizeMessage(
     wake: has(WAKES, message.wake) ? message.wake : "unknown",
     ...replyLink(message.replyTo),
     ...(relay ? { relay } : {}),
+    ...(message.coordination === "sealed" || message.coordination === "report"
+      ? { coordination: message.coordination }
+      : {}),
   };
 }
 function replyLink(value: unknown) {

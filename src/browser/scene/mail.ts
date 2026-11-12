@@ -16,11 +16,26 @@ const MAIL = { pendingHeight: 1.2 };
 const WAKE_MARKS = ["failed", "unsupported", "unknown"];
 export const mailOf = (scene: Scene, host: Host) =>
   host ? (scene.ships || []).find((ship) => ship.id === host)?.mail || null : scene.mail;
+// A seated coordinator is not in the room layout, so it is found among the scene workers of its own host.
+function seatedRoute(scene: Scene, id: string, host: Host) {
+  return scene.workers.find(
+    (w) => w.id === id && w.role === "coordinator" && (w.row.host || null) === host,
+  )?.route;
+}
 export function endpoint(
   scene: Scene,
   layout: MailLayout,
   id: string,
   host: Host = null,
+): { key: string; points: Point[]; deck?: number } {
+  const seat = seatedRoute(scene, id, host);
+  return seat ? { key: id, points: seat } : layoutEndpoint(scene, layout, id, host);
+}
+function layoutEndpoint(
+  scene: Scene,
+  layout: MailLayout,
+  id: string,
+  host: Host,
 ): { key: string; points: Point[]; deck?: number } {
   const own = mailOf(scene, host) || scene.mail;
   if (layout.seatFor(id) !== undefined) {
@@ -118,11 +133,14 @@ export function route(
 ) {
   const { from, to, recipientId } = messageEndpoints(scene, layout, message, host);
   const recipient = rows.find((row) => row.id === recipientId);
+  const kind = message.coordination;
   return {
-    key: `${from.key}>${to.key}`,
+    // A kind suffix keeps sealed, report and plain mail between the same endpoints in separate flights.
+    key: kind ? `${from.key}>${to.key}|${kind}` : `${from.key}>${to.key}`,
     from: from.points,
     to: to.points,
     color: recipient ? layout.colorFor(projectKey(recipient)).accent : null,
+    ...(kind ? { kind } : {}),
   };
   // The courier colours unassigned recipients.
 }

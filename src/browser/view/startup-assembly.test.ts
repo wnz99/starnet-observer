@@ -133,6 +133,10 @@ test("walkways derive latest endpoint ownership; detached geometry remains unkno
     "observatory",
   );
   assert.equal(
+    assembly.owners.worker({ role: "coordinator" } as Parameters<typeof assembly.owners.worker>[0]),
+    "observatory",
+  );
+  assert.equal(
     assembly.owners.worker({ platformKey: "room" } as Parameters<typeof assembly.owners.worker>[0]),
     "platform:room",
   );

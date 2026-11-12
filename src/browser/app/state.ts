@@ -1,5 +1,10 @@
 import type { ThemeContents } from "../../shared/theme.js";
 import { createModel } from "../model.js";
+import {
+  EMPTY_COORDINATION,
+  type CoordinationView,
+  type TeamFacts,
+} from "../model/coordination.js";
 import type { Scene } from "../scene/types.js";
 import type { AppClock } from "./dom.js";
 import type { AppQuerySnapshot, AppRow, AppSnapshot } from "./data.js";
@@ -21,6 +26,7 @@ export class AppState {
   zoomed: string | null = null;
   scene: Scene | null = null;
   byId = new Map<string, AppRow>();
+  coordination: CoordinationView = EMPTY_COORDINATION;
   active = false;
   disposed = false;
   resumedAt = 0;
@@ -100,6 +106,12 @@ export class AppState {
   // The mail panel lists the selected host's own bus (this machine's unless a remote host tab is chosen).
   panelBus() {
     return this.busFor(this.selectedHost);
+  }
+  // The team the selected agent coordinates, whether it sits on the bench or kept its room desk.
+  selectedTeam(): TeamFacts | null {
+    const { selected } = this;
+    if (selected === null) return null;
+    return this.coordination.teams.find((facts) => facts.coordinatorId === selected) ?? null;
   }
   presentation() {
     return !!this.latest?.data?.presentation;

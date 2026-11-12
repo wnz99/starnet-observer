@@ -4,7 +4,7 @@ import type { createControls } from "./controls.js";
 import type { AppNode } from "./dom.js";
 import { Ledger } from "./ledger.js";
 import type { AppCore } from "./mount-core.js";
-import type { MountLinks } from "./mount-view.js";
+import { openCoordination, type MountLinks } from "./mount-view.js";
 import type { Navigation } from "./navigation.js";
 import { Overlays } from "./overlays.js";
 import { PanelAdapter } from "./panel-adapter.js";
@@ -54,7 +54,9 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
           ? (this.links.roster?.inspectTrigger(target.id) ?? null)
           : target.kind === "mail"
             ? (this.links.ledger?.readTrigger(target.id) ?? null)
-            : ui.get("mail-title"),
+            : target.kind === "coordination"
+              ? ui.get("world")
+              : ui.get("mail-title"),
       closeHelp: () => {
         this.links.overlays?.closeHelp();
       },
@@ -110,7 +112,13 @@ export class StationPanels<N extends AppNode, R extends SpriteResource, B extend
       controls,
       panels: panelAccess,
       enabled: bootstrap.control,
-      select: (id) => {
+      // A roster pick of a coordinator opens its panel exactly as a canvas click does,
+      // but focus returns to the row. The magnifier only reveals, keeping one agent panel.
+      select: (id, trigger) => {
+        navigationOwner.select(id);
+        openCoordination(this.core, this.links, id, trigger);
+      },
+      reveal: (id) => {
         navigationOwner.select(id);
       },
       toggleRepository: (repo) => {

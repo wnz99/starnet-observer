@@ -2414,3 +2414,160 @@ test("observer-scene regression contracts", () => {
   }
   verifyOverseerSeating();
 }, 120000);
+
+// Coordinator bench: seated coordinators are scene workers on the observatory bench with courier routes.
+test("coordinators sit on the observatory bench with local and remote courier routes", () => {
+  const coordinator = (id: string, host: string | null = null) => ({
+    row: {
+      id,
+      project: "P",
+      projectId: "p",
+      projectKind: "group" as const,
+      repo: "r",
+      repoId: "r",
+      provider: "codex",
+      status: "idle" as const,
+      ...(host ? { host } : {}),
+    },
+    host,
+    accent: "#abcdef",
+  });
+  const none = Scene.build([], 0),
+    empty = Scene.build([], 0, { coordinators: [] });
+  const inside = (inner: Rect, outer: Rect) =>
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.w <= outer.x + outer.w &&
+    inner.y + inner.h <= outer.y + outer.h;
+  const overlaps = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  // (a) four slots inside the floor, clear of every prop and each other.
+  const { observatory } = none;
+  assert.equal(observatory.bench.length, 4);
+  const props = [
+    observatory.desk,
+    ...observatory.screens.map((p) => p.rect),
+    ...observatory.telescopes.map((p) => p.rect),
+    observatory.plant.rect,
+    observatory.light.rect,
+  ];
+  observatory.bench.forEach((slot, index) => {
+    assert(inside(slot.desk, observatory.rect));
+    assert(inside({ ...slot.chair, w: 0, h: 0 }, observatory.rect));
+    for (const prop of props) assert(!overlaps(slot.desk, prop), "bench desk clears props");
+    for (const other of observatory.bench.slice(index + 1))
+      assert(!overlaps(slot.desk, other.desk), "bench desks do not overlap");
+  });
+
+  // (g) no coordinators: nothing seated, extents and revision unchanged.
+  assert.equal(none.workers.filter((w) => w.role === "coordinator").length, 0);
+  assert.equal(none.observatory.extents.length, 8);
+  assert.equal(empty.revision, none.revision);
+  assert(!none.revision.includes("coordinator"));
+  // Literal captured before the coordinator change (80d9328): an unchanged revision means no repaint churn.
+  assert.equal(
+    none.revision,
+    '[0,[{"rect":{"x":0,"y":-14,"w":14,"h":10},"height":3.2},{"rect":{"x":4,"y":-12,"w":2,"h":1},"height":1.5},{"rect":{"x":1,"y":-14,"w":2,"h":1},"height":3},{"rect":{"x":7,"y":-14,"w":2,"h":1},"height":3},{"rect":{"x":1,"y":-11,"w":1,"h":1},"height":3.5},{"rect":{"x":10,"y":-11,"w":1,"h":1},"height":3.5},{"rect":{"x":8,"y":-9,"w":1,"h":1},"height":2},{"rect":{"x":8,"y":-13,"w":1,"h":1},"height":4.5}],null,[],[],[["observatory-link",{"x":11,"y":-4,"w":2,"h":4},null,null,null]],[]]',
+  );
+
+  const local = Scene.build([], 0, { coordinators: [coordinator("a"), coordinator("b")] });
+  const seated = local.workers.filter((w) => w.role === "coordinator");
+  assert.deepEqual(
+    seated.map((w) => w.id),
+    ["a", "b"],
+  );
+  const { bench } = local.observatory,
+    localHub = local.mail.hub;
+  seated.forEach((worker, index) => {
+    assert.deepEqual(worker.desk, bench[index]?.desk);
+    assert.deepEqual(worker.chair, bench[index]?.chair);
+    assert.equal(worker.platformKey, "observatory");
+    const route = present(worker.route);
+    assert.deepEqual(route[0], worker.chair);
+    assert.deepEqual(route.at(-1), localHub);
+  });
+  assert.deepEqual(local.observatory.extents, none.observatory.extents);
+  assert.notEqual(local.revision, none.revision);
+  assert.notEqual(
+    local.revision,
+    Scene.build([], 0, { coordinators: [coordinator("a")] }).revision,
+  );
+
+  // (d) endpoint returns the seat route; a host mismatch falls back to the chute.
+  const layout = {
+    seatFor: () => undefined,
+    pageFor: () => undefined,
+    colorFor: () => ({ accent: "#fff" }),
+  };
+  assert.deepEqual(Scene.endpoint(local, layout, "a"), { key: "a", points: seated[0]?.route });
+  assert.equal(Scene.endpoint(local, layout, "a", "elsewhere").key, "chute");
+
+  // Coordination kind rides on the route; kinds never share a flight key, plain mail keeps today's key.
+  const plainRoute = Scene.route(local, layout, { from: "a", to: "x" }, []);
+  const sealedRoute = Scene.route(
+    local,
+    layout,
+    { from: "a", to: "x", coordination: "sealed" },
+    [],
+  );
+  const reportRoute = Scene.route(
+    local,
+    layout,
+    { from: "a", to: "x", coordination: "report" },
+    [],
+  );
+  assert.equal(plainRoute.key, "a>chute");
+  assert.equal("kind" in plainRoute, false);
+  assert.deepEqual(
+    [sealedRoute.kind, sealedRoute.key, reportRoute.kind, reportRoute.key],
+    ["sealed", "a>chute|sealed", "report", "a>chute|report"],
+  );
+
+  // (c) remote coordinators end exactly at that host's mail hub: direct link, relay-routed link, no link.
+  const member = (host: string | null) => ({
+    host,
+    machine: host ?? "mac",
+    lastActivityAt: null,
+    state: "quiet",
+    crossed: [],
+  });
+  const hubOf = (scene: SceneValue, host: string) =>
+    present(present(scene.ships?.find((ship) => ship.id === host)).mail).hub;
+  const direct = Scene.build([], 0, {
+    hosts: [{ id: "one", health: "available" }],
+    coordinators: [coordinator("r", "one")],
+  });
+  const directRoute = present(present(direct.workers.find((w) => w.id === "r")).route);
+  assert.deepEqual(directRoute.at(-1), hubOf(direct, "one"));
+  assert.equal(
+    directRoute.filter((p) => p.x === hubOf(direct, "one").x && p.y === hubOf(direct, "one").y)
+      .length,
+    1,
+    "the hub is not appended twice",
+  );
+  const relayed = Scene.build([], 0, {
+    hosts: [
+      { id: "one", health: "available" },
+      { id: "two", health: "available" },
+    ],
+    relays: [
+      {
+        relay: "relay.example",
+        members: [member(null), member("one"), member("two")],
+        shadows: [],
+      },
+    ],
+    coordinators: [coordinator("r", "two")],
+  });
+  const link = present(present(relayed.links).find((value) => value.host === "two"));
+  const hub = hubOf(relayed, "two");
+  assert.notDeepEqual(link.path.at(-1), hub, "the relay-routed link ends offset from the hub");
+  const relayedRoute = present(present(relayed.workers.find((w) => w.id === "r")).route);
+  assert.deepEqual(relayedRoute.at(-1), hub);
+  assert.deepEqual(relayedRoute.at(-2), link.path.at(-1));
+  assert.equal(Scene.endpoint(relayed, layout, "r", "two").key, "r");
+  const orphan = Scene.build([], 0, { coordinators: [coordinator("r", "gone")] });
+  assert.equal(present(orphan.workers.find((w) => w.id === "r")).route, null);
+  assert.equal(Scene.endpoint(orphan, layout, "r", "gone").key, "chute");
+});

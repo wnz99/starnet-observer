@@ -20,7 +20,13 @@ export interface BusTarget {
   id: string;
   identity: string;
 }
-export type PanelTarget = AgentTarget | MailTarget | BusTarget;
+// id is the browser team key; identity is the team's generation, so a handover is a different exact target.
+export interface CoordinationTarget {
+  kind: "coordination";
+  id: string;
+  identity: string;
+}
+export type PanelTarget = AgentTarget | MailTarget | BusTarget | CoordinationTarget;
 export interface RosterPanels<N extends AppNode> {
   agentTarget(row: AppRow): AgentTarget | null;
   panelFor(target: PanelTarget | null): { root: N } | null;
@@ -43,7 +49,10 @@ export interface RosterOptions<N extends AppNode, R extends SpriteResource> {
   controls: AppControls<N, R>;
   panels: RosterPanels<N>;
   enabled: boolean;
-  select(id: string): void;
+  /** Row select action: selects the agent and opens a coordinator's panel, returning focus to `trigger`. */
+  select(id: string, trigger: N): void;
+  /** Selects the agent without opening a coordination panel (magnifier path). */
+  reveal(id: string): void;
   toggleRepository(repoId: string): void;
   zoomProject(key: string): void;
   confirm(message: string): boolean;

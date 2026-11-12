@@ -47,6 +47,7 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     this.view.regions = [];
 
     this.view.anchors = [];
+    this.overlays.teams.begin();
 
     if (!this.view.scene) {
       const frame = { animate: false };
@@ -78,6 +79,8 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     if (!this.view.assemblyFrame.active) {
       this.observations(now, animate);
       this.overlays.repository(stationArt);
+      this.overlays.teams.team();
+      this.overlays.teams.crests();
       this.overlays.focus(now, animate);
       this.overlays.platform(this.view.camera.zoom);
       this.overlays.host(now, animate, this.view.camera.zoom);
@@ -91,8 +94,14 @@ export class FramePaint<R extends SpriteResource, B extends R = R> {
     this.view.plates.paintPlates(isStale, staleKeys, now, animate);
     this.view.interaction.refreshBadgeHover();
 
+    this.wake(animate);
+
     return animate || assemblyAnimating;
   };
+  // Without a frame loop (reduced motion, stale) one timed repaint keeps time-based text current.
+  private wake(animate: boolean) {
+    this.view.lifecycle.wakeIn(animate ? null : this.view.coordinationSignals.nextChangeIn());
+  }
   private observations(now: number, animate: boolean) {
     for (const link of this.view.activeScene.links || [])
       this.view.effects.paintObservation(link, now, animate);

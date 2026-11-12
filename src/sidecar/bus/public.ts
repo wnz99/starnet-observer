@@ -26,6 +26,7 @@ export function publicBus(state: BusState, sessions: BusPane[]) {
       wake: row.wake,
       ...(row.replyTo === undefined ? {} : { replyTo: row.replyTo }),
       ...(row.relay ? { relay: { ...row.relay } } : {}),
+      ...(row.coordination ? { coordination: row.coordination } : {}),
     })),
     ...(state.remote
       ? {

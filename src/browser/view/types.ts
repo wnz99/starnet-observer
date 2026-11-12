@@ -1,4 +1,5 @@
 import type { ThemeContents, ThemeDefault } from "../../shared/theme.js";
+import type { CoordinationView, TeamFacts } from "../model/coordination.js";
 import type { OfficeImage } from "../office-art/types.js";
 import type {
   Camera,
@@ -155,6 +156,7 @@ export interface ViewEnvironment<R extends SpriteResource, B extends R = R> {
   window?: ViewWindow<R>;
   raf?: (callback: (now: number) => void) => number;
   caf?: (id: number) => void;
+  timers?: { after: (run: () => void, ms: number) => number; cancel: (id: number) => void };
   dpr?: () => number;
   createCanvas?: (w: number, h: number) => ViewCanvas<R> & R;
   sprites?: ViewSprites<R, B> | null;
@@ -200,6 +202,10 @@ export interface MailFrame {
   drones: Drone[];
   envelopes: Envelope[];
 }
+export interface CoordinationViewForPaint {
+  view: CoordinationView;
+  team: TeamFacts | null;
+}
 export interface UpdateOptions {
   startupEligible?: boolean;
   onHelperSettled?: (id: string, phase: "entering" | "returning") => void;
@@ -208,6 +214,7 @@ export interface UpdateOptions {
   mailFrame?: (now: number) => MailFrame;
   inspected?: () => string | null;
   repositorySelection?: () => string | null;
+  coordination?: () => CoordinationViewForPaint | null;
   onRepositoryToggle?: (repo: string) => void;
 }
 export interface ZoomLimits {

@@ -2,6 +2,8 @@ import { element, required } from "./types.js";
 import { identityHash } from "./identity.js";
 import type { Unit } from "./types.js";
 const ROOMS_PER_PAGE = 8;
+export const goldenHue = (index: number) =>
+  `hsl(${String((index * 137.507764 + 7.5) % 360)} 70% 65%)`;
 const ownerOf = (key: string) => key.slice(0, key.lastIndexOf(":"));
 const deckOf = (slot: number) => Math.floor(slot / ROOMS_PER_PAGE);
 export class Hues {

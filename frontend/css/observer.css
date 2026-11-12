@@ -933,6 +933,27 @@ input::placeholder {
 .bus-message {
   min-width: 0;
 }
+.team-section {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  margin-bottom: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
+}
+.team-section h3 {
+  margin: 0 0 4px;
+  font-size: inherit;
+}
+.team-lines {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+}
 .mail-reply {
   margin: 4px;
 }

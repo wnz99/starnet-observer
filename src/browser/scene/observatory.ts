@@ -21,7 +21,10 @@ const OBSERVATORY = {
   ],
   floorHeight: 3.2,
   deskHeight: 1.5,
+  bench: { seats: 4, y: -7, x0: 1.5, pitch: 2.5, w: 2, h: 1, chairDx: 1, chairDy: -0.5 },
 };
+/** Seat count owned by the scene; the floor imports it to decide which coordinators leave their rooms. */
+export const BENCH_SEATS = OBSERVATORY.bench.seats;
 export function observatoryFor(): Observatory {
   const rect = { ...OBSERVATORY.rect },
     desk = { ...OBSERVATORY.desk },
@@ -36,10 +39,17 @@ export function observatoryFor(): Observatory {
   }));
   const plant = { ...OBSERVATORY.plant, rect: { ...OBSERVATORY.plant.rect } },
     light = { ...OBSERVATORY.light, rect: { ...OBSERVATORY.light.rect } };
+  const { seats, y, x0, pitch, w, h, chairDx, chairDy } = OBSERVATORY.bench;
+  // Slot geometry only: it is not an extent (the floor covers it) and only occupied slots get a worker to paint.
+  const bench = Array.from({ length: seats }, (_, index) => {
+    const x = x0 + index * pitch;
+    return { desk: { x, y, w, h }, chair: { x: x + chairDx, y: y + chairDy, z: 0 } };
+  });
   return {
     rect,
     desk,
     chair,
+    bench,
     viewer: { id: "observer_viewer", label: "Viewer", kind: "ambient", point: chair },
     screens,
     telescopes,

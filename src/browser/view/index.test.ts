@@ -10,13 +10,16 @@ import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
 import type { SceneArtRoleName } from "../../shared/scene-art-roles.js";
 import { SCENE_ART_ROLE_NAMES, SCENE_ART_ROLES } from "../../shared/scene-art-roles.js";
+import type { AppBus } from "../app/data.js";
 import { createMail } from "../mail.js";
+import { coordinationView } from "../model/coordination.js";
+import type { CoordinationView } from "../model/coordination.js";
 import { createModel } from "../model.js";
 import type { LayoutRow } from "../model/types.js";
 import * as Scene from "../scene/index.js";
 import type { ActorFrame } from "../scene/motion-types.js";
 import { create as createOffice } from "../office-art.js";
-import type { Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
+import type { BuildOptions, Point, Rect, Scene as SceneGeometry } from "../scene/types.js";
 import { load } from "../sprites/runtime.fixture.js";
 import type { SpriteAppearance, SpriteBody } from "../sprites/types.js";
 import { canonicalTheme } from "../theme.fixture.js";
@@ -45,6 +48,8 @@ import { paintersFor } from "./painters.js";
 import { visibleFaces } from "./primitives.js";
 import type {
   AppearanceTheme,
+  CoordinationViewForPaint,
+  UpdateOptions,
   ViewContext,
   ViewEvent,
   ViewOptions,
@@ -1031,6 +1036,327 @@ test("observer-view regression contracts", async () => {
     runtime.lifecycle.stop();
   }
   verifyAssemblyLabels();
+
+  function verifyTeamPaint() {
+    const key = "team_0123456789abcdef";
+    const coordination = coordinationView({
+      bus: {
+        coordination: {
+          teams: {
+            asOf: 1,
+            status: "available",
+            truncated: false,
+            sources: {},
+            projects: [
+              {
+                key,
+                label: "Project",
+                generation: "gen00001",
+                coordinator: "boss",
+                objective: "",
+                workers: [
+                  { agent: "member", status: "idle", claim: { ticket: "T-1", branch: "b" } },
+                ],
+                unobservedWorkers: 0,
+                grantExpiresAt: null,
+                instructions: null,
+                amendments: null,
+                decisions: [],
+                gates: [],
+              },
+            ],
+          },
+        } as unknown as NonNullable<AppBus["coordination"]>,
+      },
+      hostBus: {},
+      rowIds: new Set(["boss", "member", "stranger", "ghost"]),
+      previous: null,
+      now: 1,
+    });
+    const selected = present(coordination.teams[0]);
+    let paint: CoordinationViewForPaint = { view: coordination, team: selected };
+    const runtime = new ViewRuntime(
+      { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+      {
+        canvas: canvas(1440, 1000),
+        nameFor: (id) => id,
+        reducedMotion: () => true,
+        env: {
+          raf: () => 1,
+          caf() {},
+          dpr: () => 1,
+          createCanvas: () => canvas(),
+          sprites: sprites(),
+        },
+      },
+    );
+    const layout = Model.createLayout();
+    layout.reconcile(
+      ["boss", "member", "stranger", "ghost"].map((id) => ({
+        id,
+        projectId: "teams",
+        repoId: "teams",
+        status: "working",
+        ...(id === "member" ? { worktree: "wt-member" } : {}),
+        ...(id === "ghost" ? { shadow: true } : {}),
+      })),
+    );
+    const scene = Scene.build(layout.onPage(0), 0);
+    runtime.update(scene, { coordination: () => paint });
+    runtime.fx = false;
+    runtime.movement.step = () =>
+      scene.workers.map((worker) => ({
+        id: worker.id,
+        point: { ...worker.chair },
+        pose: "idle",
+        direction: "south",
+      }));
+    const real = runtime.crew.paintCrew.bind(runtime.crew);
+    const ctx = runtime.ctx,
+      stack: number[] = [],
+      peak = new Map<string, number>();
+    let current = "";
+    ctx.save = () => {
+      stack.push(ctx.globalAlpha);
+    };
+    ctx.restore = () => {
+      ctx.globalAlpha = present(stack.pop());
+    };
+    ctx.fill = () => {
+      peak.set(current, Math.max(peak.get(current) ?? 0, ctx.globalAlpha));
+    };
+    runtime.crew.paintCrew = (worker, actor, now, reduced) => {
+      current = worker.id;
+      const parent = ctx.globalAlpha;
+      real(worker, actor, now, reduced);
+      current = "";
+      assert.equal(ctx.globalAlpha, parent, "dimming restores the parent alpha");
+    };
+    runtime.framePaint.paint(100);
+    assert.ok(present(peak.get("member")) === 1, "members paint at full alpha");
+    assert.ok(Math.abs(present(peak.get("stranger")) - 0.35) < 1e-9, "non-members recede");
+    assert.ok(
+      Math.abs(present(peak.get("ghost")) - 0.35 * 0.45) < 1e-9,
+      "a shadow ghost composes with the dimming",
+    );
+    peak.clear();
+    paint = { view: coordination, team: null };
+    runtime.framePaint.paint(116);
+    assert.equal(peak.get("stranger"), 1, "no selected team leaves everyone at full alpha");
+
+    const member = present(scene.workers.find((worker) => worker.id === "member"));
+    runtime.anchors = [
+      {
+        id: member.id,
+        left: 690,
+        top: 400,
+        width: 20,
+        height: 60,
+        depth: 0,
+        head: { x: 700, y: 400 },
+        foot: 460,
+      },
+    ];
+    const { overlays } = runtime.framePaint;
+    overlays.teams.begin();
+    const labels = runtime.plates.workerLabels.collect({
+      tier: "detail",
+      selectedRepo: null,
+      isStale: false,
+      staleKeys: new Set(),
+    });
+    assert.deepEqual(
+      placePlates(labels)
+        .map((plate) => plate.text)
+        .sort(),
+      ["T-1 · b", "wt-member"],
+      "the claim chip and the worktree detail plate both survive placement",
+    );
+    runtime.lifecycle.stop();
+  }
+  verifyTeamPaint();
+
+  // A seated coordinator whose team carries an overdue and a defaulted decision, two gates (PR 8 just turned
+  // accepted) and a generation change, all stamped at the current wall time.
+  function signalFixture() {
+    const key = "team_0123456789abcdef",
+      wall = Date.now(),
+      project = (generation: string, gate8: string) => ({
+        key,
+        label: "Project",
+        generation,
+        coordinator: "boss",
+        objective: "",
+        workers: [],
+        unobservedWorkers: 0,
+        grantExpiresAt: null,
+        instructions: null,
+        amendments: null,
+        decisions: [
+          {
+            class: "scope",
+            status: "pending",
+            question: "q",
+            createdAt: 1,
+            deadlineAt: wall - 1000,
+          },
+          { class: "scope", status: "defaulted", question: "q", createdAt: 1, deadlineAt: null },
+        ],
+        gates: [
+          { pr: 9, ticket: "T-9", status: "submitted", submittedAt: 20, decidedAt: null },
+          { pr: 8, ticket: "T-8", status: gate8, submittedAt: 10, decidedAt: null },
+        ],
+      }),
+      bus = (generation: string, gate8: string) => ({
+        coordination: {
+          teams: {
+            asOf: 1,
+            status: "available",
+            truncated: false,
+            sources: {},
+            projects: [project(generation, gate8)],
+          },
+        } as unknown as NonNullable<AppBus["coordination"]>,
+      }),
+      input = { hostBus: {}, rowIds: new Set(["boss"]), now: wall },
+      before = coordinationView({ ...input, bus: bus("gen00001", "submitted"), previous: null }),
+      view = coordinationView({ ...input, bus: bus("gen00002", "accepted"), previous: before }),
+      row: LayoutRow = {
+        id: "boss",
+        project: "P",
+        projectId: "p",
+        projectKind: "group",
+        repo: "r",
+        repoId: "r",
+        provider: "claude",
+        status: "idle",
+      };
+    const paint: SignalPaint = {
+      view,
+      extras: { coordinators: [{ row, host: null, accent: "#abcdef" }] },
+      update: { coordination: () => ({ view, team: null }) },
+    };
+    return paint;
+  }
+  interface SignalPaint {
+    view: CoordinationView | null;
+    extras: BuildOptions | undefined;
+    update: UpdateOptions;
+  }
+  const NO_SIGNALS: SignalPaint = { view: null, extras: undefined, update: {} };
+
+  function verifySignalPaint() {
+    const { view, extras, update } = signalFixture(),
+      node = canvas(1440, 1000),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => false,
+          env: {
+            raf: () => 1,
+            caf() {},
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout();
+    layout.reconcile([]);
+    const scene = Scene.build(layout.onPage(0), 0, extras);
+    runtime.update(scene, update);
+    runtime.cameraControl.setCamera(
+      Scene.focus(scene.observatory.chair, scene.bounds, runtime.viewport),
+    );
+    const glows: string[] = [],
+      strokes: unknown[] = [],
+      glow = runtime.geometry.glow.bind(runtime.geometry);
+    runtime.geometry.glow = (point, radius, style) => {
+      glows.push(style.color);
+      glow(point, radius, style);
+    };
+    const stroke = node.ctx.stroke.bind(node.ctx);
+    node.ctx.stroke = () => {
+      strokes.push(node.ctx.strokeStyle);
+      stroke();
+    };
+    runtime.framePaint.paint(100);
+    assert(glows.includes("#ff9f43"), "the decision beacon glows in its theme colour");
+    assert(
+      strokes.includes(present(present(view).teams[0]).hue),
+      "the handover sweep rings the seat in the team hue",
+    );
+    const drawn = recordedCalls(node).fillText;
+    for (const text of [
+      "? 1 · overdue",
+      "!",
+      "#9 T-9 submitted",
+      "#8 T-8 accepted",
+      "handover · gen gen00002",
+    ])
+      assert(drawn.includes(text), "the observatory paints " + text);
+    runtime.lifecycle.stop();
+  }
+  verifySignalPaint();
+
+  // Reduced motion has no frame loop: the handover plate must still expire through one timed repaint.
+  function verifyReducedSignalRepaint() {
+    const { extras, update } = signalFixture(),
+      node = canvas(1440, 1000),
+      frames: ((now: number) => void)[] = [],
+      timers: { run: () => void; ms: number }[] = [],
+      realNow = Date.now.bind(Date),
+      runtime = new ViewRuntime(
+        { defaults: canonicalTheme(), themeStatus: { reportNotice() {}, reportWarning() {} } },
+        {
+          canvas: node,
+          nameFor: (id) => id,
+          reducedMotion: () => true,
+          env: {
+            raf: (fn) => frames.push(fn),
+            caf() {},
+            timers: { after: (run, ms) => timers.push({ run, ms }), cancel() {} },
+            dpr: () => 1,
+            createCanvas: () => canvas(),
+            sprites: sprites(),
+          },
+        },
+      ),
+      layout = Model.createLayout();
+    layout.reconcile([]);
+    const scene = Scene.build(layout.onPage(0), 0, extras);
+    runtime.update(scene, update);
+    runtime.cameraControl.setCamera(
+      Scene.focus(scene.observatory.chair, scene.bounds, runtime.viewport),
+    );
+    runtime.lifecycle.start();
+    try {
+      frames.shift()?.(100);
+      const drawn = recordedCalls(node).fillText,
+        handover = "handover · gen gen00002";
+      assert(drawn.includes(handover), "the handover plate shows without animation");
+      assert.equal(timers.length, 1, "one timed repaint is scheduled, no frame loop");
+      assert.equal(frames.length, 0);
+      const [timer] = timers;
+      assert(timer && timer.ms > 0 && timer.ms <= 2400, "the wake lands within the plate lifetime");
+      Date.now = () => realNow() + 2500;
+      const painted = drawn.length;
+      timer.run();
+      assert.equal(frames.length, 1, "the timer invalidates the view");
+      frames[0]?.(200);
+      assert(
+        !drawn.slice(painted).includes(handover),
+        "the handover plate is gone after the timed repaint",
+      );
+      assert.equal(timers.length, 1, "nothing further to wake for");
+    } finally {
+      Date.now = realNow;
+      runtime.lifecycle.stop();
+    }
+  }
+  verifyReducedSignalRepaint();
 
   function verifyAgentIndicators() {
     const node = canvas(1440, 1000),
@@ -3969,11 +4295,18 @@ test("observer-view regression contracts", async () => {
         focus = "r2",
         list = rows,
         at = 4321,
-      }: { only?: string[] | null; focus?: string | null; list?: LayoutRow[]; at?: number } = {},
+        signals = NO_SIGNALS,
+      }: {
+        only?: string[] | null;
+        focus?: string | null;
+        list?: LayoutRow[];
+        at?: number;
+        signals?: SignalPaint;
+      } = {},
     ) {
       const layout = Model.createLayout();
       layout.reconcile(list);
-      const scene = Scene.build(layout.onPage(0), 0),
+      const scene = Scene.build(layout.onPage(0), 0, signals.extras),
         courier = createThemeCourier(theme),
         result: Record<string, ColorRecord> = {};
       // Keep the selected repository sign on screen in the worker-focused palette fixture.
@@ -4035,6 +4368,7 @@ test("observer-view regression contracts", async () => {
           mailFrame: () => frame,
           inspected: () => "r1",
           repositorySelection: () => "web",
+          ...signals.update,
         });
         if (zoom !== 1) view.zoomBy(zoom);
         if (focus) view.focus(focus);
@@ -4144,6 +4478,9 @@ test("observer-view regression contracts", async () => {
       themedKeys = new Set([
         ...used(themed),
         ...used(record(snapshot(), { focus: null }).result),
+        ...used(
+          record(snapshot(), { focus: null, signals: signalFixture(), only: ["fx-on"] }).result,
+        ),
         ...[7400, 14400, 21400, 28400].flatMap((at) => [
           ...used(record(snapshot(), { focus: null, list: wide, at, only: ["fx-on"] }).result),
         ]),
@@ -4170,7 +4507,16 @@ test("observer-view regression contracts", async () => {
      office-backdrop (home-office art) and the courier-owned mail keys, which observer-mail tests cover. */
     assert.deepEqual(
       keys.filter((key) => !themedKeys.has(key)),
-      ["console", "chair", "spark", "office-backdrop", "mail-acknowledged", "mail-unassigned"],
+      [
+        "console",
+        "chair",
+        "spark",
+        "office-backdrop",
+        "mail-acknowledged",
+        "mail-unassigned",
+        "mail-sealed",
+        "mail-report",
+      ],
     );
 
     // Two views on one page: a custom view never changes a default view painted before or after it.

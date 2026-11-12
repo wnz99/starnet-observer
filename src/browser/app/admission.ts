@@ -137,6 +137,7 @@ const message: Check = (value) =>
     sentAt: time,
     acknowledgedAt: time,
     wake: names(WAKE_STATES),
+    coordination: names(["sealed", "report"]),
     relay: (entry) =>
       record(entry) &&
       string(entry.machine) &&

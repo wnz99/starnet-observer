@@ -1,6 +1,15 @@
 import { strip, onHost } from "./geometry.js";
 import type { RoomsGeometry } from "./rooms.js";
-import type { BuildOptions, Mailroom, Observatory, Walkway, Worker } from "./types.js";
+import type {
+  BuildOptions,
+  Mailroom,
+  ObservationLink,
+  Observatory,
+  Point,
+  Ship,
+  Walkway,
+  Worker,
+} from "./types.js";
 const SPINE_DOCK_Y = 6;
 const MIN_COMPANY = 2;
 const CREW_ROUTE = { x: 12, y: -11 };
@@ -79,6 +88,56 @@ function seatOverseer(observatory: Observatory, extras: BuildOptions, mail: Mail
     };
     return { observatory: { ...observatory, viewer: null, overseer: overseerRow.id }, overseer };
   }
+}
+const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
+interface CoordinatorSite {
+  observatory: Observatory;
+  mail: Mailroom;
+  links: ObservationLink[];
+  ships: Ship[];
+}
+function coordinatorRoute(site: CoordinatorSite, chair: Point, host: string | null) {
+  const { observatory, mail, links, ships } = site;
+  const local = [
+    chair,
+    { x: chair.x, y: CREW_ROUTE.y, z: 0 },
+    { x: CREW_ROUTE.x, y: CREW_ROUTE.y, z: 0 },
+    ...observatory.link,
+    mail.hub,
+  ];
+  if (host === null) return local;
+  const link = links.find((value) => value.host === host),
+    hub = ships.find((ship) => ship.id === host)?.mail?.hub;
+  if (!link || !hub) return null;
+  // Relay-routed links are shifted alongside their relay spokes, so the path may not end on the hub itself.
+  const across = link.path.slice(1);
+  const last = across.at(-1);
+  return [...local, ...across, ...(last && samePoint(last, hub) ? [] : [{ ...hub, z: 0 }])];
+}
+/** Seats observed coordinators (caller sorts and passes at most the bench capacity) as workers on the bench. */
+export function seatCoordinators(
+  site: CoordinatorSite,
+  coordinators: NonNullable<BuildOptions["coordinators"]>,
+): Worker[] {
+  return coordinators.flatMap(({ row, host, accent }, index) => {
+    const seat = site.observatory.bench[index];
+    if (!seat) return [];
+    return [
+      {
+        id: row.id,
+        row,
+        kind: "session",
+        role: "coordinator",
+        parentId: null,
+        scale: 1,
+        platformKey: "observatory",
+        accent,
+        desk: seat.desk,
+        chair: seat.chair,
+        route: coordinatorRoute(site, seat.chair, host),
+      },
+    ];
+  });
 }
 export function finishCrew(
   geometry: RoomsGeometry,

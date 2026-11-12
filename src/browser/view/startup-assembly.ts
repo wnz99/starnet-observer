@@ -96,7 +96,9 @@ class AssemblyOwnership {
     return this.platforms.get(key);
   }
   worker(worker: Worker): AssemblyOwner | undefined {
-    return worker.role === "overseer" ? "observatory" : this.platform(worker.platformKey);
+    return worker.role === "overseer" || worker.role === "coordinator"
+      ? "observatory"
+      : this.platform(worker.platformKey);
   }
   ship(host: Host): AssemblyOwner | undefined {
     return this.ships.get(host);
