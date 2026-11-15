@@ -1,36 +1,35 @@
 # Local Observer
 
-A standalone browser view for people running Codex and Claude Code agents in Herdr terminals. It groups sessions by project and repository in an isometric pixel-art station, with session status, available token usage, transcript inspectors, and animated llm-bus message couriers. Start it from your terminal, then keep working in your agent terminals. Observation is read-only by default; control actions require an explicit opt-in.
+Watch your Codex and Claude Code sessions in a local browser dashboard. Local Observer turns agents running in [Herdr](https://herdr.dev/) terminals into crew on an isometric pixel-art station, grouped by project and repository.
 
-![Local Observer with FX on: Matrix glyph rain and pixies over the station, neon rim bloom and lit furniture on three project decks, a glowing working agent, and llm-bus messages in the mailroom](docs/observer-screenshot.jpg)
+See which sessions are working or waiting, inspect verified transcripts and available token usage, and follow [llm-bus](https://github.com/wnz99/llm-bus) messages as animated couriers. Keep using your agent terminals normally.
 
-You do **not** need to install or run StarNet. The necessary observer code, shared helpers, and three crew sprite sets are included here. This is a local companion app, not a Herdr plugin installed with `herdr plugin install`.
+![Local Observer showing project decks, agent crew, and llm-bus messages](docs/observer-screenshot.jpg)
 
-Use this README to [install the observer](#install-the-observer) and [start terminal agents](#start-terminal-agents-with-herdr). Optional setup covers [llm-bus mail](#enable-llm-bus-mail-and-couriers), [themes](#themes-and-configuration), [Codex desktop windows](#optional-codex-desktop-observation), [control actions](#optional-control-actions), and [remote hosts](#optional-remote-hosts-multi-host). Read [privacy and limits](#privacy-and-limits) before sharing a view or recording. Contributors should use the [development guide](docs/development.md).
+The observer is read-only by default. It needs no provider API keys, cloud service, or StarNet installation. Optional [control actions](docs/controls.md) let you start, attach to, and close Herdr agents.
 
-## Dependencies
+## Prerequisites
 
-| Dependency                                                      | Purpose                                                                                                                                              |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS                                                           | Supported initial target. Hosted CI runs on Ubuntu; live macOS desktop observation is not established by CI.                                         |
-| [Bun](https://bun.sh/) latest stable (minimum 1.4.4)            | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
-| Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
-| Node.js 24.19.0                                                 | Runs the pinned development tooling; application startup uses Bun.                                                                                   |
-| [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
-| Codex CLI and/or Claude Code                                    | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys.                      |
-| [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS through a reused, lazy helper.                                                 |
-| [llm-bus](https://github.com/wnz99/llm-bus) (optional)          | Supplies local agent registrations, message couriers, and message inspectors. Without it, terminal observation still works, but mail is unavailable. |
-| Xcode Command Line Tools (optional)                             | Supplies `swiftc` for observing the Codex desktop app. Not needed for terminal-only use.                                                             |
+macOS terminal use is the supported initial target. Hosted CI runs on Ubuntu; other platforms and live macOS desktop integration are not established by that CI.
 
-There are no runtime package dependencies. Bun runs the server and regression suite; its native `bun:sqlite` reads private database snapshots. Pinned development dependencies provide quality tooling; Node 24.19.0 is required for those tools, not for application startup.
+| Requirement                                                     | Purpose                                                                                   |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [Bun](https://bun.sh/), latest stable, minimum 1.4.4            | Runs the application and native SQLite reads.                                             |
+| Git                                                             | Clones and updates this repository; identifies repositories and worktrees.                |
+| Node.js 24.19.0                                                 | Runs the pinned development tooling. An already built or packaged observer runs with Bun. |
+| [Herdr](https://herdr.dev/docs/install/)                        | Hosts the terminal agents you want to observe.                                            |
+| Codex CLI, Claude Code, or both                                 | Provide local sessions and transcripts. Authenticate them normally.                       |
+| [Python 3.11 or newer](https://www.python.org/downloads/macos/) | Reads Codex TOML settings and supports macOS process identity verification.               |
 
-`bun.lock` records the development dependency graph. Use `bun install --frozen-lockfile` to replay it.
+On macOS with Homebrew, install Herdr with `brew install herdr`. Follow its [installation guide](https://herdr.dev/docs/install/) for other setup details.
 
-Repository install, start, dev and presentation commands upgrade Bun to the latest stable release before proceeding. These commands need network access and update the installed Bun shared with other projects. CI also uses latest stable Bun. Direct execution of built or packaged files uses the currently installed Bun without upgrading it.
+**Bun upgrade side effect:** repository install, start, dev, and presentation commands run `bun upgrade` first. They need network access and update the Bun executable shared with other projects. Direct execution of built files uses your installed Bun without upgrading it.
 
-## Install the observer
+Optional integrations have separate prerequisites: [llm-bus mail](docs/llm-bus.md) uses llm-bus and uv; [Codex desktop observation](docs/sessions.md#codex-desktop-windows) uses Xcode Command Line Tools and Accessibility permission. Neither is needed for terminal-only observation.
 
-Install Bun, Git, Node.js 24.19.0, Herdr, and Python 3.11 or newer before running these commands. Installation and startup upgrade the shared Bun executable, as described above.
+## Quick start
+
+### 1. Install and start the observer
 
 ```sh
 git clone https://github.com/wnz99/starnet-observer.git
@@ -39,375 +38,92 @@ bun install --frozen-lockfile
 bun run start
 ```
 
-Open **http://127.0.0.1:4319** in your browser. Keep the server terminal open. Stop with **Ctrl+C**.
+Startup builds the runtime and browser assets, then prints:
 
-The station shows sessions discovered through Herdr. To verify discovery, [launch an agent in a Herdr pane](#start-terminal-agents-with-herdr) and confirm that it appears in **Live sessions**. If a transcript remains unavailable, see [Codex session identity](#codex-session-identity); the observer will not guess which transcript belongs to a pane.
-
-`bun run start` builds the runtime and public assets before starting the server. `bun run dev` performs the same build and starts `src/server/main.ts`; rebuild and restart explicitly after edits.
-
-After `bun run build`, you can also run `bun --no-env-file dist/runtime/src/server/main.js` directly. Start it from any directory with `bun --no-env-file /path/to/starnet-observer/dist/runtime/src/server/main.js`. If port 4319 is occupied:
-
-```sh
-PORT=4320 bun run start
+```text
+Local Observer: http://127.0.0.1:4319
+Private labels: off
+Read only. Stop with Ctrl+C.
 ```
 
-The server prints the address to open. It listens only on your own computer's loopback address.
+Open **http://127.0.0.1:4319**. Keep the server terminal open; stop it with **Ctrl+C**. The server listens only on your computer's loopback address.
 
-Supported commands disable implicit `.env` loading, including when launched from another directory. Shell-exported settings such as `PORT` and `HERDR_SOCKET_PATH` still apply. JSON application configuration is described below.
+### 2. Start an agent in Herdr
 
-## Start terminal agents with Herdr
-
-Install Herdr using its [official installation guide](https://herdr.dev/docs/install/). On macOS with Homebrew:
-
-```sh
-brew install herdr
-```
-
-In a separate terminal, start Herdr in the project you want to observe:
+In a separate terminal, open a project you want to observe:
 
 ```sh
 cd /path/to/your/project
 herdr
 ```
 
-Launch `codex` or `claude` inside a Herdr pane. Check discovery from another terminal:
+Inside a Herdr pane, run `codex` or `claude`. The agent should appear in the observer's **Live sessions** panel. Discovery covers the active Herdr inventory, including projects outside the observer's own folder, and the browser refreshes about every two seconds.
+
+To check what Herdr exposes, run this from another terminal:
 
 ```sh
 herdr agent list
 ```
 
-Keep using those terminals normally. The browser observer refreshes about every two seconds. Verified repository rooms appear first; transcript summaries, helpers, desktop windows, and bus metadata fill in independently. It reads sessions across the active Herdr inventory, not just the folder where you launched the observer.
+A pane can appear before its transcript becomes available. The observer requires verified session identity before opening a transcript; see [Codex session identity](docs/sessions.md#codex-session-identity) if it remains unavailable.
 
-The helper list, deck counts and status totals describe displayed crew: room avatars, including pane agents and helpers, rather than all retained helper histories or proven running processes. A verified helper relationship does not confirm running presence. Each project room has crew quarters. A helper with fresh, verified new-assignment evidence walks from quarters to its parent; confirmed closed or killed helpers return and disappear. Task completion alone does not send a helper back. Initial observations and recovery after unavailable evidence seed the scene without replaying arrivals.
+## Use the station
 
-Codex helper discovery combines recorded database edges with native transcript spawn evidence. Every candidate still needs its own transcript to verify the exact parent relationship. Older spawn evidence can appear on a later refresh while the bounded background index completes. Paginated forks use their explicit history boundary to exclude copied parent messages and token usage from the child.
+- **Find a session.** Use the session list, search, and status filters. Select a session to focus its worker.
+- **Navigate projects.** Double-click a room to fit it; double-click the same fitted room to return to overview. Click room headings or repository signs to filter the list.
+- **Inspect activity.** Open session inspectors for verified transcripts and statistics. Token observations may be partial and are not billing totals.
+- **Follow messages.** Install [llm-bus](docs/llm-bus.md) to populate mailrooms, message inspectors, and couriers. The observer never sends or acknowledges mail.
+- **Customize the view.** Choose [configuration and presets](docs/configuration.md), author a [local theme pack](docs/theme-packs.md), or enable fictional labels for a recording.
+- **Watch other machines.** Add [remote hosts over SSH](docs/remote-hosts.md); remote transcript and message-body inspection remain unavailable.
 
-Statistics show provider-reported cumulative session-history token observations, including retained helper histories hidden from the room. Bounded histories can have partial usage data; coverage means complete, partial or unavailable usage data, not completed tasks. These are not billing totals. Codex input includes cached input, so do not add cache read to input. Claude reports input and cache counters separately.
+See [sessions and navigation](docs/sessions.md) for helper behavior, checkout grouping, token coverage, and identity troubleshooting.
 
-For a named/non-default Herdr server, launch the observer with `HERDR_SOCKET_PATH` set to that server's Unix socket. The default is `~/.config/herdr/herdr.sock`.
+## Common setup changes
 
-### Codex session identity
-
-The observer requires a proven session identity before showing a transcript. It uses Herdr's published identity when available. A fallback reads the Codex terminal footer through the local Herdr socket only when Codex explicitly configures `thread-id` as the **first** status-line field.
-
-If Codex panes appear but their transcript inspector is unavailable, check your Codex configuration (`~/.codex/config.toml`, or `$CODEX_HOME/config.toml`). Merge this field into your existing `[tui]` table; do not duplicate the table or overwrite other settings:
-
-```toml
-[tui]
-status_line = ["thread-id"]
-```
-
-Keep any other status-line fields after `thread-id`, then restart the affected Codex pane. Python 3.11+ and an accessible local Herdr socket are needed for this fallback. An unresolved identity stays unavailable rather than opening a guessed session.
-
-On macOS, fallback verification starts one Python process lazily and reuses it for fresh process-birth queries. It admits at most eight outstanding birth queries and sends one at a time, with a 1500 ms deadline from admission. It closes that helper when the observer shuts down. A capture without contention uses eight Herdr requests and two fresh process-birth queries; transcript inspection repeats verification before and after reading content.
-
-If terminal output changes during capture, the observer retries the complete capture at most twice. A refresh shares eight extra attempts across all panes, with four capture workers. Retries must start within 1500 ms of the first attempt; individual operations have separate timeouts. Sustained output changes can leave identity unavailable until a later refresh succeeds. These bounds do not guarantee a live refresh latency.
-
-## Enable llm-bus mail and couriers
-
-[llm-bus](https://github.com/wnz99/llm-bus) is a separate local mailbox for Claude Code and Codex. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first. Close your Codex and Claude Code sessions before installing its hooks:
+Choose a different port if 4319 is occupied:
 
 ```sh
-git clone https://github.com/wnz99/llm-bus.git
-cd llm-bus
-uv tool install --from . llm-bus
-llm-bus install
+PORT=4320 bun run start
 ```
 
-Restart your agents. In Codex, review and trust the bus hooks in `/hooks`, as described in the [bus README](https://github.com/wnz99/llm-bus#install-and-verify). If the command is missing, run `uv tool update-shell` and open a new terminal.
-
-Run `llm-bus whoami` through each agent's shell tool to confirm registration. Agents use `llm-bus send` to exchange messages; the observer visualizes that traffic. It never sends, acknowledges, or wakes agents itself.
-
-Double-click a mailroom on the station, or choose **Bus details** in the sidebar, to open its read-only detail panel. Four cards show Codex and Claude registrations seen within five minutes (including ended registrations), messages sent in the last hour, recent messages awaiting acknowledgement with their oldest age, and recipients pending a wake alongside recent failed wake messages. Counts come from metadata aggregates before detail caps. Missing sources show unavailable values; partial observations stay marked partial, and stale snapshots stay marked as last known.
-
-Grouped sections show **Needs attention**, the latest ten messages under **Recent activity**, **Resources in use**, and **Remote activity**. Empty available sections disappear. Structured details show at most 100 rows and mark truncation. Resource disclosures show holders, waiters, expiry and check observations; expired records do not establish current ownership. Remote state is labeled with its snapshot observation age, separately from message sent age. Initially collapsed **Diagnostics** holds registrations, the resource catalog, wake dispatch and coverage, relay publications and cached peers, synchronization, work reports, and monitor/submission counts. Registrations and cached peers do not prove reachability; recorded acknowledgement or wake status does not prove handling.
-
-Messages with a recorded `reply_to` show **Reply to #…**. For local messages whose parent remains in the recent window, the link opens that parent's inspector. Older parents are identified by number but cannot be opened from this window. Remote messages retain their reply links as metadata; their bodies remain unavailable at the hub. Opening the mailroom does not read bodies; opening a local message performs the existing redacted, identity-checked read. Presentation mode disables these panels. The optional cross-person `llm-bus collab` mailbox is separate and is not read by this view.
-
-The observer reads the default macOS mailbox at `~/.local/share/llm-bus/bus.sqlite3`. If you use a custom bus database, set `LLM_BUS_DB` to the same database file when launching it. The bus must have actual messages for couriers to appear.
-
-### Coordinator mode
-
-When llm-bus coordinator mode records a coordinated project, the station shows its structure. Only agents the observer already identifies by an exact pane join take part; any other participant is counted as not observed.
-
-- **Bench.** Observed coordinators sit on a bench of up to four seats in the observatory, next to the overseer desk, and carry a star in their team colour. A coordinator running on a remote host sits on the same bench, and its label and hover text carry an `@host` tag. Further coordinators stay at their room desks and keep the star. A station without coordinated projects looks unchanged.
-- **Team highlight.** Clicking a coordinator selects it, rings its whole team (the coordinator and every observed enrolled worker, in any room or ship) and dims every other sprite. Team members carry a diamond in the team colour. Press `Escape` (once to close the panel, once more to clear the selection) or switch to the overview to remove the highlight. A project whose coordinator runs on another machine keeps one team key on both machines, so the two halves merge: selecting the remote coordinator lights up the local workers it directs, and the reverse.
-- **Couriers.** Mail from or to a seated coordinator flies from its bench seat through the observatory and the mailroom to the worker desk. A coordinator on a remote host continues along that host's observation link. A _sealed_ directive flies in the `mail-sealed` colour and a worker's report to its coordinator in the `mail-report` colour. Other mail keeps its usual colours.
-- **Signals.** A coordinator with pending owner decisions shows a pulsing beacon and a plate with the pending count and the time left to the earliest deadline. A defaulted decision adds a red `!`. The two observatory screens list up to three gate records each, one per pull request, newest first and the selected team first. A gate that becomes accepted flashes briefly. A change of generation or coordinator plays a short handover sweep. The first snapshot after loading or resuming the page never triggers a flash or a handover. With reduced motion the pulse, flash and sweep are replaced by static marks and a plate that is shown for a short time.
-- **Claim chips.** A worker with a claim shows `<ticket> · <branch>` under its sprite. The repository desk badge keeps priority, and a chip that would collide with it is dropped.
-- **Coordination panel.** Selecting a coordinator also opens a read-only panel for its project. It lists the project label, the objective, the short generation id, the workers (`claimed` with ticket and branch, `idle`, `no consent` or `unknown`) and the count of enrolled workers on observed machines that the page does not show. It also lists the earliest active grant expiry, the number of instructions and amendments with the latest text of each, pending and defaulted decisions, and gate rows. A source table that could not be read shows "unavailable" instead of zero. For a team whose coordinator runs on another machine, gate rows and grant expiry come from every half, because llm-bus stores them on the workers' machine; the earliest expiry wins.
-
-A courier is _sealed_ when the message's coordination metadata matches the current coordination records for a project: its direction is valid, the sender is the project coordinator, the recipient is enrolled in the same generation, and an unrevoked grant for that recipient lists the message's operation and has not expired. This is the observer's reading of stored records, not llm-bus's own authorization decision. It omits the live checks of the recipient's current agent scope and session end, so the observer only colours such a courier and never presents it as verified by llm-bus. Only the six non-gate operations (`assign`, `reprioritize`, `clarify`, `pause`, `cancel`, `review`) can be sealed. The four `approve-*` gate operations are never sealed, because llm-bus authorizes them from approvals, gate records, delegations and peer configuration that the observer does not mirror. An unreadable or overflowed grants, consents or enrollments table seals nothing, and an expiry that cannot be parsed counts as expired.
-
-## Record a presentation with fictional company names
-
-For a screen recording, stop the normal server and start:
+Use a bundled preset with fictional project labels and visual effects:
 
 ```sh
-bun run presentation
-```
-
-Open http://127.0.0.1:4319. This mode shows **real live activity** under a fictional company, **Helioforge**. Rooms use Product, Platform, Intelligence, and Operations; repositories use names such as `helio-web`, `helio-auth`, `helio-agents`, and `helio-console`. Additional rooms and repositories receive numbered aliases.
-
-Labels stay stable during that server run. Actual repositories, folders, sessions, and their ownership are unchanged. Task titles, helper nicknames, worktree names, and project/repository labels are masked at the server boundary. Paths and raw process details are omitted. Real Herdr pane IDs remain visible so optional controls target the correct panes. Session and mail inspectors are disabled, and their API routes return no content. Live status, timestamps, token totals, and body-free message traffic remain visible.
-
-The header explicitly says **LIVE · FICTIONAL LABELS**. Describe a shared recording as “Live agent activity with fictional company/project labels”; these labels do not represent an actual customer or employer. This is presentation masking, not a guarantee of full anonymity: activity patterns, timing, and aggregate counts are still real.
-
-Restart with `bun run start --no-presentation` to return to normal observation, even if your config enables masking. Do not record private terminal windows or unrelated browser tabs alongside it.
-
-## Themes and configuration
-
-The same observer loads JSON configuration over its built-in defaults. Themes are data files: they can set fictional labels, interface colors, and initial FX without changing the application code.
-
-Two presets are included:
-
-```sh
-# Original interface colors, real names, simple starfield
-bun run start --config themes/basic.json
-
-# Helioforge fictional labels, cyan interface accents, FX enabled
 bun run start --config themes/helioforge.json
 ```
 
-`presentation` explicitly controls privacy masking. Colors and FX do not enable masking on their own. The Helioforge preset sets `presentation: true`; the basic preset sets it to `false`.
-
-Visual settings contains independent Startup animation and Ambient FX switches, saved in this browser. Startup animation defaults to on: the first observer snapshot assembles the station and pulls back to its overview within 2.8 seconds. Reduced motion skips the sequence. Camera input or selection completes it immediately; subsequent polls and tab resumes do not replay it. Reloading can replay it when the saved switch and motion preference permit. Ambient FX controls the existing scene effects independently of the assembly sequence. Escape closes Visual settings and returns focus to its trigger.
-
-To make your own theme, copy the example:
+Return to real labels, overriding presentation mode in configuration:
 
 ```sh
-cp observer.config.example.json observer.config.json
-```
-
-Edit it, then run `bun run start`. `observer.config.json` next to `package.json` is loaded automatically and is Git-ignored. An explicit `--config` path instead selects that file; relative paths resolve from the directory where you run the command. The selected file replaces the automatic file, then merges with built-in defaults. Restart the server and reload the browser after edits.
-
-The configuration fields are:
-
-| Field          | Meaning                                                                                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `presentation` | Boolean; private labels and blocked inspectors when true. Defaults to false.                                                                                                                 |
-| `company`      | Company name in the presentation header.                                                                                                                                                     |
-| `repoPrefix`   | Prefix for generated repo aliases. With built-in room lists, it also updates the built-in aliases. Explicit `rooms[].repos` names stay verbatim.                                             |
-| `rooms`        | Ordered room objects with `name` and optional `repos` arrays. Overrides the built-in room list. Aliases are allocated by opaque source IDs; allocation stays stable during one server run.   |
-| `theme.pack`   | Installed data-only pack ID; omitted selects `starnet`. Restart and reload after changing it.                                                                                                |
-| `theme.fx`     | Boolean; initial sky/station FX. CLI overrides configuration; omitted defaults to off. A saved Ambient FX browser preference takes precedence over this initial value.                       |
-| `theme.colors` | Optional interface colors: `accent`, `background`, `panel`, `text`, each a six-digit hex color. Omitted colors inherit the selected pack. These four overrides change interface colors only. |
-
-Names must be nonempty text without control characters, at most 80 characters. Room names and explicit repo names must be unique, ignoring case. `repoPrefix` is 1–32 lowercase letters, digits, or hyphens, starting with a letter or digit. Additional rooms/repos get unique generated names. Unknown fields, invalid values, missing explicit files, and malformed JSON stop startup instead of silently applying a different mode. Files are limited to 64 KiB.
-
-CLI flags override the selected file:
-
-```sh
-bun run start --presentation --company "Orbit Works" --repo-prefix orbit --no-fx
-bun run start --config themes/helioforge.json --company "My Demo Studio" --no-fx
 bun run start --no-presentation
-bun --no-env-file dist/runtime/src/server/main.js --help
 ```
 
-Use either `--presentation` or `--no-presentation`, and either `--fx` or `--no-fx`; conflicting pairs are rejected. `--company` and `--repo-prefix` customize labels but do not enable presentation mode. Port selection remains `PORT=4320 bun run start`.
-
-### Local theme packs
-
-`theme.pack` selects one installed pack. Omit it to use `starnet`. A pack is a data-only directory at `frontend/assets/themes/<id>/theme.json`; IDs contain 1–32 lowercase letters, digits, or hyphens, starting with a letter or digit. The local build includes installed directories, including ignored private packs. Rebuild after installation or asset changes. There is no browser picker or saved pack preference: edit configuration, restart the server, and reload the page.
-
-For a minimal local pack, create `frontend/assets/themes/example/theme.json`:
-
-```json
-{
-  "version": 1,
-  "id": "example",
-  "extends": "starnet",
-  "ui": { "colors": { "phosphor": "#abcdef" } }
-}
-```
-
-Select it with `"theme": { "pack": "example" }` in the ignored local configuration. Add your private pack directory and any private presets/references to local Git ignore rules before adding artwork. Only the canonical `starnet` pack is bundled. Validate installed directories before restarting:
-
-```sh
-bun run validate:themes
-# An isolated authoring fixture can use its own public frontend root:
-bun --no-env-file scripts/validate-theme-packs.ts /absolute/path/to/frontend
-```
-
-The author validator examines at most 16 immediate non-symlink pack directories and rejects invalid directory IDs. Startup reads only the selected pack and required default resources. A missing selected manifest stops startup. An existing selected pack with malformed data, invalid assets, or a resource-budget violation uses the complete default pack and supplies one bounded warning with requested/effective IDs. An invalid default installation stops startup. Warning metadata never contains private filesystem paths. Browser image/font decode has its own fallback checks; a valid PNG header does not prove an image can decode.
-
-The canonical [default manifest](frontend/assets/themes/starnet/theme.json) is the complete inventory of accepted color keys and values. Unknown fields and color keys are rejected. Missing custom fields inherit the default; supplied crew groups and office art maps must be complete. Custom packs extend only `starnet`; inheritance chains, JavaScript, CSS, HTML, remote resources, authored geometry, selectors, and callbacks are not supported.
-
-The semantic color responsibilities are:
-
-| Inventory                             | Roles                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ui.colors` existing variable names   | `bg`, `panel`, `row`, `line`, `chrome`, `phosphor`, `glow`, `alien`, `alien-dim`, `ink`, `dim`, `working`, `blocked`, `stale`, `focus`, and `tab-ink` retain the corresponding interface variable roles.                                                                                                                                                                                                                                                                    |
-| Interface surfaces                    | `body-halo`, `control-bg`, `control-hover`, `topbar-grid`, `topbar-top`, `topbar-bottom`, `panel-outline`, `panel-inset`, `toolbar-top`, `stage-bg`, `footer-bg`, `filter-hover`, `row-hover`, `row-selected`, `inspect-control-bg`, `modal-backdrop`, and `tool-bg` name background/gradient/frame surfaces.                                                                                                                                                               |
-| Interface text and state effects      | `control-ink`, `heading-ink`, `totals-ink`, `filter-ink`, `provider-ink`, `provider-claude`, `summary-ink`, and `unknown-role` name text roles. `selected-inset`, `selected-hover`, `mail-glow`, `stale-glow`, `repo-glow`, `scanline`, and `vignette` name selected/decorative effects. `danger`, `danger-ink`, `danger-tab-ink`, `danger-glow`, `danger-notice-ink`, and `danger-notice-glow` colour the opt-in close control and error notices.                          |
-| `scene.colors` base palette           | `space`, `hullTop`, `hullSeam`, `hullLeft`, `hullRight`, `wall`, `wallCap`, `grate`, `grateDark`, `window`, `amber`, `cyan`, `rail`, `console`, `consoleTop`, `chair`, `glass`, `ink`, `dim`, `focus`, and `repo` name the original station palette.                                                                                                                                                                                                                        |
-| Scene status                          | `working`, `blocked`, `idle`, `done`, `unknown`, and `stale` keep status identities. Default canvas `stale` intentionally uses the blocked hue; interface `stale` remains separate.                                                                                                                                                                                                                                                                                         |
-| Scene materials                       | `furnishing-*`, `rack-shelf`, `wall-screen-face`, `vent-*`, `board-*`, `tank-*`, `planter-*`, `plant-leaf`, `crate-*`, `crate-stack-*`, `walkway-support`, `hub-*`, `pod-*`, `chute-*`, `tower-*`, `observatory-*`, `telescope-shell`, `telescope-core`, `desk-*`, `monitor-*`, `chair-*`, `partition-*`, `planning-desk-*`, and `deck-*` name fixed material faces, edges, and insets. Prefixes are documentation shorthand; only exact keys in the manifest are accepted. |
-| Scene lighting and sky                | `star-*`, `shooting-star-*`, `plain-star`, `nebula-*`, `rain-*`, `pixie-*`, `planet-*`, `shuttle-body`, `spark`, `rim-spark`, `platform-spark`, `screen-spark`, `furniture-spark`, `vent-spark`, `tank-spark`, `mast-*`, `apron-spark`, `walkway-light-head`, `tower-spark`, `pod-spark`, `observatory-spark`, `telescope-spark`, `desk-spark`, `desk-spark-alt`, and `aura-*` name effect colors. Dynamic opacity/timing remains application-owned.                        |
-| Scene labels, crew fallback, and mail | `glow-transparent`, `contact-shadow`, `viewer-body`, `body-outline`, `office-backdrop`, `mail-pending`, `mail-acknowledged`, `mail-unassigned`, `mail-sealed`, `mail-report`, `coordination-beacon`, `envelope-outline`, `envelope-mark`, `drone-shadow`, `drone-body`, `drone-wing`, `plate-scanline`, `repo-label`, `viewer-label`, `radar-sweep`, and `stale-overlay` name their individual appearance roles.                                                            |
-
-Colors accept six-digit hex or numeric `rgba(r,g,b,a)` only: integer RGB channels 0–255 and alpha 0–1. `scene.projectAccents` contains exactly ten ordered hex colors, retaining the cobalt, teal, verdant, moss, amber, ember, crimson, orchid, violet, and indigo slot identities. They recolor only each slot's displayed accent (deck edges, signs, partitions, tethers, room swatches and courier parcels); project-to-slot assignment, floor names and geometry are unchanged. Scene colors apply per station view, so a themed view never changes another view on the same page. Legacy `theme.colors` overrides apply last to interface colors only: accent sets phosphor/chrome and derives the `.22` alpha glow from its RGB channels; background sets bg, panel sets panel, and text sets ink. It never recolors scene or crew.
-
-Other accepted data groups:
-
-- `ui.typography`: fixed `classic`, `dm-sans`, or `pixel` profile and scale 0.9–1.1. Interface font metrics belong to the application; canvas labels and numeric terminal readouts retain VT323. The `dm-sans` profile requires local `fonts/dm-sans.woff2` and `fonts/DM-Sans-OFL.txt`. Inspect the actual file's family, weights 500/600, provenance, and redistribution license before distributing it. The validator checks bounded WOFF2 structure and OFL text; browser font loading proves usability. No manifest font path or remote import is accepted. `classic` keeps the original chrome metrics; `dm-sans` applies the application's fixed table (body 14px/1.45, title 500 20px without uppercase, section headings 600 24px/1.1, metadata 500 13px/1.3, buttons 500 13px/1.1 without tracking or uppercase, tags/eyebrows 600 11px/1.6, project headings 600 14px/1.2). Scale multiplies only those chrome sizes. The deck number, station totals, session counts, timestamps, inspector stat values and every canvas label keep their existing VT323 metrics. The browser installs server-derived local faces with `font-display: swap`; pending faces use their CSS fallback, and a failed face adds one deduplicated `font-load` warning.
-- The `pixel` typography profile requires both `fonts/jersey-10.woff2` with `fonts/Jersey-10-OFL.txt` and `fonts/silkscreen.woff2` with `fonts/Silkscreen-OFL.txt`. Verify the actual families and regular 400 weight, provenance, and redistribution licenses. Jersey 10 supplies interface text with `system-ui` fallback; Silkscreen supplies small tags and metadata with `ui-monospace` fallback. Both use weight 400, disable synthetic styles and ligatures, and use application-owned sizes multiplied by the same scale. Fixed numeric readouts, canvas labels, and tool/code text retain their existing fonts. Selecting typography does not recolor scene art or change crew assets.
-- `ui.chrome`: `classic` (default) or `pixel`, independent of the typography profile. Pixel chrome supplies fixed square, stepped frames, bevels, and a dotted page background using the selected colors. Its decorative frame layers do not intercept pointer events or clip controls, scrolling regions, or focus outlines. Existing shape/decor settings and semantic status cues remain separate.
-- `ui.shapes`: `control`, `input`, `panel`, `sessionRow`, `mailRow`, `tag`, and `eyebrow` each accept four clockwise corner radii in pixels, 0–24. `badgeCut` accepts `classic` or `none`. These choices do not change hit areas or geometry. Radii map to buttons, the search input, station/console/inspector panels, session rows, mail rows, the READ ONLY tag and section eyebrows; defaults reproduce the original corners. `badgeCut: "none"` removes the chamfer clips from the tag and eyebrows.
-- `ui.decor`: boolean `scanlines`, `glyphStrip`, `cornerBrackets`, and `glow`. Decorations remain separate from the scene FX toggle and functional status/focus cues. `false` removes, respectively, the stage scanline/vignette overlay, the decorative glyph strip, the panel corner brackets, and decorative heading, panel, legend and hover glows. Focus outlines, status words, selected states, stale cues, icons and source health stay visible.
-- `ui.logo`: null or `{ "image": "branding/logo.png", "alt": "Example Brand" }`. Alt is nonempty plain text up to 80 characters. Logos use contained PNGs; rasterize source SVG before installation and retain provenance. After the local image decodes, classic chrome shows it within 112×24 CSS pixels beside the heading. Pixel chrome uses a 42px-high box, at most 312px wide, with pixelated rendering. A 14px-high source displays at integer 3× scale when its width fits; other source sizes are fitted by that fixed box, not an automatic integer-scale algorithm. These application-owned display metrics do not change the PNG validation bounds below. Until decoding succeeds, the original mark stays. Browser decode failure retains the original decorative mark and heading and adds one `logo-load` warning.
-- `scene.art`: `{ "style": "station" }`, or `home-office` with a complete `assets` map for the 34 roles in [scene-art-roles.ts](src/shared/scene-art-roles.ts). That application-owned table supplies exact native PNG dimensions, foot anchors, extents, orientation, repetition, and depth passes. Floor/corridor diamonds are 48×24; `helperChair` has its own native size for the existing 0.72 helper footprint. Authors supply `scene/*.png` paths only. Office mode requires both `backgroundFx` and `ambientFx` to be `none`; station permits `rain`/`none` and `station`/`none`, respectively. Scene effects do not supply a new initial FX preference. With the FX toggle on, `backgroundFx: "rain"` paints the matrix rain behind the station and `none` omits only that layer. `ambientFx: "none"` omits the starfield, nebulae, planet, shuttle, shooting stars and pixies, and the decorative deck, furniture, mailroom, desk and crew glows and sparks, leaving the `space` backdrop. Contact shadows, status lamps and words, selection, focus and hover markers, stale cues and helper tethers stay visible in every mode. The FX toggle keeps its existing default and behavior.
-- `crew`: logical IDs `blank`, `blank_blue`, and `blank_amber`. Each supplied group contains `tracks` only, with eight rotation tracks of one frame, eight walking tracks of six frames, four cardinal seated tracks of one frame, and `type.north` with four frames: 21 tracks and 64 frames. Use the exact suffixes in the default manifest and contained `crew/*.png` paths. Geometry remains fixed at scale 0.25, standing height 76, and review presentation; replacement set names derive from pack/logical IDs.
-
-Asset paths use lowercase simple components with no schemes, leading slash, dot segments, escapes, backslashes, query, or fragment. Real-path checks prevent symlink escapes. Manifests are at most 64 KiB. Crew PNGs are exactly 144×144, at most 128 KiB each, and at most 4 MiB per pack. Selected/default fallback crew uses at most 384 unique resources and 32 MiB decoded RGBA. Scene PNGs use the exact role dimensions, at most 512×512 and 256 KiB each, at most 34 unique resources, 6 MiB file bytes, and 36 MiB decoded RGBA. Combined crew/scene decoded memory is capped at 68 MiB. Logo PNGs are at most 128 KiB and 1024×256; each font is at most 512 KiB (one face for `dm-sans`, two faces totaling at most 1 MiB for `pixel`). Shared paths are deduplicated for budgets.
-
-Scene art decodes as a complete set: pending or failed office art retains complete procedural station art with canonical station crew. Valid selected chrome, colors, project/mail accents, and effect modes remain selected. Crew decode failure falls back by complete logical group, with one `crew-load` or `crew-dimensions` warning naming the pack and logical group; active office art uses procedural human fallback bodies. Logo and font failures retain their readable local fallback. These runtime warnings are theme metadata and do not change observed source health or session status. The header's theme status region lists them as plain text, together with requested/effective pack IDs when a requested pack fell back; it stays hidden when there is nothing to report and shows at most eight warnings, one per code, pack and group.
-
-## Optional Codex desktop observation
-
-Terminal users can skip this. For Codex desktop windows, install Apple's command-line tools if `swiftc` is missing:
-
-```sh
-xcode-select --install
-```
-
-The observer compiles its bundled Swift reader lazily. Grant Accessibility access to the terminal app running the server under **System Settings → Privacy & Security → Accessibility**, then restart the observer if needed. The desktop reader covers the Codex app; it does not monitor ordinary ChatGPT or Claude Desktop windows.
-
-## Optional control actions
-
-The observer is read-only by default. Launch it with `OBSERVER_CONTROL=1` to enable three Live sessions actions and the station’s overseer launcher. The three panel actions send only a real pane ID already shown on the page:
-
-```sh
-OBSERVER_CONTROL=1 bun run start
-```
-
-| Button | Where           | What it does                                                                                                                                                                                                                                                                                                                                                         |
-| ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `+`    | project heading | Uses a fresh Herdr session in the group as a seed, opens a tab in its workspace and current folder, and starts `claude`. No terminal opens; the new agent is selected in the panel when it appears. Use `⇱` to attach. A new agent stopped at a startup dialog (for example "trust this folder") shows a `!` and "waiting for input" until you attach and answer it. |
-| `⇱`    | session row     | Opens a Terminal window attached to that pane with `herdr agent attach --takeover`, so it takes input even if another terminal was attached. Detach with `ctrl+b q`; the agent keeps running.                                                                                                                                                                        |
-| `✕`    | session row     | Closes the Herdr pane, ending that agent. The page asks you to confirm first.                                                                                                                                                                                                                                                                                        |
-
-Agents are grouped on the station by project, then by actual checkout and sub-folder (one walled section per checkout/folder, with repository, checkout and folder text on its sign); idle agents stroll inside their own section whenever another agent from the same folder is there too. Each deck has eight project anchors per host. Overflow rooms (`+1`, `+2`, and onward) extend outward beside their parent in a straight chain with project-colored bridge trim; the entire family shares its parent's deck and anchor. Each room retains three sections with eight root seats each; separate checkout/folder sections can open an annex before all seats are filled. Large families make overview wider; use the project heading to zoom to the parent, double-click an individual room to fit it, or select a session to focus its worker. Linked Git worktrees share their main repository group and repository highlight. Main and linked checkouts have separate Live sessions headings, followed by sub-folder sections. Equal checkout basenames stay distinct through canonical opaque checkout IDs; missing proof is labeled Checkout unavailable. Sub-folders are calculated relative to the checkout where each agent is working.
-
-Double-click a room's floor, repository sign or heading to fit that room. Double-click the same fitted room again to return to overview. A different room fits directly; after manual pan or zoom, double-clicking fits the room first. Worker, title and mailroom targets keep their own actions.
-
-Room, repository and mailroom labels show a pointer cursor on hover. Single-click a room heading to filter the Projects list to that room, including its helpers; annex rooms filter independently. Single-click a repository sign or repository button to filter by its exact repository ID. Clicking the same filter again clears it; choosing a room or repository replaces the previous filter. Search and status filters still apply. These filters do not move the camera. Single-click the mailroom label or floor to open its dedicated details panel.
-
-Clicking the **OBSERVATORY** sign on the station selects the overseer if one is running, or offers to start one. Choose **Claude** (the default) or **Codex**, then select **Start**; **Cancel** leaves sessions unchanged. Provider selection applies only to the overseer.
-
-The overseer is an ordinary session of the selected provider in a Herdr workspace named `overseer`, started in `~/.local/share/starnet-observer/overseer` with matching initial `AGENTS.md` and `CLAUDE.md` briefs on using Herdr and llm-bus to watch and coordinate the other agents. Each missing file is created exclusively; existing files and divergent user edits remain untouched. Edit the appropriate file to change its standing orders; the observer never synchronizes them. The observer recognizes only its verified, persisted overseer launch, even after a rename or observer restart; names, titles, and agent configuration do not establish that role.
-
-The private launch record is `~/.local/share/starnet-observer/overseer/identity.json`, written with mode `0600`. It binds the overseer to the Herdr endpoint, pane, workspace, terminal incarnation, provider, and native session ID when available. One shared launch reservation prevents concurrent observer processes from creating duplicate overseers. Uncertain launch state, corrupt records, or mismatched identity proof leave the overseer unavailable and block a replacement. A last-known overseer may remain visible with stale status; that does not authorize control actions.
-
-After a caught launch failure, a later request can release a recorded reservation only after a complete Herdr agent inventory omits that pane and Herdr returns the exact `pane_not_found` error for it. A crash can leave the exclusive `~/.local/share/starnet-observer/overseer/identity.json.owner` directory behind. Stop every observer process using this state and verify through Herdr that no launch or recorded pane remains active before inspecting it manually. Only an empty, confirmed abandoned owner directory may be removed manually; never recursively delete the state directory or steal an uncertain lock. Nonempty locks, missing pane records, or uncertain Herdr results require manual inspection; restarting alone does not guarantee recovery.
-
-One overseer is shared across providers; choosing another provider never replaces a running overseer. Project `+` continues to launch Claude.
-
-Set `OBSERVER_CLAUDE_ARGS` to pass flags only to spawned Claude sessions (including a Claude overseer), for example `OBSERVER_CLAUDE_ARGS="--dangerously-skip-permissions"`. Only ⇱ opens a terminal (macOS Terminal.app); spawning runs the agent unattended.
-
-The control routes are `POST`-only and require the same per-launch token and local origin as the read routes. Attach, spawn, and close require a current private observer target proof, then matching live Herdr inventory, agent, and pane identities. Stale, unavailable, foreign, or reused targets are rejected before mutation. Without `OBSERVER_CONTROL=1`, the server rejects every non-GET request and omits the panel action buttons.
-
-Controls also work in presentation mode with `OBSERVER_CONTROL=1 bun run presentation`. Fictional labels remain in place; requests use real pane IDs. Control responses omit private names, paths, endpoint details, and raw process errors. Presentation mode still disables inspectors and transcript preparation; it does not make live actions anonymous.
-
-## Optional remote hosts (multi-host)
-
-Agents on other machines (for example a VPS running Herdr) can appear as their own ships next to this machine's
-station. Install the observer on each remote as usual and run `bun run build` there before connecting the hub.
-Then list the remotes in `observer.config.json`:
-
-```json
-{ "remotes": [{ "id": "vm1", "ssh": "nick@203.0.113.10", "dir": "~/starnet-observer" }] }
-```
-
-The hub keeps one `ssh -o BatchMode=yes` stream per remote running `bun --no-env-file dist/runtime/scripts/stream.js`, which prints
-one snapshot per line and opens no port. Key authentication must already work non-interactively. Remote rows and mail
-are sanitised and re-identified per host, remote ships dim with "last seen" when their stream goes quiet, and
-transcript or message inspection never reaches a remote.
-
-For explicit source development, use `bun --no-env-file scripts/stream.ts` after installing development tooling.
-
-llm-bus is per host, so each remote ship has its own mailroom showing that host's own bus; its couriers and crew stay
-on their own ship for local mail, and the Live sessions mailroom section lists the selected host's mail. Remote messages keep their
-host's numeric id and also carry a hub-wide `key` (`5@vm1`). Thin cyan SSH wires connect this machine directly to
-each observed remote. Where both machines share a relay, the wires run beside its tunnels and bypass the external
-relay mailroom. Wire appearance distinguishes live, stale and unavailable SSH observations; it never carries mail couriers.
-Mail route highlights and SSH cables follow corridor edges. Portions passing beneath a corridor or room floor are dimmed;
-exposed portions retain their normal brightness.
-
-Annex couriers follow their family's bridges inward to the parent and that host's own mailroom. Project-colored trim identifies the family; amber rails still identify relay traffic. Observed and shadow ships expand to contain their annexes, and machine rows leave enough space for those actual hulls. Shadow crew remain hover-only.
-
-### llm-bus relays
-
-llm-bus can relay mail between machines through a relay it is bound to ([remote bus](https://github.com/wnz99/llm-bus/blob/main/docs/remote-bus.md)).
-Nothing about this is configured in the observer: every observed bus, local or remote, reports its own binding, and the
-station draws exactly that. The observer reads only routing metadata from the bus's `remote_*` tables: the relay's
-host name and this machine's id, each relayed message's direction, peer machine, shared repo and delivery state, and
-the relay's cached roster per machine (agent provider, shared repo and last activity). It never reads tokens, URL paths,
-native session ids or message bodies for this.
-
-- Every machine the relay's roster names that this observer does not watch becomes a **shadow ship**, occupying its
-  own row on the external spine. It has its own mailroom (that machine's own llm-bus), a room per shared repo, and a
-  ghosted desk for each agent the roster lists as active in the last day. Hover details identify it as not observed.
-  Ghost crew are hover-only: never selected, inspected or controlled, and their status is unknown. An
-  observed machine (this one, or a configured remote bound to the same relay) is never a shadow.
-- Each relay has one **external relay mailroom**, anchored just beyond this station's front edge, outside the machine hulls.
-  Remote machines form parallel rows beside an external connection spine, with a marked junction for each branch.
-  Adding machines or growing their rooms does not move the relay relative to this station.
-  Every member and shadow machine has its own branch onto the spine. Mail between machines passes through the
-  external room and never through an intermediate machine. Tunnels avoid room floors and other machine hulls.
-  Selecting a machine highlights its complete mail route through the relay. Machine names and the relay sign stay
-  visible; connection details appear on hover or selection. SSH observation health and relay activity remain separate.
-- A tunnel has dim, **roster only** rails until a message has demonstrably crossed that machine's relay connection.
-  The relay roster alone proves the far machine
-  published to the same relay at some point, not that it is reachable now.
-- Which agents use the relay: the bridge publishes exactly the sessions of the repositories its config maps and records
-  them in `remote_publications`. The observer joins those records to panes exactly (live, under a day old). Rooms holding
-  a relay-carried agent, and every shadow room, get amber walkways to their mailroom and "⇄ relay" on their sign. Their
-  agents read "on relay (repo)" on hover. Every other room is local to its own bus.
-- Relayed mail uses the normal courier paths: the sender's desk, its mailroom, its tunnel, the external relay room,
-  the destination's tunnel and mailroom,
-  then the far agent's desk. The far agent is matched by an opaque hash of its relay address, never its session id.
-  Unacknowledged outgoing mail waits where llm-bus last proved it is: in the machine's mailroom while `queued_local`,
-  in the external relay room once `accepted_remote`, and at the far agent's desk once `delivered_local`.
-  Each observed host's bus supplies its own delivery observations.
-- Ledger rows name the far side, for example "Codex on whitenoise · llm-bus (via relay)", with the synchronised relay
-  state ("held at the relay", "delivered to the far machine, not acknowledged"). The bus status names the binding.
-- Presentation mode replaces relay hosts, machine ids and shared repo ids with fictional names.
-
-With `OBSERVER_CONTROL=1`, control actions also work on remote agents: `⇱`, `✕` and the project `+` run `herdr` on
-that host over the same non-interactive ssh (every argument validated and single-quoted; hosts not listed in
-`remotes` are refused), and attaching opens a Terminal running `ssh -t <host> 'herdr agent attach <pane> --takeover'`.
-Remote ships form parallel rows along the external relay spine when one is present. Clicking a ship (or a host tab above the Live sessions list)
-switches the list to that host's crew; the chosen tab is remembered across reloads. On a remote host the list starts
-with a "New agent in ~" row whose `+` starts Claude in that host's home folder, even on a host with no agents yet,
-reusing the Herdr workspace named after the folder or creating it. Starting an agent never opens a terminal: the new
-agent is selected when it appears. An agent waiting for input (for example Claude's "trust this folder" dialog) shows
-a "!" badge on the station and "waiting for input" in its row; press `⇱` to attach and answer it.
+Stop the running server before starting another instance on the same port. Supported commands disable implicit `.env` loading; export settings in your shell instead. See the [configuration guide](docs/configuration.md) for JSON files, CLI precedence, room arrangement, and presentation masking.
 
 ## Privacy and limits
 
-The **terminal checkout** is the checkout proved from the agent's terminal directory. A **tool checkout** is the checkout proved from the directory where a recorded tool shell started. For example, a Codex terminal can stay in the primary checkout `/work/project` while a shell command explicitly starts in the linked worktree `/work/project-feature`. With a valid shell-entry observation, the selected desk badge shows `project-feature · … · tool`; otherwise it uses the terminal checkout. The `main` checkout label means the primary Git checkout, regardless of its branch name. It does not mean that the agent is on the branch named `main`.
+The local API uses a per-launch token and rejects foreign origins and hostnames. **Do not expose it through a public proxy.** Missing sources remain unavailable; stale observations are labeled rather than presented as current proof.
 
-Normal observer operation requires no new installation or shell changes for tool-checkout support; the [existing dependencies](#dependencies) still apply. Recording is an optional addition for local Codex zsh tool shells. It captures the actual thread identity and working directory when the shell starts, not later `cd` commands or the working directory for an entire task.
+Transcripts are checked for session ownership and redacted for recognized credential patterns. Redaction does not remove every private detail: prose, paths, timing, and usage can remain visible. Share the code, not your session data.
 
-- After `bun run build`, run `bun --no-env-file dist/runtime/scripts/observe-workdir.js --preview-zsh` to print a proposed addition to your effective `ZDOTDIR/.zshenv` (normally `~/.zshenv`). This command installs nothing and never modifies shell configuration automatically. The opt-in uses `.zshenv` because non-interactive zsh shells load it too; it is not required system setup. Review the absolute Bun and recorder paths before enabling it. Removing that addition disables recording.
-- Selected desk badges prefer a proven shell-entry checkout and append `· tool`; hover shows the complete checkout, source and original UTC timestamp. Observations older than five minutes show `· stale`; after 24 hours they no longer take precedence. `Other repo · tool` identifies a different proven repository. Missing or invalid tool evidence falls back to `· terminal`, or `Checkout unavailable` when terminal checkout proof is absent. ARRANGE changes display grouping while preserving the actual repository comparison.
-- The recorder stores only version, provider, exact `CODEX_THREAD_ID`, canonical shell-entry cwd, source and original observation time under `~/.local/share/starnet-observer/tool-workdirs/v1/codex/`. It never substitutes `CODEX_SESSION_ID`, captures commands or reads transcripts. Records describe the most recent recorded shell entry, not a task-wide current checkout or later directory changes. Same-user code can impersonate this opt-in local signal. Claude, other shells, `zsh -f`, startup snapshots and overridden startup locations are outside verified coverage. Recording is synchronous and adds local process/filesystem work to shell startup; failures are quiet and leave shell execution available.
-- Observation is read-only unless you opt in with `OBSERVER_CONTROL=1`: no agent launching, provider setup, message sending, acknowledgments, or session edits. With control on, the page can start, attach to and close Herdr agent panes, on this machine and on configured remotes, and nothing else.
-- The server may prepare bounded, redacted transcript projections locally in memory before you open an inspector: at most 32 identities per enrichment sweep, with two background detail jobs at once. Opening an inspector still checks current session ownership and source contents. Message bodies and desktop text remain on demand; presentation mode disables transcript preparation. Recognized credential patterns are redacted; private prose and file paths may still be visible. Share the code, not your session data.
-- Coordinator mode reads the llm-bus coordination records read-only through fixed, bounded queries: enrollments, grants, consents, claims, gates, decisions, instructions, amendments and directive metadata. It never reads message bodies and never writes. Free text (labels, objectives, instruction and amendment text, decision questions, tickets and branches) is redacted for recognized credential patterns before it is capped, so a secret cut by the cap is not left as a visible prefix. The caps are 160 characters for labels, 512 for objectives and instruction or amendment text, 240 for decision questions, 64 for tickets and 160 for branches. Each snapshot carries at most 16 projects, 48 workers, 8 decisions and 12 gates per project. A failed read is reported as unavailable rather than empty. An overflowed grants, consents or enrollments read is unavailable too and seals no courier, while the other sources keep their capped rows. Private prose and file paths in these fields can still appear.
-- A team key is a domain-separated, unsalted SHA-256 pseudonym of llm-bus's random project id, shortened to 16 hexadecimal digits. It is deliberately unsalted so that every machine that imported the same project derives the same key, which lets the page merge the halves of a cross-machine team. The key reveals nothing about the project name, and a holder of the project id could recompute it. Presentation mode omits all coordination data, including team keys, panels and courier colours.
-- The local API requires a per-launch token delivered to the local page. Foreign origins and hostnames are rejected. Do not expose the server through a public proxy.
-- Missing sources appear unavailable. Old data is marked stale; absence of a source is not treated as a fresh empty roster.
-- An already verified transcript and its stats can remain visible during a temporary verification failure, labelled “Last verified snapshot · current identity unverified” with the original snapshot time. Further reading stops until current ownership is proved again. A confirmed session replacement or removal clears the snapshot immediately; closing, hiding or switching the inspector also clears it. Desktop window snapshots are withdrawn when their current proof fails. Retained helper rows are last-known presentation, never current ownership or permission for controls or inspection.
-- macOS terminal use is the supported initial target. Other platforms are not validated; native Codex desktop observation is macOS-only.
-- No cloud service, model calls, database server, or StarNet account is required.
+Presentation mode replaces labels and disables inspectors, but retains real activity patterns and counts. It is not a guarantee of anonymity. Read the [presentation guidance](docs/configuration.md#presentation-mode) before recording, and the [privacy reference](docs/privacy.md) for data reads, retained snapshots, and optional shell-entry recording.
 
-## Update and test
+## Documentation
 
-See [development setup](docs/development.md) for pinned tooling, hooks, packaging and CI checks.
+| Task                                                        | Guide                                       |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| Understand sessions, helpers, usage, and navigation         | [Sessions and navigation](docs/sessions.md) |
+| Configure startup, presets, room arrangement, or recordings | [Configuration](docs/configuration.md)      |
+| Build a local data-only theme                               | [Theme pack reference](docs/theme-packs.md) |
+| Set up mail, coordinator views, and courier semantics       | [llm-bus integration](docs/llm-bus.md)      |
+| Enable agent controls and manage the overseer               | [Control actions](docs/controls.md)         |
+| Observe remote agents and understand relay routes           | [Remote hosts](docs/remote-hosts.md)        |
+| Understand privacy boundaries and observation limits        | [Privacy reference](docs/privacy.md)        |
+| Develop, test, package, or contribute                       | [Development guide](docs/development.md)    |
 
-Stop the observer before updating:
+## Update
+
+Stop the observer, then run these commands from your checkout:
 
 ```sh
 git pull --ff-only
@@ -415,19 +131,14 @@ bun install --frozen-lockfile
 bun run start
 ```
 
-Tests live beside their owning modules. Pre-push runs lint and type checking:
-
-```sh
-bun run lint
-bun run typecheck
-```
-
-CI builds runtime/public assets, runs native tests, verifies the clean archive in an isolated installation, and exercises emitted browser behavior with Chromium.
+If you run built files directly, rebuild after updating. For startup commands and development checks, see the [development guide](docs/development.md).
 
 ## Help and contributing
 
-For missing sessions, check [Herdr discovery](#start-terminal-agents-with-herdr) and [Codex session identity](#codex-session-identity). For setup problems or bug reports, use the [issue tracker](https://github.com/wnz99/starnet-observer/issues). See the [development guide](docs/development.md) for tooling, local checks, packaging, and CI before contributing changes.
+For missing sessions, start with [Herdr discovery and session identity](docs/sessions.md). For an unavailable desktop inspector, check [Accessibility setup](docs/sessions.md#codex-desktop-windows). Report bugs through the [issue tracker](https://github.com/wnz99/starnet-observer/issues); exclude private transcripts, paths, and credentials from shared reports.
+
+Before contributing, read the [development guide](docs/development.md) for pinned tooling, Git hooks, local checks, packaging, and CI. The installed application has no runtime package dependencies.
 
 ## License and credits
 
-The project uses the [MIT license](LICENSE). The observer and selected sprite/runtime helpers were extracted from [StarNet](https://github.com/androoAGI/starnet), with its MIT license retained. [Herdr](https://herdr.dev/) and [llm-bus](https://github.com/wnz99/llm-bus) remain separate projects. VT323 is bundled under the SIL Open Font License; see [NOTICE.md](NOTICE.md).
+Local Observer uses the [MIT license](LICENSE). The observer and selected sprite/runtime helpers were extracted from [StarNet](https://github.com/androoAGI/starnet), with its MIT license retained. Herdr and llm-bus remain separate projects. VT323 is bundled under the SIL Open Font License; see [NOTICE.md](NOTICE.md) for attribution and bundled-resource licenses.
