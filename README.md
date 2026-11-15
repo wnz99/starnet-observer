@@ -1,18 +1,21 @@
 # Local Observer
 
-A standalone browser view of local Codex and Claude Code sessions, read-only by default, drawn as an isometric pixel-art station. Start it from your terminal, then keep working in your normal agent terminals. It shows project/repository groups, session status, available token usage, transcript inspectors, and animated llm-bus message couriers.
+A standalone browser view for people running Codex and Claude Code agents in Herdr terminals. It groups sessions by project and repository in an isometric pixel-art station, with session status, available token usage, transcript inspectors, and animated llm-bus message couriers. Start it from your terminal, then keep working in your agent terminals. Observation is read-only by default; control actions require an explicit opt-in.
 
 ![Local Observer with FX on: Matrix glyph rain and pixies over the station, neon rim bloom and lit furniture on three project decks, a glowing working agent, and llm-bus messages in the mailroom](docs/observer-screenshot.jpg)
 
 You do **not** need to install or run StarNet. The necessary observer code, shared helpers, and three crew sprite sets are included here. This is a local companion app, not a Herdr plugin installed with `herdr plugin install`.
 
+Use this README to [install the observer](#install-the-observer) and [start terminal agents](#start-terminal-agents-with-herdr). Optional setup covers [llm-bus mail](#enable-llm-bus-mail-and-couriers), [themes](#themes-and-configuration), [Codex desktop windows](#optional-codex-desktop-observation), [control actions](#optional-control-actions), and [remote hosts](#optional-remote-hosts-multi-host). Read [privacy and limits](#privacy-and-limits) before sharing a view or recording. Contributors should use the [development guide](docs/development.md).
+
 ## Dependencies
 
 | Dependency                                                      | Purpose                                                                                                                                              |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS                                                           | Supported initial target; native verification remains unverified.                                                                                    |
+| macOS                                                           | Supported initial target. Hosted CI runs on Ubuntu; live macOS desktop observation is not established by CI.                                         |
 | [Bun](https://bun.sh/) latest stable (minimum 1.4.4)            | Runs the local server; native SQLite reads bus and helper-session snapshots.                                                                         |
 | Git                                                             | Cloning, updates, and read-only repository/worktree detection.                                                                                       |
+| Node.js 24.19.0                                                 | Runs the pinned development tooling; application startup uses Bun.                                                                                   |
 | [Herdr](https://herdr.dev/docs/install/)                        | Discovers Codex and Claude Code agents running in Herdr panes. Start your terminal agents inside Herdr.                                              |
 | Codex CLI and/or Claude Code                                    | Supply the sessions and their locally stored transcripts. Authenticate them normally; this observer needs no provider API keys.                      |
 | [Python](https://www.python.org/downloads/macos/) 3.11 or newer | Reads Codex TOML configuration and verifies process identity on macOS through a reused, lazy helper.                                                 |
@@ -27,7 +30,7 @@ Repository install, start, dev and presentation commands upgrade Bun to the late
 
 ## Install the observer
 
-After installing Bun, Git, Herdr, and Python:
+Install Bun, Git, Node.js 24.19.0, Herdr, and Python 3.11 or newer before running these commands. Installation and startup upgrade the shared Bun executable, as described above.
 
 ```sh
 git clone https://github.com/wnz99/starnet-observer.git
@@ -37,6 +40,8 @@ bun run start
 ```
 
 Open **http://127.0.0.1:4319** in your browser. Keep the server terminal open. Stop with **Ctrl+C**.
+
+The station shows sessions discovered through Herdr. To verify discovery, [launch an agent in a Herdr pane](#start-terminal-agents-with-herdr) and confirm that it appears in **Live sessions**. If a transcript remains unavailable, see [Codex session identity](#codex-session-identity); the observer will not guess which transcript belongs to a pane.
 
 `bun run start` builds the runtime and public assets before starting the server. `bun run dev` performs the same build and starts `src/server/main.ts`; rebuild and restart explicitly after edits.
 
@@ -419,6 +424,10 @@ bun run typecheck
 
 CI builds runtime/public assets, runs native tests, verifies the clean archive in an isolated installation, and exercises emitted browser behavior with Chromium.
 
-## Credits
+## Help and contributing
 
-The observer and selected sprite/runtime helpers were extracted from [StarNet](https://github.com/androoAGI/starnet), with its MIT license retained. [Herdr](https://herdr.dev/) and [llm-bus](https://github.com/wnz99/llm-bus) remain separate projects. VT323 is bundled under the SIL Open Font License; see [NOTICE.md](NOTICE.md).
+For missing sessions, check [Herdr discovery](#start-terminal-agents-with-herdr) and [Codex session identity](#codex-session-identity). For setup problems or bug reports, use the [issue tracker](https://github.com/wnz99/starnet-observer/issues). See the [development guide](docs/development.md) for tooling, local checks, packaging, and CI before contributing changes.
+
+## License and credits
+
+The project uses the [MIT license](LICENSE). The observer and selected sprite/runtime helpers were extracted from [StarNet](https://github.com/androoAGI/starnet), with its MIT license retained. [Herdr](https://herdr.dev/) and [llm-bus](https://github.com/wnz99/llm-bus) remain separate projects. VT323 is bundled under the SIL Open Font License; see [NOTICE.md](NOTICE.md).
