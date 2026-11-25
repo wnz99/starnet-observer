@@ -272,19 +272,19 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
       forked_from_id: PARENT,
       multi_agent_version: "v2",
       history_mode: "paginated",
-      subagent_history_start_ordinal: 5,
+      subagent_history_start_ordinal: 7,
     };
     const childFile = path.join(root, CHILD + ".jsonl");
     const records = [
-      { ordinal: 0, type: "session_meta", payload: header },
-      { ordinal: 1, type: "session_meta", payload: { id: PARENT } },
+      { ordinal: 1, type: "session_meta", payload: header },
+      { ordinal: 2, type: "session_meta", payload: { id: PARENT } },
       {
-        ordinal: 2,
+        ordinal: 3,
         type: "token_usage_record",
         payload: { session_id: PARENT, thread_token_usage: { input_tokens: 999 } },
       },
       {
-        ordinal: 3,
+        ordinal: 4,
         type: "response_item",
         payload: {
           type: "message",
@@ -293,7 +293,7 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
         },
       },
       {
-        ordinal: 4,
+        ordinal: 5,
         type: "response_item",
         payload: {
           type: "function_call",
@@ -303,7 +303,7 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
         },
       },
       {
-        ordinal: 4,
+        ordinal: 6,
         type: "event_msg",
         payload: {
           type: "item_completed",
@@ -316,7 +316,7 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
         },
       },
       {
-        ordinal: 5,
+        ordinal: 7,
         type: "token_usage_record",
         payload: { session_id: CHILD, thread_token_usage: { input_tokens: 7 } },
       },
@@ -340,6 +340,9 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
     const found = await helpers.children([parent]);
     const child = required(found.rows[0]);
     assert.equal(required(child.taskEvidence).summary, "Indexed audit");
+    assert.equal(child.parentId, parent.id);
+    assert.equal(child.lineageState, "verified");
+    assert.equal(required(child.lifecycleEvidence).state, "unknown");
     assert.equal(required(child.usage).inputTokens?.value, 7);
     const detail = await helpers.inspect(child);
     assert(detail.available);
@@ -350,13 +353,19 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
     await transcripts.spawnIndexIdle();
     const indexed = await transcripts.codexMetadata("fork", CHILD, binding);
     assert.equal(indexed?.helperSpawns.has(OTHER), false, "inherited spawn claims stay excluded");
+    await fs.appendFile(childFile, line(records[0]));
+    assert.equal(
+      await transcripts.bindChild("codex", CHILD, PARENT),
+      null,
+      "a repeated one-based child header rejects the binding",
+    );
     await fs.writeFile(
       childFile,
       records
         .map((record) =>
           line(
-            record.ordinal === 0
-              ? { ...record, payload: { ...header, subagent_history_start_ordinal: 6 } }
+            record.ordinal === 1
+              ? { ...record, payload: { ...header, subagent_history_start_ordinal: 8 } }
               : record,
           ),
         )
@@ -368,7 +377,7 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
     assert.equal(contradicted.helperClaimsPartial, true);
     const rebound = await transcripts.bindChild("codex", CHILD, PARENT);
     assert(rebound);
-    assert.equal(required(rebound.codexMetadata).historyStartOrdinal, 6);
+    assert.equal(required(rebound.codexMetadata).historyStartOrdinal, 8);
     const reread = await transcripts.inspectChild("fork", rebound);
     assert(reread.available);
     assert.notEqual(reread.stats.inputTokens.value, 7);
@@ -377,7 +386,7 @@ test("indexed native spawn and paginated fork exclude inherited parent usage and
       records
         .map((record) =>
           line(
-            record.ordinal === 0
+            record.ordinal === 1
               ? { ...record, payload: { ...header, forked_from_id: OTHER } }
               : record,
           ),

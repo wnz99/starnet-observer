@@ -75,6 +75,12 @@ function validFork(payload: Record<string, unknown>, parent: string, paginated: 
     historyOrdinal(payload.subagent_history_start_ordinal) !== null
   );
 }
+function ownHeader(record: Record<string, unknown>, binding: SessionContext["binding"]) {
+  return (
+    record.type === "session_meta" &&
+    record.ordinal === (binding?.codexMetadata?.headerOrdinal ?? 0)
+  );
+}
 export function inheritedRecord(
   record: Record<string, unknown>,
   binding: SessionContext["binding"],
@@ -82,6 +88,7 @@ export function inheritedRecord(
   const boundary = binding?.codexMetadata?.historyStartOrdinal;
   return (
     boundary !== undefined &&
+    !ownHeader(record, binding) &&
     typeof record.ordinal === "number" &&
     Number.isSafeInteger(record.ordinal) &&
     record.ordinal > 0 &&
@@ -93,7 +100,7 @@ function ownForkRecord(record: Record<string, unknown>, binding: SessionContext[
   if (boundary === undefined) return true;
   const ordinal = record.ordinal;
   if (typeof ordinal !== "number" || !Number.isSafeInteger(ordinal)) return false;
-  return ordinal >= boundary || (ordinal === 0 && record.type === "session_meta");
+  return ordinal >= boundary || ownHeader(record, binding);
 }
 function codexMetadata(payload: Record<string, unknown>, context: SessionContext) {
   const { sessionId, binding } = context;
