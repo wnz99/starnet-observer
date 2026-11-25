@@ -28,6 +28,7 @@ export interface Spawn extends Assignment {
 }
 export interface CodexChildMetadata {
   rootSessionId: string;
+  headerOrdinal?: 0 | 1 | undefined;
   historyStartOrdinal?: number | undefined;
 }
 export interface ChildBinding {

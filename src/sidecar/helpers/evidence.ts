@@ -133,7 +133,7 @@ export function lineage(
       ...grouping(parent),
       usage: binding.usage || null,
       parentId: parent.id,
-      lineageState: candidate.state,
+      lineageState: candidate.state === "unknown" ? "verified" : candidate.state,
       taskEvidence,
       lifecycleEvidence: lifecycle(parent.provider, candidate.state, status),
       taskStatusEvidence: statusEvidence(status),
