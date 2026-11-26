@@ -49,17 +49,24 @@ class HelperObserver {
       };
     const roots = await graph.roots(readSummary),
       source = await this.source(roots);
+    const unavailableProvider = source.reason ? ("codex" as const) : undefined;
+    const availableRoots = roots.filter((row) => row.provider !== unavailableProvider);
     if (source.rows) graph.edges(source.rows);
-    await graph.nativeRoots(roots, this.transcripts);
-    await traversal.discover(roots);
+    await graph.nativeRoots(availableRoots, this.transcripts);
+    await traversal.discover(availableRoots);
     return {
       rows: traversal.rows,
       annotations: traversal.annotations,
       overflow: traversal.overflow,
       groupOwners: traversal.groupOwners,
       commitBindings,
-      health: source.reason ? "unavailable" : "available",
+      health: unavailableProvider
+        ? availableRoots.length > 0
+          ? "partial"
+          : "unavailable"
+        : "available",
       reason: source.reason || null,
+      unavailableProvider,
     };
   }
   async children(parents: HelperRow[]) {

@@ -52,6 +52,7 @@ export type HelperResult = {
   commitBindings?: (ids: Set<string>) => void;
   health?: string;
   reason?: string | null;
+  unavailableProvider?: ObserverRow["provider"] | undefined;
 };
 export interface Helpers {
   prepareChildren?: (

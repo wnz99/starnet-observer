@@ -85,6 +85,7 @@ export class Publication {
   }
   private validParent(id: string, parent: ObserverInputRow) {
     return (
+      parent.provider !== this.result.unavailableProvider &&
       !this.lineage.withdrawn?.has(id) &&
       this.classify(parent, this.lineage.proofs.get(id)) === "current"
     );
