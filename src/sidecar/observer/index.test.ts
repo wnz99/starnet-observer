@@ -27,6 +27,7 @@ import path from "node:path";
 import net from "node:net";
 import { makeObserver as makeNativeObserver, aggregateRows, lastActivity } from "./index.js";
 import { makeHelperObserver } from "../helpers/index.js";
+import { MAX_EDGES } from "../helpers/edges.js";
 import { makeDesktopObserver } from "../desktop/index.js";
 import { makeTranscriptObserver } from "../transcripts/index.js";
 import { makeIdentityResolver } from "../identity/index.js";
@@ -2360,6 +2361,7 @@ test("observer regression contracts", async () => {
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "starnet-claude-namespaces-"));
     try {
       const second = "00000000-0000-0000-0000-000000000002";
+      const codex = "00000000-0000-0000-0000-000000000003";
       for (const [session, tokens] of [
         [ID, 3],
         [second, 7],
@@ -2410,11 +2412,22 @@ test("observer regression contracts", async () => {
           }) + "\n",
         );
       }
-      const transcripts = makeTranscriptObserver({ now: () => 1000, roots: { claude: folder } });
+      await fs.writeFile(
+        path.join(folder, codex + ".jsonl"),
+        JSON.stringify({ type: "session_meta", payload: { id: codex } }) + "\n",
+      );
+      const transcripts = makeTranscriptObserver({
+        now: () => 1000,
+        roots: { claude: folder, codex: folder },
+      });
       const observer = makeObserver({
         now: () => 1000,
         transcripts,
-        helpers: makeHelperObserver({ now: () => 1000, transcripts }),
+        helpers: makeHelperObserver({
+          now: () => 1000,
+          transcripts,
+          readEdges: () => ({ rows: new Array<unknown>(MAX_EDGES + 1).fill(null) }),
+        }),
         identities: {
           resolve: (row) => settled(() => ({ sessionId: nativeSession(row), source: "herdr" })),
         },
@@ -2425,6 +2438,7 @@ test("observer regression contracts", async () => {
                 agents: [
                   { ...pane("a"), agent: "claude" },
                   { ...pane("b", second), agent: "claude" },
+                  pane("codex", codex),
                 ],
               },
             }),
@@ -2435,11 +2449,11 @@ test("observer regression contracts", async () => {
       });
       const result = await observer.get(),
         children = result.sessions.filter((row) => row.source === "helper");
-      assert.equal(children.length, 2);
+      assert.equal(children.length, 2, "Codex edge overflow cannot hide verified Claude helpers");
       assert.notEqual(must(children[0]).id, must(children[1]).id);
       assert.equal(
         result.aggregate.agents.verifiedSessions,
-        4,
+        5,
         "real binding IDs separate equal agent IDs under two canonical roots",
       );
       const stats = await Promise.all(children.map((row) => observer.inspect(row.id)));
@@ -2459,7 +2473,7 @@ test("observer regression contracts", async () => {
       const {
         counters: { inputTokens: unavailableInputCoverage },
       } = result.aggregate.coverage;
-      assert.equal(unavailableInputCoverage.unavailable, 2);
+      assert.equal(unavailableInputCoverage.unavailable, 3);
     } finally {
       await fs.rm(folder, { recursive: true, force: true });
     }

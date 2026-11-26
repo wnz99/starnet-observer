@@ -8,6 +8,18 @@ import type {
   HelperTranscripts,
   Root,
 } from "./contracts.js";
+
+function edgeAvailability(roots: Root[], reason?: string) {
+  if (!reason) return { roots, health: "available" };
+  if (reason === "unsupported") return { roots, health: "unavailable" };
+  const available = roots.filter((row) => row.provider !== "codex");
+  return {
+    roots: available,
+    health: available.length > 0 ? "partial" : "unavailable",
+    unavailableProvider: "codex" as const,
+  };
+}
+
 // Persisted lineage proves a relationship, never a running task.
 class HelperObserver {
   private bindings = new Map<string, ChildBinding>();
@@ -49,17 +61,19 @@ class HelperObserver {
       };
     const roots = await graph.roots(readSummary),
       source = await this.source(roots);
+    const availability = edgeAvailability(roots, source.reason);
     if (source.rows) graph.edges(source.rows);
-    await graph.nativeRoots(roots, this.transcripts);
-    await traversal.discover(roots);
+    await graph.nativeRoots(availability.roots, this.transcripts);
+    await traversal.discover(availability.roots);
     return {
       rows: traversal.rows,
       annotations: traversal.annotations,
       overflow: traversal.overflow,
       groupOwners: traversal.groupOwners,
       commitBindings,
-      health: source.reason ? "unavailable" : "available",
+      health: availability.health,
       reason: source.reason || null,
+      unavailableProvider: availability.unavailableProvider,
     };
   }
   async children(parents: HelperRow[]) {

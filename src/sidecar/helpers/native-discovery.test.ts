@@ -6,6 +6,7 @@ import path from "node:path";
 import { makeHelperObserver } from "./index.js";
 import { makeTranscriptObserver } from "../transcripts/index.js";
 import type { HelperRow } from "./contracts.js";
+import type { HelperEdges } from "./edges.js";
 import { required } from "../transcripts/testing.fixture.js";
 
 const PARENT = "00000000-0000-0000-0000-000000000001";
@@ -449,11 +450,11 @@ test("native spawn discovers a verified child without SQLite edges and preserves
       inventoryHealth: "available",
       project: "Project",
     };
-    let edges: unknown[] = [];
+    let edges: HelperEdges = { rows: [] };
     const helpers = makeHelperObserver({
       transcripts,
       now: () => Date.parse("2026-10-31T11:00:01Z"),
-      readEdges: () => ({ rows: edges }),
+      readEdges: () => edges,
     });
     const found = await helpers.children([parent]);
     assert.equal(found.rows.length, 1);
@@ -470,10 +471,19 @@ test("native spawn discovers a verified child without SQLite edges and preserves
     };
     const joined = await helpers.children([parent, independent]);
     assert.equal(joined.annotations.get("child-pane")?.parentId, "parent");
-    edges = [{ parent_thread_id: PARENT, child_thread_id: CHILD, status: "closed" }];
+    edges = { reason: "unsupported" };
+    const fallback = await helpers.children([parent]);
+    assert.equal(fallback.health, "unavailable");
+    assert.equal(fallback.reason, "unsupported");
+    assert.equal(
+      required(fallback.rows[0]).sessionId,
+      CHILD,
+      "unsupported SQLite still permits verified native discovery",
+    );
+    edges = { rows: [{ parent_thread_id: PARENT, child_thread_id: CHILD, status: "closed" }] };
     const closed = await helpers.children([parent]);
     assert.equal(required(required(closed.rows[0]).lifecycleEvidence).state, "closed");
-    edges = [];
+    edges = { rows: [] };
     await writeChild(OTHER);
     assert.equal(
       (await helpers.children([parent])).rows.length,
